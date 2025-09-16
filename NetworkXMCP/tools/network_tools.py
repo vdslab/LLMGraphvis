@@ -261,7 +261,7 @@ def fix_graphml_structure(graphml_content):
 
 def convert_to_standard_graphml(graphml_content):
     """
-    あらゆるGraphMLデータを標準形式に変換する
+    あらゆるGraphMLデータを標準形式に変換し、主要な中心性指標を計算して属性として追加する
     
     Args:
         graphml_content (str): GraphML文字列
@@ -331,6 +331,35 @@ def convert_to_standard_graphml(graphml_content):
                     "error": f"Failed to parse GraphML: {error_details}"
                 }
         
+        # 主要な中心性指標を計算
+        logger.debug("Calculating centrality metrics...")
+        try:
+            if G.number_of_nodes() > 0:
+                degree_centrality = nx.degree_centrality(G)
+                closeness_centrality = nx.closeness_centrality(G)
+                betweenness_centrality = nx.betweenness_centrality(G)
+                
+                # 固有ベクトル中心性は収束しないことがあるため、例外処理を追加
+                try:
+                    eigenvector_centrality = nx.eigenvector_centrality_numpy(G, max_iter=1000)
+                except nx.PowerIterationFailedConvergence:
+                    logger.warning("Eigenvector centrality did not converge, setting to 0.")
+                    eigenvector_centrality = {node: 0.0 for node in G.nodes()}
+
+                # 計算した中心性をノード属性として設定
+                nx.set_node_attributes(G, degree_centrality, "degree_centrality")
+                nx.set_node_attributes(G, closeness_centrality, "closeness_centrality")
+                nx.set_node_attributes(G, betweenness_centrality, "betweenness_centrality")
+                nx.set_node_attributes(G, eigenvector_centrality, "eigenvector_centrality")
+                logger.debug("Successfully calculated and set centrality attributes.")
+            else:
+                logger.debug("Graph has no nodes, skipping centrality calculation.")
+
+        except Exception as centrality_error:
+            logger.error(f"Error calculating centrality: {centrality_error}")
+            # 中心性計算でエラーが発生しても、処理は続行する
+            pass
+
         # 既存の属性を確認し、標準属性名へのマッピングを検出
         attribute_mapping = {
             'name': ['name', 'label', 'id', 'title', 'node_name', 'node_label'],
@@ -433,15 +462,20 @@ def convert_to_standard_graphml(graphml_content):
                 node_attrs['y'] = str(node_attrs['y'])
         
         # <key>要素を追加するためのリスト
-        key_elements = []
-        key_elements.append('<key id="d0" for="node" attr.name="name" attr.type="string"/>')
-        key_elements.append('<key id="d1" for="node" attr.name="size" attr.type="double"/>')
-        key_elements.append('<key id="d2" for="node" attr.name="color" attr.type="string"/>')
-        key_elements.append('<key id="d3" for="node" attr.name="description" attr.type="string"/>')
-        key_elements.append('<key id="d4" for="node" attr.name="x" attr.type="double"/>')
-        key_elements.append('<key id="d5" for="node" attr.name="y" attr.type="double"/>')
-        key_elements.append('<key id="d6" for="edge" attr.name="width" attr.type="string"/>')
-        key_elements.append('<key id="d7" for="edge" attr.name="color" attr.type="string"/>')
+        key_elements = [
+            '<key id="d0" for="node" attr.name="name" attr.type="string"/>',
+            '<key id="d1" for="node" attr.name="size" attr.type="double"/>',
+            '<key id="d2" for="node" attr.name="color" attr.type="string"/>',
+            '<key id="d3" for="node" attr.name="description" attr.type="string"/>',
+            '<key id="d4" for="node" attr.name="x" attr.type="double"/>',
+            '<key id="d5" for="node" attr.name="y" attr.type="double"/>',
+            '<key id="d6" for="edge" attr.name="width" attr.type="string"/>',
+            '<key id="d7" for="edge" attr.name="color" attr.type="string"/>',
+            '<key id="d8" for="node" attr.name="degree_centrality" attr.type="double"/>',
+            '<key id="d9" for="node" attr.name="closeness_centrality" attr.type="double"/>',
+            '<key id="d10" for="node" attr.name="betweenness_centrality" attr.type="double"/>',
+            '<key id="d11" for="node" attr.name="eigenvector_centrality" attr.type="double"/>',
+        ]
         
         # グラフレベルの属性を追加
         logger.debug("Adding graph-level attributes")
@@ -475,25 +509,26 @@ def convert_to_standard_graphml(graphml_content):
                 for key, value in list(attrs.items()):
                     if value is not None:
                         try:
-                            attrs[key] = str(value)
+                            # 数値型はそのまま（write_graphmlが処理する）
+                            if not isinstance(value, (int, float)):
+                                attrs[key] = str(value)
                         except Exception as e:
                             logger.warning(f"属性変換エラー (ノード {node}, 属性 {key}): {e}")
-                            # 変換できない場合は安全な値に置き換え
                             attrs[key] = f"Value-{key}"
                         
             for u, v, attrs in G.edges(data=True):
                 for key, value in list(attrs.items()):
                     if value is not None:
                         try:
-                            attrs[key] = str(value)
+                            if not isinstance(value, (int, float)):
+                                attrs[key] = str(value)
                         except Exception as e:
                             logger.warning(f"属性変換エラー (エッジ {u}-{v}, 属性 {key}): {e}")
-                            # 変換できない場合は安全な値に置き換え
                             attrs[key] = f"Value-{key}"
             
             try:
                 output = io.BytesIO()
-                nx.write_graphml(G, output)
+                nx.write_graphml(G, output, infer_numeric_types=True)
                 output.seek(0)
                 standardized_graphml = output.read().decode("utf-8")
                 logger.debug("Successfully exported standardized GraphML")
@@ -501,31 +536,42 @@ def convert_to_standard_graphml(graphml_content):
                 logger.error(f"GraphML書き込みエラー: {write_error}")
                 # 最小限のGraphMLを生成
                 minimal_graphml = '<?xml version="1.0" encoding="UTF-8"?>\n'
-                minimal_graphml += '<graphml xmlns="http://graphml.graphdrawing.org/xmlns">\n'
+                minimal_graphml += '<graphml xmlns="http://graphml.graphdrawing.org/xmlns">
+'
                 minimal_graphml += '  <key id="d0" for="node" attr.name="name" attr.type="string"/>\n'
                 minimal_graphml += '  <key id="d1" for="node" attr.name="size" attr.type="string"/>\n'
                 minimal_graphml += '  <key id="d2" for="node" attr.name="color" attr.type="string"/>\n'
                 minimal_graphml += '  <key id="d3" for="node" attr.name="description" attr.type="string"/>\n'
                 minimal_graphml += '  <key id="d4" for="node" attr.name="x" attr.type="double"/>\n'
                 minimal_graphml += '  <key id="d5" for="node" attr.name="y" attr.type="double"/>\n'
-                minimal_graphml += '  <graph edgedefault="undirected">\n'
+                minimal_graphml += '  <graph edgedefault="undirected">
+'
                 
                 # ノードを追加
                 for node, attrs in G.nodes(data=True):
-                    minimal_graphml += f'    <node id="{node}">\n'
-                    minimal_graphml += f'      <data key="d0">{attrs.get("name", f"Node {node}")}</data>\n'
-                    minimal_graphml += f'      <data key="d1">{attrs.get("size", "5.0")}</data>\n'
-                    minimal_graphml += f'      <data key="d2">{attrs.get("color", "#1d4ed8")}</data>\n'
-                    minimal_graphml += f'      <data key="d3">{attrs.get("description", f"Node {node}")}</data>\n'
-                    minimal_graphml += f'      <data key="d4">{attrs.get("x", "0.0")}</data>\n'
-                    minimal_graphml += f'      <data key="d5">{attrs.get("y", "0.0")}</data>\n'
-                    minimal_graphml += '    </node>\n'
+                    minimal_graphml += f'    <node id="{node}">
+'
+                    minimal_graphml += f'      <data key="d0">{attrs.get("name", f"Node {node}")}</data>
+'
+                    minimal_graphml += f'      <data key="d1">{attrs.get("size", "5.0")}</data>
+'
+                    minimal_graphml += f'      <data key="d2">{attrs.get("color", "#1d4ed8")}</data>
+'
+                    minimal_graphml += f'      <data key="d3">{attrs.get("description", f"Node {node}")}</data>
+'
+                    minimal_graphml += f'      <data key="d4">{attrs.get("x", "0.0")}</data>
+'
+                    minimal_graphml += f'      <data key="d5">{attrs.get("y", "0.0")}</data>
+'
+                    minimal_graphml += '    </node>
+'
                 
                 # エッジを追加
                 for u, v, attrs in G.edges(data=True):
                     minimal_graphml += f'    <edge source="{u}" target="{v}"/>\n'
                 
-                minimal_graphml += '  </graph>\n'
+                minimal_graphml += '  </graph>
+'
                 minimal_graphml += '</graphml>'
                 
                 standardized_graphml = minimal_graphml
