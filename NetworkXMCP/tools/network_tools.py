@@ -10,6 +10,7 @@ import numpy as np
 import logging
 import io
 import random
+from xml.sax.saxutils import escape
 from typing import Dict, List, Any, Optional, Union
 
 # ロギングの設定
@@ -202,6 +203,7 @@ def fix_graphml_structure(graphml_content):
     
     # 全体的な修正作業をトライ
     try:
+        import re
         # XMLヘッダーが欠けている場合は追加
         if "<?xml" not in graphml_content:
             logger.debug("Adding XML header")
@@ -210,24 +212,27 @@ def fix_graphml_structure(graphml_content):
         # 名前空間宣言が欠けている場合は追加
         if "<graphml" in graphml_content and "xmlns=" not in graphml_content:
             logger.debug("Adding namespace declarations")
-            graphml_content = graphml_content.replace(
-                "<graphml", 
-                '<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd"'
+            graphml_content = re.sub(
+                r"(<graphml)",
+                r'\1 xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd" ',
+                graphml_content,
+                count=1
             )
         
         # <graph>要素にedgedefault属性が欠けている場合は追加
         if "<graph" in graphml_content and "edgedefault=" not in graphml_content:
             logger.debug("Adding edgedefault attribute to graph element")
-            graphml_content = graphml_content.replace(
-                "<graph", 
-                '<graph edgedefault="undirected"'
+            graphml_content = re.sub(
+                r"(<graph>)",
+                r'\1 edgedefault="undirected" ',
+                graphml_content,
+                count=1
             )
         
         # 不正なXML文字を削除
-        import re
         # XMLの不正な文字を削除するパターン
         # XMLで使用できない文字のパターン
-        illegal_xml_chars = re.compile(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]')
+        illegal_xml_chars = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
         if illegal_xml_chars.search(graphml_content):
             logger.debug("Removing illegal XML characters")
             graphml_content = illegal_xml_chars.sub('', graphml_content)
@@ -538,37 +543,47 @@ def convert_to_standard_graphml(graphml_content):
                 minimal_graphml = '<?xml version="1.0" encoding="UTF-8"?>\n'
                 minimal_graphml += '<graphml xmlns="http://graphml.graphdrawing.org/xmlns">
 '
-                minimal_graphml += '  <key id="d0" for="node" attr.name="name" attr.type="string"/>\n'
-                minimal_graphml += '  <key id="d1" for="node" attr.name="size" attr.type="string"/>\n'
-                minimal_graphml += '  <key id="d2" for="node" attr.name="color" attr.type="string"/>\n'
-                minimal_graphml += '  <key id="d3" for="node" attr.name="description" attr.type="string"/>\n'
-                minimal_graphml += '  <key id="d4" for="node" attr.name="x" attr.type="double"/>\n'
-                minimal_graphml += '  <key id="d5" for="node" attr.name="y" attr.type="double"/>\n'
+                minimal_graphml += '  <key id="d0" for="node" attr.name="name" attr.type="string"/>
+'
+                minimal_graphml += '  <key id="d1" for="node" attr.name="size" attr.type="string"/>
+'
+                minimal_graphml += '  <key id="d2" for="node" attr.name="color" attr.type="string"/>
+'
+                minimal_graphml += '  <key id="d3" for="node" attr.name="description" attr.type="string"/>
+'
+                minimal_graphml += '  <key id="d4" for="node" attr.name="x" attr.type="double"/>
+'
+                minimal_graphml += '  <key id="d5" for="node" attr.name="y" attr.type="double"/>
+'
                 minimal_graphml += '  <graph edgedefault="undirected">
 '
                 
                 # ノードを追加
                 for node, attrs in G.nodes(data=True):
-                    minimal_graphml += f'    <node id="{node}">
+                    node_id_str = escape(str(node), {"'"": "&apos;", '""': "&quot;"})
+                    minimal_graphml += f'    <node id="{node_id_str}">
 '
-                    minimal_graphml += f'      <data key="d0">{attrs.get("name", f"Node {node}")}</data>
+                    minimal_graphml += f'      <data key="d0">{escape(str(attrs.get("name", f"Node {node}")))}</data>
 '
-                    minimal_graphml += f'      <data key="d1">{attrs.get("size", "5.0")}</data>
+                    minimal_graphml += f'      <data key="d1">{escape(str(attrs.get("size", "5.0")))}</data>
 '
-                    minimal_graphml += f'      <data key="d2">{attrs.get("color", "#1d4ed8")}</data>
+                    minimal_graphml += f'      <data key="d2">{escape(str(attrs.get("color", "#1d4ed8")))}</data>
 '
-                    minimal_graphml += f'      <data key="d3">{attrs.get("description", f"Node {node}")}</data>
+                    minimal_graphml += f'      <data key="d3">{escape(str(attrs.get("description", f"Node {node}")))}</data>
 '
-                    minimal_graphml += f'      <data key="d4">{attrs.get("x", "0.0")}</data>
+                    minimal_graphml += f'      <data key="d4">{escape(str(attrs.get("x", "0.0")))}</data>
 '
-                    minimal_graphml += f'      <data key="d5">{attrs.get("y", "0.0")}</data>
+                    minimal_graphml += f'      <data key="d5">{escape(str(attrs.get("y", "0.0")))}</data>
 '
                     minimal_graphml += '    </node>
 '
                 
                 # エッジを追加
                 for u, v, attrs in G.edges(data=True):
-                    minimal_graphml += f'    <edge source="{u}" target="{v}"/>\n'
+                    u_str = escape(str(u), {"'"": "&apos;", '""': "&quot;"})
+                    v_str = escape(str(v), {"'"": "&apos;", '""': "&quot;"})
+                    minimal_graphml += f'    <edge source="{u_str}" target="{v_str}"/>
+'
                 
                 minimal_graphml += '  </graph>
 '
