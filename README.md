@@ -20,35 +20,139 @@
 
 ## 始め方
 
-1. `.env`ファイルを編集して、必要な環境変数を設定します：
+### Dockerでの実行
 
-```
-# データベース設定
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres  # 本番環境ではより強固なパスワードに変更してください
-POSTGRES_DB=graphvis
-DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+1.  `.env`ファイルをプロジェクトルートに作成し、必要な環境変数を設定します。`.env.example`をコピーして使用できます。
 
-# セキュリティ
-SECRET_KEY=09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7  # 本番環境では変更してください
+    ```bash
+    cp .env.example .env
+    ```
 
-# OpenAI API Key
-OPENAI_API_KEY=your_openai_api_key_here  # 実際のAPIキーに置き換えてください
-```
+    `.env`ファイル内の`OPENAI_API_KEY`を忘れずに設定してください。
 
-2. アプリケーションを起動します：
+2.  アプリケーションを起動します：
 
-```zsh
-# 開発環境（ホットリロード有効）
-docker compose up --build
+    ```zsh
+    # 開発環境（ホットリロード有効）
+    docker compose up --build
+    ```
 
-# 本番環境
-docker compose -f docker-compose.prod.yml up --build
-```
+3.  アプリケーションにアクセスする：
+    *   フロントエンド: http://localhost:3000
+    *   バックエンドAPI: http://localhost:8000
 
-3. アプリケーションにアクセスする：
-   - フロントエンド: http://localhost:3000
-   - バックエンドAPI: http://localhost:8000
+### ローカル環境での実行 (Dockerなし)
+
+Dockerを使用せずにローカルで開発環境をセットアップする手順です。
+
+#### 1. 前提条件
+
+-   **Python 3.12+**
+-   **Node.js v18+**
+-   **PostgreSQL** がローカルにインストールされ、実行中であること。
+
+#### 2. データベースのセットアップ
+
+1.  PostgreSQLに接続し、アプリケーション用のユーザーとデータベースを作成します。
+
+    ```bash
+    # psqlに接続
+    psql -U postgres
+
+    # ユーザーとデータベースを作成 (パスワードは.envファイルと一致させる)
+    CREATE USER postgres WITH PASSWORD 'postgres';
+    CREATE DATABASE graphvis;
+    GRANT ALL PRIVILEGES ON DATABASE graphvis TO postgres;
+    \q
+    ```
+
+2.  作成したデータベースにテーブルを初期化します。
+
+    ```bash
+    psql -U postgres -d graphvis -f API/init.sql
+    ```
+
+#### 3. 環境変数の設定
+
+1.  `.env.example`をコピーして`.env`ファイルを作成します。
+
+    ```bash
+    cp .env.example .env
+    ```
+
+2.  `.env`ファイルを編集し、ローカル環境に合わせて以下の変数を設定・変更します。
+
+    - `DATABASE_URL`をローカルのPostgreSQLを指すように変更します。
+    - `NETWORKX_MCP_URL`をローカルのNetworkXMCPサーバーを指すように追加します。
+
+    ```diff
+    - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    + DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:5432/${POSTGRES_DB}
+    + NETWORKX_MCP_URL=http://localhost:8001
+    ```
+
+    `OPENAI_API_KEY`も忘れずに設定してください。
+
+#### 4. バックエンドの起動
+
+1.  **APIサーバー**の依存関係をインストールし、起動します。（ターミナル1）
+
+    ```bash
+    # APIディレクトリに移動
+    cd API
+
+    # 仮想環境の作成と有効化
+    python -m venv .venv
+    source .venv/bin/activate
+
+    # 依存関係のインストール
+    pip install -e .
+
+    # サーバーの起動
+    uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    ```
+
+2.  **NetworkXMCPサーバー**の依存関係をインストールし、起動します。（ターミナル2）
+
+    ```bash
+    # NetworkXMCPディレクトリに移動
+    cd NetworkXMCP
+
+    # 仮想環境の作成と有効化
+    python -m venv .venv
+    source .venv/bin/activate
+
+    # 依存関係のインストール
+    pip install -e .
+
+    # サーバーの起動
+    uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+    ```
+
+#### 5. フロントエンドの起動
+
+1.  **フロントエンド**の依存関係をインストールし、開発サーバーを起動します。（ターミナル3）
+
+    ```bash
+    # frontendディレクトリに移動
+    cd frontend
+
+    # 依存関係のインストール
+    npm install
+
+    # 開発サーバーの起動
+    npm run dev
+    ```
+
+#### 6. アプリケーションへのアクセス
+
+すべてのサービスが起動したら、以下のURLにアクセスします。
+
+-   **フロントエンド**: http://localhost:3000
+-   **バックエンドAPI**: http://localhost:8000
+-   **NetworkXMCP API**: http://localhost:8001
+
+これで、Dockerなしで開発環境が整いました。
 
 ## 認証の使い方
 
