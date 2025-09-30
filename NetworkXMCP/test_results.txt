@@ -1,0 +1,38 @@
+テスト開始
+Python version: 3.12.10 (main, Apr 19 2025, 23:44:25) [Clang 17.0.0 (clang-1700.0.13.3)]
+Current working directory: /Users/takuma/develop/vdslab/chatgpt-graphvis/LLMGraphvis/NetworkXMCP
+sys.path: ['/Users/takuma/develop/vdslab/chatgpt-graphvis/LLMGraphvis/NetworkXMCP', '/Users/takuma/.pyenv/versions/3.12.10/lib/python312.zip', '/Users/takuma/.pyenv/versions/3.12.10/lib/python3.12', '/Users/takuma/.pyenv/versions/3.12.10/lib/python3.12/lib-dynload', '/Users/takuma/.pyenv/versions/3.12.10/lib/python3.12/site-packages']
+
+テスト1: グラフ作成モジュールの読み込み
+✓ create_random_network 関数が正常にインポートされました
+
+テスト2: GraphMLパーサーモジュールの読み込み
+✓ parse_graphml_string 関数が正常にインポートされました
+✓ fix_graphml_structure 関数が正常にインポートされました
+
+テスト3: GraphML変換モジュールの読み込み
+✓ convert_to_standard_graphml 関数が正常にインポートされました
+✓ export_network_as_graphml 関数が正常にインポートされました
+
+テスト4: ネットワーク分析モジュールの読み込み
+✓ get_network_info 関数が正常にインポートされました
+✓ calculate_centrality 関数が正常にインポートされました
+
+テスト5: __init__.py 経由の読み込み
+✓ __init__.py 経由で全ての関数が正常にインポートされました
+
+テスト6: ランダムネットワーク生成
+✓ ランダムネットワーク生成: ノード数=5, エッジ数=5
+
+テスト7: ネットワーク情報取得
+✓ ネットワーク情報取得: {'num_nodes': 5, 'num_edges': 5, 'density': 0.5, 'is_connected': True, 'num_components': 1, 'avg_degree': 2.0, 'clustering_coefficient': 0.3333333333333333}
+
+テスト8: 中心性計算
+✓ 次数中心性計算成功
+
+テスト9: GraphMLエクスポート
+✓ GraphMLエクスポート成功
+
+すべてのテストが成功しました！
+
+テスト結果は test_results.txt に保存されました
