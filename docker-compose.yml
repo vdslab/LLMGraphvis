@@ -20,8 +20,8 @@ services:
   api:
     build:
       context: ./API
-      cache_from:
-        - ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+      dockerfile: Dockerfile
+      network: host # Use host network for faster package downloads
     volumes:
       - ./API:/app
     ports:
@@ -31,7 +31,7 @@ services:
         condition: service_healthy
     restart: always
     command:
-      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+      ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     environment:
       # These are now managed in the .env file
       # - DATABASE_URL=postgresql://postgres:postgres@db:5432/networkvis
@@ -45,23 +45,25 @@ services:
   networkx-mcp:
     build:
       context: ./NetworkXMCP
-      cache_from:
-        - ghcr.io/astral-sh/uv:python3.12-bookworm-slim
+      dockerfile: Dockerfile
+      network: host # Use host network for faster package downloads
     volumes:
       - ./NetworkXMCP:/app
     ports:
       - "8001:8001"
     command:
-      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
+      ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
     environment:
       - LOG_LEVEL=DEBUG
 
   frontend:
     build:
       context: ./frontend
+      dockerfile: Dockerfile
       target: development # Explicitly target development stage
       cache_from:
         - node:20-alpine
+      network: host # Use host network for faster npm package downloads
     volumes:
       - ./frontend:/app
       - /app/node_modules
