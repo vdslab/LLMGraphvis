@@ -18,7 +18,10 @@ services:
     restart: always
 
   api:
-    build: ./API
+    build:
+      context: ./API
+      cache_from:
+        - ghcr.io/astral-sh/uv:python3.12-bookworm-slim
     volumes:
       - ./API:/app
     ports:
@@ -27,6 +30,8 @@ services:
       db:
         condition: service_healthy
     restart: always
+    command:
+      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     environment:
       # These are now managed in the .env file
       # - DATABASE_URL=postgresql://postgres:postgres@db:5432/networkvis
@@ -38,22 +43,32 @@ services:
       - ./.env
 
   networkx-mcp:
-    build: ./NetworkXMCP
+    build:
+      context: ./NetworkXMCP
+      cache_from:
+        - ghcr.io/astral-sh/uv:python3.12-bookworm-slim
     volumes:
       - ./NetworkXMCP:/app
     ports:
       - "8001:8001"
+    command:
+      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
     environment:
       - LOG_LEVEL=DEBUG
 
   frontend:
     build:
       context: ./frontend
+      target: development # Explicitly target development stage
+      cache_from:
+        - node:20-alpine
     volumes:
       - ./frontend:/app
       - /app/node_modules
     ports:
       - "3000:3000"
+    environment:
+      - NODE_ENV=development
     depends_on:
       - api
       - networkx-mcp

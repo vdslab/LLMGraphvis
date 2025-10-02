@@ -9,12 +9,12 @@ dependencies = [
     "networkx>=3.1",
     "numpy>=1.25.2",
     "pydantic>=2.3.0",
-    "python-dotenv>=1.0.0",
-    "python-multipart>=0.0.6",
     "fastapi-mcp>=0.3.7",
 ]
 
 # 削除した依存関係（未使用のため）:
+# - python-dotenv>=1.0.0 - 環境変数は os.environ で直接読み込み
+# - python-multipart>=0.0.6 - ファイルアップロード機能は未実装
 # - matplotlib>=3.7.2 (約8MB) - グラフ可視化はフロントエンドで実施
 # - scikit-learn>=1.2.0 (約9MB) - 機械学習機能は現在未使用
 # - python-louvain>=0.16 (約1MB) - コミュニティ検出は現在未使用

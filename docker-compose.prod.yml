@@ -1,0 +1,14 @@
+# 本番用のDocker Compose設定（オプション）
+# 使用方法: docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      target: production # 本番ステージを使用
+    ports:
+      - "80:80"
+    environment:
+      - NODE_ENV=production
+    # 本番では volumes をマウントしない（ビルド済みの静的ファイルを使用）
+    volumes: []
