@@ -36,4 +36,6 @@ docs/
 # Test files
 test_*.py
 *_test.py
-test_*.http
+test_*.txt
+basic_verification.py
+simple_test.py

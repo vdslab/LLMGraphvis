@@ -7,8 +7,6 @@ COPY package*.json ./
 
 # Install dependencies
 RUN npm ci
-# Explicitly install react-force-graph-2d to ensure it's available
-RUN npm install react-force-graph-2d@1.27.1
 
 # Copy the rest of the application
 COPY . .

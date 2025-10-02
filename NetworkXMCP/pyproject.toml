@@ -10,13 +10,15 @@ dependencies = [
     "numpy>=1.25.2",
     "pydantic>=2.3.0",
     "python-dotenv>=1.0.0",
-    "matplotlib>=3.7.2",
-    "scikit-learn>=1.2.0",
-    "python-louvain>=0.16",
-    "fastapi-mcp==0.3.7",
     "python-multipart>=0.0.6",
-    "requests>=2.31.0"
+    "fastapi-mcp>=0.3.7",
 ]
+
+# 削除した依存関係（未使用のため）:
+# - matplotlib>=3.7.2 (約8MB) - グラフ可視化はフロントエンドで実施
+# - scikit-learn>=1.2.0 (約9MB) - 機械学習機能は現在未使用
+# - python-louvain>=0.16 (約1MB) - コミュニティ検出は現在未使用
+# - requests>=2.31.0 - httpxがあれば不要（現在未使用）
 
 [tool.setuptools]
 packages = ["layouts", "metrics", "tools"]
