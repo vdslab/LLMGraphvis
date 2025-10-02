@@ -266,6 +266,98 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
         db.add(db_error)
         db.commit()
 
+@router.post("/recommend-layout")
+async def recommend_layout(
+    request: Request,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Recommend a layout algorithm based on network description and visualization purpose.
+    Uses LLM to analyze the requirements and suggest the best layout.
+    """
+    try:
+        body = await request.json()
+        description = body.get("description", "")
+        purpose = body.get("purpose", "")
+        
+        if not description or not purpose:
+            raise HTTPException(status_code=400, detail="Both description and purpose are required")
+        
+        # Create a prompt for the LLM to recommend a layout
+        prompt = f"""Based on the following network description and visualization purpose, recommend the most suitable graph layout algorithm.
+
+Network Description: {description}
+
+Visualization Purpose: {purpose}
+
+Available layout algorithms:
+- spring: Force-directed layout, good for general networks, shows clustering
+- circular: Nodes arranged in a circle, good for showing cycles
+- kamada_kawai: Force-directed with better aesthetics, good for small to medium networks
+- fruchterman_reingold: Force-directed variant, good for general networks
+- spectral: Uses graph spectrum, good for finding communities
+- shell: Concentric circles, good for hierarchical or layered networks
+- random: Random placement, baseline comparison
+
+Please respond with a JSON object containing:
+1. "recommended_layout": the name of the recommended layout (one of the above)
+2. "explanation": a brief explanation of why this layout is suitable
+3. "recommended_parameters": optional parameters for the layout (can be empty object)
+
+Example response:
+{{
+  "recommended_layout": "spring",
+  "explanation": "Spring layout is ideal for this network because it naturally reveals community structures and highlights hub nodes through force-directed positioning.",
+  "recommended_parameters": {{"iterations": 50, "k": 0.1}}
+}}
+
+Respond ONLY with the JSON object, no additional text."""
+
+        # Call LLM service
+        from services.llm import process_chat_message
+        messages = [{"role": "user", "content": prompt}]
+        llm_response = await process_chat_message(messages)
+        
+        # Parse LLM response
+        content = llm_response.get("content", "")
+        
+        # Try to extract JSON from the response
+        import re
+        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+        if json_match:
+            recommendation = json.loads(json_match.group())
+        else:
+            # Fallback to default recommendation
+            recommendation = {
+                "recommended_layout": "spring",
+                "explanation": "Spring layout is a good default choice for most networks.",
+                "recommended_parameters": {}
+            }
+        
+        return {
+            "success": True,
+            "recommended_layout": recommendation.get("recommended_layout", "spring"),
+            "explanation": recommendation.get("explanation", ""),
+            "recommended_parameters": recommendation.get("recommended_parameters", {})
+        }
+        
+    except json.JSONDecodeError as e:
+        print(f"Error parsing LLM response as JSON: {e}")
+        # Return a default recommendation
+        return {
+            "success": True,
+            "recommended_layout": "spring",
+            "explanation": "Spring layout is recommended as a versatile default for most network types.",
+            "recommended_parameters": {}
+        }
+    except Exception as e:
+        print(f"Error in /recommend-layout endpoint: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"An error occurred: {str(e)}")
+
+
 @router.post("/process")
 async def process_chat(
     request: Request,

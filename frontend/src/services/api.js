@@ -131,6 +131,20 @@ export const networkAPI = {
       responseType: 'blob',
     });
   },
+  calculateLayout: (networkId, layoutType, layoutParams = {}) => {
+    console.log("Calculating layout for network:", networkId, "Type:", layoutType);
+    return axios.post(`${API_URL}/network/${networkId}/layout`, {
+      layout_type: layoutType,
+      layout_params: layoutParams
+    });
+  },
+  getLayoutRecommendation: (description, purpose) => {
+    console.log("Getting layout recommendation");
+    return axios.post(`${API_URL}/chat/recommend-layout`, {
+      description,
+      purpose
+    });
+  },
 };
 
 // Network Chat API endpoints

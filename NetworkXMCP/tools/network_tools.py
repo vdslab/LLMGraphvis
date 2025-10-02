@@ -827,3 +827,78 @@ def calculate_centrality(G, centrality_type="degree", **kwargs):
             "success": False,
             "error": f"Error calculating {centrality_type} centrality: {str(e)}"
         }
+
+def apply_layout_to_graphml(graphml_content, layout_type="spring", layout_params=None):
+    """
+    GraphMLにレイアウトを適用し、ノードの位置情報を更新する
+    
+    Args:
+        graphml_content (str): GraphML文字列
+        layout_type (str): レイアウトアルゴリズムの種類
+        layout_params (dict, optional): レイアウトアルゴリズムのパラメータ
+        
+    Returns:
+        dict: 処理結果を含む辞書
+    """
+    try:
+        if layout_params is None:
+            layout_params = {}
+            
+        # GraphMLをパース
+        logger.debug(f"Parsing GraphML for layout application: {layout_type}")
+        content_io = io.BytesIO(graphml_content.encode('utf-8'))
+        G = nx.read_graphml(content_io)
+        
+        if G.number_of_nodes() == 0:
+            return {
+                "success": False,
+                "error": "Graph has no nodes"
+            }
+        
+        # レイアウト関数のマッピング
+        from layouts.layout_functions import get_layout_function
+        layout_func = get_layout_function(layout_type)
+        
+        # レイアウトを計算
+        logger.debug(f"Calculating {layout_type} layout with params: {layout_params}")
+        try:
+            positions = layout_func(G, **layout_params)
+        except Exception as layout_error:
+            logger.error(f"Error in layout calculation: {layout_error}")
+            # フォールバックとしてスプリングレイアウトを使用
+            logger.debug("Falling back to spring layout")
+            positions = nx.spring_layout(G)
+        
+        # 位置情報をノード属性として設定
+        for node, pos in positions.items():
+            G.nodes[node]['x'] = str(float(pos[0]))
+            G.nodes[node]['y'] = str(float(pos[1]))
+        
+        # 更新されたGraphMLを生成
+        output = io.BytesIO()
+        nx.write_graphml(G, output)
+        output.seek(0)
+        updated_graphml = output.read().decode("utf-8")
+        
+        # 位置情報を辞書形式でも返す
+        positions_dict = {
+            str(node): {"x": float(pos[0]), "y": float(pos[1])}
+            for node, pos in positions.items()
+        }
+        
+        logger.debug(f"Successfully applied {layout_type} layout to {len(positions_dict)} nodes")
+        
+        return {
+            "success": True,
+            "graphml_content": updated_graphml,
+            "layout_type": layout_type,
+            "positions": positions_dict
+        }
+    except Exception as e:
+        logger.error(f"Error applying layout to GraphML: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {
+            "success": False,
+            "error": f"Error applying layout to GraphML: {str(e)}"
+        }

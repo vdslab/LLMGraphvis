@@ -182,18 +182,31 @@ async def get_sample_network():
 @app.post("/tools/change_layout", response_model=Dict[str, Any])
 async def api_change_layout(params: LayoutParams):
     """
-    与えられたネットワークのレイアウトを計算し、ノードの位置を返す
+    与えられたネットワークのレイアウトを計算し、更新されたGraphMLと位置情報を返す
     """
     try:
-        G = parse_graphml_string(params.graphml_content)
-        positions = apply_layout(G, params.layout_type, **params.layout_params)
+        from tools.network_tools import apply_layout_to_graphml
+        result = apply_layout_to_graphml(
+            params.graphml_content,
+            params.layout_type,
+            params.layout_params
+        )
+        
+        if not result["success"]:
+            error_msg = result.get("error", "Unknown error during layout calculation")
+            logger.error(f"API: Layout calculation failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+        
         return {
             "result": {
                 "success": True,
-                "layout": params.layout_type,
-                "positions": positions
+                "layout_type": result["layout_type"],
+                "positions": result["positions"],
+                "graphml_content": result["graphml_content"]
             }
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error changing layout: {e}")
         raise HTTPException(status_code=500, detail=str(e))

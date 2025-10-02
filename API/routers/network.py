@@ -156,6 +156,65 @@ async def upload_new_network(
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 
+@router.post("/{network_id}/layout")
+async def calculate_network_layout(
+    network_id: int,
+    layout_type: str = "spring",
+    layout_params: Dict[str, Any] = {},
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Calculate layout for a network using NetworkXMCP.
+    """
+    db_network = get_network_for_user(db, network_id, current_user.id)
+    
+    try:
+        # Call NetworkXMCP to calculate layout
+        async with httpx.AsyncClient() as client:
+            url = f"{NETWORKX_MCP_URL}/tools/change_layout"
+            payload = {
+                "graphml_content": db_network.graphml_content,
+                "layout_type": layout_type,
+                "layout_params": layout_params
+            }
+            print(f"Calling NetworkXMCP for layout calculation: {url}")
+            
+            response = await client.post(url, json=payload, timeout=60.0)
+            print(f"Response status: {response.status_code}")
+            
+            if response.status_code != 200:
+                error_msg = f"Error from NetworkXMCP: {response.text}"
+                print(f"Error: {error_msg}")
+                raise HTTPException(status_code=500, detail=error_msg)
+            
+            result = response.json().get("result", {})
+            print(f"Response from NetworkXMCP: {result}")
+            
+            if not result.get("success"):
+                error_msg = result.get("error", "Unknown error from NetworkXMCP")
+                print(f"Error: {error_msg}")
+                raise HTTPException(status_code=500, detail=error_msg)
+            
+            # Update the network with new GraphML if provided
+            if "graphml_content" in result:
+                db_network.graphml_content = result["graphml_content"]
+                db.commit()
+                db.refresh(db_network)
+            
+            return {
+                "result": {
+                    "success": True,
+                    "layout_type": result.get("layout_type", layout_type),
+                    "positions": result.get("positions", {})
+                }
+            }
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+
+
 @router.post("/{conversation_id}/upload", response_model=schemas.Network)
 async def upload_and_overwrite_network(
     conversation_id: int,
