@@ -1,268 +1,23 @@
 """
-ネットワーク操作ツールモジュール
+GraphML変換モジュール
 ===================
 
-NetworkXを使用したグラフの操作ツールを提供します。
+GraphMLデータを標準形式に変換したり、エクスポートしたりするためのモジュール
 """
 
 import networkx as nx
-import numpy as np
 import logging
 import io
 import random
 from xml.sax.saxutils import escape
 from typing import Dict, List, Any, Optional, Union
+import traceback
 
 # ロギングの設定
-logger = logging.getLogger("networkx_mcp.tools.network")
+logger = logging.getLogger("networkx_mcp.tools.graphml_converter")
 
-def create_random_network(num_nodes=20, edge_probability=0.2, seed=None):
-    """
-    ランダムネットワークを作成する
-    
-    Args:
-        num_nodes (int, optional): ノード数
-        edge_probability (float, optional): エッジ確率
-        seed (int, optional): 乱数シード
-        
-    Returns:
-        tuple: (NetworkXグラフ, ノードリスト, エッジリスト)
-    """
-    try:
-        # 乱数シードの設定
-        if seed is not None:
-            random.seed(seed)
-            np.random.seed(seed)
-        
-        # ランダムグラフを生成
-        G = nx.gnp_random_graph(num_nodes, edge_probability, seed=seed)
-        
-        # 連結グラフを確保（孤立ノードがないようにする）
-        if not nx.is_connected(G):
-            # 連結成分を取得
-            components = list(nx.connected_components(G))
-            # 最大の連結成分以外の各成分から、最大成分へエッジを追加
-            largest_component = max(components, key=len)
-            for component in components:
-                if component != largest_component:
-                    # 各成分から最大成分へのエッジを追加
-                    node_from = random.choice(list(component))
-                    node_to = random.choice(list(largest_component))
-                    G.add_edge(node_from, node_to)
-        
-        # ノードとエッジの情報を抽出
-        nodes = []
-        for node in G.nodes():
-            # ノードごとに少し異なるサイズと色の変化をつける
-            size_variation = random.uniform(4.5, 5.5)
-            color_variation = random.randint(-15, 15)
-            base_color = [29, 78, 216]  # #1d4ed8のRGB値
-            
-            # 色の変化を適用（範囲内に収める）
-            r = max(0, min(255, base_color[0] + color_variation))
-            g = max(0, min(255, base_color[1] + color_variation))
-            b = max(0, min(255, base_color[2] + color_variation))
-            
-            nodes.append({
-                "id": str(node),
-                "label": f"Node {node}",
-                "size": size_variation,
-                "color": f"rgb({r}, {g}, {b})"
-            })
-        
-        edges = []
-        for edge in G.edges():
-            edges.append({
-                "source": str(edge[0]),
-                "target": str(edge[1]),
-                "width": 1,
-                "color": "#94a3b8"
-            })
-        
-        # スプリングレイアウトを適用
-        pos = nx.spring_layout(G)
-        
-        # ノードの位置情報を追加
-        for node in nodes:
-            node_id = int(node["id"])
-            if node_id in pos:
-                node["x"] = float(pos[node_id][0])
-                node["y"] = float(pos[node_id][1])
-        
-        return G, nodes, edges
-    except Exception as e:
-        logger.error(f"Error creating random network: {e}")
-        return None, [], []
-
-def parse_graphml_string(graphml_content):
-    """
-    GraphML文字列をパースしてNetworkXグラフとノード・エッジ情報を抽出する
-    
-    Args:
-        graphml_content (str): GraphML文字列
-        
-    Returns:
-        dict: 処理結果を含む辞書
-    """
-    try:
-        # Parse the GraphML content
-        content_io = io.BytesIO(graphml_content.encode('utf-8'))
-        G = nx.read_graphml(content_io)
-        
-        # Extract nodes and edges
-        nodes = []
-        for node in G.nodes(data=True):
-            node_id = str(node[0])
-            attrs = node[1]
-            
-            node_data = {
-                "id": node_id,
-                "label": attrs.get("name", node_id)
-            }
-            
-            # Add position if available
-            if 'x' in attrs and 'y' in attrs:
-                try:
-                    node_data['x'] = float(attrs['x'])
-                    node_data['y'] = float(attrs['y'])
-                except (ValueError, TypeError):
-                    pass
-            
-            # Add size if available
-            if 'size' in attrs:
-                try:
-                    node_data['size'] = float(attrs['size'])
-                except (ValueError, TypeError):
-                    node_data['size'] = 5.0
-            
-            # Add color if available
-            if 'color' in attrs:
-                node_data['color'] = attrs['color']
-            
-            # Add any additional node attributes
-            for key, value in attrs.items():
-                if key not in ["id", "label", "x", "y", "size", "color"]:
-                    node_data[key] = value
-            
-            nodes.append(node_data)
-        
-        edges = []
-        for edge in G.edges(data=True):
-            source = str(edge[0])
-            target = str(edge[1])
-            attrs = edge[2]
-            
-            edge_data = {
-                "source": source,
-                "target": target
-            }
-            
-            # Add width if available
-            if 'width' in attrs:
-                try:
-                    edge_data['width'] = float(attrs['width'])
-                except (ValueError, TypeError):
-                    pass
-            
-            # Add color if available
-            if 'color' in attrs:
-                edge_data['color'] = attrs['color']
-            
-            # Add any additional edge attributes
-            for key, value in attrs.items():
-                if key not in ["source", "target", "width", "color"]:
-                    edge_data[key] = value
-            
-            edges.append(edge_data)
-        
-        return {
-            "success": True,
-            "graph": G,
-            "nodes": nodes,
-            "edges": edges
-        }
-    except Exception as e:
-        logger.error(f"Error parsing GraphML string: {e}")
-        return {
-            "success": False,
-            "error": f"Error parsing GraphML string: {str(e)}"
-        }
-
-def fix_graphml_structure(graphml_content):
-    """
-    GraphMLの構造を修正する
-    
-    Args:
-        graphml_content (str): GraphML文字列
-        
-    Returns:
-        str: 修正されたGraphML文字列
-    """
-    # デバッグログ
-    logger.debug("Fixing GraphML structure")
-    
-    # 全体的な修正作業をトライ
-    try:
-        import re
-        # XMLヘッダーが欠けている場合は追加
-        if "<?xml" not in graphml_content:
-            logger.debug("Adding XML header")
-            graphml_content = '<?xml version="1.0" encoding="UTF-8"?>\n' + graphml_content
-        
-        # 名前空間宣言が欠けている場合は追加
-        if "<graphml" in graphml_content and "xmlns=" not in graphml_content:
-            logger.debug("Adding namespace declarations")
-            graphml_content = re.sub(
-                r"(<graphml)",
-                r'\1 xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd" ',
-                graphml_content,
-                count=1
-            )
-        
-        # <graph>要素にedgedefault属性が欠けている場合は追加
-        if "<graph" in graphml_content and "edgedefault=" not in graphml_content:
-            logger.debug("Adding edgedefault attribute to graph element")
-            graphml_content = re.sub(
-                r"(<graph>)",
-                r'\1 edgedefault="undirected" ',
-                graphml_content,
-                count=1
-            )
-        
-        # 不正なXML文字を削除
-        # XMLの不正な文字を削除するパターン
-        # XMLで使用できない文字のパターン
-        illegal_xml_chars = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
-        if illegal_xml_chars.search(graphml_content):
-            logger.debug("Removing illegal XML characters")
-            graphml_content = illegal_xml_chars.sub('', graphml_content)
-        
-        # XMLの閉じタグが不完全な場合の修正を試みる
-        # graphmlタグの確認
-        if "<graphml" in graphml_content and "</graphml>" not in graphml_content:
-            logger.debug("Adding missing </graphml> tag")
-            graphml_content += "\n</graphml>"
-        
-        # graphタグの確認
-        if "<graph" in graphml_content and "</graph>" not in graphml_content:
-            # </graphml>の前に</graph>を挿入
-            if "</graphml>" in graphml_content:
-                logger.debug("Adding missing </graph> tag before </graphml>")
-                graphml_content = graphml_content.replace("</graphml>", "</graph>\n</graphml>")
-            else:
-                logger.debug("Adding missing </graph> tag at the end")
-                graphml_content += "\n</graph>"
-        
-        # データノードの修正 - 自己閉じタグに変換
-        if "<data " in graphml_content and "</data>" not in graphml_content:
-            logger.debug("Fixing data elements to self-closing tags if needed")
-            # <data key="xxx"></data> -> <data key="xxx"/>
-            graphml_content = re.sub(r'<data key="([^"]+)"></data>', r'<data key="\1"/>', graphml_content)
-    except Exception as e:
-        logger.error(f"Error while fixing GraphML structure: {e}")
-        # エラーが発生しても元のコンテンツを返す
-    
-    return graphml_content
+# GraphMLパーサーモジュールからfix_graphml_structure関数をインポート
+from .graphml_parser import fix_graphml_structure
 
 def convert_to_standard_graphml(graphml_content):
     """
@@ -445,7 +200,6 @@ def convert_to_standard_graphml(graphml_content):
                         break
                 else:
                     # 代替属性が見つからない場合はランダムな位置を生成
-                    import random
                     node_attrs['x'] = str(random.uniform(-1.0, 1.0))
             else:
                 # 既存の属性を文字列に変換
@@ -460,7 +214,6 @@ def convert_to_standard_graphml(graphml_content):
                         break
                 else:
                     # 代替属性が見つからない場合はランダムな位置を生成
-                    import random
                     node_attrs['y'] = str(random.uniform(-1.0, 1.0))
             else:
                 # 既存の属性を文字列に変換
@@ -613,7 +366,6 @@ def convert_to_standard_graphml(graphml_content):
         except Exception as export_error:
             logger.error(f"Error exporting GraphML: {export_error}")
             # エラーの詳細をトレースバックとともに記録
-            import traceback
             logger.error(f"Export error traceback: {traceback.format_exc()}")
             
             # より詳細なエラーメッセージを提供
@@ -637,7 +389,6 @@ def convert_to_standard_graphml(graphml_content):
     except Exception as e:
         logger.error(f"Error converting GraphML: {e}")
         # エラーの詳細をトレースバックとともに記録
-        import traceback
         logger.error(f"Traceback: {traceback.format_exc()}")
         return {
             "success": False,
@@ -725,180 +476,4 @@ def export_network_as_graphml(G, positions=None, visual_properties=None):
         return {
             "success": False,
             "error": f"Error exporting network as GraphML: {str(e)}"
-        }
-
-def get_network_info(G):
-    """
-    ネットワークの基本情報を取得する
-    
-    Args:
-        G (nx.Graph): NetworkXグラフ
-        
-    Returns:
-        dict: ネットワーク情報
-    """
-    try:
-        # 基本的なネットワーク指標を計算
-        num_nodes = G.number_of_nodes()
-        num_edges = G.number_of_edges()
-        density = nx.density(G)
-        
-        # 連結成分の計算
-        is_connected = nx.is_connected(G)
-        num_components = nx.number_connected_components(G) if not is_connected else 1
-        
-        # 次数の計算
-        degrees = [d for _, d in G.degree()]
-        avg_degree = sum(degrees) / len(degrees) if degrees else 0
-        
-        # クラスタリング係数の計算
-        clustering = nx.average_clustering(G)
-        
-        return {
-            "num_nodes": num_nodes,
-            "num_edges": num_edges,
-            "density": density,
-            "is_connected": is_connected,
-            "num_components": num_components,
-            "avg_degree": avg_degree,
-            "clustering_coefficient": clustering
-        }
-    except Exception as e:
-        logger.error(f"Error getting network info: {e}")
-        return {
-            "error": f"Error getting network info: {str(e)}"
-        }
-
-def calculate_centrality(G, centrality_type="degree", **kwargs):
-    """
-    指定された中心性指標を計算し、グラフのノード属性として追加する
-
-    Args:
-        G (nx.Graph): NetworkXグラフ
-        centrality_type (str): 計算する中心性の種類
-            (degree, closeness, betweenness, eigenvector, pagerank)
-        **kwargs: 各中心性計算関数に渡す追加の引数
-
-    Returns:
-        dict: 処理結果を含む辞書
-    """
-    try:
-        centrality_calculators = {
-            "degree": nx.degree_centrality,
-            "closeness": nx.closeness_centrality,
-            "betweenness": nx.betweenness_centrality,
-            "eigenvector": nx.eigenvector_centrality,
-            "pagerank": nx.pagerank
-        }
-
-        if centrality_type not in centrality_calculators:
-            raise ValueError(f"Unsupported centrality type: {centrality_type}")
-
-        # 固有ベクトル中心性の場合、max_iterのデフォルト値を設定
-        if centrality_type == "eigenvector":
-            kwargs.setdefault("max_iter", 1000)
-
-        # 中心性を計算
-        centrality = centrality_calculators[centrality_type](G, **kwargs)
-        
-        # 結果を標準化
-        max_value = max(centrality.values()) if centrality else 1.0
-        if max_value > 0:
-            # 0で除算しないようにチェック
-            centrality = {str(k): v / max_value for k, v in centrality.items()}
-        else:
-            centrality = {str(k): 0 for k, v in centrality.items()}
-
-        # ノード属性として中心性を設定
-        nx.set_node_attributes(G, centrality, centrality_type)
-
-        return {
-            "success": True,
-            "graph": G,
-            "centrality_type": centrality_type,
-            "centrality": centrality
-        }
-    except Exception as e:
-        logger.error(f"Error calculating {centrality_type} centrality: {e}")
-        # エラー発生時にトレースバックをログに出力
-        import traceback
-        logger.error(traceback.format_exc())
-        return {
-            "success": False,
-            "error": f"Error calculating {centrality_type} centrality: {str(e)}"
-        }
-
-def apply_layout_to_graphml(graphml_content, layout_type="spring", layout_params=None):
-    """
-    GraphMLにレイアウトを適用し、ノードの位置情報を更新する
-    
-    Args:
-        graphml_content (str): GraphML文字列
-        layout_type (str): レイアウトアルゴリズムの種類
-        layout_params (dict, optional): レイアウトアルゴリズムのパラメータ
-        
-    Returns:
-        dict: 処理結果を含む辞書
-    """
-    try:
-        if layout_params is None:
-            layout_params = {}
-            
-        # GraphMLをパース
-        logger.debug(f"Parsing GraphML for layout application: {layout_type}")
-        content_io = io.BytesIO(graphml_content.encode('utf-8'))
-        G = nx.read_graphml(content_io)
-        
-        if G.number_of_nodes() == 0:
-            return {
-                "success": False,
-                "error": "Graph has no nodes"
-            }
-        
-        # レイアウト関数のマッピング
-        from layouts.layout_functions import get_layout_function
-        layout_func = get_layout_function(layout_type)
-        
-        # レイアウトを計算
-        logger.debug(f"Calculating {layout_type} layout with params: {layout_params}")
-        try:
-            positions = layout_func(G, **layout_params)
-        except Exception as layout_error:
-            logger.error(f"Error in layout calculation: {layout_error}")
-            # フォールバックとしてスプリングレイアウトを使用
-            logger.debug("Falling back to spring layout")
-            positions = nx.spring_layout(G)
-        
-        # 位置情報をノード属性として設定
-        for node, pos in positions.items():
-            G.nodes[node]['x'] = str(float(pos[0]))
-            G.nodes[node]['y'] = str(float(pos[1]))
-        
-        # 更新されたGraphMLを生成
-        output = io.BytesIO()
-        nx.write_graphml(G, output)
-        output.seek(0)
-        updated_graphml = output.read().decode("utf-8")
-        
-        # 位置情報を辞書形式でも返す
-        positions_dict = {
-            str(node): {"x": float(pos[0]), "y": float(pos[1])}
-            for node, pos in positions.items()
-        }
-        
-        logger.debug(f"Successfully applied {layout_type} layout to {len(positions_dict)} nodes")
-        
-        return {
-            "success": True,
-            "graphml_content": updated_graphml,
-            "layout_type": layout_type,
-            "positions": positions_dict
-        }
-    except Exception as e:
-        logger.error(f"Error applying layout to GraphML: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
-        return {
-            "success": False,
-            "error": f"Error applying layout to GraphML: {str(e)}"
         }

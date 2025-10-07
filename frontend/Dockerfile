@@ -1,20 +1,43 @@
-FROM node:20-alpine
+# Stage 1: Build the React app
+FROM node:20-alpine AS build
 
 WORKDIR /app
 
-# Copy package.json and package-lock.json
-COPY package*.json ./
+# Leverage caching by installing dependencies first
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --frozen-lockfile
 
-# Install dependencies
-RUN npm ci
-# Explicitly install react-force-graph-2d to ensure it's available
-RUN npm install react-force-graph-2d@1.27.1
+# Copy the rest of the application code and build for production
+COPY . ./
+RUN npm run build
 
-# Copy the rest of the application
-COPY . .
+# Stage 2: Development environment
+FROM node:20-alpine AS development
 
-# Expose the port the app will run on
+WORKDIR /app
+
+# Install dependencies again for development
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --frozen-lockfile
+
+# Copy the full source code
+COPY . ./
+
+# Expose port for the development server
 EXPOSE 3000
-
-# Command to run the development server
 CMD ["npm", "run", "dev"]
+
+# Stage 3: Production environment (Optional - for future use)
+FROM nginx:alpine AS production
+
+# Copy the production build artifacts from the build stage
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# Copy custom nginx configuration if needed
+# COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Expose the default NGINX port
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
