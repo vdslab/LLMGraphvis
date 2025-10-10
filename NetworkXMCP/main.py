@@ -171,10 +171,35 @@ def apply_layout(G: nx.Graph, layout_type: str, **kwargs) -> Dict:
         "spectral": nx.spectral_layout,
         "shell": nx.shell_layout,
         "kamada_kawai": nx.kamada_kawai_layout,
-        "fruchterman_reingold": nx.fruchterman_reingold_layout
+        "fruchterman_reingold": nx.fruchterman_reingold_layout,
+        "planar": nx.planar_layout,
+        "spiral": nx.spiral_layout
     }
-    layout_func = layout_functions.get(layout_type, nx.spring_layout)
-    positions = layout_func(G, **kwargs)
+    
+    # カスタムレイアウトの処理
+    if layout_type == "grid":
+        from layouts.layout_functions import calculate_grid_layout
+        positions = calculate_grid_layout(G, **kwargs)
+    elif layout_type == "tree":
+        from layouts.layout_functions import calculate_tree_layout
+        positions = calculate_tree_layout(G, **kwargs)
+    elif layout_type == "radial":
+        from layouts.layout_functions import calculate_radial_layout
+        positions = calculate_radial_layout(G, **kwargs)
+    elif layout_type == "multipartite":
+        from layouts.layout_functions import calculate_multipartite_layout
+        positions = calculate_multipartite_layout(G, **kwargs)
+    elif layout_type == "bipartite":
+        from layouts.layout_functions import calculate_bipartite_layout
+        # bipartiteレイアウトは特別な処理が必要
+        node_list = list(G.nodes())
+        nodes = kwargs.get('nodes', node_list[:len(node_list)//2])
+        positions = calculate_bipartite_layout(G, nodes, **{k: v for k, v in kwargs.items() if k != 'nodes'})
+    else:
+        # 既存のNetworkXレイアウト
+        layout_func = layout_functions.get(layout_type, nx.spring_layout)
+        positions = layout_func(G, **kwargs)
+    
     # JSONシリアライズ可能な形式に変換
     return {str(k): {"x": float(v[0]), "y": float(v[1])} for k, v in positions.items()}
 

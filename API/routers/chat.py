@@ -298,6 +298,13 @@ Available layout algorithms:
 - fruchterman_reingold: Force-directed variant, good for general networks
 - spectral: Uses graph spectrum, good for finding communities
 - shell: Concentric circles, good for hierarchical or layered networks
+- spiral: Spiral arrangement, good for sequential data
+- planar: Planar graph layout, good for planar networks
+- grid: Grid arrangement, good for regular structures
+- tree: Hierarchical tree layout, good for tree-like structures
+- radial: Radial layout from center, good for hub-spoke networks
+- multipartite: Multi-layer layout, good for multi-partite graphs
+- bipartite: Two-layer layout, good for bipartite graphs
 - random: Random placement, baseline comparison
 
 Please respond with a JSON object containing:

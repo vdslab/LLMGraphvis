@@ -16,6 +16,10 @@ from .layout_functions import (
     calculate_spiral_layout,
     calculate_multipartite_layout,
     calculate_bipartite_layout,
+    calculate_planar_layout,
+    calculate_grid_layout,
+    calculate_tree_layout,
+    calculate_radial_layout,
     get_layout_function
 )
 
@@ -30,5 +34,9 @@ __all__ = [
     'calculate_spiral_layout',
     'calculate_multipartite_layout',
     'calculate_bipartite_layout',
+    'calculate_planar_layout',
+    'calculate_grid_layout',
+    'calculate_tree_layout',
+    'calculate_radial_layout',
     'get_layout_function'
 ]

@@ -149,22 +149,38 @@ const NetworkVisualizationPage = () => {
                         {...register('layout', { required: 'Layout is required' })}
                         defaultValue="spring"
                       >
-                        <option value="spring">Spring Layout</option>
-                        <option value="circular">Circular Layout</option>
-                        <option value="random">Random Layout</option>
-                        <option value="spectral">Spectral Layout</option>
-                        <option value="shell">Shell Layout</option>
-                        <option value="spiral">Spiral Layout</option>
-                        <option value="planar">Planar Layout</option>
-                        <option value="kamada_kawai">Kamada-Kawai Layout</option>
-                        <option value="fruchterman_reingold">Fruchterman-Reingold Layout</option>
-                        <option value="bipartite">Bipartite Layout</option>
-                        <option value="multipartite">Multipartite Layout</option>
+                        <optgroup label="Force-Directed Layouts">
+                          <option value="spring">Spring Layout</option>
+                          <option value="kamada_kawai">Kamada-Kawai Layout</option>
+                          <option value="fruchterman_reingold">Fruchterman-Reingold Layout</option>
+                        </optgroup>
+                        <optgroup label="Geometric Layouts">
+                          <option value="circular">Circular Layout</option>
+                          <option value="grid">Grid Layout</option>
+                          <option value="spiral">Spiral Layout</option>
+                          <option value="planar">Planar Layout</option>
+                        </optgroup>
+                        <optgroup label="Hierarchical Layouts">
+                          <option value="tree">Tree Layout</option>
+                          <option value="radial">Radial Layout</option>
+                          <option value="shell">Shell Layout</option>
+                        </optgroup>
+                        <optgroup label="Specialized Layouts">
+                          <option value="bipartite">Bipartite Layout</option>
+                          <option value="multipartite">Multipartite Layout</option>
+                          <option value="spectral">Spectral Layout</option>
+                        </optgroup>
+                        <optgroup label="Other">
+                          <option value="random">Random Layout</option>
+                        </optgroup>
                       </select>
                       {errors.layout && (
                         <p className="mt-1 text-sm text-red-600">{errors.layout.message}</p>
                       )}
                     </div>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Choose a layout algorithm based on your network structure. Force-directed layouts work well for general networks, geometric layouts for structured data, and hierarchical layouts for tree-like structures.
+                    </p>
                   </div>
                   
                   <div className="mb-4">

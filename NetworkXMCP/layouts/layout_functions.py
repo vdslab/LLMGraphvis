@@ -253,6 +253,205 @@ def calculate_bipartite_layout(G, nodes, align='vertical', scale=1, center=None)
         # フォールバック: シェルレイアウト
         return nx.shell_layout(G, scale=scale, center=center)
 
+def calculate_planar_layout(G, scale=1, center=None, dim=2):
+    """
+    平面レイアウトを計算する
+    
+    Args:
+        G (nx.Graph): NetworkXグラフ
+        scale (float, optional): スケール
+        center (tuple, optional): 中心座標
+        dim (int, optional): 次元数
+        
+    Returns:
+        dict: ノードIDをキー、位置を値とする辞書
+    """
+    try:
+        return nx.planar_layout(G, scale=scale, center=center, dim=dim)
+    except Exception as e:
+        logger.error(f"Error calculating planar layout: {e}")
+        # フォールバック: スプリングレイアウト
+        return nx.spring_layout(G, scale=scale, center=center, dim=dim)
+
+def calculate_grid_layout(G, scale=1, center=None, dim=2):
+    """
+    グリッドレイアウトを計算する（カスタム実装）
+    
+    Args:
+        G (nx.Graph): NetworkXグラフ
+        scale (float, optional): スケール
+        center (tuple, optional): 中心座標
+        dim (int, optional): 次元数
+        
+    Returns:
+        dict: ノードIDをキー、位置を値とする辞書
+    """
+    try:
+        nodes = list(G.nodes())
+        n = len(nodes)
+        
+        # グリッドサイズを計算
+        grid_size = int(np.ceil(np.sqrt(n)))
+        
+        positions = {}
+        for i, node in enumerate(nodes):
+            row = i // grid_size
+            col = i % grid_size
+            
+            x = col * scale / grid_size if grid_size > 1 else 0
+            y = row * scale / grid_size if grid_size > 1 else 0
+            
+            if center:
+                x += center[0] - scale / 2
+                y += center[1] - scale / 2
+            
+            positions[node] = np.array([x, y])
+        
+        return positions
+    except Exception as e:
+        logger.error(f"Error calculating grid layout: {e}")
+        # フォールバック: ランダムレイアウト
+        return nx.random_layout(G, center=center, dim=dim)
+
+def calculate_tree_layout(G, root=None, scale=1, center=None):
+    """
+    ツリーレイアウトを計算する（階層的配置）
+    
+    Args:
+        G (nx.Graph): NetworkXグラフ
+        root (str, optional): ルートノード
+        scale (float, optional): スケール
+        center (tuple, optional): 中心座標
+        
+    Returns:
+        dict: ノードIDをキー、位置を値とする辞書
+    """
+    try:
+        # ルートノードが指定されていない場合は、次数が最高のノードを選択
+        if root is None:
+            root = max(G.nodes(), key=lambda x: G.degree(x))
+        
+        # BFSでレベルを計算
+        levels = {}
+        queue = [(root, 0)]
+        visited = {root}
+        
+        while queue:
+            node, level = queue.pop(0)
+            levels[node] = level
+            
+            for neighbor in G.neighbors(node):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append((neighbor, level + 1))
+        
+        # レベルごとにノードを配置
+        max_level = max(levels.values()) if levels else 0
+        positions = {}
+        level_counts = {}
+        level_indices = {}
+        
+        # 各レベルのノード数をカウント
+        for node, level in levels.items():
+            level_counts[level] = level_counts.get(level, 0) + 1
+            level_indices[level] = level_indices.get(level, 0)
+        
+        for node, level in levels.items():
+            # 水平位置を計算
+            level_width = level_counts[level]
+            node_index = level_indices[level]
+            level_indices[level] += 1
+            
+            if level_width > 1:
+                x = (node_index - (level_width - 1) / 2) * scale / level_width
+            else:
+                x = 0
+            
+            # 垂直位置を計算
+            y = level * scale / max(max_level, 1)
+            
+            if center:
+                x += center[0]
+                y += center[1] - scale / 2
+            
+            positions[node] = np.array([x, y])
+        
+        return positions
+    except Exception as e:
+        logger.error(f"Error calculating tree layout: {e}")
+        # フォールバック: スプリングレイアウト
+        return nx.spring_layout(G, scale=scale, center=center)
+
+def calculate_radial_layout(G, root=None, scale=1, center=None):
+    """
+    放射状レイアウトを計算する
+    
+    Args:
+        G (nx.Graph): NetworkXグラフ
+        root (str, optional): 中心ノード
+        scale (float, optional): スケール
+        center (tuple, optional): 中心座標
+        
+    Returns:
+        dict: ノードIDをキー、位置を値とする辞書
+    """
+    try:
+        # 中心ノードが指定されていない場合は、次数が最高のノードを選択
+        if root is None:
+            root = max(G.nodes(), key=lambda x: G.degree(x))
+        
+        # BFSで距離を計算
+        distances = {}
+        queue = [(root, 0)]
+        visited = {root}
+        
+        while queue:
+            node, dist = queue.pop(0)
+            distances[node] = dist
+            
+            for neighbor in G.neighbors(node):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    queue.append((neighbor, dist + 1))
+        
+        # 距離ごとにノードを円状に配置
+        positions = {}
+        distance_counts = {}
+        distance_indices = {}
+        
+        # 各距離のノード数をカウント
+        for node, dist in distances.items():
+            distance_counts[dist] = distance_counts.get(dist, 0) + 1
+            distance_indices[dist] = distance_indices.get(dist, 0)
+        
+        for node, dist in distances.items():
+            if dist == 0:
+                # 中心ノードは原点に配置
+                x, y = 0, 0
+            else:
+                # 円周上に配置
+                angle_count = distance_counts[dist]
+                angle_index = distance_indices[dist]
+                distance_indices[dist] += 1
+                
+                angle = 2 * np.pi * angle_index / angle_count
+                radius = dist * scale / 4
+                
+                x = radius * np.cos(angle)
+                y = radius * np.sin(angle)
+            
+            if center:
+                x += center[0]
+                y += center[1]
+            
+            positions[node] = np.array([x, y])
+        
+        return positions
+    except Exception as e:
+        logger.error(f"Error calculating radial layout: {e}")
+        # フォールバック: 円形レイアウト
+        return nx.circular_layout(G, scale=scale, center=center)
+
 def get_layout_function(layout_type):
     """
     レイアウトタイプに基づいてレイアウト計算関数を取得する
@@ -273,7 +472,11 @@ def get_layout_function(layout_type):
         "fruchterman_reingold": calculate_fruchterman_reingold_layout,
         "spiral": calculate_spiral_layout,
         "multipartite": calculate_multipartite_layout,
-        "bipartite": calculate_bipartite_layout
+        "bipartite": calculate_bipartite_layout,
+        "planar": calculate_planar_layout,
+        "grid": calculate_grid_layout,
+        "tree": calculate_tree_layout,
+        "radial": calculate_radial_layout
     }
     
     return layout_functions.get(layout_type, calculate_spring_layout)

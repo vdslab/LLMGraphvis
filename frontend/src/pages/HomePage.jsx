@@ -95,9 +95,21 @@ const HomePage = () => {
               </p>
             </div>
             <div className="bg-gray-50 p-4 rounded-md">
-              <h3 className="text-lg font-medium text-gray-900">And More...</h3>
+              <h3 className="text-lg font-medium text-gray-900">Tree Layout</h3>
               <p className="mt-2 text-sm text-gray-500">
-                Including Fruchterman-Reingold, Bipartite, Multipartite, and others.
+                Position nodes in a hierarchical tree structure.
+              </p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-md">
+              <h3 className="text-lg font-medium text-gray-900">Grid Layout</h3>
+              <p className="mt-2 text-sm text-gray-500">
+                Position nodes in a regular grid pattern.
+              </p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-md">
+              <h3 className="text-lg font-medium text-gray-900">Radial Layout</h3>
+              <p className="mt-2 text-sm text-gray-500">
+                Position nodes radially from a central node.
               </p>
             </div>
           </div>
