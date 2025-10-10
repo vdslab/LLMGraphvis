@@ -4,9 +4,9 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 # Leverage caching by installing dependencies first
-COPY package.json package-lock.json ./
+COPY package.json ./
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --frozen-lockfile
+    npm install
 
 # Copy the rest of the application code and build for production
 COPY . ./
@@ -18,9 +18,9 @@ FROM node:20-alpine AS development
 WORKDIR /app
 
 # Install dependencies again for development
-COPY package.json package-lock.json ./
+COPY package.json ./
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --frozen-lockfile
+    npm install
 
 # Copy the full source code
 COPY . ./

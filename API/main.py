@@ -1,36 +1,47 @@
 import time
 import logging
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, WebSocket, WebSocketDisconnect
+from datetime import timedelta
+from typing import Annotated
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, WebSocket, WebSocketDisconnect, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 from typing import List, Dict, Optional, Any
 import sqlalchemy.exc
 import json
+from sqlalchemy.orm import Session
 
-from database import engine, Base
+from database import engine, Base, get_db
 from routers import auth as auth_router
 from routers import chat as chat_router
 from routers import network as network_router
 import auth
+import schemas
+import models
 
 # WebSocket接続マネージャー
+
+
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
-    
+
     async def connect(self, websocket: WebSocket, client_id: str):
         await websocket.accept()
         self.active_connections[client_id] = websocket
-        logging.info(f"Client {client_id} connected. Total: {len(self.active_connections)}")
-    
+        logging.info(
+            f"Client {client_id} connected. Total: {len(self.active_connections)}")
+
     def disconnect(self, client_id: str):
         if client_id in self.active_connections:
             del self.active_connections[client_id]
-            logging.info(f"Client {client_id} disconnected. Total: {len(self.active_connections)}")
-    
+            logging.info(
+                f"Client {client_id} disconnected. Total: {len(self.active_connections)}")
+
     async def broadcast(self, message: Dict[str, Any]):
         for connection in self.active_connections.values():
             await connection.send_json(message)
+
 
 # データベースの接続を待機
 max_retries = 15
@@ -49,7 +60,8 @@ for i in range(max_retries):
             print(f"Retrying in {wait_time} seconds...")
             time.sleep(wait_time)
         else:
-            print(f"Failed to connect to database after {max_retries} attempts.")
+            print(
+                f"Failed to connect to database after {max_retries} attempts.")
 
 # データベーステーブルの作成
 try:
@@ -81,9 +93,17 @@ app.include_router(network_router.router)
 # WebSocket接続マネージャーをapp.stateに格納
 app.state.ws_manager = ConnectionManager()
 
+
 @app.get("/")
 async def root():
     return {"message": "Network Visualization API is running"}
+
+
+@app.get("/items/")
+async def read_items(current_user: Annotated[models.User, Depends(auth.get_current_active_user)]):
+    """Example protected endpoint that requires authentication."""
+    return {"message": f"Hello {current_user.username}, here are your items!"}
+
 
 @app.get("/health")
 async def health_check():
@@ -92,6 +112,7 @@ async def health_check():
             return {"status": "healthy", "database": "connected"}
     except Exception as e:
         return {"status": "unhealthy", "database": str(e)}
+
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -105,20 +126,20 @@ async def websocket_endpoint(websocket: WebSocket):
     if not token:
         await websocket.close(code=1008, reason="Token is required")
         return
-    
+
     try:
         user = auth.get_current_user_from_token(token)
         if not user:
             await websocket.close(code=1008, reason="Invalid token")
             return
-        
+
         client_id = f"user_{user.id}_{time.time()}"
         await ws_manager.connect(websocket, client_id)
-        
+
         try:
             # 接続を維持し、クライアントからの切断を待つ
             while True:
-                await websocket.receive_text() # クライアントからのメッセージを待つが、何もしない
+                await websocket.receive_text()  # クライアントからのメッセージを待つが、何もしない
         except WebSocketDisconnect:
             ws_manager.disconnect(client_id)
     except Exception as e:
