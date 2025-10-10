@@ -1,0 +1,108 @@
+# Docker Compose configuration for testing environment
+version: "3.8"
+
+services:
+  api-test:
+    build:
+      context: ./API
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=sqlite:///./test.db
+      - SECRET_KEY=test-secret-key-for-testing-only
+      - NETWORKX_MCP_URL=http://networkxmcp-test:8001
+    volumes:
+      - ./API:/app
+      - ./logs:/app/logs
+    working_dir: /app
+    command:
+      [
+        "python",
+        "-m",
+        "pytest",
+        "-v",
+        "--cov=.",
+        "--cov-report=term-missing",
+        "--cov-report=html:htmlcov",
+      ]
+    depends_on:
+      - networkxmcp-test
+    networks:
+      - test-network
+
+  networkxmcp-test:
+    build:
+      context: ./NetworkXMCP
+      dockerfile: Dockerfile
+    environment:
+      - PYTHONPATH=/app
+    volumes:
+      - ./NetworkXMCP:/app
+    working_dir: /app
+    command:
+      [
+        "python",
+        "-m",
+        "pytest",
+        "-v",
+        "--cov=.",
+        "--cov-report=term-missing",
+        "--cov-report=html:htmlcov",
+      ]
+    networks:
+      - test-network
+    ports:
+      - "8001:8001"
+
+  # Integration test runner
+  integration-test:
+    build:
+      context: ./API
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=sqlite:///./test.db
+      - SECRET_KEY=test-secret-key-for-testing-only
+      - NETWORKX_MCP_URL=http://networkxmcp-test:8001
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-test-key}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-test-key}
+    volumes:
+      - ./API:/app
+      - ./logs:/app/logs
+    working_dir: /app
+    command:
+      [
+        "python",
+        "-m",
+        "pytest",
+        "test_integration.py",
+        "-v",
+        "--cov=.",
+        "--cov-report=term-missing",
+      ]
+    depends_on:
+      - api-test
+      - networkxmcp-test
+    networks:
+      - test-network
+
+  # Test database for integration tests
+  test-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=test_llmgraphvis
+      - POSTGRES_USER=test_user
+      - POSTGRES_PASSWORD=test_password
+    volumes:
+      - test_db_data:/var/lib/postgresql/data
+    networks:
+      - test-network
+    ports:
+      - "5433:5432" # Different port to avoid conflicts
+
+networks:
+  test-network:
+    driver: bridge
+
+volumes:
+  test_db_data:
