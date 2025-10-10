@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { settingsAPI } from "../services/api";
 import ForceGraph2D from "react-force-graph-2d";
 import useNetworkStore from "../services/networkStore";
 import useChatStore from "../services/chatStore";
@@ -31,6 +32,89 @@ const NetworkChatPage = () => {
   const { messages, sendMessage, isProcessing, addMessage } = useChatStore();
 
   const [inputMessage, setInputMessage] = useState("");
+  // LLM provider state
+  // LLM provider/model state
+  const [llmProvider, setLlmProvider] = useState("google");
+  const [llmModel, setLlmModel] = useState("");
+  const [llmLoading, setLlmLoading] = useState(false);
+  const [llmError, setLlmError] = useState(null);
+
+  // Model options for each provider
+  const MODEL_OPTIONS = {
+    google: [
+      { value: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+      { value: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite" },
+      { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+    ],
+    openai: [
+      { value: "gpt-3.5-turbo", label: "ChatGPT o3 mini" },
+      { value: "gpt-4-turbo", label: "ChatGPT o4 mini" },
+      { value: "gpt-5-mini", label: "ChatGPT 5 mini" },
+      { value: "gpt-5", label: "ChatGPT 5" },
+      { value: "gpt-4o", label: "ChatGPT 4o" },
+    ],
+  };
+  // Fetch current LLM provider on mount
+  useEffect(() => {
+    const fetchLlmProvider = async () => {
+      setLlmLoading(true);
+      setLlmError(null);
+      try {
+        const res = await settingsAPI.getLLMProviderSettings();
+        if (res.data && res.data.provider) {
+          setLlmProvider(res.data.provider);
+          if (res.data.openai_model) setLlmModel(res.data.openai_model);
+          else if (res.data.provider === "google")
+            setLlmModel("gemini-2.5-flash");
+          else if (res.data.provider === "openai") setLlmModel("gpt-4o");
+        }
+      } catch {
+        setLlmError("Failed to load LLM provider settings");
+      } finally {
+        setLlmLoading(false);
+      }
+    };
+    fetchLlmProvider();
+  }, []);
+
+  // Handle LLM provider change
+  const handleLlmProviderChange = async (e) => {
+    const newProvider = e.target.value;
+    setLlmLoading(true);
+    setLlmError(null);
+    try {
+      // Default to first model for new provider
+      const defaultModel = MODEL_OPTIONS[newProvider][0]?.value || "";
+      await settingsAPI.updateLLMProviderSettings({
+        provider: newProvider,
+        openai_model: defaultModel,
+      });
+      setLlmProvider(newProvider);
+      setLlmModel(defaultModel);
+    } catch {
+      setLlmError("Failed to update LLM provider");
+    } finally {
+      setLlmLoading(false);
+    }
+  };
+
+  // Handle LLM model change
+  const handleLlmModelChange = async (e) => {
+    const newModel = e.target.value;
+    setLlmLoading(true);
+    setLlmError(null);
+    try {
+      await settingsAPI.updateLLMProviderSettings({
+        provider: llmProvider,
+        openai_model: newModel,
+      });
+      setLlmModel(newModel);
+    } catch {
+      setLlmError("Failed to update LLM model");
+    } finally {
+      setLlmLoading(false);
+    }
+  };
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [fileUploadError, setFileUploadError] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -402,6 +486,38 @@ const NetworkChatPage = () => {
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Left side - Chat panel */}
         <div className="w-full md:w-2/5 lg:w-1/3 flex flex-col bg-white border-r border-gray-200">
+          {/* LLM Selector */}
+          <div className="p-2 border-b border-gray-200 bg-gray-50 flex items-center space-x-2">
+            <span className="text-xs text-gray-600">Provider:</span>
+            <select
+              className="text-xs px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+              value={llmProvider}
+              onChange={handleLlmProviderChange}
+              disabled={llmLoading}
+            >
+              <option value="google">Google (Gemini)</option>
+              <option value="openai">OpenAI (ChatGPT)</option>
+            </select>
+            <span className="text-xs text-gray-600 ml-2">Model:</span>
+            <select
+              className="text-xs px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+              value={llmModel}
+              onChange={handleLlmModelChange}
+              disabled={llmLoading}
+            >
+              {(MODEL_OPTIONS[llmProvider] || []).map((model) => (
+                <option key={model.value} value={model.value}>
+                  {model.label}
+                </option>
+              ))}
+            </select>
+            {llmLoading && (
+              <span className="text-xs text-blue-500 ml-2">Switching...</span>
+            )}
+            {llmError && (
+              <span className="text-xs text-red-500 ml-2">{llmError}</span>
+            )}
+          </div>
           {/* Messages area */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((message, index) => (
