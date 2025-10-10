@@ -307,10 +307,11 @@ async def process_chat_message(messages: List[Dict[str, str]]) -> Dict[str, Any]
     """
     Process chat messages by routing to the configured LLM provider.
     """
-    print(f"Processing message with provider: {LLM_PROVIDER}")
-    if LLM_PROVIDER == "openai":
+    provider = os.environ.get("LLM_PROVIDER", "google").lower()
+    print(f"Processing message with provider: {provider}")
+    if provider == "openai":
         return await _process_with_openai(messages)
-    elif LLM_PROVIDER == "google":
+    elif provider == "google":
         return await _process_with_gemini(messages)
     else:
-        return {"content": f"Error: Unknown LLM_PROVIDER '{LLM_PROVIDER}'. Please set to 'google' or 'openai'."}
+        return {"content": f"Error: Unknown LLM_PROVIDER '{provider}'. Please set to 'google' or 'openai'."}

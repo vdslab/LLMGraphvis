@@ -39,23 +39,15 @@ class SettingsManager:
             Updated settings dictionary
 
         Raises:
-            ValueError: If invalid provider or missing required keys
+            ValueError: If invalid provider
         """
         provider = settings.get("provider")
         if provider and provider not in ["google", "openai"]:
             raise ValueError(
                 f"Invalid provider: {provider}. Must be 'google' or 'openai'.")
 
-        # Validate required API keys
-        if provider == "google" and not settings.get("google_api_key"):
-            if not os.environ.get("GOOGLE_API_KEY"):
-                raise ValueError(
-                    "Google API key is required when using Google provider.")
-
-        if provider == "openai" and not settings.get("openai_api_key"):
-            if not os.environ.get("OPENAI_API_KEY"):
-                raise ValueError(
-                    "OpenAI API key is required when using OpenAI provider.")
+        # Always use .env API keys - no validation required
+        # Users can optionally provide their own keys, but .env keys are used as fallback
 
         # Update environment variables
         if provider:

@@ -85,10 +85,14 @@ const NetworkChatPage = () => {
     try {
       // Default to first model for new provider
       const defaultModel = MODEL_OPTIONS[newProvider][0]?.value || "";
-      await settingsAPI.updateLLMProviderSettings({
-        provider: newProvider,
-        openai_model: defaultModel,
-      });
+
+      // Build settings object based on provider
+      const settings = { provider: newProvider };
+      if (newProvider === "openai") {
+        settings.openai_model = defaultModel;
+      }
+
+      await settingsAPI.updateLLMProviderSettings(settings);
       setLlmProvider(newProvider);
       setLlmModel(defaultModel);
     } catch {
@@ -104,10 +108,13 @@ const NetworkChatPage = () => {
     setLlmLoading(true);
     setLlmError(null);
     try {
-      await settingsAPI.updateLLMProviderSettings({
-        provider: llmProvider,
-        openai_model: newModel,
-      });
+      // Build settings object based on provider
+      const settings = { provider: llmProvider };
+      if (llmProvider === "openai") {
+        settings.openai_model = newModel;
+      }
+
+      await settingsAPI.updateLLMProviderSettings(settings);
       setLlmModel(newModel);
     } catch {
       setLlmError("Failed to update LLM model");
@@ -487,36 +494,90 @@ const NetworkChatPage = () => {
         {/* Left side - Chat panel */}
         <div className="w-full md:w-2/5 lg:w-1/3 flex flex-col bg-white border-r border-gray-200">
           {/* LLM Selector */}
-          <div className="p-2 border-b border-gray-200 bg-gray-50 flex items-center space-x-2">
-            <span className="text-xs text-gray-600">Provider:</span>
-            <select
-              className="text-xs px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-              value={llmProvider}
-              onChange={handleLlmProviderChange}
-              disabled={llmLoading}
-            >
-              <option value="google">Google (Gemini)</option>
-              <option value="openai">OpenAI (ChatGPT)</option>
-            </select>
-            <span className="text-xs text-gray-600 ml-2">Model:</span>
-            <select
-              className="text-xs px-2 py-1 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-              value={llmModel}
-              onChange={handleLlmModelChange}
-              disabled={llmLoading}
-            >
-              {(MODEL_OPTIONS[llmProvider] || []).map((model) => (
-                <option key={model.value} value={model.value}>
-                  {model.label}
-                </option>
-              ))}
-            </select>
-            {llmLoading && (
-              <span className="text-xs text-blue-500 ml-2">Switching...</span>
-            )}
-            {llmError && (
-              <span className="text-xs text-red-500 ml-2">{llmError}</span>
-            )}
+          <div className="px-4 py-3 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+            <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-4">
+              {/* Provider Selection */}
+              <div className="flex items-center space-x-2">
+                <label className="text-sm font-medium text-gray-700 min-w-0 whitespace-nowrap">
+                  Provider:
+                </label>
+                <select
+                  className="text-sm px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-0 flex-1 sm:flex-none sm:w-auto"
+                  value={llmProvider}
+                  onChange={handleLlmProviderChange}
+                  disabled={llmLoading}
+                >
+                  <option value="google">Google (Gemini)</option>
+                  <option value="openai">OpenAI (ChatGPT)</option>
+                </select>
+              </div>
+
+              {/* Model Selection */}
+              <div className="flex items-center space-x-2">
+                <label className="text-sm font-medium text-gray-700 min-w-0 whitespace-nowrap">
+                  Model:
+                </label>
+                <select
+                  className="text-sm px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-0 flex-1 sm:flex-none sm:w-auto"
+                  value={llmModel}
+                  onChange={handleLlmModelChange}
+                  disabled={llmLoading}
+                >
+                  {(MODEL_OPTIONS[llmProvider] || []).map((model) => (
+                    <option key={model.value} value={model.value}>
+                      {model.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Status Indicators */}
+              <div className="flex items-center space-x-2 flex-1 justify-end">
+                {llmLoading && (
+                  <div className="flex items-center space-x-2 text-blue-600">
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-sm font-medium">Switching...</span>
+                  </div>
+                )}
+                {llmError && (
+                  <div className="flex items-center space-x-1 text-red-600">
+                    <svg
+                      className="w-4 h-4"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    <span className="text-sm font-medium">{llmError}</span>
+                  </div>
+                )}
+                {!llmLoading && !llmError && (
+                  <div className="flex items-center space-x-1 text-green-600">
+                    <svg
+                      className="w-4 h-4"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    <span className="text-sm font-medium">Ready</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Rate Limit Info */}
+            <div className="mt-2 text-xs text-gray-500">
+              Using shared API keys with rate limiting (100 requests/hour)
+            </div>
           </div>
           {/* Messages area */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">

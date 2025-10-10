@@ -21,6 +21,7 @@ dependencies = [
     "starlette>=0.31.0",
     "pydantic>=2.0.0",
     "python-multipart>=0.0.9",
+    "slowapi>=0.1.9",
 ]
 
 [project.optional-dependencies]

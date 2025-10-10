@@ -10,12 +10,15 @@ from typing import List, Dict, Optional, Any
 import sqlalchemy.exc
 import json
 from sqlalchemy.orm import Session
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 from database import engine, Base, get_db
 from routers import auth as auth_router
 from routers import chat as chat_router
 from routers import network as network_router
 from routers import settings as settings_router
+from services.rate_limiter import limiter
 import auth
 import schemas
 import models
@@ -76,6 +79,10 @@ app = FastAPI(
     description="API for network visualization with user authentication, chat functionality, and NetworkX integration",
     version="1.1.0"
 )
+
+# Rate limiting setup
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS設定
 app.add_middleware(
