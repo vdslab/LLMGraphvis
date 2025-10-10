@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom';
-import useAuthStore from '../services/authStore';
+import { Link } from "react-router-dom";
+import useAuthStore from "../services/authStore";
 
 const HomePage = () => {
   const { isAuthenticated } = useAuthStore();
@@ -12,7 +12,8 @@ const HomePage = () => {
             Network Visualization API
           </h1>
           <p className="mt-5 max-w-xl mx-auto text-xl text-gray-500">
-            Visualize network data with various layout algorithms and interact through a chat interface to analyze your networks.
+            Visualize network data with various layout algorithms and interact
+            through a chat interface to analyze your networks.
           </p>
           <div className="mt-8 flex justify-center">
             {isAuthenticated ? (
@@ -41,18 +42,24 @@ const HomePage = () => {
           <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
             <div className="bg-gray-50 p-6 rounded-lg shadow-md">
               <div className="text-center">
-                <h3 className="text-lg font-medium text-gray-900">Network Chat</h3>
+                <h3 className="text-lg font-medium text-gray-900">
+                  Network Chat
+                </h3>
                 <p className="mt-2 text-base text-gray-500">
-                  Interact with your network through a chat interface to modify layouts and analyze properties.
+                  Interact with your network through a chat interface to modify
+                  layouts and analyze properties.
                 </p>
               </div>
             </div>
 
             <div className="bg-gray-50 p-6 rounded-lg shadow-md">
               <div className="text-center">
-                <h3 className="text-lg font-medium text-gray-900">MCP Integration</h3>
+                <h3 className="text-lg font-medium text-gray-900">
+                  MCP Integration
+                </h3>
                 <p className="mt-2 text-base text-gray-500">
-                  Leverage Model Context Protocol (MCP) for enhanced network visualization and analysis capabilities.
+                  Leverage Model Context Protocol (MCP) for enhanced network
+                  visualization and analysis capabilities.
                 </p>
               </div>
             </div>
@@ -65,31 +72,42 @@ const HomePage = () => {
           </h2>
           <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="bg-gray-50 p-4 rounded-md">
-              <h3 className="text-lg font-medium text-gray-900">Spring Layout</h3>
+              <h3 className="text-lg font-medium text-gray-900">
+                Spring Layout
+              </h3>
               <p className="mt-2 text-sm text-gray-500">
-                Position nodes using a force-directed algorithm based on Fruchterman-Reingold.
+                Position nodes using a force-directed algorithm based on
+                Fruchterman-Reingold.
               </p>
             </div>
             <div className="bg-gray-50 p-4 rounded-md">
-              <h3 className="text-lg font-medium text-gray-900">Circular Layout</h3>
+              <h3 className="text-lg font-medium text-gray-900">
+                Circular Layout
+              </h3>
               <p className="mt-2 text-sm text-gray-500">
                 Position nodes on a circle.
               </p>
             </div>
             <div className="bg-gray-50 p-4 rounded-md">
-              <h3 className="text-lg font-medium text-gray-900">Spectral Layout</h3>
+              <h3 className="text-lg font-medium text-gray-900">
+                Spectral Layout
+              </h3>
               <p className="mt-2 text-sm text-gray-500">
                 Position nodes using the eigenvectors of the graph Laplacian.
               </p>
             </div>
             <div className="bg-gray-50 p-4 rounded-md">
-              <h3 className="text-lg font-medium text-gray-900">Shell Layout</h3>
+              <h3 className="text-lg font-medium text-gray-900">
+                Shell Layout
+              </h3>
               <p className="mt-2 text-sm text-gray-500">
                 Position nodes in concentric circles.
               </p>
             </div>
             <div className="bg-gray-50 p-4 rounded-md">
-              <h3 className="text-lg font-medium text-gray-900">Kamada-Kawai Layout</h3>
+              <h3 className="text-lg font-medium text-gray-900">
+                Kamada-Kawai Layout
+              </h3>
               <p className="mt-2 text-sm text-gray-500">
                 Position nodes using Kamada-Kawai force-directed algorithm.
               </p>
@@ -107,7 +125,9 @@ const HomePage = () => {
               </p>
             </div>
             <div className="bg-gray-50 p-4 rounded-md">
-              <h3 className="text-lg font-medium text-gray-900">Radial Layout</h3>
+              <h3 className="text-lg font-medium text-gray-900">
+                Radial Layout
+              </h3>
               <p className="mt-2 text-sm text-gray-500">
                 Position nodes radially from a central node.
               </p>
