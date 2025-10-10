@@ -7,41 +7,80 @@ import os
 import json
 import httpx
 from typing import List, Dict, Any
+import logging
 
-# --- Provider Selection ---
-LLM_PROVIDER = os.environ.get("LLM_PROVIDER", "google").lower()
+logger = logging.getLogger(__name__)
 
-# --- Client Initialization ---
-gemini_client = None
-openai_client = None
+# --- Global state for dynamic reconfiguration ---
+_current_provider = None
+_gemini_client = None
+_openai_client = None
 
-if LLM_PROVIDER == "google":
-    if not os.environ.get("GOOGLE_API_KEY"):
-        raise ValueError("LLM_PROVIDER is 'google', but GOOGLE_API_KEY environment variable is not set.")
-    try:
-        from google import genai
-        from google.genai import types
-        gemini_client = genai.Client()
-    except ImportError:
-        print("Google GenAI SDK not installed. Please run 'pip install google-genai'")
-        gemini_client = None
-    except Exception as e:
-        print(f"Error initializing Gemini client: {e}")
-        gemini_client = None
 
-elif LLM_PROVIDER == "openai":
-    if not os.environ.get("OPENAI_API_KEY"):
-        raise ValueError("LLM_PROVIDER is 'openai', but OPENAI_API_KEY environment variable is not set.")
-    try:
-        from openai import OpenAI
-        # Explicitly pass a default httpx client to avoid issues with proxy arguments
-        openai_client = OpenAI(http_client=httpx.Client())
-    except ImportError:
-        print("OpenAI SDK not installed. Please run 'pip install openai'")
-        openai_client = None
-    except Exception as e:
-        print(f"Error initializing OpenAI client: {e}")
-        openai_client = None
+def _initialize_clients():
+    """Initialize LLM clients based on current environment variables."""
+    global _current_provider, _gemini_client, _openai_client
+
+    provider = os.environ.get("LLM_PROVIDER", "google").lower()
+    _current_provider = provider
+
+    # Reset clients
+    _gemini_client = None
+    _openai_client = None
+
+    if provider == "google":
+        if not os.environ.get("GOOGLE_API_KEY"):
+            logger.warning(
+                "LLM_PROVIDER is 'google', but GOOGLE_API_KEY environment variable is not set.")
+            return
+        try:
+            from google import genai
+            from google.genai import types
+            _gemini_client = genai.Client()
+            logger.info("Gemini client initialized successfully")
+        except ImportError:
+            logger.error(
+                "Google GenAI SDK not installed. Please run 'pip install google-genai'")
+        except Exception as e:
+            logger.error(f"Error initializing Gemini client: {e}")
+
+    elif provider == "openai":
+        if not os.environ.get("OPENAI_API_KEY"):
+            logger.warning(
+                "LLM_PROVIDER is 'openai', but OPENAI_API_KEY environment variable is not set.")
+            return
+        try:
+            from openai import OpenAI
+            # Explicitly pass a default httpx client to avoid issues with proxy arguments
+            _openai_client = OpenAI(http_client=httpx.Client())
+            logger.info("OpenAI client initialized successfully")
+        except ImportError:
+            logger.error(
+                "OpenAI SDK not installed. Please run 'pip install openai'")
+        except Exception as e:
+            logger.error(f"Error initializing OpenAI client: {e}")
+    else:
+        logger.error(f"Unknown LLM_PROVIDER: {provider}")
+
+
+def reload_llm_service():
+    """Reload the LLM service with current environment variables."""
+    logger.info("Reloading LLM service...")
+    _initialize_clients()
+
+
+def get_current_provider():
+    """Get the current LLM provider."""
+    return _current_provider
+
+
+def get_clients():
+    """Get the current LLM clients."""
+    return _gemini_client, _openai_client
+
+
+# Initialize clients on module load
+_initialize_clients()
 
 # --- Tool Definitions ---
 # Shared tool definitions, adaptable for each provider.
@@ -97,16 +136,24 @@ You have access to a set of tools to perform network operations. When a user ask
 **Your Final Output should be either a direct text response OR a tool call.**
 """
 
+
 async def _process_with_gemini(messages: List[Dict[str, str]]) -> Dict[str, Any]:
     """Process messages using Google Gemini."""
+    gemini_client, _ = get_clients()
     if not gemini_client:
         return {"content": "Error: Gemini client is not initialized."}
+
+    try:
+        from google.genai import types
+    except ImportError:
+        return {"content": "Error: Google GenAI SDK not available."}
 
     gemini_history = []
     for msg in messages:
         role = "user" if msg["role"] in ["user", "tool"] else "model"
-        gemini_history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg["content"])]))
-    
+        gemini_history.append(types.Content(
+            role=role, parts=[types.Part.from_text(text=msg["content"])]))
+
     user_prompt = gemini_history.pop().parts[0].text
 
     try:
@@ -124,10 +171,12 @@ async def _process_with_gemini(messages: List[Dict[str, str]]) -> Dict[str, Any]
             }
             gemini_tools.append(gemini_tool)
 
-        chat = gemini_client.chats.create(model="gemini-2.5-pro", history=gemini_history)
+        chat = gemini_client.chats.create(
+            model="gemini-2.5-pro", history=gemini_history)
         response = chat.send_message(
             user_prompt,
-            config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT, tools=gemini_tools)
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT, tools=gemini_tools)
         )
 
         if response.function_calls:
@@ -146,6 +195,68 @@ async def _process_with_gemini(messages: List[Dict[str, str]]) -> Dict[str, Any]
         print(f"Error with Gemini: {e}")
         return {"content": f"Error with Gemini: {e}"}
 
+
+async def _process_with_openai(messages: List[Dict[str, str]]) -> Dict[str, Any]:
+    """Process messages using OpenAI."""
+    _, openai_client = get_clients()
+    if not openai_client:
+        return {"content": "Error: OpenAI client is not initialized."}
+
+    # Adapt history for OpenAI format
+    openai_history = []
+    for msg in messages:
+        if msg["role"] == "tool":
+            openai_history.append({"role": "tool", "tool_call_id": "placeholder_id",
+                                  "name": "tool_name", "content": msg["content"]})
+        else:
+            openai_history.append(
+                {"role": msg["role"], "content": msg["content"]})
+
+    try:
+        response = openai_client.chat.completions.create(
+            model=os.environ.get("OPENAI_MODEL", "gpt-4o"),
+            messages=[{"role": "system", "content": SYSTEM_PROMPT}
+                      ] + openai_history,
+            tools=[{"type": "function", "function": f}
+                   for f in TOOLS_DEFINITION],
+            tool_choice="auto",
+        )
+
+        response_message = response.choices[0].message
+        tool_calls = response_message.tool_calls
+
+        if tool_calls:
+            # OpenAI can return multiple tool calls, we'll take the first one for simplicity
+            tool_call = tool_calls[0]
+            return {
+                "tool_calls": [{
+                    "function": {
+                        "name": tool_call.function.name,
+                        "arguments": json.loads(tool_call.function.arguments)
+                    }
+                }]
+            }
+        else:
+            return {"content": response_message.content}
+    except Exception as e:
+        print(f"Error with OpenAI: {e}")
+        return {"content": f"Error with OpenAI: {e}"}
+
+
+async def process_chat_message(messages: List[Dict[str, str]]) -> Dict[str, Any]:
+    """
+    Process chat messages by routing to the configured LLM provider.
+    """
+    provider = get_current_provider()
+    print(f"Processing message with provider: {provider}")
+    if provider == "openai":
+        return await _process_with_openai(messages)
+    elif provider == "google":
+        return await _process_with_gemini(messages)
+    else:
+        return {"content": f"Error: Unknown LLM_PROVIDER '{provider}'. Please set to 'google' or 'openai'."}
+
+
 async def _process_with_openai(messages: List[Dict[str, str]]) -> Dict[str, Any]:
     """Process messages using OpenAI."""
     if not openai_client:
@@ -155,18 +266,22 @@ async def _process_with_openai(messages: List[Dict[str, str]]) -> Dict[str, Any]
     openai_history = []
     for msg in messages:
         if msg["role"] == "tool":
-            openai_history.append({"role": "tool", "tool_call_id": "placeholder_id", "name": "tool_name", "content": msg["content"]})
+            openai_history.append({"role": "tool", "tool_call_id": "placeholder_id",
+                                  "name": "tool_name", "content": msg["content"]})
         else:
-            openai_history.append({"role": msg["role"], "content": msg["content"]})
-    
+            openai_history.append(
+                {"role": msg["role"], "content": msg["content"]})
+
     try:
         response = openai_client.chat.completions.create(
             model=os.environ.get("OPENAI_MODEL", "gpt-4o"),
-            messages=[{"role": "system", "content": SYSTEM_PROMPT}] + openai_history,
-            tools=[{"type": "function", "function": f} for f in TOOLS_DEFINITION],
+            messages=[{"role": "system", "content": SYSTEM_PROMPT}
+                      ] + openai_history,
+            tools=[{"type": "function", "function": f}
+                   for f in TOOLS_DEFINITION],
             tool_choice="auto",
         )
-        
+
         response_message = response.choices[0].message
         tool_calls = response_message.tool_calls
 

@@ -1,19 +1,20 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import Navbar from './components/Navbar';
-import ProtectedRoute from './components/ProtectedRoute';
-import HomePage from './pages/HomePage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { useEffect, useState } from "react";
+import Navbar from "./components/Navbar";
+import ProtectedRoute from "./components/ProtectedRoute";
+import HomePage from "./pages/HomePage";
+import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
+import SettingsPage from "./pages/SettingsPage";
 // Removed NetworkVisualizationPage and LayoutRecommendationPage as part of migration to MCP-based design
-import NetworkChatPage from './pages/NetworkChatPage';
-import useAuthStore from './services/authStore';
-import websocketService from './services/websocketService';
+import NetworkChatPage from "./pages/NetworkChatPage";
+import useAuthStore from "./services/authStore";
+import websocketService from "./services/websocketService";
 
 function App() {
   const { checkAuth, isLoading, isAuthenticated } = useAuthStore();
   const [authInitialized, setAuthInitialized] = useState(false);
-  
+
   // Check authentication status on app load
   useEffect(() => {
     const initAuth = async () => {
@@ -27,16 +28,16 @@ function App() {
         setAuthInitialized(true);
       }
     };
-    
+
     initAuth();
   }, [checkAuth]);
-  
+
   // Connect to WebSocket when authenticated
   useEffect(() => {
     if (isAuthenticated && authInitialized) {
       console.log("App: User is authenticated, connecting to WebSocket");
       websocketService.connect();
-      
+
       // Cleanup function to disconnect WebSocket when component unmounts
       return () => {
         console.log("App: Disconnecting WebSocket");
@@ -44,7 +45,7 @@ function App() {
       };
     }
   }, [isAuthenticated, authInitialized]);
-  
+
   // Show loading spinner while checking authentication
   if (isLoading && !authInitialized) {
     return (
@@ -53,7 +54,7 @@ function App() {
       </div>
     );
   }
-  
+
   return (
     <Router>
       <div className="min-h-screen bg-gray-100">
@@ -63,14 +64,22 @@ function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <SettingsPage />
+                </ProtectedRoute>
+              }
+            />
             {/* Routes for /network and /recommend have been removed as part of migration to MCP-based design */}
-            <Route 
-              path="/chat" 
+            <Route
+              path="/chat"
               element={
                 <ProtectedRoute>
                   <NetworkChatPage />
                 </ProtectedRoute>
-              } 
+              }
             />
           </Routes>
         </main>

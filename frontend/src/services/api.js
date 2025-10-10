@@ -15,18 +15,27 @@ axios.interceptors.request.use(
       // Ensure the Authorization header is set correctly
       config.headers = {
         ...config.headers,
-        Authorization: `Bearer ${token}`
+        Authorization: `Bearer ${token}`,
       };
-      console.log("Adding token to request:", config.url, "Token:", token.substring(0, 10) + "...");
+      console.log(
+        "Adding token to request:",
+        config.url,
+        "Token:",
+        token.substring(0, 10) + "...",
+      );
       console.log("Full headers:", JSON.stringify(config.headers));
     } else {
       console.log("No token found for request:", config.url);
-      
+
       // Check if we're on a protected route and redirect to login if needed
-      if (window.location.pathname !== '/' && 
-          window.location.pathname !== '/login' && 
-          window.location.pathname !== '/register') {
-        console.log("Protected route detected without token, redirecting to login");
+      if (
+        window.location.pathname !== "/" &&
+        window.location.pathname !== "/login" &&
+        window.location.pathname !== "/register"
+      ) {
+        console.log(
+          "Protected route detected without token, redirecting to login",
+        );
         // We'll handle this in the response interceptor
       }
     }
@@ -38,26 +47,41 @@ axios.interceptors.request.use(
 // Add response interceptor for debugging
 axios.interceptors.response.use(
   (response) => {
-    console.log("Response from:", response.config.url, "Status:", response.status);
+    console.log(
+      "Response from:",
+      response.config.url,
+      "Status:",
+      response.status,
+    );
     return response;
   },
   (error) => {
-    console.error("Error response:", error.config?.url, "Status:", error.response?.status);
+    console.error(
+      "Error response:",
+      error.config?.url,
+      "Status:",
+      error.response?.status,
+    );
     console.error("Error details:", error.response?.data);
-    
+
     // Handle 401 errors globally
     if (error.response?.status === 401) {
-      console.error("Authentication error detected, clearing token and redirecting to login");
-      localStorage.removeItem('token');
-      
+      console.error(
+        "Authentication error detected, clearing token and redirecting to login",
+      );
+      localStorage.removeItem("token");
+
       // Only redirect if we're not already on the login page
-      if (window.location.pathname !== '/login' && window.location.pathname !== '/register') {
-        window.location.href = '/login';
+      if (
+        window.location.pathname !== "/login" &&
+        window.location.pathname !== "/register"
+      ) {
+        window.location.href = "/login";
       }
     }
-    
+
     return Promise.reject(error);
-  }
+  },
 );
 
 // Auth API
@@ -116,7 +140,7 @@ export const networkAPI = {
     if (conversationId) {
       url = `${API_URL}/network/${conversationId}/upload`;
     }
-    
+
     console.log(`Uploading GraphML to ${url}`);
     return axios.post(url, formData, {
       headers: {
@@ -128,21 +152,26 @@ export const networkAPI = {
   exportNetworkAsGraphML: (networkId) => {
     console.log("Exporting network as GraphML:", networkId);
     return axios.get(`${API_URL}/network/${networkId}/export`, {
-      responseType: 'blob',
+      responseType: "blob",
     });
   },
   calculateLayout: (networkId, layoutType, layoutParams = {}) => {
-    console.log("Calculating layout for network:", networkId, "Type:", layoutType);
+    console.log(
+      "Calculating layout for network:",
+      networkId,
+      "Type:",
+      layoutType,
+    );
     return axios.post(`${API_URL}/network/${networkId}/layout`, {
       layout_type: layoutType,
-      layout_params: layoutParams
+      layout_params: layoutParams,
     });
   },
   getLayoutRecommendation: (description, purpose) => {
     console.log("Getting layout recommendation");
     return axios.post(`${API_URL}/chat/recommend-layout`, {
       description,
-      purpose
+      purpose,
     });
   },
 };
@@ -155,14 +184,19 @@ export const networkChatAPI = {
   },
   getMessages: (conversationId) => {
     console.log("Getting messages for conversation:", conversationId);
-    return axios.get(`${API_URL}/chat/conversations/${conversationId}/messages`);
+    return axios.get(
+      `${API_URL}/chat/conversations/${conversationId}/messages`,
+    );
   },
   sendMessage: (conversationId, message) => {
     console.log("Sending message to conversation:", conversationId, message);
-    return axios.post(`${API_URL}/chat/conversations/${conversationId}/messages`, {
-      content: message,
-      role: "user"
-    });
+    return axios.post(
+      `${API_URL}/chat/conversations/${conversationId}/messages`,
+      {
+        content: message,
+        role: "user",
+      },
+    );
   },
   createConversation: (title = "New Conversation") => {
     console.log("Creating new conversation with title:", title);
@@ -176,5 +210,21 @@ export const networkChatAPI = {
     console.log("Processing chat message via API:", message);
     // APIサーバーを経由してチャットメッセージを処理
     return axios.post(`${API_URL}/chat/process`, { message });
-  }
+  },
+};
+
+// Settings API endpoints
+export const settingsAPI = {
+  getLLMProviderSettings: () => {
+    console.log("Getting LLM provider settings");
+    return axios.get(`${API_URL}/settings/llm-provider`);
+  },
+  updateLLMProviderSettings: (settings) => {
+    console.log("Updating LLM provider settings:", settings);
+    return axios.put(`${API_URL}/settings/llm-provider`, settings);
+  },
+  getLLMProviderStatus: () => {
+    console.log("Getting LLM provider status");
+    return axios.get(`${API_URL}/settings/llm-provider/status`);
+  },
 };
