@@ -86,8 +86,43 @@ _initialize_clients()
 # Shared tool definitions, adaptable for each provider.
 TOOLS_DEFINITION = [
     {
+        "name": "calculate_and_store_centrality",
+        "description": "Calculates a specified centrality metric for the network and stores the results for later visualization. Use this when the user asks about node importance, influence, or connectivity and wants visualization. This is the first stage of a two-stage process.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "centrality_type": {
+                    "type": "string",
+                    "description": "The type of centrality to calculate.",
+                    "enum": ["degree", "closeness", "betweenness", "eigenvector", "pagerank"]
+                },
+            },
+            "required": ["centrality_type"]
+        }
+    },
+    {
+        "name": "get_centrality_visualization",
+        "description": "Retrieves and applies visualization data from a previously calculated centrality. Use this after calculate_and_store_centrality to actually display the centrality visualization. This is the second stage of a two-stage process.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "calculation_id": {
+                    "type": "string",
+                    "description": "The ID of the centrality calculation to visualize."
+                },
+                "color_scheme": {
+                    "type": "string",
+                    "description": "Color scheme for visualization.",
+                    "enum": ["viridis", "plasma", "inferno", "magma"],
+                    "default": "viridis"
+                }
+            },
+            "required": ["calculation_id"]
+        }
+    },
+    {
         "name": "calculate_centrality",
-        "description": "Calculates a specified centrality metric for the network. Use this when the user asks about node importance, influence, or connectivity.",
+        "description": "Calculates a specified centrality metric for the network (legacy single-stage). Use this when the user asks about node importance but doesn't need persistent visualization.",
         "parameters": {
             "type": "object",
             "properties": {
@@ -127,11 +162,21 @@ SYSTEM_PROMPT = """
 You are an expert network analysis assistant. Your role is to help users analyze and visualize network graphs.
 You have access to a set of tools to perform network operations. When a user asks a question or gives a command, first determine if it can be answered by calling one of your tools.
 
+**Centrality Visualization Process:**
+
+When users ask for centrality visualization (e.g., "show degree centrality", "visualize with betweenness centrality"), use the two-stage process:
+
+1. **Stage 1 - Calculate and Store:** Use `calculate_and_store_centrality` to compute centrality values and get a calculation_id
+2. **Stage 2 - Visualize:** Use `get_centrality_visualization` with the calculation_id to apply the visualization
+
+For requests in Japanese like "次数中心性で可視化して" or "次数中心性で可視化してください", use the degree centrality two-stage process.
+
 **Interaction Flow:**
 
 1.  **Analyze User Request:** Understand the user's intent.
 2.  **Tool Selection:** If the request matches a tool's capability, you should respond with a tool call.
-3.  **General Conversation:** If the user's message is a greeting or a question that cannot be answered by a tool, respond in a helpful and conversational manner.
+3.  **Two-Stage Processing:** For visualization requests, use the two-stage process described above.
+4.  **General Conversation:** If the user's message is a greeting or a question that cannot be answered by a tool, respond in a helpful and conversational manner.
 
 **Your Final Output should be either a direct text response OR a tool call.**
 """

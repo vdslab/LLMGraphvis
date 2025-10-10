@@ -14,6 +14,7 @@ const NetworkChatPage = () => {
     positions,
     isLoading,
     error,
+    centralityInfo,
     uploadNetworkFile,
     // Unused functions removed
   } = useNetworkStore();
@@ -829,7 +830,25 @@ const NetworkChatPage = () => {
                   let nodeInfo = `**ノード「${node.label || node.id}」の情報**\n\n`;
 
                   // 中心性値がある場合は表示
-                  if (network_state.centrality) {
+                  if (centralityInfo && centralityInfo.applied) {
+                    const centralityType = centralityInfo.type;
+                    const centralityKey = `${centralityType}_centrality`;
+                    const centralityValue = node[centralityKey];
+
+                    if (centralityValue !== undefined) {
+                      nodeInfo += `${centralityType.charAt(0).toUpperCase() + centralityType.slice(1)} 中心性値: ${centralityValue.toFixed(3)}\n\n`;
+
+                      // 重要度の判定
+                      const importance =
+                        node.size > 12
+                          ? "非常に重要"
+                          : node.size > 8
+                            ? "重要"
+                            : "標準";
+                      nodeInfo += `重要度: ${importance}\n\n`;
+                    }
+                  } else if (network_state.centrality) {
+                    // Legacy centrality display (backward compatibility)
                     const centralityValue = ((node.size - 5) / 10).toFixed(3);
                     nodeInfo += `中心性値: ${centralityValue}\n\n`;
 

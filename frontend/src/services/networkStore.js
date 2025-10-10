@@ -2,15 +2,6 @@ import { create } from "zustand";
 import { networkAPI } from "./api";
 import useChatStore from "./chatStore";
 
-// Helper function to generate colors based on centrality values
-const getCentralityColor = (value, maxValue) => {
-  // Generate a color from blue (low) to red (high)
-  const ratio = value / maxValue;
-  const r = Math.floor(255 * ratio);
-  const b = Math.floor(255 * (1 - ratio));
-  return `rgb(${r}, 70, ${b})`;
-};
-
 const useNetworkStore = create((set, get) => ({
   nodes: [],
   edges: [],
@@ -19,6 +10,7 @@ const useNetworkStore = create((set, get) => ({
   positions: [],
   centrality: null,
   centralityType: null,
+  centralityInfo: null, // Store information about applied centrality calculations
   isLoading: false,
   error: null,
   recommendation: null,
@@ -53,45 +45,53 @@ const useNetworkStore = create((set, get) => ({
   calculateLayout: async () => {
     const { layout, layoutParams } = get();
     const conversationId = useChatStore.getState().currentConversationId;
-    
+
     if (!conversationId) {
       console.log("No conversation selected, skipping layout calculation");
       return false;
     }
 
     set({ isLoading: true, error: null });
-    
+
     try {
       // Get current network data
       const networkId = conversationId;
       const cytoscapeResponse = await networkAPI.getNetworkCytoscape(networkId);
       const cytoData = cytoscapeResponse.data;
-      
+
       if (!cytoData || !cytoData.elements) {
         throw new Error("Failed to retrieve network data");
       }
-      
+
       // Call NetworkXMCP to calculate layout
-      const response = await networkAPI.calculateLayout(networkId, layout, layoutParams);
-      
-      if (response.data && response.data.result && response.data.result.success) {
+      const response = await networkAPI.calculateLayout(
+        networkId,
+        layout,
+        layoutParams,
+      );
+
+      if (
+        response.data &&
+        response.data.result &&
+        response.data.result.success
+      ) {
         const positions = response.data.result.positions;
-        
+
         // Update positions in the store
-        const updatedPositions = Object.keys(positions).map(nodeId => ({
+        const updatedPositions = Object.keys(positions).map((nodeId) => ({
           id: nodeId,
           x: positions[nodeId].x,
           y: positions[nodeId].y,
           size: 5,
-          color: "#1d4ed8"
+          color: "#1d4ed8",
         }));
-        
+
         set({
           positions: updatedPositions,
           isLoading: false,
-          error: null
+          error: null,
         });
-        
+
         return true;
       } else {
         throw new Error("Layout calculation failed");
@@ -100,7 +100,7 @@ const useNetworkStore = create((set, get) => ({
       console.error("Error calculating layout:", error);
       set({
         isLoading: false,
-        error: error.message || "Failed to calculate layout"
+        error: error.message || "Failed to calculate layout",
       });
       return false;
     }
@@ -115,18 +115,18 @@ const useNetworkStore = create((set, get) => ({
   loadSampleNetwork: async () => {
     console.log("Generating static sample network");
     set({ isLoading: true, error: null });
-    
+
     try {
       const sampleNodes = [];
       const sampleEdges = [];
       const samplePositions = [];
-      
+
       // Center node
       sampleNodes.push({
         id: "0",
         label: "Center Node",
       });
-      
+
       samplePositions.push({
         id: "0",
         label: "Center Node",
@@ -135,20 +135,20 @@ const useNetworkStore = create((set, get) => ({
         size: 8,
         color: "#1d4ed8",
       });
-      
+
       // 10 satellite nodes
       for (let i = 1; i <= 10; i++) {
         sampleNodes.push({
           id: i.toString(),
           label: `Node ${i}`,
         });
-        
+
         sampleEdges.push({
           source: "0",
           target: i.toString(),
         });
-        
-        const angle = (i - 1) * (2 * Math.PI / 10);
+
+        const angle = (i - 1) * ((2 * Math.PI) / 10);
         samplePositions.push({
           id: i.toString(),
           label: `Node ${i}`,
@@ -158,7 +158,7 @@ const useNetworkStore = create((set, get) => ({
           color: "#1d4ed8",
         });
       }
-      
+
       set({
         nodes: sampleNodes,
         edges: sampleEdges,
@@ -167,7 +167,7 @@ const useNetworkStore = create((set, get) => ({
         isLoading: false,
         error: null,
       });
-      
+
       return true;
     } catch (error) {
       console.error("Error generating static sample network:", error);
@@ -183,14 +183,17 @@ const useNetworkStore = create((set, get) => ({
   getLayoutRecommendation: async (description, purpose) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await networkAPI.getLayoutRecommendation(description, purpose);
+      const response = await networkAPI.getLayoutRecommendation(
+        description,
+        purpose,
+      );
       const result = response.data;
-      
+
       if (result && result.success) {
         set({
           recommendation: result,
           isLoading: false,
-          error: null
+          error: null,
         });
         return true;
       } else {
@@ -200,7 +203,7 @@ const useNetworkStore = create((set, get) => ({
       console.error("Error getting layout recommendation:", error);
       set({
         isLoading: false,
-        error: error.message || "Failed to get layout recommendation"
+        error: error.message || "Failed to get layout recommendation",
       });
       return false;
     }
@@ -213,34 +216,87 @@ const useNetworkStore = create((set, get) => ({
       set({ error: "No recommendation available" });
       return false;
     }
-    
-    set({ 
+
+    set({
       layout: recommendation.recommended_layout,
-      layoutParams: recommendation.recommended_parameters || {}
+      layoutParams: recommendation.recommended_parameters || {},
     });
-    
+
     return await get().calculateLayout();
   },
 
-  // Apply centrality values to nodes
-  applyCentralityValues: (centralityValues, centralityType) => {
-    const maxValue = Math.max(...Object.values(centralityValues), 1);
-    const updatedPositions = get().positions.map((node) => {
-      const value = centralityValues[node.id] || 0;
-      const normalizedSize = 5 + (value / maxValue) * 15;
+  // Apply centrality values directly to graph data for backward compatibility
+  applyCentralityValues: (centrality_values, centrality_type) => {
+    set((state) => {
+      console.log(
+        `Applying ${centrality_type} centrality values:`,
+        centrality_values,
+      );
+
+      // Update graph data with centrality values
+      const updatedGraphData = { ...state.graphData };
+      if (updatedGraphData.nodes) {
+        updatedGraphData.nodes = updatedGraphData.nodes.map((node) => ({
+          ...node,
+          [`${centrality_type}_centrality`]: centrality_values[node.id] || 0,
+        }));
+      }
+
       return {
-        ...node,
-        size: normalizedSize,
-        color: getCentralityColor(value, maxValue),
+        ...state,
+        graphData: updatedGraphData,
       };
     });
-    set({
-      positions: updatedPositions,
-      centrality: centralityValues,
-      centralityType,
+  },
+
+  // Apply visualization data from two-stage centrality processing
+  applyCentralityVisualizationData: (
+    visualization_data,
+    centrality_type,
+    calculation_id,
+  ) => {
+    set((state) => {
+      console.log(
+        `Applying ${centrality_type} centrality visualization data:`,
+        visualization_data,
+      );
+
+      const { centrality_values, color_map, size_map } = visualization_data;
+
+      // Update graph data with centrality values and visual properties
+      const updatedGraphData = { ...state.graphData };
+      if (updatedGraphData.nodes) {
+        updatedGraphData.nodes = updatedGraphData.nodes.map((node) => {
+          const nodeId = node.id;
+          const centralityValue = centrality_values[nodeId] || 0;
+          const color = color_map[nodeId] || "#999999";
+          const size = size_map[nodeId] || 5;
+
+          return {
+            ...node,
+            [`${centrality_type}_centrality`]: centralityValue,
+            color: color,
+            size: size,
+            // Store original properties for potential restoration
+            originalColor: node.originalColor || node.color || "#999999",
+            originalSize: node.originalSize || node.size || 5,
+          };
+        });
+      }
+
+      return {
+        ...state,
+        graphData: updatedGraphData,
+        centralityInfo: {
+          type: centrality_type,
+          calculationId: calculation_id,
+          applied: true,
+          timestamp: new Date().toISOString(),
+        },
+      };
     });
   },
- 
+
   // Clear all data
   clearData: () => {
     set({
@@ -269,31 +325,41 @@ const useNetworkStore = create((set, get) => ({
       if (result && result.network_id && result.conversation_id) {
         console.log("File uploaded successfully. New data:", result);
 
-        useChatStore.getState().setCurrentConversationId(result.conversation_id);
-        
+        useChatStore
+          .getState()
+          .setCurrentConversationId(result.conversation_id);
+
         useChatStore.getState().addMessage({
           role: "assistant",
           content: `ファイル "${file.name}" が正常にアップロードされ、新しいネットワークが作成されました。`,
           timestamp: new Date().toISOString(),
         });
 
-        const cytoscapeResponse = await networkAPI.getNetworkCytoscape(result.network_id);
+        const cytoscapeResponse = await networkAPI.getNetworkCytoscape(
+          result.network_id,
+        );
         const cytoData = cytoscapeResponse.data;
 
         if (cytoData && cytoData.elements) {
           set({
-            nodes: cytoData.elements.nodes.map(n => n.data),
-            edges: cytoData.elements.edges.map(e => e.data),
-            positions: cytoData.elements.nodes.map(n => ({ ...n.data, ...n.position })),
+            nodes: cytoData.elements.nodes.map((n) => n.data),
+            edges: cytoData.elements.edges.map((e) => e.data),
+            positions: cytoData.elements.nodes.map((n) => ({
+              ...n.data,
+              ...n.position,
+            })),
             isLoading: false,
             error: null,
           });
           return { success: true };
         } else {
-          throw new Error("Failed to retrieve valid Cytoscape data after upload.");
+          throw new Error(
+            "Failed to retrieve valid Cytoscape data after upload.",
+          );
         }
       } else {
-        const errorMessage = result.detail || "Unknown error during file upload process.";
+        const errorMessage =
+          result.detail || "Unknown error during file upload process.";
         console.error("File upload failed:", errorMessage);
         throw new Error(errorMessage);
       }
@@ -304,7 +370,7 @@ const useNetworkStore = create((set, get) => ({
         "An unknown error occurred during file upload.";
 
       console.error("Caught error in uploadNetworkFile:", errorMessage);
-      
+
       set({
         isLoading: false,
         error: errorMessage,
@@ -324,7 +390,7 @@ const useNetworkStore = create((set, get) => ({
       set({ error: "No active conversation selected." });
       return null;
     }
-    const networkId = currentConversationId; 
+    const networkId = currentConversationId;
 
     set({ isLoading: true, error: null });
     try {
@@ -356,9 +422,12 @@ const useNetworkStore = create((set, get) => ({
       const response = await networkAPI.getNetworkCytoscape(networkId);
       const cytoData = response.data;
       if (cytoData && cytoData.elements) {
-        const nodes = cytoData.elements.nodes.map(n => n.data);
-        const edges = cytoData.elements.edges.map(e => e.data);
-        const positions = cytoData.elements.nodes.map(n => ({ ...n.data, ...n.position }));
+        const nodes = cytoData.elements.nodes.map((n) => n.data);
+        const edges = cytoData.elements.edges.map((e) => e.data);
+        const positions = cytoData.elements.nodes.map((n) => ({
+          ...n.data,
+          ...n.position,
+        }));
         set({
           nodes,
           edges,

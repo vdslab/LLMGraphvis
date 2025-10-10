@@ -99,8 +99,10 @@ class GraphMLExportParams(BaseModel):
 
 
 class CalculateMetricsParams(BaseModel):
-    graphml_content: str = Field(..., description="GraphML content to analyze.")
-    layout_type: str = Field("spring", description="Layout algorithm to apply.")
+    graphml_content: str = Field(...,
+                                 description="GraphML content to analyze.")
+    layout_type: str = Field(
+        "spring", description="Layout algorithm to apply.")
     layout_params: Dict[str, Any] = Field({}, description="Layout parameters.")
     metrics_to_calculate: Optional[List[str]] = Field(
         None, description="List of metrics to calculate. If None, all metrics are calculated.")
@@ -108,9 +110,35 @@ class CalculateMetricsParams(BaseModel):
 
 class VisualizationParams(BaseModel):
     graph_id: str = Field(..., description="ID of the cached graph.")
-    metric_name: str = Field(..., description="Name of the metric to visualize.")
-    color_scheme: str = Field("viridis", description="Color scheme for visualization.")
-    size_range: Optional[List[float]] = Field(None, description="Node size range [min, max].")
+    metric_name: str = Field(...,
+                             description="Name of the metric to visualize.")
+    color_scheme: str = Field(
+        "viridis", description="Color scheme for visualization.")
+    size_range: Optional[List[float]] = Field(
+        None, description="Node size range [min, max].")
+
+
+class CentralityCalculationParams(BaseModel):
+    graphml_content: str = Field(...,
+                                 description="GraphML content to analyze.")
+    centrality_type: str = Field(
+        "degree", description="Type of centrality to calculate.")
+    centrality_params: Dict[str, Any] = Field(
+        {}, description="Parameters for centrality calculation.")
+
+
+class CentralityVisualizationParams(BaseModel):
+    calculation_id: str = Field(...,
+                                description="ID of the centrality calculation.")
+    color_scheme: str = Field(
+        "viridis", description="Color scheme for visualization.")
+    size_range: List[float] = Field(
+        [5, 20], description="Node size range [min, max].")
+
+
+class CalculationIdParams(BaseModel):
+    calculation_id: str = Field(...,
+                                description="ID of the centrality calculation.")
 
 
 class GraphIdParams(BaseModel):
@@ -175,7 +203,7 @@ def apply_layout(G: nx.Graph, layout_type: str, **kwargs) -> Dict:
         "planar": nx.planar_layout,
         "spiral": nx.spiral_layout
     }
-    
+
     # カスタムレイアウトの処理
     if layout_type == "grid":
         from layouts.layout_functions import calculate_grid_layout
@@ -194,12 +222,13 @@ def apply_layout(G: nx.Graph, layout_type: str, **kwargs) -> Dict:
         # bipartiteレイアウトは特別な処理が必要
         node_list = list(G.nodes())
         nodes = kwargs.get('nodes', node_list[:len(node_list)//2])
-        positions = calculate_bipartite_layout(G, nodes, **{k: v for k, v in kwargs.items() if k != 'nodes'})
+        positions = calculate_bipartite_layout(
+            G, nodes, **{k: v for k, v in kwargs.items() if k != 'nodes'})
     else:
         # 既存のNetworkXレイアウト
         layout_func = layout_functions.get(layout_type, nx.spring_layout)
         positions = layout_func(G, **kwargs)
-    
+
     # JSONシリアライズ可能な形式に変換
     return {str(k): {"x": float(v[0]), "y": float(v[1])} for k, v in positions.items()}
 
@@ -226,6 +255,14 @@ async def get_mcp_info():
                 "description": "Change the layout algorithm for a given network"},
             {"name": "calculate_centrality",
                 "description": "Calculate centrality metrics for a given network"},
+            {"name": "calculate_and_store_centrality",
+                "description": "Calculate centrality and store results (Stage 1)"},
+            {"name": "get_centrality_visualization",
+                "description": "Get visualization data from stored centrality (Stage 2)"},
+            {"name": "list_centrality_calculations",
+                "description": "List all stored centrality calculations"},
+            {"name": "get_centrality_status",
+                "description": "Get status of a centrality calculation"},
             {"name": "calculate_and_store_metrics",
                 "description": "Calculate all metrics and store graph in cache"},
             {"name": "get_visualization_data",
@@ -456,21 +493,22 @@ async def api_calculate_and_store_metrics(params: CalculateMetricsParams):
     """
     try:
         from tools.analysis_tools import calculate_and_store_metrics
-        
+
         result = calculate_and_store_metrics(
             graphml_content=params.graphml_content,
             layout_type=params.layout_type,
             layout_params=params.layout_params,
             metrics_to_calculate=params.metrics_to_calculate
         )
-        
+
         if not result["success"]:
-            error_msg = result.get("error", "Unknown error during metrics calculation")
+            error_msg = result.get(
+                "error", "Unknown error during metrics calculation")
             logger.error(f"API: Metrics calculation failed: {error_msg}")
             raise HTTPException(status_code=400, detail=error_msg)
-        
+
         return {"result": result}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -485,23 +523,25 @@ async def api_get_visualization_data(params: VisualizationParams):
     """
     try:
         from tools.analysis_tools import get_visualization_data
-        
+
         size_range = tuple(params.size_range) if params.size_range else None
-        
+
         result = get_visualization_data(
             graph_id=params.graph_id,
             metric_name=params.metric_name,
             color_scheme=params.color_scheme,
             size_range=size_range
         )
-        
+
         if not result["success"]:
-            error_msg = result.get("error", "Unknown error during visualization data generation")
-            logger.error(f"API: Visualization data generation failed: {error_msg}")
+            error_msg = result.get(
+                "error", "Unknown error during visualization data generation")
+            logger.error(
+                f"API: Visualization data generation failed: {error_msg}")
             raise HTTPException(status_code=400, detail=error_msg)
-        
+
         return {"result": result}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -516,16 +556,17 @@ async def api_get_available_metrics(params: GraphIdParams):
     """
     try:
         from tools.analysis_tools import get_available_metrics
-        
+
         result = get_available_metrics(graph_id=params.graph_id)
-        
+
         if not result["success"]:
-            error_msg = result.get("error", "Unknown error during metrics retrieval")
+            error_msg = result.get(
+                "error", "Unknown error during metrics retrieval")
             logger.error(f"API: Metrics retrieval failed: {error_msg}")
             raise HTTPException(status_code=400, detail=error_msg)
-        
+
         return {"result": result}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -542,13 +583,124 @@ async def get_cache_stats():
         from tools.graph_cache import get_cache
         cache = get_cache()
         stats = cache.get_stats()
-        
+
         return {
             "success": True,
             "stats": stats
         }
     except Exception as e:
         logger.error(f"Error getting cache stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/tools/calculate_and_store_centrality", response_model=Dict[str, Any])
+async def api_calculate_and_store_centrality(params: CentralityCalculationParams):
+    """
+    中心性を計算し結果を保存する（1段階目）
+    """
+    try:
+        from tools.centrality_persistence import calculate_and_store_centrality
+
+        result = calculate_and_store_centrality(
+            graphml_content=params.graphml_content,
+            centrality_type=params.centrality_type,
+            centrality_params=params.centrality_params
+        )
+
+        if not result["success"]:
+            error_msg = result.get(
+                "error", "Unknown error during centrality calculation")
+            logger.error(f"API: Centrality calculation failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+
+        return {"result": result}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in calculate_and_store_centrality: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/tools/get_centrality_visualization", response_model=Dict[str, Any])
+async def api_get_centrality_visualization(params: CentralityVisualizationParams):
+    """
+    保存された中心性データから可視化データを取得する（2段階目）
+    """
+    try:
+        from tools.centrality_persistence import get_centrality_visualization_data
+
+        size_range = tuple(params.size_range) if params.size_range else (5, 20)
+
+        result = get_centrality_visualization_data(
+            calculation_id=params.calculation_id,
+            color_scheme=params.color_scheme,
+            size_range=size_range
+        )
+
+        if not result["success"]:
+            error_msg = result.get(
+                "error", "Unknown error during visualization data generation")
+            logger.error(
+                f"API: Visualization data generation failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+
+        return {"result": result}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_centrality_visualization: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/tools/list_centrality_calculations", response_model=Dict[str, Any])
+async def api_list_centrality_calculations():
+    """
+    保存されている中心性計算のリストを取得する
+    """
+    try:
+        from tools.centrality_persistence import list_stored_calculations
+
+        result = list_stored_calculations()
+
+        if not result["success"]:
+            error_msg = result.get(
+                "error", "Unknown error during calculations listing")
+            logger.error(f"API: Calculations listing failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+
+        return {"result": result}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in list_centrality_calculations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/tools/get_centrality_status", response_model=Dict[str, Any])
+async def api_get_centrality_status(params: CalculationIdParams):
+    """
+    中心性計算の状態を取得する
+    """
+    try:
+        from tools.centrality_persistence import get_calculation_status
+
+        result = get_calculation_status(calculation_id=params.calculation_id)
+
+        if not result["success"]:
+            error_msg = result.get(
+                "error", "Unknown error during status retrieval")
+            logger.error(f"API: Status retrieval failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+
+        return {"result": result}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_centrality_status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
