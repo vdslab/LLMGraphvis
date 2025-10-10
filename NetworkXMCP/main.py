@@ -95,6 +95,27 @@ class GraphMLExportParams(BaseModel):
     include_visual_properties: bool = Field(
         True, description="Include visual properties in the exported GraphML.")
 
+# 新しい分析ツール用のPydanticモデル
+
+
+class CalculateMetricsParams(BaseModel):
+    graphml_content: str = Field(..., description="GraphML content to analyze.")
+    layout_type: str = Field("spring", description="Layout algorithm to apply.")
+    layout_params: Dict[str, Any] = Field({}, description="Layout parameters.")
+    metrics_to_calculate: Optional[List[str]] = Field(
+        None, description="List of metrics to calculate. If None, all metrics are calculated.")
+
+
+class VisualizationParams(BaseModel):
+    graph_id: str = Field(..., description="ID of the cached graph.")
+    metric_name: str = Field(..., description="Name of the metric to visualize.")
+    color_scheme: str = Field("viridis", description="Color scheme for visualization.")
+    size_range: Optional[List[float]] = Field(None, description="Node size range [min, max].")
+
+
+class GraphIdParams(BaseModel):
+    graph_id: str = Field(..., description="ID of the cached graph.")
+
 # --- ヘルパー関数 ---
 
 
@@ -170,16 +191,22 @@ async def get_mcp_info():
     """MCPサーバーの情報を返す"""
     return {
         "success": True,
-        "name": "NetworkX MCP (Stateless)",
-        "version": "0.2.0",
-        "description": "Stateless NetworkX graph analysis and visualization MCP server",
+        "name": "NetworkX MCP (Enhanced)",
+        "version": "0.3.0",
+        "description": "Enhanced NetworkX graph analysis and visualization MCP server with caching",
         "tools": [
             {"name": "get_sample_network",
                 "description": "Get a sample network in GraphML format"},
             {"name": "change_layout",
                 "description": "Change the layout algorithm for a given network"},
             {"name": "calculate_centrality",
-                "description": "Calculate centrality metrics for a given network"}
+                "description": "Calculate centrality metrics for a given network"},
+            {"name": "calculate_and_store_metrics",
+                "description": "Calculate all metrics and store graph in cache"},
+            {"name": "get_visualization_data",
+                "description": "Get visualization data for a specific metric"},
+            {"name": "get_available_metrics",
+                "description": "Get list of available metrics for a cached graph"}
         ]
     }
 
@@ -395,6 +422,110 @@ async def api_export_graphml(params: GraphMLExportParams):
         error_msg = f"Error exporting GraphML: {str(e)}"
         logger.error(f"API: Unexpected error: {error_msg}")
         raise HTTPException(status_code=500, detail=error_msg)
+
+
+@app.post("/tools/calculate_and_store_metrics", response_model=Dict[str, Any])
+async def api_calculate_and_store_metrics(params: CalculateMetricsParams):
+    """
+    GraphMLからグラフを読み込み、レイアウトと指標を計算してキャッシュに保存する
+    """
+    try:
+        from tools.analysis_tools import calculate_and_store_metrics
+        
+        result = calculate_and_store_metrics(
+            graphml_content=params.graphml_content,
+            layout_type=params.layout_type,
+            layout_params=params.layout_params,
+            metrics_to_calculate=params.metrics_to_calculate
+        )
+        
+        if not result["success"]:
+            error_msg = result.get("error", "Unknown error during metrics calculation")
+            logger.error(f"API: Metrics calculation failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+        
+        return {"result": result}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in calculate_and_store_metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/tools/get_visualization_data", response_model=Dict[str, Any])
+async def api_get_visualization_data(params: VisualizationParams):
+    """
+    キャッシュされたグラフから指定された指標に基づく可視化データを取得する
+    """
+    try:
+        from tools.analysis_tools import get_visualization_data
+        
+        size_range = tuple(params.size_range) if params.size_range else None
+        
+        result = get_visualization_data(
+            graph_id=params.graph_id,
+            metric_name=params.metric_name,
+            color_scheme=params.color_scheme,
+            size_range=size_range
+        )
+        
+        if not result["success"]:
+            error_msg = result.get("error", "Unknown error during visualization data generation")
+            logger.error(f"API: Visualization data generation failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+        
+        return {"result": result}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_visualization_data: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/tools/get_available_metrics", response_model=Dict[str, Any])
+async def api_get_available_metrics(params: GraphIdParams):
+    """
+    キャッシュされたグラフで利用可能な指標のリストを取得する
+    """
+    try:
+        from tools.analysis_tools import get_available_metrics
+        
+        result = get_available_metrics(graph_id=params.graph_id)
+        
+        if not result["success"]:
+            error_msg = result.get("error", "Unknown error during metrics retrieval")
+            logger.error(f"API: Metrics retrieval failed: {error_msg}")
+            raise HTTPException(status_code=400, detail=error_msg)
+        
+        return {"result": result}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error in get_available_metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/cache/stats", response_model=Dict[str, Any])
+async def get_cache_stats():
+    """
+    キャッシュの統計情報を取得する
+    """
+    try:
+        from tools.graph_cache import get_cache
+        cache = get_cache()
+        stats = cache.get_stats()
+        
+        return {
+            "success": True,
+            "stats": stats
+        }
+    except Exception as e:
+        logger.error(f"Error getting cache stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     import uvicorn

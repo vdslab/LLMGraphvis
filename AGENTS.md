@@ -32,7 +32,7 @@ docker compose logs
 docker-compose up    # ハイフン付きは古い記法です
 ```
 
-**理由**: Docker Compose V2では、`docker compose`（スペース区切り）が標準のコマンド形式です。`docker-compose`（ハイフン）は古いバージョンの記法であり、環境によっては動作しない可能性があります。
+**理由**: Docker Compose V2では、`docker compose`（スペース区切り）が標準のコマンド形式です。`docker-compose`（ハイフン）は古いバージョンの記法であり、環境によっては動作しない可能性があります。現在の開発環境で確認されているバージョンは `Docker Compose version v2.40.0-desktop.1` であり、このバージョンでは `docker compose` とスペースを開ける必要があります。
 
 ## プロジェクト構成
 
