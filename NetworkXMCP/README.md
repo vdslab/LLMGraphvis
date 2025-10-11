@@ -14,7 +14,7 @@ NetworkX Model Context Protocol (MCP) サーバーは、**FastMCP 2.0**を使用
 - ✅ **高性能**: 向上した処理能力とサーバーレス対応
 - ✅ **将来対応**: アクティブな開発とコミュニティサポート
 
-詳細な移行情報については [FASTMCP_MIGRATION.md](./FASTMCP_MIGRATION.md) をご覧ください。
+詳細な移行情報については [../docs/FASTMCP_MIGRATION.md](../docs/FASTMCP_MIGRATION.md) をご覧ください。
 
 ## 機能
 

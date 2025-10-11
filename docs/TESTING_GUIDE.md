@@ -1,86 +1,99 @@
-# FastAPI Testing Guide
+# LLMGraphvis Testing Guide
 
-This guide provides comprehensive information about running and maintaining the test suite for the LLMGraphvis project, which includes both API and NetworkXMCP services.
+このガイドでは、API、NetworkXMCP、フロントエンドサービスを含むLLMGraphvisプロジェクトのテストスイートの実行と維持管理について包括的な情報を提供します。
 
-## Overview
+## 概要
 
-The test suite is built using FastAPI's testing framework based on the [official FastAPI testing tutorial](https://fastapi.tiangolo.com/tutorial/testing/). It includes:
+テストスイートは[FastAPI公式テストチュートリアル](https://fastapi.tiangolo.com/tutorial/testing/)に基づいて構築されており、以下を含みます：
 
-- **Unit tests** for individual components
-- **Integration tests** for service communication
-- **API endpoint tests** with authentication
-- **Network analysis tests** for graph operations
-- **Coverage reporting** for code quality metrics
+- **単体テスト**: 個別コンポーネントのテスト
+- **統合テスト**: サービス間通信のテスト
+- **APIエンドポイントテスト**: 認証機能付き
+- **ネットワーク分析テスト**: グラフ操作のテスト
+- **LLM統合テスト**: Google Gemini/OpenAI統合のテスト
+- **カバレッジレポート**: コード品質メトリクス
 
-## Test Structure
+## テスト構造
 
 ```
 ├── API/
-│   ├── conftest.py           # Test fixtures and configuration
-│   ├── test_auth.py          # Authentication tests
-│   ├── test_network.py       # Network operations tests
-│   ├── test_chat.py          # Chat functionality tests
-│   ├── test_main.py          # Main application tests
-│   └── test_integration.py   # API-NetworkXMCP integration tests
+│   ├── conftest.py           # テストフィクスチャーと設定
+│   ├── test_auth.py          # 認証機能のテスト
+│   ├── test_network.py       # ネットワーク操作のテスト
+│   ├── test_chat.py          # チャット機能のテスト（LLM統合）
+│   ├── test_main.py          # メインアプリケーションのテスト
+│   └── test_integration.py   # API-NetworkXMCP統合テスト
 ├── NetworkXMCP/
-│   ├── conftest.py           # NetworkXMCP test fixtures
-│   ├── test_main.py          # NetworkXMCP API tests
-│   └── test_tools.py         # Analysis tools tests
-├── run_tests.sh              # Test runner script
-└── docker-compose.test.yml   # Docker test environment
+│   ├── conftest.py           # NetworkXMCPテストフィクスチャー
+│   ├── test_main.py          # NetworkXMCP APIのテスト
+│   ├── test_tools.py         # 分析ツールのテスト
+│   └── test_new_features.py  # FastMCP 2.0機能のテスト
+├── frontend/
+│   ├── src/tests/            # Reactコンポーネントのテスト
+│   └── vitest.config.js      # Viteテスト設定
+├── run_tests.sh              # テスト実行スクリプト
+└── docker-compose.test.yml   # Dockerテスト環境
 ```
 
-## Running Tests
+## テストの実行
 
-### Method 1: Using the Test Runner Script (Recommended)
+### 方法1: テストランナースクリプトの使用（推奨）
 
 ```bash
-# Run all tests
+# すべてのテストを実行
 ./run_tests.sh
 
-# Run with options
-./run_tests.sh --skip-integration  # Skip integration tests
-./run_tests.sh --skip-api          # Skip API tests only
-./run_tests.sh --skip-networkxmcp  # Skip NetworkXMCP tests only
-./run_tests.sh --verbose           # Enable verbose output
+# オプション付きで実行
+./run_tests.sh --skip-integration  # 統合テストをスキップ
+./run_tests.sh --skip-api          # APIテストのみスキップ
+./run_tests.sh --skip-networkxmcp  # NetworkXMCPテストのみスキップ
+./run_tests.sh --skip-frontend     # フロントエンドテストをスキップ
+./run_tests.sh --verbose           # 詳細出力を有効化
 
-# Get help
+# ヘルプの表示
 ./run_tests.sh --help
 ```
 
-### Method 2: Using Docker Compose
+### 方法2: Docker Composeの使用
 
 ```bash
-# Run tests in Docker environment
+# Docker環境でテストを実行
 docker compose -f docker-compose.test.yml up --build
 
-# Run specific service tests
+# 特定のサービステストを実行
 docker compose -f docker-compose.test.yml up api-test
 docker compose -f docker-compose.test.yml up networkxmcp-test
+docker compose -f docker-compose.test.yml up frontend-test
 docker compose -f docker-compose.test.yml up integration-test
 
-# Clean up test environment
+# テスト環境のクリーンアップ
 docker compose -f docker-compose.test.yml down -v
 ```
 
-### Method 3: Manual Execution
+### 方法3: 手動実行
 
 ```bash
-# Install test dependencies
+# テスト依存関係をインストール
 cd API && pip install -e ".[test]"
 cd NetworkXMCP && pip install -e ".[test]"
+cd frontend && npm install
 
-# Run API tests
+# APIテストを実行
 cd API
 pytest -v --cov=. --cov-report=term-missing --cov-report=html:htmlcov
 
-# Run NetworkXMCP tests
+# NetworkXMCPテストを実行
 cd NetworkXMCP
 pytest -v --cov=. --cov-report=term-missing --cov-report=html:htmlcov
 
-# Run specific test files
+# フロントエンドテストを実行
+cd frontend
+npm test
+
+# 特定のテストファイルを実行
 pytest test_auth.py -v
 pytest test_network.py::test_upload_network_file -v
+npm test -- auth.test.jsx
 ```
 
 ## Test Configuration
@@ -128,19 +141,60 @@ pytest -m "not slow"
 pytest -m integration
 ```
 
-## Test Dependencies
+## テスト依存関係
 
-### API Service
+### APIサービス
 
-- `pytest>=7.4.0` - Testing framework
-- `pytest-asyncio>=0.21.0` - Async test support
-- `pytest-mock>=3.11.0` - Mocking utilities
-- `pytest-cov>=4.1.0` - Coverage reporting
-- `httpx[test]>=0.27.0` - HTTP test client
+- `pytest>=7.4.0` - テスティングフレームワーク
+- `pytest-asyncio>=0.21.0` - 非同期テストサポート
+- `pytest-mock>=3.11.0` - モッキングユーティリティ
+- `pytest-cov>=4.1.0` - カバレッジレポート
+- `httpx[test]>=0.27.0` - HTTPテストクライアント
 
-### NetworkXMCP Service
+### NetworkXMCPサービス
 
-- Same as API service for consistency
+- 一貫性のためAPIサービスと同じ依存関係
+
+### フロントエンドサービス
+
+- `vitest>=1.0.0` - Viteテスティングフレームワーク
+- `@testing-library/react>=13.0.0` - Reactテストユーティリティ
+- `@testing-library/jest-dom>=6.0.0` - 追加のマッチャー
+- `jsdom>=22.0.0` - DOM環境のシミュレーション
+
+## 新機能のテスト
+
+### FastMCP 2.0統合テスト
+
+NetworkXMCPサービスでは、FastMCP 2.0フレームワークの統合をテストします：
+
+```python
+# NetworkXMCP/test_new_features.py
+def test_fastmcp_openapi_integration():
+    """OpenAPI仕様からMCPツールが正しく生成されることを確認"""
+    # テスト実装
+
+def test_mcp_tool_availability():
+    """すべてのAPIエンドポイントがMCPツールとして利用可能であることを確認"""
+    # テスト実装
+```
+
+### LLM統合テスト
+
+```python
+# API/test_chat.py
+def test_google_gemini_integration():
+    """Google Gemini統合のテスト"""
+    # モック実装
+
+def test_openai_integration():
+    """OpenAI統合のテスト"""
+    # モック実装
+
+def test_layout_recommendation():
+    """レイアウト推薦機能のテスト"""
+    # テスト実装
+```
 
 ## Test Coverage
 

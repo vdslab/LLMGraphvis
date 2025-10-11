@@ -1,162 +1,230 @@
-# Network Layout Application with Authentication
+# LLMGraphvis - AI-Powered Network Visualization Platform
 
-グラフのレイアウト計算とユーザー認証機能を備えたWebアプリケーション
+AI統合とユーザー認証機能を備えた高度なネットワーク可視化・分析Webアプリケーション
 
-## プロジェクト構成
+## ✨ 主な機能
 
-このプロジェクトは以下のコンポーネントで構成されています：
+- 🔗 **ネットワーク可視化**: 11種類のレイアウトアルゴリズムをサポート
+- 🤖 **AI統合**: Google Gemini/OpenAIによる智的なレイアウト推薦
+- 🔐 **認証システム**: OAuth2+JWT+PostgreSQLによる安全なユーザー管理
+- ⚡ **高性能**: NetworkXMCP Serverによる分散グラフ処理
+- 🎯 **MCP対応**: Model Context Protocol (FastMCP 2.0)によるLLM統合
+- 🎨 **モダンUI**: React+Viteによるレスポンシブフロントエンド
 
-- **frontend**: Reactフロントエンド
-- **API**: FastAPIバックエンド（認証、ChatGPT連携）
-- **NetworkXMCP**: NetworkXを使用したグラフ計算とMCPサーバー
-- **db**: PostgreSQLデータベース（ユーザー認証用）
+## 🏗️ アーキテクチャ
 
-## 機能
+このプロジェクトは以下のマイクロサービスで構成されています：
 
-- グラフのレイアウト計算（spring, circular, random, spectral）
-- ユーザー認証（OAuth2 + JWT + PostgreSQL）
-- ChatGPT連携（認証保護）
-- Reactフロントエンド
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Frontend      │    │   API Server    │    │ NetworkXMCP     │
+│   (React)       │◄──►│   (FastAPI)     │◄──►│   (FastMCP)     │
+│   Port: 3000    │    │   Port: 8000    │    │   Port: 8001    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                │
+                                ▼
+                        ┌─────────────────┐
+                        │   PostgreSQL    │
+                        │   Port: 5432    │
+                        └─────────────────┘
+```
 
-## 始め方
+### コンポーネント詳細
 
-### Dockerでの実行
+- **Frontend**: React+ViteによるSPA（Single Page Application）
+- **API**: FastAPIバックエンド（認証、LLM統合、ネットワーク管理）
+- **NetworkXMCP**: NetworkX+FastMCP 2.0による分散グラフ処理サーバー
+- **Database**: PostgreSQLによるユーザー認証とセッション管理
 
-1.  `.env`ファイルをプロジェクトルートに作成し、必要な環境変数を設定します。`.env.example`をコピーして使用できます。
+## 🚀 クイックスタート
 
-    ```bash
-    cp .env.example .env
-    ```
+### 前提条件
 
-    `.env`ファイル内の`OPENAI_API_KEY`を忘れずに設定してください。
+- DockerとDocker Compose
+- Git
 
-2.  アプリケーションを起動します：
+### 1. リポジトリのクローン
 
-    ```zsh
-    # 開発環境（ホットリロード有効）
-    docker compose up --build
+```bash
+git clone https://github.com/vdslab/LLMGraphvis.git
+cd LLMGraphvis
+```
 
-    # または、最適化されたビルドスクリプトを使用
-    ./build.sh
-    ```
+### 2. 環境設定
 
-    > **💡 ヒント**: `build.sh`を使用すると、BuildKitが自動的に有効化され、ビルド時間が表示されます。
+```bash
+# 環境変数ファイルを作成
+cp .env.example .env
 
-3.  アプリケーションにアクセスする：
-    - フロントエンド: http://localhost:3000
-    - バックエンドAPI: http://localhost:8000
+# .envファイルを編集してAPIキーを設定
+# GOOGLE_API_KEY または OPENAI_API_KEY を設定
+```
 
-### ローカル環境での実行 (Dockerなし)
+### 3. アプリケーションの起動
 
-Dockerを使用せずにローカルで開発環境をセットアップする手順です。
+```bash
+# サービスをビルド・起動
+docker compose up -d
 
-##### 1. 前提条件
+# 初回起動の確認（ヘルスチェック）
+docker compose ps
+```
 
-- **Python 3.12+**
-- **Node.js v18+**
-- **PostgreSQL** がローカルにインストールされ、実行中であること。
+### 4. アクセス
 
-##### 2. データベースのセットアップ
+- **アプリケーション**: http://localhost:3000
+- **API ドキュメント**: http://localhost:8000/docs
+- **NetworkXMCP**: http://localhost:8001/docs
 
-1.  PostgreSQLに接続し、アプリケーション用のユーザーとデータベースを作成します。
+## 🔐 認証システム
 
-    ```bash
-    # psqlに接続
-    psql -U postgres
+### ユーザー登録・ログイン
 
-    # ユーザーとデータベースを作成 (パスワードは.envファイルと一致させる)
-    CREATE USER postgres WITH PASSWORD 'postgres';
-    CREATE DATABASE graphvis;
-    GRANT ALL PRIVILEGES ON DATABASE graphvis TO postgres;
-    \q
-    ```
+```bash
+# 1. ユーザー登録
+curl -X POST "http://localhost:8000/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{"username": "testuser", "password": "password123"}'
 
-2.  作成したデータベースにテーブルを初期化します。
+# 2. トークン取得
+curl -X POST "http://localhost:8000/auth/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=testuser&password=password123"
+```
 
-    ```bash
-    psql -U postgres -d graphvis -f API/init.sql
-    ```
+### 保護されたAPIの使用
 
-##### 3. 環境変数の設定
+```bash
+# 3. LLM機能の使用（認証必須）
+curl -X POST "http://localhost:8000/chatgpt/generate" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"prompt": "ネットワーク可視化について教えて"}'
+```
 
-1.  `.env.example`をコピーして`.env`ファイルを作成します。
+## 🤖 AI機能
 
-    ```bash
-    cp .env.example .env
-    ```
+### レイアウト推薦システム
 
-2.  `.env`ファイルを編集し、ローカル環境に合わせて以下の変数を設定・変更します。
-    - `DATABASE_URL`をローカルのPostgreSQLを指すように変更します。
-    - `NETWORKX_MCP_URL`をローカルのNetworkXMCPサーバーを指すように追加します。
+ネットワークの特性を分析し、最適なレイアウトアルゴリズムを提案：
 
-    ```diff
-    - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-    + DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@localhost:5432/${POSTGRES_DB}
-    + NETWORKX_MCP_URL=http://localhost:8001
-    ```
+```bash
+curl -X POST "http://localhost:8000/chatgpt/recommend-layout" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "ソーシャルネットワーク、500ノード、2000エッジ",
+    "purpose": "コミュニティ構造の可視化"
+  }'
+```
 
-    `OPENAI_API_KEY`も忘れずに設定してください。
+### サポートされているLLMプロバイダー
 
-##### 4. バックエンドの起動
+- **Google Gemini**: 高速で効率的な応答
+- **OpenAI**: GPT-4oモデルによる高精度な分析
 
-1.  **APIサーバー**の依存関係をインストールし、起動します。（ターミナル1）
+設定方法は [docs/LLM_PROVIDER_GUIDE.md](docs/LLM_PROVIDER_GUIDE.md) を参照してください。
 
-    ```bash
-    # APIディレクトリに移動
-    cd API
+## 📊 ネットワーク分析機能
 
-    # 仮想環境の作成と有効化
-    python -m venv .venv
-    source .venv/bin/activate
+### サポートされているレイアウトアルゴリズム
 
-    # 依存関係のインストール
-    pip install -e .
+1. **spring** - バネモデルに基づくレイアウト
+2. **circular** - 円形配置
+3. **random** - ランダム配置
+4. **spectral** - スペクトル分解に基づくレイアウト
+5. **shell** - 同心円状配置
+6. **spiral** - 螺旋状配置
+7. **planar** - 平面グラフ用レイアウト
+8. **kamada_kawai** - Kamada-Kawaiアルゴリズム
+9. **fruchterman_reingold** - Fruchterman-Reingoldアルゴリズム
+10. **bipartite** - 二部グラフ用レイアウト
+11. **multipartite** - 多部グラフ用レイアウト
 
-    # サーバーの起動
-    uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-    ```
+### ネットワーク形式
 
-2.  **NetworkXMCPサーバー**の依存関係をインストールし、起動します。（ターミナル2）
+- **GraphML**: 標準的なグラフ交換形式
+- **GML**: Graph Modeling Language
+- **JSON**: カスタムネットワーク形式
 
-    ```bash
-    # NetworkXMCPディレクトリに移動
-    cd NetworkXMCP
+## 🔧 開発環境
 
-    # 仮想環境の作成と有効化
-    python -m venv .venv
-    source .venv/bin/activate
+### ローカル開発セットアップ
 
-    # 依存関係のインストール
-    pip install -e .
+```bash
+# APIサーバー（ターミナル1）
+cd API
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+uvicorn main:app --reload
 
-    # サーバーの起動
-    uvicorn main:app --host 0.0.0.0 --port 8001 --reload
-    ```
+# NetworkXMCPサーバー（ターミナル2）
+cd NetworkXMCP
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+uvicorn main:app --port 8001 --reload
 
-##### 5. フロントエンドの起動
+# フロントエンド（ターミナル3）
+cd frontend
+npm install
+npm run dev
+```
 
-1.  **フロントエンド**の依存関係をインストールし、開発サーバーを起動します。（ターミナル3）
+詳細は [AGENTS.md](AGENTS.md) を参照してください。
 
-    ```bash
-    # frontendディレクトリに移動
-    cd frontend
+## 📝 ドキュメント
 
-    # 依存関係のインストール
-    npm install
+- [📖 クイックスタートガイド](docs/QUICK_START.md)
+- [🤖 LLMプロバイダー設定](docs/LLM_PROVIDER_GUIDE.md)
+- [🧪 テスト実行ガイド](docs/TESTING_GUIDE.md)
+- [🛠️ AI Agents開発ガイド](AGENTS.md)
+- [⚙️ NetworkXMCP詳細](NetworkXMCP/README.md)
+- [📊 ネットワークレイアウト機能](docs/README_network_layout.md)
 
-    # 開発サーバーの起動
-    npm run dev
-    ```
+## 🧪 テスト
 
-##### 6. アプリケーションへのアクセス
+```bash
+# すべてのテストを実行
+./run_tests.sh
 
-すべてのサービスが起動したら、以下のURLにアクセスします。
+# 特定のサービスのテスト
+./run_tests.sh --skip-integration
+docker compose -f docker-compose.test.yml up api-test
+```
 
-- **フロントエンド**: http://localhost:3000
-- **バックエンドAPI**: http://localhost:8000
-- **NetworkXMCP API**: http://localhost:8001
+## 📋 APIエンドポイント
 
-これで、Dockerなしで開発環境が整いました。
+### 認証
+- `POST /auth/register` - ユーザー登録
+- `POST /auth/token` - アクセストークン取得
+- `GET /auth/users/me` - ユーザー情報取得
+
+### LLM統合
+- `POST /chatgpt/generate` - AI応答生成
+- `POST /chatgpt/recommend-layout` - レイアウト推薦
+
+### ネットワーク分析
+- `POST /network/layout` - レイアウト計算
+- `POST /network/upload` - ネットワークファイルアップロード
+- `GET /network/formats` - サポート形式一覧
+
+## 🤝 コントリビューション
+
+1. フォークを作成
+2. フィーチャーブランチを作成 (`git checkout -b feature/amazing-feature`)
+3. 変更をコミット (`git commit -m 'Add amazing feature'`)
+4. ブランチをプッシュ (`git push origin feature/amazing-feature`)
+5. プルリクエストを作成
+
+## 📄 ライセンス
+
+このプロジェクトはMITライセンスの下で公開されています。詳細は [LICENSE](LICENSE) ファイルを参照してください。
+
+## 📄 ライセンス
+
+このプロジェクトはMITライセンスの下で公開されています。詳細は [LICENSE](LICENSE) ファイルを参照してください。
 
 ## 認証の使い方
 
