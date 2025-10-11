@@ -257,36 +257,71 @@ const useNetworkStore = create((set, get) => ({
   ) => {
     set((state) => {
       console.log(
-        `Applying ${centrality_type} centrality visualization data:`,
+        `🎨 Applying ${centrality_type} centrality visualization data:`,
         visualization_data,
       );
 
-      const { centrality_values, color_map, size_map } = visualization_data;
+      // Update positions array with centrality visualization
+      const updatedPositions = state.positions.map((node) => {
+        const nodeId = node.id;
+        const nodeVizData = visualization_data[nodeId];
+        
+        if (nodeVizData) {
+          const {
+            centrality_value,
+            color,
+            size,
+            importance_level,
+            percentile
+          } = nodeVizData;
 
-      // Update graph data with centrality values and visual properties
-      const updatedGraphData = { ...state.graphData };
-      if (updatedGraphData.nodes) {
-        updatedGraphData.nodes = updatedGraphData.nodes.map((node) => {
-          const nodeId = node.id;
-          const centralityValue = centrality_values[nodeId] || 0;
-          const color = color_map[nodeId] || "#999999";
-          const size = size_map[nodeId] || 5;
+          console.log(`Updating node ${nodeId}: size=${size}, color=${color}, centrality=${centrality_value}`);
 
           return {
             ...node,
-            [`${centrality_type}_centrality`]: centralityValue,
+            // Update visual properties
             color: color,
             size: size,
+            // Store centrality information
+            [`${centrality_type}_centrality`]: centrality_value,
+            centrality_value: centrality_value,
+            importance_level: importance_level,
+            percentile: percentile,
             // Store original properties for potential restoration
-            originalColor: node.originalColor || node.color || "#999999",
+            originalColor: node.originalColor || node.color || "#1d4ed8",
             originalSize: node.originalSize || node.size || 5,
           };
-        });
-      }
+        }
+        
+        return node;
+      });
+
+      // Also update nodes array if it exists
+      const updatedNodes = state.nodes.map((node) => {
+        const nodeId = node.id;
+        const nodeVizData = visualization_data[nodeId];
+        
+        if (nodeVizData) {
+          const { centrality_value, importance_level, percentile } = nodeVizData;
+          
+          return {
+            ...node,
+            [`${centrality_type}_centrality`]: centrality_value,
+            centrality_value: centrality_value,
+            importance_level: importance_level,
+            percentile: percentile,
+          };
+        }
+        
+        return node;
+      });
+
+      console.log(`✅ Applied centrality visualization to ${updatedPositions.length} nodes`);
 
       return {
         ...state,
-        graphData: updatedGraphData,
+        positions: updatedPositions,
+        nodes: updatedNodes,
         centralityInfo: {
           type: centrality_type,
           calculationId: calculation_id,

@@ -87,34 +87,75 @@ _initialize_clients()
 TOOLS_DEFINITION = [
     {
         "name": "calculate_and_store_centrality",
-        "description": "Calculates a specified centrality metric for the network and stores the results for later visualization. Use this when the user asks about node importance, influence, or connectivity and wants visualization. This is the first stage of a two-stage process.",
+        "description": "🔄 Calculate and store centrality values (Stage 1 of 2). Use this when the user asks for centrality visualization like 'show degree centrality', 'visualize by betweenness centrality', etc. This calculates the centrality values and prepares them for visualization. The system will automatically proceed to Stage 2 (visualization) after this completes.",
         "parameters": {
             "type": "object",
             "properties": {
                 "centrality_type": {
                     "type": "string",
-                    "description": "The type of centrality to calculate.",
-                    "enum": ["degree", "closeness", "betweenness", "eigenvector", "pagerank"]
+                    "description": "The type of centrality to calculate and visualize.",
+                    "enum": ["degree", "closeness", "betweenness", "eigenvector", "pagerank", "katz"]
                 },
+                "centrality_params": {
+                    "type": "object",
+                    "description": "Optional parameters for centrality calculation.",
+                    "properties": {
+                        "max_iter": {
+                            "type": "integer",
+                            "description": "Maximum iterations for eigenvector/PageRank centrality",
+                            "default": 1000
+                        },
+                        "alpha": {
+                            "type": "number",
+                            "description": "Alpha parameter for PageRank/Katz centrality",
+                            "default": 0.85
+                        }
+                    }
+                }
             },
             "required": ["centrality_type"]
         }
     },
     {
         "name": "get_centrality_visualization",
-        "description": "Retrieves and applies visualization data from a previously calculated centrality. Use this after calculate_and_store_centrality to actually display the centrality visualization. This is the second stage of a two-stage process.",
+        "description": "🎨 Apply visualization to stored centrality data (Stage 2 of 2). Use this only when you have a calculation_id from Stage 1. This applies colors, sizes, and visual properties to the network based on calculated centrality values.",
         "parameters": {
             "type": "object",
             "properties": {
                 "calculation_id": {
                     "type": "string",
-                    "description": "The ID of the centrality calculation to visualize."
+                    "description": "The ID of the centrality calculation from Stage 1."
                 },
                 "color_scheme": {
                     "type": "string",
                     "description": "Color scheme for visualization.",
-                    "enum": ["viridis", "plasma", "inferno", "magma"],
+                    "enum": ["viridis", "plasma", "inferno", "magma", "simple", "blue_red", "cool_warm"],
                     "default": "viridis"
+                },
+                "size_range": {
+                    "type": "array",
+                    "description": "Node size range [min, max].",
+                    "items": {"type": "number"},
+                    "default": [5, 20]
+                }
+            },
+            "required": ["calculation_id"]
+        }
+    },
+    {
+        "name": "list_centrality_calculations",
+        "description": "📋 List all stored centrality calculations. Use this to see what centrality calculations are available for visualization.",
+        "parameters": {}
+    },
+    {
+        "name": "get_centrality_status",
+        "description": "📊 Get status and details of a specific centrality calculation.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "calculation_id": {
+                    "type": "string",
+                    "description": "The ID of the centrality calculation to check."
                 }
             },
             "required": ["calculation_id"]
@@ -122,29 +163,37 @@ TOOLS_DEFINITION = [
     },
     {
         "name": "calculate_centrality",
-        "description": "Calculates a specified centrality metric for the network (legacy single-stage). Use this when the user asks about node importance but doesn't need persistent visualization.",
+        "description": "🧮 Calculate centrality values only (legacy single-stage). Use this when the user asks about node importance but doesn't need visualization - just the raw values.",
         "parameters": {
             "type": "object",
             "properties": {
                 "centrality_type": {
                     "type": "string",
                     "description": "The type of centrality to calculate.",
-                    "enum": ["degree", "closeness", "betweenness", "eigenvector", "pagerank"]
+                    "enum": ["degree", "closeness", "betweenness", "eigenvector", "pagerank", "katz"]
                 },
+                "centrality_params": {
+                    "type": "object",
+                    "description": "Optional parameters for centrality calculation."
+                }
             },
             "required": ["centrality_type"]
         }
     },
     {
         "name": "change_layout",
-        "description": "Changes the visual layout of the network graph.",
+        "description": "🔄 Change the visual layout of the network graph. Use this when users want to change how the network is arranged visually.",
         "parameters": {
             "type": "object",
             "properties": {
                 "layout_type": {
                     "type": "string",
                     "description": "The layout algorithm to apply.",
-                    "enum": ["spring", "circular", "random", "spectral", "shell", "kamada_kawai", "fruchterman_reingold"]
+                    "enum": ["spring", "circular", "random", "spectral", "shell", "kamada_kawai", "fruchterman_reingold", "grid", "tree", "radial"]
+                },
+                "layout_params": {
+                    "type": "object",
+                    "description": "Optional parameters for the layout algorithm."
                 }
             },
             "required": ["layout_type"]
@@ -152,7 +201,7 @@ TOOLS_DEFINITION = [
     },
     {
         "name": "get_network_info",
-        "description": "Retrieves basic statistics about the network, such as the number of nodes and edges, density, etc.",
+        "description": "📊 Retrieve basic statistics about the network, such as the number of nodes and edges, density, etc.",
         "parameters": {}
     },
 ]
@@ -162,23 +211,62 @@ SYSTEM_PROMPT = """
 You are an expert network analysis assistant. Your role is to help users analyze and visualize network graphs.
 You have access to a set of tools to perform network operations. When a user asks a question or gives a command, first determine if it can be answered by calling one of your tools.
 
-**Centrality Visualization Process:**
+**🎯 Enhanced Centrality Visualization Process (Two-Stage System):**
 
-When users ask for centrality visualization (e.g., "show degree centrality", "visualize with betweenness centrality"), use the two-stage process:
+When users ask for centrality visualization (e.g., "show degree centrality", "visualize with betweenness centrality", "次数中心性で可視化して"), ALWAYS use the two-stage process:
 
-1. **Stage 1 - Calculate and Store:** Use `calculate_and_store_centrality` to compute centrality values and get a calculation_id
-2. **Stage 2 - Visualize:** Use `get_centrality_visualization` with the calculation_id to apply the visualization
+1. **🔄 Stage 1 - Calculate and Store:** Use `calculate_and_store_centrality` to compute centrality values
+   - This calculates the centrality and returns a calculation_id
+   - The system automatically proceeds to Stage 2
 
-For requests in Japanese like "次数中心性で可視化して" or "次数中心性で可視化してください", use the degree centrality two-stage process.
+2. **🎨 Stage 2 - Visualize:** The system automatically calls `get_centrality_visualization`
+   - This applies colors, sizes, and visual properties to nodes
+   - Users will see immediate visual changes in the network
 
-**Interaction Flow:**
+**🔑 Key Phrases for Centrality Visualization:**
+- "visualize by [centrality]" → use calculate_and_store_centrality
+- "show [centrality] centrality" → use calculate_and_store_centrality  
+- "color nodes by [centrality]" → use calculate_and_store_centrality
+- "次数中心性で可視化" → use calculate_and_store_centrality with "degree"
+- "中心性を表示" → use calculate_and_store_centrality
 
-1.  **Analyze User Request:** Understand the user's intent.
-2.  **Tool Selection:** If the request matches a tool's capability, you should respond with a tool call.
-3.  **Two-Stage Processing:** For visualization requests, use the two-stage process described above.
-4.  **General Conversation:** If the user's message is a greeting or a question that cannot be answered by a tool, respond in a helpful and conversational manner.
+**🎨 Available Centrality Types:**
+- **degree**: How many connections a node has (local importance)
+- **betweenness**: How often a node lies on shortest paths (bridge importance)
+- **closeness**: How close a node is to all other nodes (global accessibility)
+- **eigenvector**: Importance based on connected nodes' importance (recursive importance)
+- **pagerank**: Google's PageRank algorithm (authoritative importance)
+- **katz**: Similar to eigenvector with baseline importance
 
-**Your Final Output should be either a direct text response OR a tool call.**
+**🎨 Visual Color Schemes:**
+- viridis (default): Purple to yellow gradient
+- plasma: Purple to pink to yellow
+- inferno: Black to yellow through purple/red
+- magma: Black to white through purple/pink
+- simple: Blue to red spectrum
+- blue_red: Cool blue to warm red
+- cool_warm: Scientific blue-white-red
+
+**📋 Other Tools:**
+- `list_centrality_calculations`: See all stored calculations
+- `get_centrality_status`: Check specific calculation details
+- `calculate_centrality`: Get raw centrality values (no visualization)
+- `change_layout`: Change network layout arrangement
+- `get_network_info`: Get network statistics
+
+**🎭 Interaction Flow:**
+
+1. **Analyze User Request:** Understand what they want to do
+2. **Tool Selection:** Choose the appropriate tool based on their intent
+3. **Two-Stage Processing:** For visualization, use calculate_and_store_centrality (Stage 2 is automatic)
+4. **Helpful Responses:** Provide informative feedback about what was done
+
+**⚡ Quick Examples:**
+- User: "show degree centrality" → call calculate_and_store_centrality with centrality_type="degree"
+- User: "次数中心性で可視化して" → call calculate_and_store_centrality with centrality_type="degree"
+- User: "color by betweenness" → call calculate_and_store_centrality with centrality_type="betweenness"
+
+Always be helpful, informative, and explain what the centrality measure means and what the visualization shows!
 """
 
 
