@@ -275,7 +275,7 @@ async def get_mcp_info():
 
 @app.get("/get_sample_network", response_model=Dict[str, Any])
 async def get_sample_network():
-    """サンプルネットワークを生成し、GraphML形式で返す"""
+    """サンプルネットワークを生成し、スプリングレイアウトを適用してGraphML形式で返す"""
     try:
         num_nodes = random.randint(18, 25)
         edge_probability = random.uniform(0.15, 0.25)
@@ -289,6 +289,24 @@ async def get_sample_network():
                     node_from = random.choice(list(component))
                     node_to = random.choice(list(largest_component))
                     G.add_edge(node_from, node_to)
+
+        # スプリングレイアウトを適用
+        positions = nx.spring_layout(G, k=1.0, iterations=50, seed=42)
+
+        # ノード属性を設定（位置、サイズ、色）
+        for node in G.nodes():
+            pos = positions.get(node, (0, 0))
+            G.nodes[node]['x'] = str(float(pos[0]))
+            G.nodes[node]['y'] = str(float(pos[1]))
+            G.nodes[node]['name'] = f"Node {node}"
+            G.nodes[node]['size'] = "5.0"
+            G.nodes[node]['color'] = "#1d4ed8"
+            G.nodes[node]['description'] = f"Sample node {node}"
+
+        # エッジ属性を設定
+        for u, v in G.edges():
+            G.edges[u, v]['width'] = "1.0"
+            G.edges[u, v]['color'] = "#94a3b8"
 
         # GraphMLとして出力
         output = io.BytesIO()

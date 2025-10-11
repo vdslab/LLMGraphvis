@@ -17,47 +17,55 @@ const CytoscapeGraph = ({
   const cyRef = useRef(null);
   const [cyInstance, setCyInstance] = useState(null);
 
-  // Default Cytoscape styles
+  // Default Cytoscape styles with improved readability
   const defaultStyle = [
     {
       selector: "node",
       style: {
-        "background-color": "#666",
+        "background-color": "#1d4ed8",
         label: "data(label)",
         "text-valign": "center",
         "text-halign": "center",
         color: "white",
         "text-outline-width": 2,
-        "text-outline-color": "#666",
-        "font-size": "12px",
-        width: 30,
-        height: 30,
+        "text-outline-color": "#1d4ed8",
+        "font-size": "14px",
+        "font-weight": "bold",
+        width: "mapData(size, 0, 10, 25, 50)",
+        height: "mapData(size, 0, 10, 25, 50)",
+        "border-width": 2,
+        "border-color": "#1e40af",
+        "border-opacity": 0.8,
+        "background-opacity": 0.9,
       },
     },
     {
       selector: "edge",
       style: {
         width: 2,
-        "line-color": "#ccc",
-        "target-arrow-color": "#ccc",
+        "line-color": "#94a3b8",
+        "target-arrow-color": "#94a3b8",
         "target-arrow-shape": "triangle",
         "curve-style": "bezier",
+        opacity: 0.7,
       },
     },
     {
       selector: "node:selected",
       style: {
-        "background-color": "#e74c3c",
-        "border-width": 3,
-        "border-color": "#c0392b",
+        "background-color": "#dc2626",
+        "border-color": "#b91c1c",
+        "border-width": 4,
+        "text-outline-color": "#dc2626",
       },
     },
     {
       selector: "edge:selected",
       style: {
-        "line-color": "#e74c3c",
-        "target-arrow-color": "#e74c3c",
+        "line-color": "#dc2626",
+        "target-arrow-color": "#dc2626",
         width: 4,
+        opacity: 1,
       },
     },
   ];
@@ -109,12 +117,23 @@ const CytoscapeGraph = ({
     };
   }, [cyInstance, onNodeClick, onEdgeClick, onLayoutReady, minZoom, maxZoom]);
 
-  // Fit graph to container when elements change
+  // Fit graph to container when elements change with improved positioning
   useEffect(() => {
     if (cyInstance && elements.length > 0) {
       setTimeout(() => {
-        cyInstance.fit();
+        // Fit the graph with padding for better visibility
+        cyInstance.fit(undefined, 50); // 50px padding
         cyInstance.center();
+
+        // Set a reasonable initial zoom level for spring layouts
+        const currentZoom = cyInstance.zoom();
+        if (currentZoom > 2) {
+          cyInstance.zoom(2);
+          cyInstance.center();
+        } else if (currentZoom < 0.5) {
+          cyInstance.zoom(0.5);
+          cyInstance.center();
+        }
       }, 100);
     }
   }, [elements, cyInstance]);

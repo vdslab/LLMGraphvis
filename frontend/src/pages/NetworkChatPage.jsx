@@ -134,9 +134,17 @@ const NetworkChatPage = () => {
 
   // Helper function to get graph style based on current state
   const getGraphStyle = () => {
+    const { layout } = useNetworkStore.getState();
+
     if (centralityInfo && centralityInfo.applied) {
       return StylePresets.CENTRALITY;
     }
+
+    // Use SPRING_LAYOUT style when layout is spring for better readability
+    if (layout === "spring") {
+      return StylePresets.SPRING_LAYOUT;
+    }
+
     return StylePresets.DEFAULT;
   };
 
