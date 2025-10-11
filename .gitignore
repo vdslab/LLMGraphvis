@@ -1,5 +1,6 @@
 .vscode/mcp.json
 sample_data/
+copilot-chat-history/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
