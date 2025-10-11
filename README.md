@@ -197,15 +197,18 @@ docker compose -f docker-compose.test.yml up api-test
 ## 📋 APIエンドポイント
 
 ### 認証
+
 - `POST /auth/register` - ユーザー登録
 - `POST /auth/token` - アクセストークン取得
 - `GET /auth/users/me` - ユーザー情報取得
 
 ### LLM統合
+
 - `POST /chatgpt/generate` - AI応答生成
 - `POST /chatgpt/recommend-layout` - レイアウト推薦
 
 ### ネットワーク分析
+
 - `POST /network/layout` - レイアウト計算
 - `POST /network/upload` - ネットワークファイルアップロード
 - `GET /network/formats` - サポート形式一覧

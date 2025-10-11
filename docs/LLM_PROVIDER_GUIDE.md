@@ -55,22 +55,22 @@ ACCESS_TOKEN_EXPIRE_MINUTES=30
 
 `.env`ファイル内の変数をニーズに合わせて変更してください：
 
-*   **`LLM_PROVIDER`**:
-    *   Google Geminiを使用する場合は`google`に設定
-    *   OpenAIのモデル（例：GPT-4o）を使用する場合は`openai`に設定
+- **`LLM_PROVIDER`**:
+  - Google Geminiを使用する場合は`google`に設定
+  - OpenAIのモデル（例：GPT-4o）を使用する場合は`openai`に設定
 
-*   **`GOOGLE_API_KEY`**:
-    *   `google`を使用する場合、[Google AI Studio](https://aistudio.google.com/app/apikey)から取得したAPIキーを貼り付けてください。
+- **`GOOGLE_API_KEY`**:
+  - `google`を使用する場合、[Google AI Studio](https://aistudio.google.com/app/apikey)から取得したAPIキーを貼り付けてください。
 
-*   **`OPENAI_API_KEY`**:
-    *   `openai`を使用する場合、[OpenAI Platform](https://platform.openai.com/api-keys)から取得したAPIキーを貼り付けてください。
+- **`OPENAI_API_KEY`**:
+  - `openai`を使用する場合、[OpenAI Platform](https://platform.openai.com/api-keys)から取得したAPIキーを貼り付けてください。
 
-*   **`OPENAI_MODEL`**（オプション）:
-    *   `openai`を使用する場合、コメントアウトを解除してモデル名を指定できます。例：`OPENAI_MODEL="gpt-4o"`。コメントアウトしたままの場合、デフォルトで`gpt-4o`が使用されます。
+- **`OPENAI_MODEL`**（オプション）:
+  - `openai`を使用する場合、コメントアウトを解除してモデル名を指定できます。例：`OPENAI_MODEL="gpt-4o"`。コメントアウトしたままの場合、デフォルトで`gpt-4o`が使用されます。
 
-*   **その他の設定**:
-    *   データベース接続情報（`POSTGRES_*`、`DATABASE_URL`）
-    *   JWT認証設定（`SECRET_KEY`、`ALGORITHM`、`ACCESS_TOKEN_EXPIRE_MINUTES`）
+- **その他の設定**:
+  - データベース接続情報（`POSTGRES_*`、`DATABASE_URL`）
+  - JWT認証設定（`SECRET_KEY`、`ALGORITHM`、`ACCESS_TOKEN_EXPIRE_MINUTES`）
 
 **重要**: `.env`ファイルは`.gitignore`に記載されており、Gitリポジトリにコミットされません。これはAPIキーを保護するためのセキュリティ対策です。
 
