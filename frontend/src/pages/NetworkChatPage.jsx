@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { settingsAPI } from "../services/api";
-import ForceGraph2D from "react-force-graph-2d";
+import CytoscapeGraph from "../components/CytoscapeGraph";
+import { LayoutTypes, StylePresets } from "../constants/cytoscapePresets";
 import useNetworkStore from "../services/networkStore";
 import useChatStore from "../services/chatStore";
 import ReactMarkdown from "react-markdown";
@@ -125,11 +126,87 @@ const NetworkChatPage = () => {
       setLlmLoading(false);
     }
   };
-  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+  // const [graphData, setGraphData] = useState({ nodes: [], links: [] }); // No longer needed with Cytoscape
   const [fileUploadError, setFileUploadError] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const graphRef = useRef();
   const messagesEndRef = useRef();
+
+  // Helper function to get graph style based on current state
+  const getGraphStyle = () => {
+    if (centralityInfo && centralityInfo.applied) {
+      return StylePresets.CENTRALITY;
+    }
+    return StylePresets.DEFAULT;
+  };
+
+  // Helper function to handle node clicks
+  const handleNodeClick = (nodeData) => {
+    console.log("Node clicked:", nodeData);
+
+    // ノードの属性情報を収集
+    let nodeInfo = `**ノード「${nodeData.label || nodeData.id}」の情報**\n\n`;
+
+    // 中心性値がある場合は表示
+    if (centralityInfo && centralityInfo.applied) {
+      const centralityType = centralityInfo.type;
+      const centralityKey = `${centralityType}_centrality`;
+      const centralityValue = nodeData[centralityKey];
+
+      if (centralityValue !== undefined) {
+        nodeInfo += `${centralityType.charAt(0).toUpperCase() + centralityType.slice(1)} 中心性値: ${centralityValue.toFixed(3)}\n\n`;
+      }
+    }
+
+    // ノードの他の属性を表示
+    for (const [key, value] of Object.entries(nodeData)) {
+      // 表示する必要のないキーをスキップ
+      if (
+        !["id", "label", "x", "y", "size", "color"].includes(key) &&
+        !key.endsWith("_centrality")
+      ) {
+        nodeInfo += `${key}: ${value}\n`;
+      }
+    }
+
+    // チャットにメッセージを追加
+    addMessage({
+      role: "assistant",
+      content: nodeInfo,
+      timestamp: new Date().toISOString(),
+    });
+  };
+
+  // Get Cytoscape elements from store
+  // Temporary: Create Cytoscape elements from basic network data
+  const cytoscapeElements = [];
+
+  // Add nodes
+  nodes.forEach((node) => {
+    const position = positions.find((p) => p.id === node.id);
+    cytoscapeElements.push({
+      group: "nodes",
+      data: {
+        id: node.id,
+        label: node.label || node.id,
+        ...node,
+      },
+      position: position ? { x: position.x, y: position.y } : undefined,
+    });
+  });
+
+  // Add edges
+  edges.forEach((edge) => {
+    cytoscapeElements.push({
+      group: "edges",
+      data: {
+        id: edge.id || `${edge.source}-${edge.target}`,
+        source: edge.source,
+        target: edge.target,
+        ...edge,
+      },
+    });
+  });
 
   // Handle file upload
   const handleFileUpload = async (file) => {
@@ -445,31 +522,6 @@ const NetworkChatPage = () => {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  // Convert positions to graph data format for ForceGraph
-  useEffect(() => {
-    if (positions.length > 0) {
-      const graphNodes = positions.map((node) => ({
-        id: node.id,
-        x: node.x * 100, // Scale for better visualization
-        y: node.y * 100,
-        label: node.label || node.id,
-        // Add any additional properties for visualization
-        size: node.size || 5,
-        color: node.color || "#1d4ed8",
-      }));
-
-      const graphLinks = edges.map((edge) => ({
-        source: edge.source,
-        target: edge.target,
-        // Add any additional properties for visualization
-        width: edge.width || 1,
-        color: edge.color || "#94a3b8",
-      }));
-
-      setGraphData({ nodes: graphNodes, links: graphLinks });
-    }
-  }, [positions, edges]);
 
   // Scroll to bottom of messages
   useEffect(() => {
@@ -834,160 +886,13 @@ const NetworkChatPage = () => {
               </div>
             )}
 
-            <div className="w-full h-full">
-              <ForceGraph2D
-                ref={graphRef}
-                graphData={graphData}
-                width={
-                  window.innerWidth * (window.innerWidth >= 768 ? 0.65 : 1)
-                }
-                height={
-                  window.innerHeight - (window.innerWidth >= 768 ? 100 : 200)
-                }
-                nodeLabel={(node) => {
-                  // ノードの基本情報を表示
-                  let label = `${node.label || node.id}`;
-
-                  // 中心性値がある場合は表示
-                  if (network_state.centrality) {
-                    label += `\n中心性値: ${node.size ? ((node.size - 5) / 10).toFixed(2) : "不明"}`;
-                  }
-
-                  // ノードの属性情報を表示
-                  for (const [key, value] of Object.entries(node)) {
-                    // id, label, x, y, size, colorは基本情報なのでスキップ
-                    if (
-                      ![
-                        "id",
-                        "label",
-                        "x",
-                        "y",
-                        "size",
-                        "color",
-                        "__indexColor",
-                        "index",
-                        "vx",
-                        "vy",
-                        "fx",
-                        "fy",
-                      ].includes(key)
-                    ) {
-                      label += `\n${key}: ${value}`;
-                    }
-                  }
-
-                  return label;
-                }}
-                nodeRelSize={6}
-                nodeVal={(node) => node.size}
-                nodeColor={(node) => node.color}
-                linkWidth={(link) => link.width}
-                linkColor={(link) => link.color}
-                cooldownTicks={100}
-                onEngineStop={() => console.log("Layout stabilized")}
-                // ノードクリック時の処理
-                onNodeClick={(node) => {
-                  console.log("Node clicked:", node);
-
-                  // ノードの属性情報を収集
-                  let nodeInfo = `**ノード「${node.label || node.id}」の情報**\n\n`;
-
-                  // 中心性値がある場合は表示
-                  if (centralityInfo && centralityInfo.applied) {
-                    const centralityType = centralityInfo.type;
-                    const centralityKey = `${centralityType}_centrality`;
-                    const centralityValue = node[centralityKey];
-
-                    if (centralityValue !== undefined) {
-                      nodeInfo += `${centralityType.charAt(0).toUpperCase() + centralityType.slice(1)} 中心性値: ${centralityValue.toFixed(3)}\n\n`;
-
-                      // 重要度の判定
-                      const importance =
-                        node.size > 12
-                          ? "非常に重要"
-                          : node.size > 8
-                            ? "重要"
-                            : "標準";
-                      nodeInfo += `重要度: ${importance}\n\n`;
-                    }
-                  } else if (network_state.centrality) {
-                    // Legacy centrality display (backward compatibility)
-                    const centralityValue = ((node.size - 5) / 10).toFixed(3);
-                    nodeInfo += `中心性値: ${centralityValue}\n\n`;
-
-                    // 重要度の判定
-                    const importance =
-                      node.size > 12
-                        ? "非常に重要"
-                        : node.size > 9
-                          ? "比較的重要"
-                          : node.size > 7
-                            ? "平均的な重要度"
-                            : "あまり重要でない";
-
-                    nodeInfo += `このノードは${importance}位置にあります。\n\n`;
-                  }
-
-                  // その他の属性情報を表示
-                  nodeInfo += "**属性情報:**\n";
-                  for (const [key, value] of Object.entries(node)) {
-                    // id, label, x, y, size, colorは基本情報なのでスキップ
-                    if (
-                      ![
-                        "id",
-                        "label",
-                        "x",
-                        "y",
-                        "size",
-                        "color",
-                        "__indexColor",
-                        "index",
-                        "vx",
-                        "vy",
-                        "fx",
-                        "fy",
-                      ].includes(key)
-                    ) {
-                      nodeInfo += `- ${key}: ${value}\n`;
-                    }
-                  }
-
-                  // 基本情報も表示
-                  nodeInfo += "\n**基本情報:**\n";
-                  nodeInfo += `- ID: ${node.id}\n`;
-                  nodeInfo += `- ラベル: ${node.label || node.id}\n`;
-                  nodeInfo += `- サイズ: ${node.size}\n`;
-                  nodeInfo += `- 色: ${node.color}\n`;
-                  nodeInfo += `- 位置: (${node.x.toFixed(2)}, ${node.y.toFixed(2)})\n`;
-
-                  addMessage({
-                    role: "assistant",
-                    content: nodeInfo,
-                    timestamp: new Date().toISOString(),
-                  });
-                }}
-                // ホバー効果の追加
-                nodeCanvasObject={(node, ctx) => {
-                  const size = node.size || 5;
-                  // サイズに応じたフォントサイズ（高い中心性値を持つノードのラベルを大きく表示）
-                  // const fontSize = (12 + (node.size - 5) * 0.5) / globalScale;
-                  // ノードの描画
-                  ctx.beginPath();
-                  ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
-                  ctx.fillStyle = node.color || "#1d4ed8";
-                  ctx.fill();
-
-                  // ノード周囲の発光効果（中心性が高いものほど強く光る）
-                  if (network_state.centrality && node.size > 7) {
-                    const glowSize = size * 1.5;
-                    const glowOpacity = (node.size - 5) / 10; // 中心性の正規化値（0〜1）
-
-                    ctx.beginPath();
-                    ctx.arc(node.x, node.y, glowSize, 0, 2 * Math.PI);
-                    ctx.fillStyle = `rgba(66, 153, 225, ${glowOpacity * 0.4})`; // 青色の発光効果
-                    ctx.fill();
-                  }
-                }}
+            <div id="graph-area-wrap" className="w-full h-full min-h-[480px]">
+              <CytoscapeGraph
+                elements={cytoscapeElements}
+                layout={LayoutTypes.PRESET}
+                style={getGraphStyle()}
+                className="w-full h-full"
+                onNodeClick={handleNodeClick}
               />
             </div>
           </div>
