@@ -90,10 +90,12 @@ def calculate_and_store_centrality(graphml_content: str, centrality_type: str = 
         if centrality_params is None:
             centrality_params = {}
 
-        logger.info(f"🔄 Starting enhanced centrality calculation: {centrality_type}")
+        logger.info(
+            f"🔄 Starting enhanced centrality calculation: {centrality_type}")
 
         # Validate centrality type
-        valid_types = ["degree", "betweenness", "closeness", "eigenvector", "pagerank", "katz"]
+        valid_types = ["degree", "betweenness",
+                       "closeness", "eigenvector", "pagerank", "katz"]
         if centrality_type not in valid_types:
             return {
                 "success": False,
@@ -110,9 +112,10 @@ def calculate_and_store_centrality(graphml_content: str, centrality_type: str = 
                     "success": False,
                     "error": "NetworkX not available for graph processing"
                 }
-            
+
             G = nx.read_graphml(content_io)
-            logger.info(f"📊 Graph loaded: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
+            logger.info(
+                f"📊 Graph loaded: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
         except ImportError:
             return {
                 "success": False,
@@ -131,7 +134,8 @@ def calculate_and_store_centrality(graphml_content: str, centrality_type: str = 
             }
 
         # Enhanced centrality calculation with proper error handling
-        logger.info(f"🧮 Calculating {centrality_type} centrality for {G.number_of_nodes()} nodes")
+        logger.info(
+            f"🧮 Calculating {centrality_type} centrality for {G.number_of_nodes()} nodes")
 
         centrality_values = {}
         try:
@@ -139,29 +143,38 @@ def calculate_and_store_centrality(graphml_content: str, centrality_type: str = 
                 centrality_values = nx.degree_centrality(G)  # type: ignore
             elif centrality_type == "betweenness":
                 # Add normalized parameter for betweenness
-                centrality_values = nx.betweenness_centrality(G, normalized=True, **centrality_params)  # type: ignore
+                centrality_values = nx.betweenness_centrality(
+                    G, normalized=True, **centrality_params)  # type: ignore
             elif centrality_type == "closeness":
-                centrality_values = nx.closeness_centrality(G, **centrality_params)  # type: ignore
+                centrality_values = nx.closeness_centrality(
+                    G, **centrality_params)  # type: ignore
             elif centrality_type == "eigenvector":
                 # Handle potential convergence issues
                 try:
                     max_iter = centrality_params.get('max_iter', 1000)
-                    centrality_values = nx.eigenvector_centrality(G, max_iter=max_iter, **{k: v for k, v in centrality_params.items() if k != 'max_iter'})  # type: ignore
+                    centrality_values = nx.eigenvector_centrality(
+                        # type: ignore
+                        G, max_iter=max_iter, **{k: v for k, v in centrality_params.items() if k != 'max_iter'})
                 except Exception:  # Catch any convergence errors
-                    logger.warning("Eigenvector centrality failed to converge, using degree centrality as fallback")
+                    logger.warning(
+                        "Eigenvector centrality failed to converge, using degree centrality as fallback")
                     centrality_values = nx.degree_centrality(G)  # type: ignore
                     centrality_type = "degree"  # Update type for accurate reporting
             elif centrality_type == "pagerank":
-                centrality_values = nx.pagerank(G, **centrality_params)  # type: ignore
+                centrality_values = nx.pagerank(
+                    G, **centrality_params)  # type: ignore
             elif centrality_type == "katz":
                 try:
-                    centrality_values = nx.katz_centrality(G, **centrality_params)  # type: ignore
+                    centrality_values = nx.katz_centrality(
+                        G, **centrality_params)  # type: ignore
                 except Exception as e:
-                    logger.warning(f"Katz centrality failed: {e}, using degree centrality as fallback")
+                    logger.warning(
+                        f"Katz centrality failed: {e}, using degree centrality as fallback")
                     centrality_values = nx.degree_centrality(G)  # type: ignore
                     centrality_type = "degree"
 
-            logger.info(f"✅ {centrality_type.title()} centrality calculation completed")
+            logger.info(
+                f"✅ {centrality_type.title()} centrality calculation completed")
 
         except Exception as calc_error:
             logger.error(f"Centrality calculation failed: {calc_error}")
@@ -181,16 +194,17 @@ def calculate_and_store_centrality(graphml_content: str, centrality_type: str = 
         max_value = max(values_list)
         min_value = min(values_list)
         mean_value = sum(values_list) / len(values_list)
-        
+
         # Normalize to [0, 1] range
         if max_value > min_value:
             normalized_centrality = {
-                str(k): (v - min_value) / (max_value - min_value) 
+                str(k): (v - min_value) / (max_value - min_value)
                 for k, v in centrality_values.items()
             }
         else:
             # All values are the same
-            normalized_centrality = {str(k): 0.5 for k in centrality_values.keys()}
+            normalized_centrality = {
+                str(k): 0.5 for k in centrality_values.keys()}
 
         # 計算IDを生成
         calculation_id = str(uuid.uuid4())
@@ -210,9 +224,12 @@ def calculate_and_store_centrality(graphml_content: str, centrality_type: str = 
                 "mean_value": mean_value
             },
             "graph_properties": {
-                "is_connected": nx.is_connected(G) if NETWORKX_AVAILABLE else False,  # type: ignore
-                "density": nx.density(G) if NETWORKX_AVAILABLE else 0.0,  # type: ignore
-                "number_of_components": nx.number_connected_components(G) if NETWORKX_AVAILABLE else 1  # type: ignore
+                # type: ignore
+                "is_connected": nx.is_connected(G) if NETWORKX_AVAILABLE else False,
+                # type: ignore
+                "density": nx.density(G) if NETWORKX_AVAILABLE else 0.0,
+                # type: ignore
+                "number_of_components": nx.number_connected_components(G) if NETWORKX_AVAILABLE else 1
             },
             "calculation_timestamp": datetime.now().isoformat()
         }
@@ -228,7 +245,8 @@ def calculate_and_store_centrality(graphml_content: str, centrality_type: str = 
 
         # キャッシュに保存
         centrality_cache[calculation_id] = result
-        logger.info(f"💾 Centrality calculation completed and stored with ID: {calculation_id}")
+        logger.info(
+            f"💾 Centrality calculation completed and stored with ID: {calculation_id}")
 
         return {
             "success": True,
@@ -283,10 +301,12 @@ def get_centrality_visualization_data(calculation_id: str,
         result = centrality_cache[calculation_id]
         centrality_values = result.centrality_values
 
-        logger.info(f"🎨 Generating enhanced visualization data for calculation {calculation_id}")
+        logger.info(
+            f"🎨 Generating enhanced visualization data for calculation {calculation_id}")
 
         # Enhanced color mapping
-        color_map = generate_enhanced_color_map(centrality_values, color_scheme)
+        color_map = generate_enhanced_color_map(
+            centrality_values, color_scheme)
 
         # Enhanced size mapping with smoother scaling
         size_map = generate_enhanced_size_map(centrality_values, size_range)
@@ -353,7 +373,7 @@ def get_centrality_visualization_data(calculation_id: str,
 
 
 def generate_enhanced_color_map(centrality_values: Dict[str, float],
-                               color_scheme: str = "viridis") -> Dict[str, str]:
+                                color_scheme: str = "viridis") -> Dict[str, str]:
     """
     Enhanced color mapping with multiple color schemes
 
@@ -366,7 +386,7 @@ def generate_enhanced_color_map(centrality_values: Dict[str, float],
     """
     try:
         color_map = {}
-        
+
         # Define color schemes
         color_schemes = {
             "viridis": ["#440154", "#31688e", "#35b779", "#fde725"],
@@ -377,10 +397,10 @@ def generate_enhanced_color_map(centrality_values: Dict[str, float],
             "blue_red": ["#0066cc", "#3399ff", "#66ccff", "#ffcc66", "#ff9933", "#cc0000"],
             "cool_warm": ["#3690c0", "#7fcdbb", "#c7e9b4", "#ffeda0", "#fd8d3c", "#e31a1c"]
         }
-        
+
         colors = color_schemes.get(color_scheme, color_schemes["simple"])
         num_colors = len(colors)
-        
+
         for node_id, value in centrality_values.items():
             # Map value to color index
             if value == 1.0:
@@ -388,19 +408,20 @@ def generate_enhanced_color_map(centrality_values: Dict[str, float],
             else:
                 color_index = int(value * num_colors)
                 color_index = min(color_index, num_colors - 1)
-            
+
             color_map[node_id] = colors[color_index]
 
         return color_map
 
     except Exception as e:
-        logger.warning(f"Error generating enhanced color map: {e}, using fallback colors")
+        logger.warning(
+            f"Error generating enhanced color map: {e}, using fallback colors")
         # Fallback: simple color mapping
         return {node_id: "#1d4ed8" for node_id in centrality_values.keys()}
 
 
 def generate_enhanced_size_map(centrality_values: Dict[str, float],
-                              size_range: tuple = (5, 20)) -> Dict[str, float]:
+                               size_range: tuple = (5, 20)) -> Dict[str, float]:
     """
     Enhanced size mapping with smooth scaling and logarithmic option
 
@@ -412,7 +433,7 @@ def generate_enhanced_size_map(centrality_values: Dict[str, float],
         dict: ノードIDをキー、サイズを値とする辞書
     """
     import math
-    
+
     min_size, max_size = size_range
     size_range_span = max_size - min_size
 
@@ -424,7 +445,7 @@ def generate_enhanced_size_map(centrality_values: Dict[str, float],
             scaled_value = math.sqrt(value)
         else:
             scaled_value = 0
-            
+
         size = min_size + (scaled_value * size_range_span)
         size_map[node_id] = max(min_size, size)  # Ensure minimum size
 

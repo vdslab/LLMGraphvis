@@ -265,17 +265,19 @@ const useNetworkStore = create((set, get) => ({
       const updatedPositions = state.positions.map((node) => {
         const nodeId = node.id;
         const nodeVizData = visualization_data[nodeId];
-        
+
         if (nodeVizData) {
           const {
             centrality_value,
             color,
             size,
             importance_level,
-            percentile
+            percentile,
           } = nodeVizData;
 
-          console.log(`Updating node ${nodeId}: size=${size}, color=${color}, centrality=${centrality_value}`);
+          console.log(
+            `Updating node ${nodeId}: size=${size}, color=${color}, centrality=${centrality_value}`,
+          );
 
           return {
             ...node,
@@ -292,7 +294,7 @@ const useNetworkStore = create((set, get) => ({
             originalSize: node.originalSize || node.size || 5,
           };
         }
-        
+
         return node;
       });
 
@@ -300,10 +302,11 @@ const useNetworkStore = create((set, get) => ({
       const updatedNodes = state.nodes.map((node) => {
         const nodeId = node.id;
         const nodeVizData = visualization_data[nodeId];
-        
+
         if (nodeVizData) {
-          const { centrality_value, importance_level, percentile } = nodeVizData;
-          
+          const { centrality_value, importance_level, percentile } =
+            nodeVizData;
+
           return {
             ...node,
             [`${centrality_type}_centrality`]: centrality_value,
@@ -312,11 +315,13 @@ const useNetworkStore = create((set, get) => ({
             percentile: percentile,
           };
         }
-        
+
         return node;
       });
 
-      console.log(`✅ Applied centrality visualization to ${updatedPositions.length} nodes`);
+      console.log(
+        `✅ Applied centrality visualization to ${updatedPositions.length} nodes`,
+      );
 
       return {
         ...state,
