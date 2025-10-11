@@ -33,6 +33,8 @@ const NetworkChatPage = () => {
   const { messages, sendMessage, isProcessing, addMessage } = useChatStore();
 
   const [inputMessage, setInputMessage] = useState("");
+  // Mobile: control left chat panel visibility
+  const [isChatOpenMobile, setIsChatOpenMobile] = useState(false);
   // LLM provider state
   // LLM provider/model state
   const [llmProvider, setLlmProvider] = useState("google");
@@ -490,10 +492,21 @@ const NetworkChatPage = () => {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+    // Lock the page height under the navbar (Navbar h-16 = 4rem) so only inner panes can scroll
+    <div className="flex flex-col h-[calc(100vh-4rem)]">
+      <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
         {/* Left side - Chat panel */}
-        <div className="w-full md:w-2/5 lg:w-1/3 flex flex-col bg-white border-r border-gray-200">
+        <div
+          className={
+            // Mobile: slide-in drawer; Desktop: static panel
+            `z-30 md:z-auto ` +
+            `fixed md:static top-16 bottom-0 md:inset-auto left-0 ` +
+            `w-full sm:w-4/5 md:w-2/5 lg:w-1/3 ` +
+            `transform transition-transform duration-200 ease-out ` +
+            `${isChatOpenMobile ? "translate-x-0" : "-translate-x-full md:translate-x-0"} ` +
+            `flex flex-col bg-white border-r border-gray-200 shadow md:shadow-none min-h-0`
+          }
+        >
           {/* LLM Selector */}
           <div className="px-4 py-3 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
             <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:space-x-4">
@@ -581,7 +594,7 @@ const NetworkChatPage = () => {
             </div>
           </div>
           {/* Messages area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
             {messages.map((message, index) => (
               <div
                 key={index}
@@ -695,7 +708,57 @@ const NetworkChatPage = () => {
         </div>
 
         {/* Right side - Network visualization panel */}
-        <div className="w-full md:flex-1 flex flex-col bg-white relative">
+        <div className="w-full md:flex-1 flex flex-col bg-white relative min-h-0">
+          {/* Mobile toggle button to open chat panel */}
+          <div className="md:hidden fixed bottom-4 left-4 z-30">
+            <button
+              type="button"
+              aria-label="Open chat panel"
+              onClick={() => setIsChatOpenMobile(true)}
+              className="bg-white/90 backdrop-blur px-3 py-2 rounded-full shadow border border-gray-200 text-gray-700 flex items-center space-x-2"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-5 h-5"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M7.5 8.25h9m-9 3h6m-6 3h9M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span className="text-sm font-medium">Chat</span>
+            </button>
+          </div>
+
+          {/* Mobile: close button inside chat panel header overlay */}
+          {isChatOpenMobile && (
+            <button
+              type="button"
+              aria-label="Close chat panel"
+              onClick={() => setIsChatOpenMobile(false)}
+              className="md:hidden fixed top-[4.25rem] right-4 z-40 bg-white/90 backdrop-blur px-2.5 py-2 rounded-full shadow border border-gray-200"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={1.5}
+                stroke="currentColor"
+                className="w-5 h-5"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          )}
           {/* Upload button - positioned for better visibility */}
           <div className="absolute top-4 right-4 z-20">
             <FileUploadButton
@@ -717,7 +780,7 @@ const NetworkChatPage = () => {
 
           {/* Graph visualization */}
           <div
-            className={`flex-1 relative overflow-hidden ${isDragging ? "bg-blue-50" : ""}`}
+            className={`flex-1 min-h-0 relative overflow-hidden ${isDragging ? "bg-blue-50" : ""}`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleFileDrop}
