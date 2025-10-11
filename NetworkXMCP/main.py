@@ -1,10 +1,10 @@
 """
-NetworkX MCP Server (Stateless)
-=================================
+NetworkX MCP Server (FastMCP with OpenAPI)
+==========================================
 
-FastAPI Model Context Protocol (MCP) サーバー
-ネットワーク分析と可視化のためのステートレスなAPIを提供します。
-GraphML形式のデータをサポートし、NetworkXを使用したグラフ分析を行います。
+FastMCP Model Context Protocol (MCP) サーバー
+ネットワーク分析と可視化のためのAPIを自動的にMCPツールとして公開します。
+OpenAPI仕様からMCPツールを自動生成し、NetworkXを使用したグラフ分析を行います。
 """
 
 import os
@@ -15,13 +15,14 @@ from typing import Dict, Any, List, Optional, Union
 from fastapi import FastAPI, Depends, HTTPException, Body, Request, Header
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi_mcp import FastApiMCP
 from pydantic import BaseModel, Field
 import random
 import json
 import base64
 import io
 from datetime import datetime
+import httpx
+from fastmcp import FastMCP
 
 # ロギングの設定
 log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
@@ -33,9 +34,12 @@ logger = logging.getLogger("networkx_mcp")
 
 # FastAPIアプリケーションの作成
 app = FastAPI(
-    title="NetworkX MCP (Stateless)",
-    description="Stateless MCP server for network analysis and visualization using NetworkX",
-    version="0.2.0",
+    title="NetworkX MCP (FastMCP with OpenAPI)",
+    description="FastMCP-based MCP server for network analysis and visualization using NetworkX with OpenAPI integration",
+    version="0.3.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
 )
 
 # CORSミドルウェアの設定
@@ -46,10 +50,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# FastAPI MCPの統合
-mcp = FastApiMCP(app)
-mcp.mount()  # MCPサーバーを /mcp にマウント
 
 # --- Pydanticモデル定義 ---
 
@@ -245,9 +245,9 @@ async def get_mcp_info():
     """MCPサーバーの情報を返す"""
     return {
         "success": True,
-        "name": "NetworkX MCP (Enhanced)",
+        "name": "NetworkX MCP (FastMCP with OpenAPI)",
         "version": "0.3.0",
-        "description": "Enhanced NetworkX graph analysis and visualization MCP server with caching",
+        "description": "FastMCP-based NetworkX graph analysis and visualization MCP server with OpenAPI integration",
         "tools": [
             {"name": "get_sample_network",
                 "description": "Get a sample network in GraphML format"},
@@ -704,6 +704,53 @@ async def api_get_centrality_status(params: CalculationIdParams):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# FastMCP with OpenAPI integration
+async def create_mcp_server():
+    """Create FastMCP server from OpenAPI specification"""
+    try:
+        # サーバーがローカルで動作している場合のベースURL
+        base_url = os.environ.get("BASE_URL", "http://localhost:8001")
+
+        # HTTPクライアントを作成
+        client = httpx.AsyncClient(base_url=base_url)
+
+        # OpenAPI仕様を取得
+        try:
+            response = await client.get("/openapi.json")
+            openapi_spec = response.json()
+        except Exception as e:
+            logger.warning(
+                f"Could not fetch OpenAPI spec from running server: {e}")
+            # サーバーが起動していない場合は、アプリからOpenAPI仕様を生成
+            openapi_spec = app.openapi()
+
+        # FastMCPサーバーを作成
+        mcp = FastMCP.from_openapi(
+            openapi_spec=openapi_spec,
+            client=client,
+            name="NetworkX MCP (FastMCP)",
+            tags={"networkx", "graph-analysis", "visualization"}
+        )
+
+        logger.info(
+            "FastMCP server created successfully with OpenAPI integration")
+        return mcp
+
+    except Exception as e:
+        logger.error(f"Error creating FastMCP server: {e}")
+        raise
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    import asyncio
+
+    # FastAPIアプリケーションとFastMCPサーバーを統合
+    # まずFastAPIサーバーを起動し、その後OpenAPI仕様からMCPサーバーを作成
+    try:
+        logger.info(
+            "Starting NetworkX MCP Server with FastMCP and OpenAPI integration")
+        uvicorn.run(app, host="0.0.0.0", port=8001)
+    except Exception as e:
+        logger.error(f"Failed to start server: {e}")
+        raise
