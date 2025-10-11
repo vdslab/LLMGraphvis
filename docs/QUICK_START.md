@@ -21,7 +21,7 @@ LLMGraphvisプロジェクトの迅速な起動方法を説明します。この
 2. **APIキーの設定**
 
    `.env`ファイルを編集して、必要なAPIキーを設定してください：
-   
+
    ```bash
    # LLM Provider（google または openai）
    LLM_PROVIDER=google
@@ -133,6 +133,7 @@ docker compose restart frontend
 ### 認証機能の利用
 
 1. **ユーザー登録**
+
    ```bash
    curl -X POST "http://localhost:8000/auth/register" \
      -H "Content-Type: application/json" \
@@ -140,6 +141,7 @@ docker compose restart frontend
    ```
 
 2. **トークン取得**
+
    ```bash
    curl -X POST "http://localhost:8000/auth/token" \
      -H "Content-Type: application/x-www-form-urlencoded" \
