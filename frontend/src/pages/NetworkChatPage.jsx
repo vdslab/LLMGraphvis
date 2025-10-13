@@ -915,7 +915,7 @@ const NetworkChatPage = () => {
                   const success = await calculateCentralityDirect(
                     "degree",
                     "viridis",
-                    [5, 25],
+                    [10, 200], // Updated for better node visibility
                   );
                   if (success) {
                     addMessage({
@@ -937,7 +937,7 @@ const NetworkChatPage = () => {
                   const success = await calculateCentralityDirect(
                     "betweenness",
                     "plasma",
-                    [6, 30],
+                    [10, 200], // Updated for better node visibility
                   );
                   if (success) {
                     addMessage({

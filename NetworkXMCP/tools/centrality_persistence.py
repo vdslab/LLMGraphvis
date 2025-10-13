@@ -421,13 +421,16 @@ def generate_enhanced_color_map(centrality_values: Dict[str, float],
 
 
 def generate_enhanced_size_map(centrality_values: Dict[str, float],
-                               size_range: tuple = (5, 20)) -> Dict[str, float]:
+                               size_range: tuple = (10, 200)) -> Dict[str, float]:
     """
     Enhanced size mapping with smooth scaling and better visual distinction for centrality values
 
+    The size range is now optimized for better node visibility with values from 10 to 200.
+    This provides a much more pronounced visual difference between nodes with different centrality values.
+
     Args:
         centrality_values (dict): 中心性値 (normalized between 0-1)
-        size_range (tuple): サイズの範囲 (min, max)
+        size_range (tuple): サイズの範囲 (min, max) - default (10, 200) for better visibility
 
     Returns:
         dict: ノードIDをキー、サイズを値とする辞書
@@ -460,11 +463,14 @@ def generate_enhanced_size_map(centrality_values: Dict[str, float],
             (max_centrality - min_centrality)
 
         # Apply enhanced scaling for better visual perception
+        # Using a more aggressive scaling function for the 10-200 range
         if normalized_value > 0:
-            # Use a combination of linear and square root scaling for better distinction
-            # This gives more pronounced differences between high and low centrality nodes
-            scaled_value = 0.3 * normalized_value + \
-                0.7 * math.sqrt(normalized_value)
+            # Combine linear, square root, and quadratic scaling for maximum visual impact
+            linear_component = 0.2 * normalized_value
+            sqrt_component = 0.3 * math.sqrt(normalized_value)
+            # More aggressive for high values
+            quadratic_component = 0.5 * (normalized_value ** 1.5)
+            scaled_value = linear_component + sqrt_component + quadratic_component
         else:
             scaled_value = 0
 

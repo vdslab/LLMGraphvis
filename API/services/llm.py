@@ -134,9 +134,10 @@ TOOLS_DEFINITION = [
                 },
                 "size_range": {
                     "type": "array",
-                    "description": "Node size range [min, max].",
+                    "description": "Node size range [min, max] for better node visibility.",
                     "items": {"type": "number"},
-                    "default": [5, 20]
+                    # Updated for much better visual distinction
+                    "default": [10, 200]
                 }
             },
             "required": ["calculation_id"]

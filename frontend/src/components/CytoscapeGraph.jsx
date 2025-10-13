@@ -80,11 +80,12 @@ const CytoscapeGraph = ({
       },
     },
     // Apply continuous size mapping only when `size` data exists to avoid Cytoscape warnings
+    // Updated to handle the new size range of 10-200 for better node visibility
     {
       selector: "node[size]",
       style: {
-        width: "mapData(size, 0, 10, 25, 50)",
-        height: "mapData(size, 0, 10, 25, 50)",
+        width: "mapData(size, 10, 200, 30, 200)", // Map 10-200 input to 30-200 pixel size
+        height: "mapData(size, 10, 200, 30, 200)",
       },
     },
     {
@@ -134,8 +135,9 @@ const CytoscapeGraph = ({
       {
         selector: "node[size]",
         style: {
-          width: "mapData(size, 0, 10, 25, 50)",
-          height: "mapData(size, 0, 10, 25, 50)",
+          // Updated to handle the new size range of 10-200 for better node visibility
+          width: "mapData(size, 10, 200, 30, 200)", // Map 10-200 input to 30-200 pixel size
+          height: "mapData(size, 10, 200, 30, 200)",
         },
       },
     ];

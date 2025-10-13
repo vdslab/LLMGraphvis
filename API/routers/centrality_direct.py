@@ -36,7 +36,7 @@ class CentralityRequest(BaseModel):
     network: NetworkData
     centrality_type: str = "degree"
     color_scheme: str = "viridis"
-    size_range: List[float] = [5, 20]
+    size_range: List[float] = [10, 200]  # Updated for better node visibility
 
 
 def convert_frontend_network_to_graphml(nodes: List[Dict], edges: List[Dict]) -> str:

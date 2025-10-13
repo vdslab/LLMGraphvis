@@ -91,11 +91,12 @@ def test_centrality_calculation():
                 print(f"✅ Stage 1 completed. Calculation ID: {calculation_id}")
                 print(f"   Centrality type: {centrality_type}")
 
-                # Stage 2: Get visualization data
+                # Stage 2: Get visualization data with new improved size range
                 stage2_payload = {
                     "calculation_id": calculation_id,
                     "color_scheme": "viridis",
-                    "size_range": [5, 20]
+                    # Updated for better node visibility
+                    "size_range": [10, 200]
                 }
 
                 viz_response = requests.post(f"{mcp_url}/tools/get_centrality_visualization",
@@ -192,11 +193,12 @@ def test_betweenness_centrality():
 
                 print(f"✅ Stage 1 completed. Calculation ID: {calculation_id}")
 
-                # Stage 2: Get visualization data
+                # Stage 2: Get visualization data with new improved size range
                 stage2_payload = {
                     "calculation_id": calculation_id,
                     "color_scheme": "plasma",
-                    "size_range": [6, 25]
+                    # Updated for better node visibility
+                    "size_range": [10, 200]
                 }
 
                 viz_response = requests.post(f"{mcp_url}/tools/get_centrality_visualization",
