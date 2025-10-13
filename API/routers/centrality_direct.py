@@ -66,21 +66,22 @@ def convert_frontend_network_to_graphml(nodes: List[Dict], edges: List[Dict]) ->
             output.seek(0)
             graphml_bytes = output.getvalue()
             output.close()
-            
+
             # Decode bytes to string
             if isinstance(graphml_bytes, bytes):
                 graphml_content = graphml_bytes.decode('utf-8')
             else:
                 graphml_content = str(graphml_bytes)
-            
+
             return graphml_content
         except Exception as write_error:
-            print(f"Warning: BytesIO write failed ({write_error}), trying temporary file method")
+            print(
+                f"Warning: BytesIO write failed ({write_error}), trying temporary file method")
             # Alternative: use temporary file with binary mode, then read as text
             with tempfile.NamedTemporaryFile(mode='wb', suffix='.graphml', delete=False) as tmp:
                 nx.write_graphml(G, tmp, encoding='utf-8', prettyprint=True)
                 tmp.flush()
-            
+
             # Read back the content as text
             with open(tmp.name, 'r', encoding='utf-8') as f:
                 graphml_content = f.read()
