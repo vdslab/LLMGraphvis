@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { settingsAPI } from "../services/api";
 import CytoscapeGraph from "../components/CytoscapeGraph";
+import { StylePresets } from "../constants/cytoscapePresets";
 import useNetworkStore from "../services/networkStore";
 import useChatStore from "../services/chatStore";
 import ReactMarkdown from "react-markdown";
@@ -183,6 +184,14 @@ const NetworkChatPage = () => {
         id: node.id,
         label: node.label || node.id,
         ...node,
+        // Include visual properties from position data (centrality size, color, etc.)
+        ...(position && {
+          size: position.size,
+          color: position.color,
+          centrality_value: position.centrality_value,
+          importance_level: position.importance_level,
+          percentile: position.percentile,
+        }),
       },
       position: position ? { x: position.x, y: position.y } : undefined,
     });
@@ -924,7 +933,11 @@ const NetworkChatPage = () => {
               <CytoscapeGraph
                 elements={cytoscapeElements}
                 layout={{ name: "preset" }}
-                style={undefined}
+                style={
+                  centralityInfo && centralityInfo.applied
+                    ? StylePresets.CENTRALITY
+                    : undefined
+                }
                 className="w-full h-full"
                 onNodeClick={handleNodeClick}
               />
