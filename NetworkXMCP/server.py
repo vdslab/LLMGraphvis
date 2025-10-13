@@ -65,6 +65,8 @@ logging.basicConfig(
 logger = logging.getLogger("networkx_mcp")
 
 # Structured error response helper following MCP patterns
+
+
 def create_error_response(error_msg: str, error_code: str = "EXECUTION_ERROR") -> Dict[str, Any]:
     """Create standardized error response following MCP best practices."""
     logger.error(f"Error [{error_code}]: {error_msg}")
@@ -76,6 +78,7 @@ def create_error_response(error_msg: str, error_code: str = "EXECUTION_ERROR") -
             "timestamp": datetime.now().isoformat()
         }
     }
+
 
 def create_success_response(data: Dict[str, Any], operation: str = "unknown") -> Dict[str, Any]:
     """Create standardized success response following MCP best practices."""
@@ -91,7 +94,7 @@ def create_success_response(data: Dict[str, Any], operation: str = "unknown") ->
 async def server_lifespan(server: FastMCP) -> AsyncIterator[ServerContext]:
     """
     Manage server startup and shutdown lifecycle following MCP best practices.
-    
+
     This lifespan manager:
     - Initializes shared resources and caches
     - Provides proper cleanup on shutdown
@@ -99,13 +102,13 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[ServerContext]:
     """
     # Use stderr for all MCP server logs
     logger.info("NetworkX MCP Server starting up with best practices...")
-    
+
     # Initialize shared resources with enhanced context
     context = ServerContext()
-    
+
     # Log initialization details
     logger.info(f"Server context initialized: {context.get_cache_stats()}")
-    
+
     try:
         # Yield context for use during server lifetime
         yield context
@@ -124,7 +127,7 @@ async def server_lifespan(server: FastMCP) -> AsyncIterator[ServerContext]:
 # Create FastMCP server with enhanced configuration following best practices
 mcp = FastMCP(
     name="NetworkX Graph Analysis Server",
-    version="2.0.0", 
+    version="2.0.0",
     description="Advanced NetworkX graph analysis and visualization server following MCP best practices",
     lifespan=server_lifespan
 )
@@ -142,31 +145,31 @@ try:
 
     # Register all tools and resources with error handling
     tools_registered = []
-    
+
     try:
         register_network_tools(mcp)
         tools_registered.append("network_operations")
     except Exception as e:
         logger.error(f"Failed to register network tools: {e}")
-    
+
     try:
         register_layout_tools(mcp)
         tools_registered.append("layout_algorithms")
     except Exception as e:
         logger.error(f"Failed to register layout tools: {e}")
-    
+
     try:
         register_centrality_tools(mcp)
         tools_registered.append("centrality_metrics")
     except Exception as e:
         logger.error(f"Failed to register centrality tools: {e}")
-    
+
     try:
         register_io_tools(mcp)
         tools_registered.append("graph_io")
     except Exception as e:
         logger.error(f"Failed to register I/O tools: {e}")
-    
+
     try:
         register_visualization_tools(mcp)
         tools_registered.append("visualization")
@@ -175,13 +178,13 @@ try:
 
     # Register resources with error handling
     resources_registered = []
-    
+
     try:
         register_graph_resources(mcp)
         resources_registered.append("graph_resources")
     except Exception as e:
         logger.error(f"Failed to register graph resources: {e}")
-    
+
     try:
         register_cache_resources(mcp)
         resources_registered.append("cache_resources")
@@ -202,13 +205,13 @@ except ImportError as e:
 def get_server_info() -> Dict[str, Any]:
     """
     Get comprehensive information about the MCP server and its capabilities.
-    
+
     Following MCP best practices, this tool provides:
     - Structured server metadata
     - Available tools and their parameters
     - Resource endpoints and their schemas
     - Capability matrix for client discovery
-    
+
     Returns:
         Dict containing server information, capabilities, and available tools/resources
     """
@@ -256,7 +259,7 @@ def get_server_info() -> Dict[str, Any]:
                 },
                 "cache://centrality": {
                     "description": "Cached centrality calculations",
-                    "mime_type": "application/json", 
+                    "mime_type": "application/json",
                     "schema": "centrality_calculation"
                 },
                 "cache://stats": {
@@ -267,7 +270,7 @@ def get_server_info() -> Dict[str, Any]:
             },
             "tools": {
                 "get_server_info": "Get server capabilities and information",
-                "create_sample_graph": "Generate sample graphs for analysis", 
+                "create_sample_graph": "Generate sample graphs for analysis",
                 "calculate_centrality": "Compute centrality measures with caching",
                 "apply_layout": "Calculate node positions using various algorithms",
                 "get_visualization_data": "Generate visualization data from calculations",
@@ -275,12 +278,12 @@ def get_server_info() -> Dict[str, Any]:
                 "clear_cache": "Clear server caches and reset state"
             }
         }
-        
+
         return create_success_response(server_info, "get_server_info")
-        
+
     except Exception as e:
         return create_error_response(
-            f"Failed to get server info: {str(e)}", 
+            f"Failed to get server info: {str(e)}",
             "SERVER_INFO_ERROR"
         )
 
@@ -291,7 +294,7 @@ def get_server_info() -> Dict[str, Any]:
 def get_cache_status() -> str:
     """
     Get current cache status and statistics.
-    
+
     Returns cache information in a human-readable format following
     MCP resource best practices.
     """
@@ -304,24 +307,24 @@ def get_cache_status() -> str:
             "active_calculations": 0,
             "memory_usage": "0 MB"
         }
-        
+
         return json.dumps({
             "status": "active",
             "cache_stats": stats,
             "last_updated": datetime.now().isoformat(),
             "server_uptime": "running"
         }, indent=2)
-        
+
     except Exception as e:
         logger.error(f"Error getting cache status: {e}")
         return json.dumps({"error": str(e)})
 
 
-@mcp.resource("mcp://server-info")  
+@mcp.resource("mcp://server-info")
 def get_mcp_server_metadata() -> str:
     """
     Get MCP server metadata in standardized format.
-    
+
     This resource provides server information that clients can use
     for discovery and capability negotiation.
     """
@@ -341,9 +344,9 @@ def get_mcp_server_metadata() -> str:
                 "framework": "fastmcp"
             }
         }
-        
+
         return json.dumps(metadata, indent=2)
-        
+
     except Exception as e:
         logger.error(f"Error getting MCP metadata: {e}")
         return json.dumps({"error": str(e)})
@@ -353,16 +356,16 @@ def get_mcp_server_metadata() -> str:
 
 @mcp.prompt()
 def analyze_network_structure(
-    graph_description: str = "a network", 
+    graph_description: str = "a network",
     analysis_type: str = "general"
 ) -> str:
     """
     Generate analysis prompts for network structure exploration.
-    
+
     Args:
         graph_description: Description of the network to analyze
         analysis_type: Type of analysis (general, centrality, community, etc.)
-    
+
     Returns:
         Structured prompt for network analysis
     """
@@ -387,15 +390,15 @@ def compare_centrality_measures(
 ) -> str:
     """
     Generate prompts for comparing different centrality measures.
-    
+
     Args:
         measures: Comma-separated list of centrality measures to compare
-    
+
     Returns:
         Structured prompt for centrality comparison
     """
     measure_list = [m.strip() for m in measures.split(",")]
-    
+
     return f"""Compare centrality measures for network analysis: {', '.join(measure_list)}
 
 Analysis Steps:
@@ -417,11 +420,11 @@ def optimize_graph_layout(
 ) -> str:
     """
     Generate prompts for selecting optimal graph layout algorithms.
-    
+
     Args:
         network_size: Size of network (small, medium, large)
         purpose: Purpose of visualization (exploration, presentation, analysis)
-    
+
     Returns:
         Structured prompt for layout optimization
     """
@@ -448,14 +451,15 @@ Goal: Create the most effective and informative network visualization for {purpo
 
 if __name__ == "__main__":
     # Run the MCP server with enhanced logging
-    logger.info("Starting NetworkX MCP Server with best practices implementation...")
+    logger.info(
+        "Starting NetworkX MCP Server with best practices implementation...")
     logger.info("Server configured with:")
     logger.info("- Structured error handling and responses")
-    logger.info("- Proper stderr logging for MCP compatibility") 
+    logger.info("- Proper stderr logging for MCP compatibility")
     logger.info("- Resource endpoints for cached data")
     logger.info("- Prompt templates for common analysis tasks")
     logger.info("- Lifespan management for proper cleanup")
-    
+
     try:
         mcp.run()
     except Exception as e:

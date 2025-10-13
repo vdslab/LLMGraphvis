@@ -37,8 +37,12 @@ except ImportError:
     # Mock for development
     class FastMCP:
         def tool(self): return lambda f: f
-    class Context: pass
-    class ServerSession: pass
+
+    class Context:
+        pass
+
+    class ServerSession:
+        pass
 
 from core.context import ServerContext
 from core.graph_utils import parse_graphml_content
@@ -59,7 +63,7 @@ def register_centrality_tools(mcp: FastMCP):
     ) -> Dict[str, Any]:
         """
         Calculate degree centrality for all nodes in the graph.
-        
+
         Enhanced with MCP best practices:
         - Structured input/output schemas
         - Optional result caching
@@ -86,7 +90,7 @@ def register_centrality_tools(mcp: FastMCP):
                         "timestamp": datetime.now().isoformat()
                     }
                 }
-            
+
             # Parse graph with error handling
             try:
                 G = parse_graphml_content(graphml_content)
@@ -95,7 +99,7 @@ def register_centrality_tools(mcp: FastMCP):
                 return {
                     "success": False,
                     "error": {
-                        "code": "PARSE_ERROR", 
+                        "code": "PARSE_ERROR",
                         "message": f"Failed to parse GraphML: {str(parse_error)}",
                         "timestamp": datetime.now().isoformat()
                     }
@@ -111,18 +115,20 @@ def register_centrality_tools(mcp: FastMCP):
                         "timestamp": datetime.now().isoformat()
                     }
                 }
-            
-            centrality = nx.degree_centrality(G) if normalized else dict(G.degree())
+
+            centrality = nx.degree_centrality(
+                G) if normalized else dict(G.degree())
 
             # Convert to string keys for JSON serialization
-            centrality_values = {str(k): float(v) for k, v in centrality.items()}
-            
+            centrality_values = {str(k): float(v)
+                                 for k, v in centrality.items()}
+
             # Calculate comprehensive statistics
             values = list(centrality_values.values())
             statistics = {
                 "count": len(values),
                 "min": min(values),
-                "max": max(values), 
+                "max": max(values),
                 "mean": sum(values) / len(values),
                 "median": sorted(values)[len(values) // 2] if values else 0,
                 "sum": sum(values)
@@ -132,7 +138,7 @@ def register_centrality_tools(mcp: FastMCP):
             calc_id = calculation_id or f"deg_{uuid.uuid4().hex[:8]}"
             metadata = {
                 "calculation_id": calc_id,
-                "algorithm": "degree_centrality", 
+                "algorithm": "degree_centrality",
                 "parameters": {"normalized": normalized},
                 "graph_info": {
                     "nodes": G.number_of_nodes(),
@@ -153,11 +159,13 @@ def register_centrality_tools(mcp: FastMCP):
                         "statistics": statistics,
                         "metadata": metadata
                     }
-                    logger.info(f"Stored degree centrality calculation: {calc_id}")
+                    logger.info(
+                        f"Stored degree centrality calculation: {calc_id}")
                 except Exception as cache_error:
                     logger.warning(f"Failed to cache result: {cache_error}")
 
-            logger.info(f"Calculated degree centrality for {len(centrality_values)} nodes (normalized={normalized})")
+            logger.info(
+                f"Calculated degree centrality for {len(centrality_values)} nodes (normalized={normalized})")
 
             # Structured response following MCP best practices
             return {
