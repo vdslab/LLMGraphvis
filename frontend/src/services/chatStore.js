@@ -104,18 +104,57 @@ const useChatStore = create((set, get) => ({
             );
           } else if (type === "change_layout" && updateData.positions) {
             // Update node positions based on new layout
-            const { positions: newPositionsData } = updateData;
+            console.log("Processing layout change in chat store:", updateData);
+            const { positions: newPositionsData, layout_type } = updateData;
             const currentPositions = networkStore.positions;
 
-            const newPositions = currentPositions.map((node) => {
-              const newPos = newPositionsData[node.id];
-              if (newPos) {
-                return { ...node, x: newPos.x, y: newPos.y };
-              }
-              return node;
-            });
+            if (currentPositions && currentPositions.length > 0) {
+              const newPositions = currentPositions.map((node) => {
+                const newPos = newPositionsData[node.id];
+                if (newPos) {
+                  return {
+                    ...node,
+                    x: parseFloat(newPos.x || 0),
+                    y: parseFloat(newPos.y || 0),
+                  };
+                }
+                return node;
+              });
 
-            networkStore.setPositions(newPositions);
+              console.log(
+                `Updating positions for ${newPositions.length} nodes with ${layout_type} layout`,
+              );
+              networkStore.setPositions(newPositions);
+
+              // Also update the layout type if provided
+              if (layout_type) {
+                networkStore.setLayout(layout_type);
+              }
+            } else {
+              console.warn(
+                "No current positions found to update in chat store",
+              );
+
+              // If no current positions, create them from the provided data
+              if (networkStore.nodes && networkStore.nodes.length > 0) {
+                const positions = networkStore.nodes.map((node) => {
+                  const newPos = newPositionsData[node.id];
+                  return {
+                    id: node.id,
+                    label: node.label || node.id,
+                    x: parseFloat(newPos?.x || 0),
+                    y: parseFloat(newPos?.y || 0),
+                    size: parseFloat(node.size || 5),
+                    color: node.color || "#1d4ed8",
+                  };
+                });
+
+                console.log(
+                  `Creating ${positions.length} new positions from nodes data`,
+                );
+                networkStore.setPositions(positions);
+              }
+            }
           }
         }
 
