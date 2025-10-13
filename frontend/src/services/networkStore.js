@@ -362,12 +362,16 @@ const useNetworkStore = create((set, get) => ({
 
       console.log("Upload response from API:", result);
 
-      if (result && result.network_id && result.conversation_id) {
+      // Accept either { network_id } or { id } as the returned network identifier
+      const returnedNetworkId = result?.network_id || result?.id;
+      const returnedConversationId = result?.conversation_id || null;
+
+      if (result && returnedNetworkId && returnedConversationId) {
         console.log("File uploaded successfully. New data:", result);
 
         useChatStore
           .getState()
-          .setCurrentConversationId(result.conversation_id);
+          .setCurrentConversationId(returnedConversationId);
 
         useChatStore.getState().addMessage({
           role: "assistant",
@@ -375,9 +379,8 @@ const useNetworkStore = create((set, get) => ({
           timestamp: new Date().toISOString(),
         });
 
-        const cytoscapeResponse = await networkAPI.getNetworkCytoscape(
-          result.network_id,
-        );
+        const cytoscapeResponse =
+          await networkAPI.getNetworkCytoscape(returnedNetworkId);
         const cytoData = cytoscapeResponse.data;
 
         if (cytoData && cytoData.elements) {

@@ -208,8 +208,8 @@ export const networkChatAPI = {
   },
   processChatMessage: (message) => {
     console.log("Processing chat message via API:", message);
-    // APIサーバーを経由してチャットメッセージを処理
-    return axios.post(`${API_URL}/chat/process`, { message });
+    // Send the full message object (may include conversation_id) so server can map to the correct network
+    return axios.post(`${API_URL}/chat/process`, message);
   },
 };
 
