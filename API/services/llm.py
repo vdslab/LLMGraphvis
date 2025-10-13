@@ -86,6 +86,15 @@ _initialize_clients()
 # Shared tool definitions, adaptable for each provider.
 TOOLS_DEFINITION = [
     {
+        "name": "get_sample_network",
+        "description": "🔄 Generate a sample network for testing and demonstration purposes. Use this when the user wants to create a network from scratch or when no network is currently loaded and they want to analyze centrality or layout. This creates a random network with 18-25 nodes and appropriate connectivity.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    {
         "name": "calculate_and_store_centrality",
         "description": "🔄 Calculate and store centrality values (Stage 1 of 2). Use this when the user asks for centrality visualization like 'show degree centrality', 'visualize by betweenness centrality', etc. This calculates the centrality values and prepares them for visualization. The system will automatically proceed to Stage 2 (visualization) after this completes.",
         "parameters": {

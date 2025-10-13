@@ -290,6 +290,52 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
                             "details": f"Tool execution failed with status {response.status_code}: {response.text}"
                         })
 
+            elif tool_name == "get_sample_network":
+                # Handle sample network generation
+                print("Generating sample network for conversation")
+
+                async with httpx.AsyncClient() as client:
+                    url = f"{NETWORKX_MCP_URL}/get_sample_network"
+                    print(f"Calling NetworkXMCP: {url}")
+                    response = await client.get(url, timeout=60.0)
+
+                    if response.status_code == 200:
+                        mcp_result = response.json()
+                        if mcp_result.get("success"):
+                            graphml_content = mcp_result.get("graphml_content")
+
+                            # Update the conversation's network with the sample network
+                            if db_conversation.network and graphml_content:
+                                try:
+                                    db_conversation.network.graphml_content = graphml_content
+                                    db.add(db_conversation.network)
+                                    db.commit()
+                                    db.refresh(db_conversation)
+                                    print(
+                                        f"Sample network saved to conversation {db_conversation.id}")
+                                except Exception as save_error:
+                                    print(
+                                        f"Warning: failed to save sample network to DB: {save_error}")
+
+                            # Tool result content for LLM
+                            tool_result_content = json.dumps({
+                                "status": "success",
+                                "details": {
+                                    "message": "Sample network created successfully",
+                                    "metadata": mcp_result.get("metadata", {})
+                                }
+                            })
+                        else:
+                            tool_result_content = json.dumps({
+                                "status": "error",
+                                "details": mcp_result.get("error", "Failed to create sample network")
+                            })
+                    else:
+                        tool_result_content = json.dumps({
+                            "status": "error",
+                            "details": f"Sample network request failed with status {response.status_code}: {response.text}"
+                        })
+
             else:
                 # Handle other tools (existing logic)
                 # Prepare payload for NetworkXMCP
@@ -303,14 +349,17 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
                 async with httpx.AsyncClient() as client:
                     # If the user requested a layout but the current GraphML is empty, request a sample network first
                     if tool_name in ("calculate_and_store_layout", "change_layout"):
-                        graphml_content = mcp_payload.get("graphml_content", "")
+                        graphml_content = mcp_payload.get(
+                            "graphml_content", "")
                         if isinstance(graphml_content, str) and "<node" not in graphml_content:
                             try:
-                                print("No nodes in current GraphML, requesting a sample network from MCP")
+                                print(
+                                    "No nodes in current GraphML, requesting a sample network from MCP")
                                 sample_resp = await client.get(f"{NETWORKX_MCP_URL}/get_sample_network", timeout=60.0)
                                 if sample_resp.status_code == 200:
                                     sample_json = sample_resp.json()
-                                    sample_graphml = sample_json.get("graphml_content")
+                                    sample_graphml = sample_json.get(
+                                        "graphml_content")
                                     if sample_graphml:
                                         # Update DB network content so future requests use the sample
                                         try:
@@ -320,17 +369,22 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
                                             db.refresh(db_conversation)
                                             # Replace payload content
                                             mcp_payload["graphml_content"] = sample_graphml
-                                            print("Sample network loaded and stored in DB for conversation", db_conversation.id)
+                                            print(
+                                                "Sample network loaded and stored in DB for conversation", db_conversation.id)
                                         except Exception as inner_e:
-                                            print("Warning: failed to persist sample graphml to DB:", inner_e)
+                                            print(
+                                                "Warning: failed to persist sample graphml to DB:", inner_e)
                                 else:
-                                    print("Warning: sample network request returned status", sample_resp.status_code)
+                                    print(
+                                        "Warning: sample network request returned status", sample_resp.status_code)
                             except Exception as sample_e:
-                                print("Warning: could not fetch sample network:", sample_e)
+                                print(
+                                    "Warning: could not fetch sample network:", sample_e)
 
                         # Map layout-related tool names to the change_layout endpoint
                         url = f"{NETWORKX_MCP_URL}/tools/change_layout"
-                        print(f"Calling MCP change_layout: {url} with args {tool_args}")
+                        print(
+                            f"Calling MCP change_layout: {url} with args {tool_args}")
                         response = await client.post(url, json=mcp_payload, timeout=60.0)
 
                         if response.status_code == 200:
@@ -345,14 +399,18 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
                                     "success": True,
                                 }
 
-                                tool_result_content = json.dumps({"status": "success", "details": mcp_result})
+                                tool_result_content = json.dumps(
+                                    {"status": "success", "details": mcp_result})
                             else:
-                                tool_result_content = json.dumps({"status": "error", "details": mcp_result.get("error", "Unknown error from tool.")})
+                                tool_result_content = json.dumps(
+                                    {"status": "error", "details": mcp_result.get("error", "Unknown error from tool.")})
                         else:
-                            tool_result_content = json.dumps({"status": "error", "details": f"Tool execution failed with status {response.status_code}: {response.text}"})
+                            tool_result_content = json.dumps(
+                                {"status": "error", "details": f"Tool execution failed with status {response.status_code}: {response.text}"})
                     else:
                         url = f"{NETWORKX_MCP_URL}/tools/{tool_name}"
-                        print(f"Calling NetworkXMCP: {url} with args {tool_args}")
+                        print(
+                            f"Calling NetworkXMCP: {url} with args {tool_args}")
                         response = await client.post(url, json=mcp_payload, timeout=60.0)
 
                         if response.status_code == 200:
@@ -369,11 +427,14 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
                                     pass
 
                                 # Create a summary of the successful tool result for the LLM
-                                tool_result_content = json.dumps({"status": "success", "details": mcp_result})
+                                tool_result_content = json.dumps(
+                                    {"status": "success", "details": mcp_result})
                             else:
-                                tool_result_content = json.dumps({"status": "error", "details": mcp_result.get("error", "Unknown error from tool.")})
+                                tool_result_content = json.dumps(
+                                    {"status": "error", "details": mcp_result.get("error", "Unknown error from tool.")})
                         else:
-                            tool_result_content = json.dumps({"status": "error", "details": f"Tool execution failed with status {response.status_code}: {response.text}"})
+                            tool_result_content = json.dumps(
+                                {"status": "error", "details": f"Tool execution failed with status {response.status_code}: {response.text}"})
 
             # 4. Send the tool result back to the LLM to get a natural language response
             # Append the original llm_response (with the tool call) and the tool result to the history
@@ -430,7 +491,8 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
                         "network_update": network_update_info,
                     })
                 except Exception as e_b:
-                    print("Warning: failed to broadcast websocket in background task:", e_b)
+                    print(
+                        "Warning: failed to broadcast websocket in background task:", e_b)
         except Exception:
             pass
 
@@ -739,6 +801,60 @@ async def process_chat(
                             "details": f"Tool execution failed with status {response.status_code}: {response.text}"
                         }
 
+            elif tool_name == "get_sample_network":
+                # Handle sample network generation
+                print("Generating sample network for conversation")
+
+                async with httpx.AsyncClient() as client:
+                    url = f"{NETWORKX_MCP_URL}/get_sample_network"
+                    print(f"Calling NetworkXMCP: {url}")
+                    response = await client.get(url, timeout=60.0)
+
+                    if response.status_code == 200:
+                        mcp_result = response.json()
+                        if mcp_result.get("success"):
+                            graphml_content = mcp_result.get("graphml_content")
+
+                            # Update the conversation's network with the sample network
+                            if db_conversation.network and graphml_content:
+                                try:
+                                    db_conversation.network.graphml_content = graphml_content
+                                    db.add(db_conversation.network)
+                                    db.commit()
+                                    db.refresh(db_conversation)
+                                    print(
+                                        f"Sample network saved to conversation {db_conversation.id}")
+                                except Exception as save_error:
+                                    print(
+                                        f"Warning: failed to save sample network to DB: {save_error}")
+
+                            # Create network update for frontend
+                            network_update_info = {
+                                "type": "sample_network_created",
+                                "graphml_content": graphml_content,
+                                "metadata": mcp_result.get("metadata", {}),
+                                "success": True
+                            }
+
+                            # Tool result for LLM
+                            tool_result_for_llm = {
+                                "status": "success",
+                                "details": {
+                                    "message": "Sample network created successfully",
+                                    "metadata": mcp_result.get("metadata", {})
+                                }
+                            }
+                        else:
+                            tool_result_for_llm = {
+                                "status": "error",
+                                "details": mcp_result.get("error", "Failed to create sample network")
+                            }
+                    else:
+                        tool_result_for_llm = {
+                            "status": "error",
+                            "details": f"Sample network request failed with status {response.status_code}: {response.text}"
+                        }
+
             else:
                 # Handle other tools (existing logic)
                 mcp_payload = {
@@ -750,14 +866,17 @@ async def process_chat(
                 async with httpx.AsyncClient() as client:
                     # If the user requested a layout but the current GraphML is empty, request a sample network first
                     if tool_name in ("calculate_and_store_layout", "change_layout"):
-                        graphml_content = mcp_payload.get("graphml_content", "")
+                        graphml_content = mcp_payload.get(
+                            "graphml_content", "")
                         if isinstance(graphml_content, str) and "<node" not in graphml_content:
                             try:
-                                print("No nodes in current GraphML, requesting a sample network from MCP")
+                                print(
+                                    "No nodes in current GraphML, requesting a sample network from MCP")
                                 sample_resp = await client.get(f"{NETWORKX_MCP_URL}/get_sample_network", timeout=60.0)
                                 if sample_resp.status_code == 200:
                                     sample_json = sample_resp.json()
-                                    sample_graphml = sample_json.get("graphml_content")
+                                    sample_graphml = sample_json.get(
+                                        "graphml_content")
                                     if sample_graphml:
                                         try:
                                             db_conversation.network.graphml_content = sample_graphml
@@ -765,22 +884,28 @@ async def process_chat(
                                             db.commit()
                                             db.refresh(db_conversation)
                                             mcp_payload["graphml_content"] = sample_graphml
-                                            print("Sample network loaded and stored in DB for conversation", db_conversation.id)
+                                            print(
+                                                "Sample network loaded and stored in DB for conversation", db_conversation.id)
                                         except Exception as inner_e:
-                                            print("Warning: failed to persist sample graphml to DB:", inner_e)
+                                            print(
+                                                "Warning: failed to persist sample graphml to DB:", inner_e)
                                 else:
-                                    print("Warning: sample network request returned status", sample_resp.status_code)
+                                    print(
+                                        "Warning: sample network request returned status", sample_resp.status_code)
                             except Exception as sample_e:
-                                print("Warning: could not fetch sample network:", sample_e)
+                                print(
+                                    "Warning: could not fetch sample network:", sample_e)
 
                         # Map layout-related tool names to the change_layout endpoint
                         url = f"{NETWORKX_MCP_URL}/tools/change_layout"
-                        print(f"Calling MCP change_layout: {url} with args: {tool_args}")
+                        print(
+                            f"Calling MCP change_layout: {url} with args: {tool_args}")
                         response = await client.post(url, json=mcp_payload, timeout=60.0)
 
                         if response.status_code == 200:
                             mcp_result = response.json().get("result", {})
-                            tool_result_for_llm = {"status": "success", "details": mcp_result}
+                            tool_result_for_llm = {
+                                "status": "success", "details": mcp_result}
                             if mcp_result.get("success"):
                                 network_update_info = {
                                     "type": "change_layout",
@@ -791,21 +916,26 @@ async def process_chat(
                                 }
                         else:
                             error_detail = response.text
-                            tool_result_for_llm = {"status": "error", "details": f"Tool execution failed with status {response.status_code}: {error_detail}"}
+                            tool_result_for_llm = {
+                                "status": "error", "details": f"Tool execution failed with status {response.status_code}: {error_detail}"}
                     else:
                         url = f"{NETWORKX_MCP_URL}/tools/{tool_name}"
-                        print(f"Calling MCP Tool: {url} with args: {tool_args}")
+                        print(
+                            f"Calling MCP Tool: {url} with args: {tool_args}")
                         response = await client.post(url, json=mcp_payload, timeout=60.0)
 
                         if response.status_code == 200:
                             mcp_result = response.json().get("result", {})
-                            tool_result_for_llm = {"status": "success", "details": mcp_result}
+                            tool_result_for_llm = {
+                                "status": "success", "details": mcp_result}
                             if mcp_result.get("success"):
-                                network_update_info = {"type": tool_name, **mcp_result}
+                                network_update_info = {
+                                    "type": tool_name, **mcp_result}
                                 # Potentially update graphml in DB here if needed
                         else:
                             error_detail = response.text
-                            tool_result_for_llm = {"status": "error", "details": f"Tool execution failed with status {response.status_code}: {error_detail}"}
+                            tool_result_for_llm = {
+                                "status": "error", "details": f"Tool execution failed with status {response.status_code}: {error_detail}"}
 
             # 4. Send tool result back to LLM
             # We need to reconstruct the history for the final summarization call
