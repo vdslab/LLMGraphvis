@@ -14,6 +14,10 @@ export const LayoutTypes = {
 };
 
 // Style presets for different visualization types
+// Notes:
+// - Avoid :hover selectors which can be invalid in some Cytoscape builds.
+// - Use fixed sizes instead of continuous mappers to avoid warnings about non-numeric data
+// - Continuous mappers will be applied dynamically when appropriate data is available
 export const StylePresets = {
   DEFAULT: [
     {
@@ -28,8 +32,9 @@ export const StylePresets = {
         "text-outline-color": "#1d4ed8",
         "font-size": "14px",
         "font-weight": "bold",
-        width: "mapData(size, 0, 10, 20, 60)",
-        height: "mapData(size, 0, 10, 20, 60)",
+        // Use fixed size to avoid mapping warnings
+        width: 36,
+        height: 36,
         "border-width": 2,
         "border-color": "#1e40af",
         "border-opacity": 0.8,
@@ -79,8 +84,9 @@ export const StylePresets = {
         "text-outline-color": "#1d4ed8",
         "font-size": "14px",
         "font-weight": "bold",
-        width: "mapData(size, 0, 10, 25, 50)",
-        height: "mapData(size, 0, 10, 25, 50)",
+        // Use fixed size to avoid mapping warnings
+        width: 34,
+        height: 34,
         "border-width": 2,
         "border-color": "#1e40af",
         "border-opacity": 0.8,
@@ -92,7 +98,7 @@ export const StylePresets = {
     {
       selector: "edge",
       style: {
-        width: "mapData(weight, 0, 5, 1, 4)",
+        width: 2,
         "line-color": "#94a3b8",
         "target-arrow-color": "#94a3b8",
         "target-arrow-shape": "triangle",
@@ -122,29 +128,13 @@ export const StylePresets = {
         opacity: 1,
       },
     },
-    {
-      selector: "node:hover",
-      style: {
-        "background-color": "#3b82f6",
-        "border-color": "#2563eb",
-        "border-width": 3,
-      },
-    },
-    {
-      selector: "edge:hover",
-      style: {
-        "line-color": "#3b82f6",
-        "target-arrow-color": "#3b82f6",
-        width: 3,
-        opacity: 0.8,
-      },
-    },
   ],
   CENTRALITY: [
     {
       selector: "node",
       style: {
         "background-color": "data(color)",
+        // Use data(size) directly since centrality data should include size
         width: "data(size)",
         height: "data(size)",
         label: "data(label)",

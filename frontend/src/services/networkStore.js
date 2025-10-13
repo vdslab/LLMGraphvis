@@ -2,6 +2,16 @@ import { create } from "zustand";
 import { networkAPI } from "./api";
 import useChatStore from "./chatStore";
 
+// Helper: coerce numeric-like values to numbers, leave other values untouched
+const coerceNumber = (v) => {
+  if (v === null || v === undefined) return v;
+  // If already a number, return as-is
+  if (typeof v === "number") return v;
+  // Try numeric conversion from string/other
+  const n = Number(v);
+  return Number.isNaN(n) ? v : n;
+};
+
 const useNetworkStore = create((set, get) => ({
   nodes: [],
   edges: [],
@@ -384,13 +394,71 @@ const useNetworkStore = create((set, get) => ({
         const cytoData = cytoscapeResponse.data;
 
         if (cytoData && cytoData.elements) {
+          // Defensive: some nodes may not include 'position' (no x/y), avoid spreading undefined
+          const mappedNodes = cytoData.elements.nodes.map((n) => {
+            const data = n.data || {};
+            // Build a stable node object and coerce numeric-like values
+            const id = data.id ?? n.data?.id ?? n.id ?? data.label;
+            const x = coerceNumber(data.x ?? n.position?.x ?? n.x);
+            const y = coerceNumber(data.y ?? n.position?.y ?? n.y);
+            const size = coerceNumber(
+              data.size ?? n.position?.size ?? data.node_size ?? undefined,
+            );
+
+            return {
+              // preserve original data fields but prefer coerced numeric fields for x/y/size
+              ...data,
+              id,
+              ...(x !== undefined ? { x } : {}),
+              ...(y !== undefined ? { y } : {}),
+              ...(size !== undefined ? { size } : {}),
+            };
+          });
+
+          const mappedEdges = (cytoData.elements.edges || []).map((e) => {
+            const d = e.data || {};
+            return {
+              ...d,
+              width: coerceNumber(
+                d.width ?? d.edge_width ?? d.weight ?? undefined,
+              ),
+              weight: coerceNumber(d.weight ?? d.edge_weight ?? undefined),
+            };
+          });
+
+          const mappedPositions = cytoData.elements.nodes.map((n) => {
+            const dataPart = n.data || {};
+            const posPart = n.position || {};
+
+            // Coerce numeric fields if present (GraphML may return strings)
+            const x = coerceNumber(posPart.x ?? dataPart.x ?? undefined);
+            const y = coerceNumber(posPart.y ?? dataPart.y ?? undefined);
+            const size = coerceNumber(
+              dataPart.size ?? posPart.size ?? undefined,
+            );
+
+            return {
+              id: dataPart.id ?? n.id ?? dataPart.label,
+              label: dataPart.label ?? dataPart.id,
+              ...(x !== undefined ? { x } : {}),
+              ...(y !== undefined ? { y } : {}),
+              ...(size !== undefined ? { size } : {}),
+              color: dataPart.color ?? dataPart.node_color ?? "#1d4ed8",
+            };
+          });
+          console.log(
+            "uploadNetworkFile: mappedNodes",
+            mappedNodes.length,
+            "mappedEdges",
+            mappedEdges.length,
+            "mappedPositions",
+            mappedPositions.length,
+          );
+
           set({
-            nodes: cytoData.elements.nodes.map((n) => n.data),
-            edges: cytoData.elements.edges.map((e) => e.data),
-            positions: cytoData.elements.nodes.map((n) => ({
-              ...n.data,
-              ...n.position,
-            })),
+            nodes: mappedNodes,
+            edges: mappedEdges,
+            positions: mappedPositions,
             isLoading: false,
             error: null,
           });
@@ -465,12 +533,40 @@ const useNetworkStore = create((set, get) => ({
       const response = await networkAPI.getNetworkCytoscape(networkId);
       const cytoData = response.data;
       if (cytoData && cytoData.elements) {
-        const nodes = cytoData.elements.nodes.map((n) => n.data);
-        const edges = cytoData.elements.edges.map((e) => e.data);
-        const positions = cytoData.elements.nodes.map((n) => ({
-          ...n.data,
-          ...n.position,
-        }));
+        const nodes = cytoData.elements.nodes.map((n) => {
+          const d = n.data || {};
+          return {
+            ...d,
+            id: d.id ?? n.id ?? d.label,
+            x: coerceNumber(d.x ?? n.position?.x ?? undefined),
+            y: coerceNumber(d.y ?? n.position?.y ?? undefined),
+            size: coerceNumber(d.size ?? n.position?.size ?? undefined),
+          };
+        });
+
+        const edges = (cytoData.elements.edges || []).map((e) => {
+          const d = e.data || {};
+          return {
+            ...d,
+            width: coerceNumber(
+              d.width ?? d.edge_width ?? d.weight ?? undefined,
+            ),
+            weight: coerceNumber(d.weight ?? d.edge_weight ?? undefined),
+          };
+        });
+
+        const positions = cytoData.elements.nodes.map((n) => {
+          const d = n.data || {};
+          const p = n.position || {};
+          return {
+            id: d.id ?? n.id ?? d.label,
+            label: d.label ?? d.id,
+            x: coerceNumber(p.x ?? d.x ?? undefined),
+            y: coerceNumber(p.y ?? d.y ?? undefined),
+            size: coerceNumber(d.size ?? p.size ?? undefined),
+            color: d.color ?? d.node_color ?? "#1d4ed8",
+          };
+        });
         set({
           nodes,
           edges,

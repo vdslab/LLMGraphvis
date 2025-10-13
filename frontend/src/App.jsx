@@ -81,6 +81,8 @@ function App() {
                 </ProtectedRoute>
               }
             />
+            {/* Development-only route to load NetworkChatPage without auth for UI testing */}
+            <Route path="/debug-network" element={<NetworkChatPage />} />
           </Routes>
         </main>
       </div>

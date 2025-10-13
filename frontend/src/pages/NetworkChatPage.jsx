@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { settingsAPI } from "../services/api";
 import CytoscapeGraph from "../components/CytoscapeGraph";
-import { LayoutTypes, StylePresets } from "../constants/cytoscapePresets";
 import useNetworkStore from "../services/networkStore";
 import useChatStore from "../services/chatStore";
 import ReactMarkdown from "react-markdown";
@@ -132,21 +131,7 @@ const NetworkChatPage = () => {
   const graphRef = useRef();
   const messagesEndRef = useRef();
 
-  // Helper function to get graph style based on current state
-  const getGraphStyle = () => {
-    const { layout } = useNetworkStore.getState();
-
-    if (centralityInfo && centralityInfo.applied) {
-      return StylePresets.CENTRALITY;
-    }
-
-    // Use SPRING_LAYOUT style when layout is spring for better readability
-    if (layout === "spring") {
-      return StylePresets.SPRING_LAYOUT;
-    }
-
-    return StylePresets.DEFAULT;
-  };
+  // MCP: All style and layout is determined by backend. Frontend does not select style or layout.
 
   // Helper function to handle node clicks
   const handleNodeClick = (nodeData) => {
@@ -514,6 +499,46 @@ const NetworkChatPage = () => {
 
     loadInitialNetwork();
   }, [nodes?.length, edges?.length, positions?.length, isLoading]); // 必要な依存関係を追加
+
+  // Dev helper: expose setters to window for debugging (non-production only)
+  useEffect(() => {
+    try {
+      if (import.meta.env.MODE !== "production") {
+        // Allow DevTools to set the network store directly for testing
+        window.__setNetworkState = (state) => {
+          try {
+            useNetworkStore.setState(state);
+            console.log("__setNetworkState applied", {
+              nodes: state.nodes?.length,
+              edges: state.edges?.length,
+              positions: state.positions?.length,
+            });
+          } catch (err) {
+            console.error("Failed to apply __setNetworkState", err);
+          }
+        };
+
+        // Convenience getter
+        window.__getNetworkState = () => useNetworkStore.getState();
+
+        console.info(
+          "Dev helper: window.__setNetworkState and __getNetworkState are available",
+        );
+      }
+    } catch (err) {
+      // Ignore in case window is not available in some environments
+      console.debug("Dev helper setup skipped", err);
+    }
+
+    return () => {
+      try {
+        if (window.__setNetworkState) delete window.__setNetworkState;
+        if (window.__getNetworkState) delete window.__getNetworkState;
+      } catch {
+        /* ignore */
+      }
+    };
+  }, []);
 
   // Handle window resize for graph
   useEffect(() => {
@@ -895,10 +920,11 @@ const NetworkChatPage = () => {
             )}
 
             <div id="graph-area-wrap" className="w-full h-full min-h-[480px]">
+              {/* MCP: Always use preset layout and backend-provided style/positions */}
               <CytoscapeGraph
                 elements={cytoscapeElements}
-                layout={LayoutTypes.PRESET}
-                style={getGraphStyle()}
+                layout={{ name: "preset" }}
+                style={undefined}
                 className="w-full h-full"
                 onNodeClick={handleNodeClick}
               />
