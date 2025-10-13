@@ -171,20 +171,68 @@ const NetworkChatPage = () => {
     });
   };
 
-  // Get Cytoscape elements from store
-  // Temporary: Create Cytoscape elements from basic network data
-  const cytoscapeElements = [];
+  // --- Position Normalization Helper ---
+  function normalizePositions(
+    positions,
+    width = 800,
+    height = 600,
+    padding = 40,
+  ) {
+    if (!positions || positions.length === 0) return {};
+    let minX = Infinity,
+      maxX = -Infinity,
+      minY = Infinity,
+      maxY = -Infinity;
+    positions.forEach((p) => {
+      if (typeof p.x === "number" && typeof p.y === "number") {
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+      }
+    });
+    // Avoid division by zero
+    if (minX === maxX) {
+      minX -= 1;
+      maxX += 1;
+    }
+    if (minY === maxY) {
+      minY -= 1;
+      maxY += 1;
+    }
+    const scaleX = (width - 2 * padding) / (maxX - minX);
+    const scaleY = (height - 2 * padding) / (maxY - minY);
+    const scale = Math.min(scaleX, scaleY);
+    const offsetX = (width - (maxX - minX) * scale) / 2;
+    const offsetY = (height - (maxY - minY) * scale) / 2;
+    const norm = {};
+    positions.forEach((p) => {
+      if (typeof p.x === "number" && typeof p.y === "number") {
+        norm[p.id] = {
+          ...p,
+          x: (p.x - minX) * scale + offsetX,
+          y: (p.y - minY) * scale + offsetY,
+        };
+      } else {
+        norm[p.id] = { ...p };
+      }
+    });
+    return norm;
+  }
 
-  // Add nodes
+  // Normalize positions for Cytoscape
+  const normalizedPositions = normalizePositions(positions);
+
+  // Build Cytoscape elements with normalized positions
+  const cytoscapeElements = [];
   nodes.forEach((node) => {
-    const position = positions.find((p) => p.id === node.id);
+    const position = normalizedPositions[node.id];
     cytoscapeElements.push({
       group: "nodes",
       data: {
         id: node.id,
         label: node.label || node.id,
         ...node,
-        // Include visual properties from position data (centrality size, color, etc.)
         ...(position && {
           size: position.size,
           color: position.color,
@@ -196,8 +244,6 @@ const NetworkChatPage = () => {
       position: position ? { x: position.x, y: position.y } : undefined,
     });
   });
-
-  // Add edges
   edges.forEach((edge) => {
     cytoscapeElements.push({
       group: "edges",
