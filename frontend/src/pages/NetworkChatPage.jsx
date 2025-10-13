@@ -17,6 +17,7 @@ const NetworkChatPage = () => {
     error,
     centralityInfo,
     uploadNetworkFile,
+    calculateCentralityDirect,
     // Unused functions removed
   } = useNetworkStore();
 
@@ -899,13 +900,60 @@ const NetworkChatPage = () => {
               </svg>
             </button>
           )}
-          {/* Upload button - positioned for better visibility */}
-          <div className="absolute top-4 right-4 z-20">
+          {/* Control buttons - positioned for better visibility */}
+          <div className="absolute top-4 right-4 z-20 flex flex-col gap-2">
             <FileUploadButton
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg flex items-center justify-center transition-colors duration-200"
               buttonText="Upload Network File"
               onFileUpload={handleFileUpload}
             />
+            {/* Centrality Test Buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  console.log("🎯 Testing degree centrality...");
+                  const success = await calculateCentralityDirect(
+                    "degree",
+                    "viridis",
+                    [5, 25],
+                  );
+                  if (success) {
+                    addMessage({
+                      role: "assistant",
+                      content:
+                        "✅ Degree centrality applied! Center node should now be larger than peripheral nodes.",
+                      timestamp: new Date().toISOString(),
+                    });
+                  }
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white font-bold py-1 px-2 text-sm rounded shadow transition-colors duration-200"
+                disabled={isLoading || nodes?.length === 0}
+              >
+                Test Degree
+              </button>
+              <button
+                onClick={async () => {
+                  console.log("🎯 Testing betweenness centrality...");
+                  const success = await calculateCentralityDirect(
+                    "betweenness",
+                    "plasma",
+                    [6, 30],
+                  );
+                  if (success) {
+                    addMessage({
+                      role: "assistant",
+                      content:
+                        "✅ Betweenness centrality applied! Node sizes now reflect betweenness values.",
+                      timestamp: new Date().toISOString(),
+                    });
+                  }
+                }}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 px-2 text-sm rounded shadow transition-colors duration-200"
+                disabled={isLoading || nodes?.length === 0}
+              >
+                Test Betweenness
+              </button>
+            </div>
           </div>
 
           {/* Mobile upload button */}

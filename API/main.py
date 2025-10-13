@@ -18,6 +18,7 @@ from routers import auth as auth_router
 from routers import chat as chat_router
 from routers import network as network_router
 from routers import settings as settings_router
+from routers import centrality_direct as centrality_direct_router
 from services.rate_limiter import limiter
 import auth
 import schemas
@@ -98,6 +99,7 @@ app.include_router(auth_router.router)
 app.include_router(chat_router.router)
 app.include_router(network_router.router)
 app.include_router(settings_router.router)
+app.include_router(centrality_direct_router.router)
 
 # WebSocket接続マネージャーをapp.stateに格納
 app.state.ws_manager = ConnectionManager()

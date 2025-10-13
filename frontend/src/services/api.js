@@ -174,6 +174,18 @@ export const networkAPI = {
       purpose,
     });
   },
+  calculateCentralityDirect: (requestData) => {
+    console.log(
+      "Direct centrality calculation for",
+      requestData.network.nodes.length,
+      "nodes, type:",
+      requestData.centrality_type,
+    );
+    return axios.post(
+      `${API_URL}/network/calculate-centrality-direct`,
+      requestData,
+    );
+  },
 };
 
 // Network Chat API endpoints

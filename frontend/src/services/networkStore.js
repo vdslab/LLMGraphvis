@@ -347,6 +347,132 @@ const useNetworkStore = create((set, get) => ({
     });
   },
 
+  // Direct centrality calculation using current frontend network
+  calculateCentralityDirect: async (
+    centralityType = "degree",
+    colorScheme = "viridis",
+    sizeRange = [5, 20],
+  ) => {
+    const { nodes, edges } = get();
+
+    if (!nodes || !edges || nodes.length === 0) {
+      set({ error: "No network data available for centrality calculation" });
+      return false;
+    }
+
+    set({ isLoading: true, error: null });
+
+    try {
+      console.log(
+        `🎯 Direct centrality calculation: ${centralityType} for ${nodes.length} nodes`,
+      );
+
+      const requestData = {
+        network: {
+          nodes: nodes,
+          edges: edges,
+        },
+        centrality_type: centralityType,
+        color_scheme: colorScheme,
+        size_range: sizeRange,
+      };
+
+      const response = await networkAPI.calculateCentralityDirect(requestData);
+      const result = response.data;
+
+      if (result && result.success) {
+        console.log("✅ Direct centrality calculation completed:", result);
+
+        // Apply the visualization data directly
+        const { visualization_data, centrality_type, calculation_id } = result;
+
+        set((state) => {
+          const updatedPositions = state.positions.map((node) => {
+            const nodeId = node.id;
+            const nodeVizData = visualization_data[nodeId];
+
+            if (nodeVizData) {
+              const {
+                centrality_value,
+                color,
+                size,
+                importance_level,
+                percentile,
+              } = nodeVizData;
+
+              console.log(
+                `🎨 Updating node ${nodeId}: size=${size}, color=${color}, centrality=${centrality_value}`,
+              );
+
+              return {
+                ...node,
+                color: color,
+                size: size,
+                [`${centrality_type}_centrality`]: centrality_value,
+                centrality_value: centrality_value,
+                importance_level: importance_level,
+                percentile: percentile,
+                originalColor: node.originalColor || node.color || "#1d4ed8",
+                originalSize: node.originalSize || node.size || 5,
+              };
+            }
+            return node;
+          });
+
+          const updatedNodes = state.nodes.map((node) => {
+            const nodeId = node.id;
+            const nodeVizData = visualization_data[nodeId];
+
+            if (nodeVizData) {
+              const { centrality_value, importance_level, percentile } =
+                nodeVizData;
+              return {
+                ...node,
+                [`${centrality_type}_centrality`]: centrality_value,
+                centrality_value: centrality_value,
+                importance_level: importance_level,
+                percentile: percentile,
+              };
+            }
+            return node;
+          });
+
+          console.log(
+            `✅ Applied direct centrality visualization to ${updatedPositions.length} nodes`,
+          );
+
+          return {
+            ...state,
+            positions: updatedPositions,
+            nodes: updatedNodes,
+            isLoading: false,
+            error: null,
+            centralityInfo: {
+              type: centrality_type,
+              calculationId: calculation_id,
+              applied: true,
+              timestamp: new Date().toISOString(),
+            },
+          };
+        });
+
+        return true;
+      } else {
+        throw new Error(result.detail || "Centrality calculation failed");
+      }
+    } catch (error) {
+      console.error("❌ Error in direct centrality calculation:", error);
+      set({
+        isLoading: false,
+        error:
+          error.response?.data?.detail ||
+          error.message ||
+          "Failed to calculate centrality",
+      });
+      return false;
+    }
+  },
+
   // Clear all data
   clearData: () => {
     set({

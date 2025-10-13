@@ -423,10 +423,10 @@ def generate_enhanced_color_map(centrality_values: Dict[str, float],
 def generate_enhanced_size_map(centrality_values: Dict[str, float],
                                size_range: tuple = (5, 20)) -> Dict[str, float]:
     """
-    Enhanced size mapping with smooth scaling and logarithmic option
+    Enhanced size mapping with smooth scaling and better visual distinction for centrality values
 
     Args:
-        centrality_values (dict): 中心性値
+        centrality_values (dict): 中心性値 (normalized between 0-1)
         size_range (tuple): サイズの範囲 (min, max)
 
     Returns:
@@ -435,19 +435,48 @@ def generate_enhanced_size_map(centrality_values: Dict[str, float],
     import math
 
     min_size, max_size = size_range
-    size_range_span = max_size - min_size
+
+    if not centrality_values:
+        return {}
+
+    # Get all centrality values for better scaling
+    values = list(centrality_values.values())
+    min_centrality = min(values)
+    max_centrality = max(values)
 
     size_map = {}
+
+    # If all values are the same, use average size
+    if min_centrality == max_centrality:
+        avg_size = (min_size + max_size) / 2
+        for node_id in centrality_values.keys():
+            size_map[node_id] = avg_size
+        return size_map
+
+    # Enhanced mapping with better scaling for visual distinction
     for node_id, value in centrality_values.items():
-        # Enhanced mapping with exponential scaling for better visual distinction
-        if value > 0:
-            # Use square root scaling for better visual perception
-            scaled_value = math.sqrt(value)
+        # Normalize to 0-1 range within the actual data range
+        normalized_value = (value - min_centrality) / \
+            (max_centrality - min_centrality)
+
+        # Apply enhanced scaling for better visual perception
+        if normalized_value > 0:
+            # Use a combination of linear and square root scaling for better distinction
+            # This gives more pronounced differences between high and low centrality nodes
+            scaled_value = 0.3 * normalized_value + \
+                0.7 * math.sqrt(normalized_value)
         else:
             scaled_value = 0
 
-        size = min_size + (scaled_value * size_range_span)
-        size_map[node_id] = max(min_size, size)  # Ensure minimum size
+        # Map to size range with ensured minimum
+        size = min_size + (scaled_value * (max_size - min_size))
+        size_map[node_id] = max(min_size, round(
+            size, 1))  # Round to 1 decimal place
+
+    logger.info(f"🎯 Enhanced size mapping: min={min_size}, max={max_size}, "
+                f"centrality_range=[{min_centrality:.3f}, {max_centrality:.3f}], "
+                f"size_range=[{min([size_map[k] for k in size_map]):.1f}, "
+                f"{max([size_map[k] for k in size_map]):.1f}]")
 
     return size_map
 
