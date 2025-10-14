@@ -172,25 +172,6 @@ TOOLS_DEFINITION = [
         }
     },
     {
-        "name": "calculate_centrality",
-        "description": "🧮 Calculate centrality values only (legacy single-stage). Use this when the user asks about node importance but doesn't need visualization - just the raw values.",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "centrality_type": {
-                    "type": "string",
-                    "description": "The type of centrality to calculate.",
-                    "enum": ["degree", "closeness", "betweenness", "eigenvector", "pagerank", "katz"]
-                },
-                "centrality_params": {
-                    "type": "object",
-                    "description": "Optional parameters for centrality calculation."
-                }
-            },
-            "required": ["centrality_type"]
-        }
-    },
-    {
         "name": "calculate_and_store_layout",
         "description": "🔄 Calculate and store layout positions (Stage 1 of 2). Use this when the user asks for layout changes like 'change to spring layout', 'apply circular layout', etc. This calculates the layout positions and prepares them for visualization. The system will automatically proceed to Stage 2 (rendering) after this completes.",
         "parameters": {
@@ -488,61 +469,3 @@ async def process_chat_message(messages: List[Dict[str, str]]) -> Dict[str, Any]
         return {"content": f"Error: Unknown LLM_PROVIDER '{provider}'. Please set to 'google' or 'openai'."}
 
 
-async def _process_with_openai(messages: List[Dict[str, str]]) -> Dict[str, Any]:
-    """Process messages using OpenAI."""
-    if not openai_client:
-        return {"content": "Error: OpenAI client is not initialized."}
-
-    # Adapt history for OpenAI format
-    openai_history = []
-    for msg in messages:
-        if msg["role"] == "tool":
-            openai_history.append({"role": "tool", "tool_call_id": "placeholder_id",
-                                  "name": "tool_name", "content": msg["content"]})
-        else:
-            openai_history.append(
-                {"role": msg["role"], "content": msg["content"]})
-
-    try:
-        response = openai_client.chat.completions.create(
-            model=os.environ.get("OPENAI_MODEL", "gpt-4o"),
-            messages=[{"role": "system", "content": SYSTEM_PROMPT}
-                      ] + openai_history,
-            tools=[{"type": "function", "function": f}
-                   for f in TOOLS_DEFINITION],
-            tool_choice="auto",
-        )
-
-        response_message = response.choices[0].message
-        tool_calls = response_message.tool_calls
-
-        if tool_calls:
-            # OpenAI can return multiple tool calls, we'll take the first one for simplicity
-            tool_call = tool_calls[0]
-            return {
-                "tool_calls": [{
-                    "function": {
-                        "name": tool_call.function.name,
-                        "arguments": json.loads(tool_call.function.arguments)
-                    }
-                }]
-            }
-        else:
-            return {"content": response_message.content}
-    except Exception as e:
-        print(f"Error with OpenAI: {e}")
-        return {"content": f"Error with OpenAI: {e}"}
-
-
-async def process_chat_message(messages: List[Dict[str, str]]) -> Dict[str, Any]:
-    """
-    Process chat messages by routing to the configured LLM provider.
-    """
-    provider = os.environ.get("LLM_PROVIDER", "google").lower()
-    print(f"Processing message with provider: {provider}")
-    if provider == "openai":
-        return await _process_with_openai(messages)
-    elif provider == "google":
-        return await _process_with_gemini(messages)
-    else:
-        return {"content": f"Error: Unknown LLM_PROVIDER '{provider}'. Please set to 'google' or 'openai'."}

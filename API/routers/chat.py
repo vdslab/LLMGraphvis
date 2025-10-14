@@ -19,6 +19,7 @@ import auth
 from database import get_db
 from services.llm import process_chat_message
 from services.rate_limiter import limiter
+from services.mcp_client import get_mcp_client
 
 router = APIRouter(
     prefix="/chat",
@@ -209,131 +210,83 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
             tool_name = tool_call["function"]["name"]
             tool_args = tool_call["function"]["arguments"]  # Already a dict
 
-            # Handle two-stage centrality workflow
+            # Handle two-stage centrality workflow using new MCP client
             if tool_name == "calculate_and_store_centrality":
-                # Stage 1: Calculate and store centrality
-                print(
-                    f"Starting Stage 1: Calculate and store {tool_args.get('centrality_type', 'degree')} centrality")
+                print(f"🎯 Starting two-stage centrality workflow: {tool_args.get('centrality_type', 'degree')}")
+                
+                graphml_content = db_conversation.network.graphml_content if db_conversation.network else create_empty_graphml()
+                centrality_type = tool_args.get('centrality_type', 'degree')
+                centrality_params = tool_args.get('centrality_params', {})
+                color_scheme = tool_args.get('color_scheme', 'viridis')
+                size_range = tool_args.get('size_range', [10, 200])
 
-                mcp_payload = {
-                    "graphml_content": db_conversation.network.graphml_content if db_conversation.network else create_empty_graphml(),
-                    **tool_args
-                }
-
-                async with httpx.AsyncClient() as client:
-                    url = f"{NETWORKX_MCP_URL}/tools/{tool_name}"
-                    print(f"Calling NetworkXMCP: {url} with args {tool_args}")
-                    response = await client.post(url, json=mcp_payload, timeout=60.0)
-
-                    if response.status_code == 200:
-                        mcp_result = response.json().get("result", {})
-                        if mcp_result.get("success"):
-                            calculation_id = mcp_result.get("calculation_id")
-                            centrality_type = mcp_result.get("centrality_type")
-
-                            print(
-                                f"Stage 1 completed. Calculation ID: {calculation_id}")
-
-                            # Stage 2: Automatically call visualization
-                            print(
-                                f"Starting Stage 2: Generate visualization for calculation {calculation_id}")
-
-                            viz_payload = {
-                                "calculation_id": calculation_id,
-                                "color_scheme": "viridis",
-                                "size_range": [5, 20]
+                async with get_mcp_client() as mcp_client:
+                    result = await mcp_client.calculate_centrality_two_stage(
+                        graphml_content=graphml_content,
+                        centrality_type=centrality_type,
+                        centrality_params=centrality_params,
+                        color_scheme=color_scheme,
+                        size_range=size_range
+                    )
+                    
+                    if result.get("success"):
+                        print(f"✅ Two-stage centrality workflow completed: {centrality_type}")
+                        tool_result_content = json.dumps({
+                            "status": "success",
+                            "details": {
+                                "centrality_type": result.get("centrality_type"),
+                                "calculation_id": result.get("calculation_id"),
+                                "visualization_data": result.get("visualization_data", {}),
+                                "metadata": result.get("metadata", {}),
+                                "stage1_result": result.get("stage1_result", {}),
+                                "stage2_result": result.get("stage2_result", {}),
+                                "message": f"Successfully calculated and visualized {centrality_type} centrality"
                             }
-
-                            viz_url = f"{NETWORKX_MCP_URL}/tools/get_centrality_visualization"
-                            viz_response = await client.post(viz_url, json=viz_payload, timeout=60.0)
-
-                            if viz_response.status_code == 200:
-                                viz_result = viz_response.json().get("result", {})
-                                if viz_result.get("success"):
-                                    # Combine both results for the LLM
-                                    combined_result = {
-                                        "stage1": mcp_result,
-                                        "stage2": viz_result,
-                                        "centrality_type": centrality_type,
-                                        "calculation_id": calculation_id,
-                                        "visualization_data": viz_result.get("visualization_data", {}),
-                                        "message": f"Successfully calculated and visualized {centrality_type} centrality"
-                                    }
-                                    tool_result_content = json.dumps(
-                                        {"status": "success", "details": combined_result})
-                                else:
-                                    tool_result_content = json.dumps({
-                                        "status": "partial_success",
-                                        "details": {
-                                            "stage1": mcp_result,
-                                            "stage2_error": viz_result.get("error", "Visualization failed"),
-                                            "message": "Calculation completed but visualization failed"
-                                        }
-                                    })
-                            else:
-                                tool_result_content = json.dumps({
-                                    "status": "partial_success",
-                                    "details": {
-                                        "stage1": mcp_result,
-                                        "stage2_error": f"Visualization request failed with status {viz_response.status_code}",
-                                        "message": "Calculation completed but visualization failed"
-                                    }
-                                })
-                        else:
-                            tool_result_content = json.dumps({
-                                "status": "error",
-                                "details": mcp_result.get("error", "Centrality calculation failed")
-                            })
+                        })
                     else:
+                        print(f"❌ Two-stage centrality workflow failed: {result.get('error')}")
                         tool_result_content = json.dumps({
                             "status": "error",
-                            "details": f"Tool execution failed with status {response.status_code}: {response.text}"
+                            "details": {
+                                "error": result.get("error", "Centrality calculation failed"),
+                                "stage": result.get("stage", "unknown"),
+                                "stage1_result": result.get("stage1_result", {}),
+                                "message": f"Failed to calculate {centrality_type} centrality"
+                            }
                         })
 
             elif tool_name == "get_sample_network":
-                # Handle sample network generation
-                print("Generating sample network for conversation")
+                # Handle sample network generation using new MCP client
+                print("🎲 Generating sample network for conversation")
 
-                async with httpx.AsyncClient() as client:
-                    url = f"{NETWORKX_MCP_URL}/get_sample_network"
-                    print(f"Calling NetworkXMCP: {url}")
-                    response = await client.get(url, timeout=60.0)
+                async with get_mcp_client() as mcp_client:
+                    result = await mcp_client.get_sample_network()
+                    
+                    if result.get("success"):
+                        graphml_content = result.get("graphml_content")
+                        
+                        # Update the conversation's network with the sample network
+                        if db_conversation.network and graphml_content:
+                            try:
+                                db_conversation.network.graphml_content = graphml_content
+                                db.add(db_conversation.network)
+                                db.commit()
+                                db.refresh(db_conversation)
+                                print(f"✅ Sample network saved to conversation {db_conversation.id}")
+                            except Exception as save_error:
+                                print(f"⚠️ Warning: failed to save sample network to DB: {save_error}")
 
-                    if response.status_code == 200:
-                        mcp_result = response.json()
-                        if mcp_result.get("success"):
-                            graphml_content = mcp_result.get("graphml_content")
-
-                            # Update the conversation's network with the sample network
-                            if db_conversation.network and graphml_content:
-                                try:
-                                    db_conversation.network.graphml_content = graphml_content
-                                    db.add(db_conversation.network)
-                                    db.commit()
-                                    db.refresh(db_conversation)
-                                    print(
-                                        f"Sample network saved to conversation {db_conversation.id}")
-                                except Exception as save_error:
-                                    print(
-                                        f"Warning: failed to save sample network to DB: {save_error}")
-
-                            # Tool result content for LLM
-                            tool_result_content = json.dumps({
-                                "status": "success",
-                                "details": {
-                                    "message": "Sample network created successfully",
-                                    "metadata": mcp_result.get("metadata", {})
-                                }
-                            })
-                        else:
-                            tool_result_content = json.dumps({
-                                "status": "error",
-                                "details": mcp_result.get("error", "Failed to create sample network")
-                            })
+                        tool_result_content = json.dumps({
+                            "status": "success",
+                            "details": {
+                                "message": "Sample network created successfully",
+                                "metadata": result.get("metadata", {})
+                            }
+                        })
                     else:
                         tool_result_content = json.dumps({
                             "status": "error",
-                            "details": f"Sample network request failed with status {response.status_code}: {response.text}"
+                            "details": result.get("error", "Failed to create sample network")
                         })
 
             else:
@@ -687,118 +640,76 @@ async def process_chat(
             tool_name = tool_call["function"]["name"]
             tool_args = tool_call["function"]["arguments"]
 
-            # Handle two-stage centrality workflow
+            # Handle two-stage centrality workflow using new MCP client
             if tool_name == "calculate_and_store_centrality":
-                # Stage 1: Calculate and store centrality
-                print(
-                    f"Starting Stage 1: Calculate and store {tool_args.get('centrality_type', 'degree')} centrality")
+                print(f"🎯 Starting two-stage centrality workflow: {tool_args.get('centrality_type', 'degree')}")
+                
+                graphml_content = db_conversation.network.graphml_content if db_conversation.network else create_empty_graphml()
+                centrality_type = tool_args.get('centrality_type', 'degree')
+                centrality_params = tool_args.get('centrality_params', {})
+                color_scheme = tool_args.get('color_scheme', 'viridis')
+                size_range = tool_args.get('size_range', [10, 200])
 
-                mcp_payload = {
-                    "graphml_content": db_conversation.network.graphml_content if db_conversation.network else create_empty_graphml(),
-                    **tool_args
-                }
-
-                async with httpx.AsyncClient() as client:
-                    url = f"{NETWORKX_MCP_URL}/tools/{tool_name}"
-                    print(f"Calling NetworkXMCP: {url} with args {tool_args}")
-                    response = await client.post(url, json=mcp_payload, timeout=60.0)
-
-                    if response.status_code == 200:
-                        mcp_result = response.json().get("result", {})
-                        if mcp_result.get("success"):
-                            calculation_id = mcp_result.get("calculation_id")
-                            centrality_type = mcp_result.get("centrality_type")
-
-                            print(
-                                f"Stage 1 completed. Calculation ID: {calculation_id}")
-
-                            # Stage 2: Automatically call visualization
-                            print(
-                                f"Starting Stage 2: Generate visualization for calculation {calculation_id}")
-
-                            viz_payload = {
-                                "calculation_id": calculation_id,
-                                "color_scheme": "viridis",
-                                "size_range": [5, 20]
+                async with get_mcp_client() as mcp_client:
+                    result = await mcp_client.calculate_centrality_two_stage(
+                        graphml_content=graphml_content,
+                        centrality_type=centrality_type,
+                        centrality_params=centrality_params,
+                        color_scheme=color_scheme,
+                        size_range=size_range
+                    )
+                    
+                    if result.get("success"):
+                        print(f"✅ Two-stage centrality workflow completed: {centrality_type}")
+                        
+                        # Create network update for frontend
+                        network_update_info = {
+                            "type": "calculate_and_store_centrality",
+                            "centrality_type": result.get("centrality_type"),
+                            "calculation_id": result.get("calculation_id"),
+                            "visualization_data": result.get("visualization_data", {}),
+                            "metadata": result.get("metadata", {}),
+                            "stage1": result.get("stage1_result", {}),
+                            "stage2": result.get("stage2_result", {}),
+                            "success": True
+                        }
+                        
+                        # Tool result for LLM
+                        tool_result_for_llm = {
+                            "status": "success",
+                            "details": {
+                                "centrality_type": result.get("centrality_type"),
+                                "calculation_id": result.get("calculation_id"),
+                                "visualization_data": result.get("visualization_data", {}),
+                                "metadata": result.get("metadata", {}),
+                                "stage1_result": result.get("stage1_result", {}),
+                                "stage2_result": result.get("stage2_result", {}),
+                                "message": f"Successfully calculated and visualized {centrality_type} centrality"
                             }
-
-                            viz_url = f"{NETWORKX_MCP_URL}/tools/get_centrality_visualization"
-                            viz_response = await client.post(viz_url, json=viz_payload, timeout=60.0)
-
-                            if viz_response.status_code == 200:
-                                viz_result = viz_response.json().get("result", {})
-                                if viz_result.get("success"):
-                                    # Create networkUpdate for frontend with two-stage data
-                                    network_update_info = {
-                                        "type": "calculate_and_store_centrality",
-                                        "stage1": mcp_result,
-                                        "stage2": viz_result,
-                                        "centrality_type": centrality_type,
-                                        "calculation_id": calculation_id,
-                                        "visualization_data": viz_result.get("visualization_data", {}),
-                                        "success": True
-                                    }
-
-                                    # Tool result for LLM
-                                    tool_result_for_llm = {
-                                        "status": "success",
-                                        "details": {
-                                            "stage1": mcp_result,
-                                            "stage2": viz_result,
-                                            "message": f"Successfully calculated and visualized {centrality_type} centrality"
-                                        }
-                                    }
-                                else:
-                                    # Stage 1 success, Stage 2 failed
-                                    network_update_info = {
-                                        "type": "calculate_and_store_centrality",
-                                        "stage1": mcp_result,
-                                        "stage2": None,
-                                        "centrality_type": centrality_type,
-                                        "calculation_id": calculation_id,
-                                        "success": False,
-                                        "error": "Visualization failed"
-                                    }
-
-                                    tool_result_for_llm = {
-                                        "status": "partial_success",
-                                        "details": {
-                                            "stage1": mcp_result,
-                                            "stage2_error": viz_result.get("error", "Visualization failed"),
-                                            "message": "Calculation completed but visualization failed"
-                                        }
-                                    }
-                            else:
-                                # Stage 1 success, Stage 2 request failed
-                                network_update_info = {
-                                    "type": "calculate_and_store_centrality",
-                                    "stage1": mcp_result,
-                                    "stage2": None,
-                                    "centrality_type": centrality_type,
-                                    "calculation_id": calculation_id,
-                                    "success": False,
-                                    "error": f"Visualization request failed with status {viz_response.status_code}"
-                                }
-
-                                tool_result_for_llm = {
-                                    "status": "partial_success",
-                                    "details": {
-                                        "stage1": mcp_result,
-                                        "stage2_error": f"Visualization request failed with status {viz_response.status_code}",
-                                        "message": "Calculation completed but visualization failed"
-                                    }
-                                }
-                        else:
-                            # Stage 1 failed
-                            tool_result_for_llm = {
-                                "status": "error",
-                                "details": mcp_result.get("error", "Centrality calculation failed")
-                            }
+                        }
                     else:
-                        # Stage 1 request failed
+                        print(f"❌ Two-stage centrality workflow failed: {result.get('error')}")
+                        
+                        # Create network update for frontend (failure case)
+                        network_update_info = {
+                            "type": "calculate_and_store_centrality",
+                            "centrality_type": centrality_type,
+                            "calculation_id": None,
+                            "success": False,
+                            "error": result.get("error", "Centrality calculation failed"),
+                            "stage": result.get("stage", "unknown"),
+                            "stage1": result.get("stage1_result", {}),
+                            "stage2": None
+                        }
+                        
                         tool_result_for_llm = {
                             "status": "error",
-                            "details": f"Tool execution failed with status {response.status_code}: {response.text}"
+                            "details": {
+                                "error": result.get("error", "Centrality calculation failed"),
+                                "stage": result.get("stage", "unknown"),
+                                "stage1_result": result.get("stage1_result", {}),
+                                "message": f"Failed to calculate {centrality_type} centrality"
+                            }
                         }
 
             elif tool_name == "get_sample_network":
