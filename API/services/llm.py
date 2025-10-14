@@ -8,6 +8,13 @@ import json
 import httpx
 from typing import List, Dict, Any
 import logging
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +58,12 @@ def _initialize_clients():
             return
         try:
             from openai import OpenAI
-            # Explicitly pass a default httpx client to avoid issues with proxy arguments
-            _openai_client = OpenAI(http_client=httpx.Client())
+            # Initialize OpenAI client with proper configuration
+            api_key = os.environ.get("OPENAI_API_KEY")
+            _openai_client = OpenAI(
+                api_key=api_key,
+                timeout=60.0,
+            )
             logger.info("OpenAI client initialized successfully")
         except ImportError:
             logger.error(
@@ -349,8 +360,15 @@ Always be helpful, informative, and explain what the centrality measure or layou
 """
 
 
+@retry(
+    retry=retry_if_exception_type(Exception),  # Retry on any exception for now
+    wait=wait_exponential(multiplier=1, min=4, max=60),
+    stop=stop_after_attempt(3),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True
+)
 async def _process_with_gemini(messages: List[Dict[str, str]]) -> Dict[str, Any]:
-    """Process messages using Google Gemini."""
+    """Process messages using Google Gemini with automatic retry on 503 errors."""
     gemini_client, _ = get_clients()
     if not gemini_client:
         return {"content": "Error: Gemini client is not initialized."}
