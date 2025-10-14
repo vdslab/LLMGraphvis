@@ -9,7 +9,7 @@ The NetworkX MCP server has been successfully redesigned following **Model Conte
 ### 1. **Proper MCP Architecture Implementation**
 
 - ✅ **Pure MCP Server** (`server.py`) - Full MCP Python SDK implementation
-- ✅ **FastAPI-MCP Hybrid** (`main_fastapi_mcp.py`) - Maintains API compatibility
+- ✅ **FastAPI HTTP Server** (`main.py`) - Maintains API compatibility
 - ✅ **Graceful Fallback** (`main_new.py`) - Smart server selection based on dependencies
 
 ### 2. **Modular Tool Organization**

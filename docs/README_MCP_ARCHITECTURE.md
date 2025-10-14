@@ -9,7 +9,7 @@ The new architecture separates concerns properly and follows MCP design patterns
 ```
 NetworkXMCP/
 ├── server.py                    # Pure MCP server (recommended)
-├── main_fastapi_mcp.py         # FastAPI-MCP hybrid (current)
+├── main.py                     # FastAPI app exposing HTTP tools (current)
 ├── main.py                     # Legacy FastAPI server
 ├── core/                       # Core utilities and context
 │   ├── __init__.py
@@ -76,12 +76,12 @@ if __name__ == "__main__":
     mcp.run()
 ```
 
-### FastAPI-MCP Hybrid (Current)
+### FastAPI HTTP Server (Current)
 
 ```python
-# Use main_fastapi_mcp.py for FastAPI + MCP
+# Use main.py for the FastAPI HTTP server
 import uvicorn
-from main_fastapi_mcp import app
+from main import app
 
 uvicorn.run(app, host="0.0.0.0", port=8001)
 ```
@@ -202,10 +202,10 @@ python validate_structure.py
 # Pure MCP server
 python server.py
 
-# FastAPI-MCP hybrid
-python main_fastapi_mcp.py
+# FastAPI HTTP server (current)
+python main.py
 
-# Legacy FastAPI
+# Legacy FastAPI (fallback)
 python main.py
 ```
 
