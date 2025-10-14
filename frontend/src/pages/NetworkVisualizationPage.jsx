@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import FileUploadButton from "../components/FileUploadButton";
+import * as graphml from "graphml-js";
 import { useForm } from "react-hook-form";
 import ForceGraph2D from "react-force-graph-2d";
 import useNetworkStore from "../services/networkStore";
@@ -21,6 +23,48 @@ const NetworkVisualizationPage = () => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [layoutParamsInput, setLayoutParamsInput] = useState("{}");
   const graphRef = useRef();
+
+  // Handle GraphML file upload
+  const handleGraphMLUpload = async (file) => {
+    try {
+      const text = await file.text();
+      // Parse GraphML using graphml-js (or fallback to simple XML parsing)
+      let parsed;
+      try {
+        parsed = graphml.parse(text);
+      } catch (e) {
+        // fallback: try DOMParser
+        const parser = new window.DOMParser();
+        const xmlDoc = parser.parseFromString(text, "text/xml");
+        // Simple GraphML to nodes/edges extraction (basic, not robust)
+        const nodeEls = xmlDoc.getElementsByTagName("node");
+        const edgeEls = xmlDoc.getElementsByTagName("edge");
+        const nodes = Array.from(nodeEls).map((n) => ({
+          id: n.getAttribute("id"),
+          label: n.getAttribute("id"),
+        }));
+        const edges = Array.from(edgeEls).map((e) => ({
+          source: e.getAttribute("source"),
+          target: e.getAttribute("target"),
+        }));
+        setNetworkData(nodes, edges);
+        setLayout("spring");
+        await calculateLayout();
+        return;
+      }
+      // If using graphml-js
+      const nodes = parsed.nodes.map((n) => ({ id: n.id, label: n.id }));
+      const edges = parsed.edges.map((e) => ({
+        source: e.source,
+        target: e.target,
+      }));
+      setNetworkData(nodes, edges);
+      setLayout("spring");
+      await calculateLayout();
+    } catch (e) {
+      alert("Failed to parse GraphML: " + e.message);
+    }
+  };
 
   const {
     register,
@@ -106,6 +150,15 @@ const NetworkVisualizationPage = () => {
                 Network Data Input
               </h3>
               <div className="mt-5">
+                {/* Upload GraphML Button */}
+                <div className="mb-4">
+                  <FileUploadButton
+                    buttonText="Upload GraphML File"
+                    className="mb-2"
+                    onFileUpload={handleGraphMLUpload}
+                  />
+                  <p className="text-xs text-gray-500">Supported: .graphml</p>
+                </div>
                 <form onSubmit={handleSubmit(onSubmit)}>
                   <div className="mb-4">
                     <label
