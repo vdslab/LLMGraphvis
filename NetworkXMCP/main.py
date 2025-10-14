@@ -133,7 +133,7 @@ class CentralityVisualizationParams(BaseModel):
     color_scheme: str = Field(
         "viridis", description="Color scheme for visualization.")
     size_range: List[float] = Field(
-        [5, 20], description="Node size range [min, max].")
+        [10, 100], description="Node size range [min, max].")
 
 
 class CalculationIdParams(BaseModel):
@@ -631,7 +631,7 @@ async def api_calculate_and_store_centrality(params: CentralityCalculationParams
             logger.error(f"API: Centrality calculation failed: {error_msg}")
             raise HTTPException(status_code=400, detail=error_msg)
 
-        return {"result": result}
+        return result
 
     except HTTPException:
         raise
@@ -663,7 +663,7 @@ async def api_get_centrality_visualization(params: CentralityVisualizationParams
                 f"API: Visualization data generation failed: {error_msg}")
             raise HTTPException(status_code=400, detail=error_msg)
 
-        return {"result": result}
+        return result
 
     except HTTPException:
         raise
