@@ -129,7 +129,8 @@ async def calculate_centrality_direct(
                     detail=f"Stage 1 failed: {response.text}"
                 )
 
-            stage1_result = response.json().get("result", {})
+            response_data = response.json()
+            stage1_result = response_data.get("result", {})
             if not stage1_result.get("success"):
                 raise HTTPException(
                     status_code=400,
@@ -138,6 +139,14 @@ async def calculate_centrality_direct(
 
             calculation_id = stage1_result.get("calculation_id")
             centrality_type = stage1_result.get("centrality_type")
+            
+            # calculation_idが取得できない場合のエラーハンドリング
+            if not calculation_id:
+                print(f"❌ calculation_id is null. Stage 1 response: {response_data}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Stage 1 did not return valid calculation_id. Response: {stage1_result}"
+                )
 
             print(f"✅ Stage 1 completed. Calculation ID: {calculation_id}")
 
@@ -157,7 +166,8 @@ async def calculate_centrality_direct(
                     detail=f"Stage 2 failed: {viz_response.text}"
                 )
 
-            stage2_result = viz_response.json().get("result", {})
+            viz_response_data = viz_response.json()
+            stage2_result = viz_response_data.get("result", {})
             if not stage2_result.get("success"):
                 raise HTTPException(
                     status_code=400,
@@ -165,6 +175,14 @@ async def calculate_centrality_direct(
                 )
 
             visualization_data = stage2_result.get("visualization_data", {})
+            
+            # visualization_dataが空の場合のエラーハンドリング
+            if not visualization_data:
+                print(f"❌ visualization_data is empty. Stage 2 response: {viz_response_data}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Stage 2 did not return visualization data. Response: {stage2_result}"
+                )
 
             print(
                 f"✅ Stage 2 completed. Generated visualization data for {len(visualization_data)} nodes")
@@ -185,3 +203,112 @@ async def calculate_centrality_direct(
         print(f"❌ Error in direct centrality calculation: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Internal error: {str(e)}")
+
+
+# テスト用の認証不要エンドポイント
+@router.post("/test-centrality-direct")
+async def test_centrality_direct(request: CentralityRequest):
+    """
+    テスト用の認証不要の中心性計算エンドポイント
+    """
+    try:
+        # Convert frontend network to GraphML
+        graphml_content = convert_frontend_network_to_graphml(
+            request.network.nodes,
+            request.network.edges
+        )
+
+        print(
+            f"🔄 TEST: Direct centrality calculation for {len(request.network.nodes)} nodes, {len(request.network.edges)} edges")
+
+        # Stage 1: Calculate and store centrality
+        stage1_payload = {
+            "graphml_content": graphml_content,
+            "centrality_type": request.centrality_type
+        }
+
+        async with httpx.AsyncClient() as client:
+            # Call NetworkX MCP for centrality calculation
+            stage1_url = f"{NETWORKX_MCP_URL}/tools/calculate_and_store_centrality"
+            response = await client.post(stage1_url, json=stage1_payload, timeout=60.0)
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Stage 1 failed: {response.text}"
+                )
+
+            response_data = response.json()
+            stage1_result = response_data.get("result", {})
+            if not stage1_result.get("success"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Stage 1 failed: {stage1_result.get('error')}"
+                )
+
+            calculation_id = stage1_result.get("calculation_id")
+            centrality_type = stage1_result.get("centrality_type")
+            
+            # calculation_idが取得できない場合のエラーハンドリング
+            if not calculation_id:
+                print(f"❌ calculation_id is null. Stage 1 response: {response_data}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Stage 1 did not return valid calculation_id. Response: {stage1_result}"
+                )
+
+            print(f"✅ TEST Stage 1 completed. Calculation ID: {calculation_id}")
+
+            # Stage 2: Get visualization data
+            stage2_payload = {
+                "calculation_id": calculation_id,
+                "color_scheme": request.color_scheme,
+                "size_range": request.size_range
+            }
+
+            stage2_url = f"{NETWORKX_MCP_URL}/tools/get_centrality_visualization"
+            viz_response = await client.post(stage2_url, json=stage2_payload, timeout=60.0)
+
+            if viz_response.status_code != 200:
+                raise HTTPException(
+                    status_code=viz_response.status_code,
+                    detail=f"Stage 2 failed: {viz_response.text}"
+                )
+
+            viz_response_data = viz_response.json()
+            stage2_result = viz_response_data.get("result", {})
+            if not stage2_result.get("success"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Stage 2 failed: {stage2_result.get('error')}"
+                )
+
+            visualization_data = stage2_result.get("visualization_data", {})
+            
+            # visualization_dataが空の場合のエラーハンドリング
+            if not visualization_data:
+                print(f"❌ visualization_data is empty. Stage 2 response: {viz_response_data}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Stage 2 did not return visualization data. Response: {stage2_result}"
+                )
+
+            print(
+                f"✅ TEST Stage 2 completed. Generated visualization data for {len(visualization_data)} nodes")
+
+            return {
+                "success": True,
+                "centrality_type": centrality_type,
+                "calculation_id": calculation_id,
+                "visualization_data": visualization_data,
+                "metadata": stage2_result.get("metadata", {}),
+                "node_statistics": stage2_result.get("node_statistics", {}),
+                "message": f"TEST: {centrality_type.capitalize()} centrality visualization completed successfully! Nodes are now sized and colored by their centrality values."
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ TEST Error in direct centrality calculation: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"TEST Internal error: {str(e)}")
