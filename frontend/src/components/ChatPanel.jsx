@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { chatAPI } from "../services/api";
+import { networkChatAPI } from "../services/api";
 
 const ChatPanel = ({
   isLoading,
@@ -63,7 +63,7 @@ const ChatPanel = ({
         formData.append("files", file);
       });
 
-      const response = await chatAPI.sendMessage(formData);
+      const response = await networkChatAPI.sendMessage(formData);
 
       const assistantMessage = {
         id: Date.now() + 1,

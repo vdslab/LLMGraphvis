@@ -1,15 +1,12 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import cytoscape from "cytoscape";
-import klay from "cytoscape-klay";
-import { layoutAPI } from "../services/api";
 
-// Register the layout extension
-cytoscape.use(klay);
+// Note: Using built-in layouts instead of cytoscape-klay for now
 
 const NetworkVisualization = ({ graph, onGraphUpdate, isLoading }) => {
   const cyContainerRef = useRef(null);
   const cyRef = useRef(null);
-  const [selectedLayout, setSelectedLayout] = useState("klay");
+  const [selectedLayout, setSelectedLayout] = useState("breadthfirst");
   const [layoutLoading, setLayoutLoading] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [fitOnUpdate, setFitOnUpdate] = useState(true);
@@ -17,16 +14,14 @@ const NetworkVisualization = ({ graph, onGraphUpdate, isLoading }) => {
   // Layout options - memoized to avoid dependency issues
   const layoutOptions = useMemo(
     () => ({
-      klay: {
-        name: "klay",
-        nodeDimensionsIncludeLabels: true,
+      breadthfirst: {
+        name: "breadthfirst",
         fit: true,
         padding: 20,
-        klay: {
-          spacing: 20,
-          direction: "DOWN",
-          thoroughness: 7,
-        },
+        directed: true,
+        spacingFactor: 1.75,
+        animate: true,
+        animationDuration: 500,
       },
       cose: {
         name: "cose",
@@ -42,14 +37,6 @@ const NetworkVisualization = ({ graph, onGraphUpdate, isLoading }) => {
         initialTemp: 200,
         coolingFactor: 0.95,
         minTemp: 1.0,
-      },
-      breadthfirst: {
-        name: "breadthfirst",
-        fit: true,
-        padding: 20,
-        directed: true,
-        roots: "#a",
-        spacingFactor: 1.75,
       },
       circle: {
         name: "circle",
@@ -198,41 +185,15 @@ const NetworkVisualization = ({ graph, onGraphUpdate, isLoading }) => {
 
       setLayoutLoading(true);
       try {
-        // If using server-side layout calculation
+        // For now, we only support client-side layouts
         if (layoutName === "server") {
-          const elements = cyRef.current.elements().jsons();
-          const nodes = elements.filter(
-            (el) => !el.data.source && !el.data.target,
-          );
-          const edges = elements.filter(
-            (el) => el.data.source && el.data.target,
-          );
-
-          const response = await layoutAPI.calculateLayout({
-            nodes,
-            edges,
-            layout: "spring",
-          });
-
-          if (response.data && response.data.nodes) {
-            // Update node positions
-            response.data.nodes.forEach((nodeData) => {
-              const node = cyRef.current.getElementById(nodeData.id);
-              if (node.length > 0) {
-                node.position({
-                  x: nodeData.position.x,
-                  y: nodeData.position.y,
-                });
-              }
-            });
-
-            cyRef.current.fit();
-          }
-        } else {
-          // Use client-side layout
-          const layout = cyRef.current.layout(layoutOptions[layoutName]);
-          layout.run();
+          console.warn("Server-side layout calculation not implemented yet");
+          layoutName = "cose"; // Fallback to cose layout
         }
+
+        // Use client-side layout
+        const layout = cyRef.current.layout(layoutOptions[layoutName]);
+        layout.run();
       } catch (error) {
         console.error("Error applying layout:", error);
       } finally {
