@@ -351,7 +351,7 @@ const useNetworkStore = create((set, get) => ({
   calculateCentralityDirect: async (
     centralityType = "degree",
     colorScheme = "viridis",
-    sizeRange = [10, 200], // Updated for better node visibility
+    sizeRange = [30, 80], // Updated for better node visibility
   ) => {
     const { nodes, edges } = get();
 

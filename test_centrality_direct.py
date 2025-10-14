@@ -96,7 +96,7 @@ def test_centrality_calculation():
                     "calculation_id": calculation_id,
                     "color_scheme": "viridis",
                     # Updated for better node visibility
-                    "size_range": [10, 200]
+                    "size_range": [30, 80]
                 }
 
                 viz_response = requests.post(f"{mcp_url}/tools/get_centrality_visualization",
@@ -198,7 +198,7 @@ def test_betweenness_centrality():
                     "calculation_id": calculation_id,
                     "color_scheme": "plasma",
                     # Updated for better node visibility
-                    "size_range": [10, 200]
+                    "size_range": [30, 80]
                 }
 
                 viz_response = requests.post(f"{mcp_url}/tools/get_centrality_visualization",

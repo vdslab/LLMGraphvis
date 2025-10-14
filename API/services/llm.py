@@ -146,7 +146,7 @@ TOOLS_DEFINITION = [
                     "description": "Node size range [min, max] for better node visibility.",
                     "items": {"type": "number"},
                     # Updated for much better visual distinction
-                    "default": [10, 200]
+                    "default": [30, 80]
                 }
             },
             "required": ["calculation_id"]
@@ -467,5 +467,3 @@ async def process_chat_message(messages: List[Dict[str, str]]) -> Dict[str, Any]
         return await _process_with_gemini(messages)
     else:
         return {"content": f"Error: Unknown LLM_PROVIDER '{provider}'. Please set to 'google' or 'openai'."}
-
-

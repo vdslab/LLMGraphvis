@@ -212,13 +212,14 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
 
             # Handle two-stage centrality workflow using new MCP client
             if tool_name == "calculate_and_store_centrality":
-                print(f"🎯 Starting two-stage centrality workflow: {tool_args.get('centrality_type', 'degree')}")
-                
+                print(
+                    f"🎯 Starting two-stage centrality workflow: {tool_args.get('centrality_type', 'degree')}")
+
                 graphml_content = db_conversation.network.graphml_content if db_conversation.network else create_empty_graphml()
                 centrality_type = tool_args.get('centrality_type', 'degree')
                 centrality_params = tool_args.get('centrality_params', {})
                 color_scheme = tool_args.get('color_scheme', 'viridis')
-                size_range = tool_args.get('size_range', [10, 200])
+                size_range = tool_args.get('size_range', [30, 80])
 
                 async with get_mcp_client() as mcp_client:
                     result = await mcp_client.calculate_centrality_two_stage(
@@ -228,9 +229,10 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
                         color_scheme=color_scheme,
                         size_range=size_range
                     )
-                    
+
                     if result.get("success"):
-                        print(f"✅ Two-stage centrality workflow completed: {centrality_type}")
+                        print(
+                            f"✅ Two-stage centrality workflow completed: {centrality_type}")
                         tool_result_content = json.dumps({
                             "status": "success",
                             "details": {
@@ -244,7 +246,8 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
                             }
                         })
                     else:
-                        print(f"❌ Two-stage centrality workflow failed: {result.get('error')}")
+                        print(
+                            f"❌ Two-stage centrality workflow failed: {result.get('error')}")
                         tool_result_content = json.dumps({
                             "status": "error",
                             "details": {
@@ -261,10 +264,10 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
 
                 async with get_mcp_client() as mcp_client:
                     result = await mcp_client.get_sample_network()
-                    
+
                     if result.get("success"):
                         graphml_content = result.get("graphml_content")
-                        
+
                         # Update the conversation's network with the sample network
                         if db_conversation.network and graphml_content:
                             try:
@@ -272,9 +275,11 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
                                 db.add(db_conversation.network)
                                 db.commit()
                                 db.refresh(db_conversation)
-                                print(f"✅ Sample network saved to conversation {db_conversation.id}")
+                                print(
+                                    f"✅ Sample network saved to conversation {db_conversation.id}")
                             except Exception as save_error:
-                                print(f"⚠️ Warning: failed to save sample network to DB: {save_error}")
+                                print(
+                                    f"⚠️ Warning: failed to save sample network to DB: {save_error}")
 
                         tool_result_content = json.dumps({
                             "status": "success",
@@ -642,13 +647,14 @@ async def process_chat(
 
             # Handle two-stage centrality workflow using new MCP client
             if tool_name == "calculate_and_store_centrality":
-                print(f"🎯 Starting two-stage centrality workflow: {tool_args.get('centrality_type', 'degree')}")
-                
+                print(
+                    f"🎯 Starting two-stage centrality workflow: {tool_args.get('centrality_type', 'degree')}")
+
                 graphml_content = db_conversation.network.graphml_content if db_conversation.network else create_empty_graphml()
                 centrality_type = tool_args.get('centrality_type', 'degree')
                 centrality_params = tool_args.get('centrality_params', {})
                 color_scheme = tool_args.get('color_scheme', 'viridis')
-                size_range = tool_args.get('size_range', [10, 200])
+                size_range = tool_args.get('size_range', [30, 80])
 
                 async with get_mcp_client() as mcp_client:
                     result = await mcp_client.calculate_centrality_two_stage(
@@ -658,10 +664,11 @@ async def process_chat(
                         color_scheme=color_scheme,
                         size_range=size_range
                     )
-                    
+
                     if result.get("success"):
-                        print(f"✅ Two-stage centrality workflow completed: {centrality_type}")
-                        
+                        print(
+                            f"✅ Two-stage centrality workflow completed: {centrality_type}")
+
                         # Create network update for frontend
                         network_update_info = {
                             "type": "calculate_and_store_centrality",
@@ -673,7 +680,7 @@ async def process_chat(
                             "stage2": result.get("stage2_result", {}),
                             "success": True
                         }
-                        
+
                         # Tool result for LLM
                         tool_result_for_llm = {
                             "status": "success",
@@ -688,8 +695,9 @@ async def process_chat(
                             }
                         }
                     else:
-                        print(f"❌ Two-stage centrality workflow failed: {result.get('error')}")
-                        
+                        print(
+                            f"❌ Two-stage centrality workflow failed: {result.get('error')}")
+
                         # Create network update for frontend (failure case)
                         network_update_info = {
                             "type": "calculate_and_store_centrality",
@@ -701,7 +709,7 @@ async def process_chat(
                             "stage1": result.get("stage1_result", {}),
                             "stage2": None
                         }
-                        
+
                         tool_result_for_llm = {
                             "status": "error",
                             "details": {

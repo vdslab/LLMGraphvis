@@ -199,7 +199,7 @@ def get_centrality_visualization(
     try:
         if size_range is None:
             # Enhanced default range for better visibility
-            size_range = [10, 200]
+            size_range = [30, 80]
 
         result = get_centrality_visualization_data(
             calculation_id=calculation_id,
