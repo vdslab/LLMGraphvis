@@ -434,21 +434,56 @@ async def _process_with_openai(messages: List[Dict[str, str]]) -> Dict[str, Any]
 
     # Adapt history for OpenAI format
     openai_history = []
+    last_tool_call_id = None
+    
     for msg in messages:
         if msg["role"] == "tool":
-            openai_history.append({"role": "tool", "tool_call_id": "placeholder_id",
-                                  "name": "tool_name", "content": msg["content"]})
+            # OpenAI requires proper tool_call_id for tool messages
+            # Try to extract from previous assistant message or use a generated ID
+            tool_call_id = last_tool_call_id or f"call_{len(openai_history)}"
+            openai_history.append({
+                "role": "tool",
+                "tool_call_id": tool_call_id,
+                "content": msg["content"]
+            })
+        elif msg["role"] == "assistant":
+            # Check if this is a tool call response
+            try:
+                parsed_content = json.loads(msg["content"])
+                if "tool_calls" in parsed_content:
+                    # This is an assistant message with tool calls
+                    tool_calls = parsed_content["tool_calls"]
+                    if tool_calls and len(tool_calls) > 0:
+                        # Extract tool call ID for subsequent tool messages
+                        last_tool_call_id = f"call_{len(openai_history)}"
+                        # Create proper tool call structure for OpenAI
+                        openai_history.append({
+                            "role": "assistant",
+                            "content": None,
+                            "tool_calls": [{
+                                "id": last_tool_call_id,
+                                "type": "function",
+                                "function": {
+                                    "name": tool_calls[0]["function"]["name"],
+                                    "arguments": json.dumps(tool_calls[0]["function"]["arguments"])
+                                }
+                            }]
+                        })
+                    else:
+                        openai_history.append({"role": "assistant", "content": msg["content"]})
+                else:
+                    openai_history.append({"role": "assistant", "content": msg["content"]})
+            except (json.JSONDecodeError, KeyError):
+                # Not a JSON tool call, treat as regular message
+                openai_history.append({"role": "assistant", "content": msg["content"]})
         else:
-            openai_history.append(
-                {"role": msg["role"], "content": msg["content"]})
+            openai_history.append({"role": msg["role"], "content": msg["content"]})
 
     try:
         response = openai_client.chat.completions.create(
             model=os.environ.get("OPENAI_MODEL", "gpt-4o"),
-            messages=[{"role": "system", "content": SYSTEM_PROMPT}
-                      ] + openai_history,
-            tools=[{"type": "function", "function": f}
-                   for f in TOOLS_DEFINITION],
+            messages=[{"role": "system", "content": SYSTEM_PROMPT}] + openai_history,
+            tools=[{"type": "function", "function": tool} for tool in TOOLS_DEFINITION],
             tool_choice="auto",
         )
 
@@ -458,19 +493,30 @@ async def _process_with_openai(messages: List[Dict[str, str]]) -> Dict[str, Any]
         if tool_calls:
             # OpenAI can return multiple tool calls, we'll take the first one for simplicity
             tool_call = tool_calls[0]
+            
+            # Handle both string and dict arguments
+            try:
+                if isinstance(tool_call.function.arguments, str):
+                    arguments = json.loads(tool_call.function.arguments)
+                else:
+                    arguments = tool_call.function.arguments
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.error(f"Error parsing tool call arguments: {e}")
+                arguments = {}
+            
             return {
                 "tool_calls": [{
                     "function": {
                         "name": tool_call.function.name,
-                        "arguments": json.loads(tool_call.function.arguments)
+                        "arguments": arguments
                     }
                 }]
             }
         else:
             return {"content": response_message.content}
     except Exception as e:
-        print(f"Error with OpenAI: {e}")
-        return {"content": f"Error with OpenAI: {e}"}
+        logger.error(f"Error with OpenAI: {e}")
+        return {"content": f"Error with OpenAI: {str(e)}"}
 
 
 async def process_chat_message(messages: List[Dict[str, str]]) -> Dict[str, Any]:
@@ -478,10 +524,22 @@ async def process_chat_message(messages: List[Dict[str, str]]) -> Dict[str, Any]
     Process chat messages by routing to the configured LLM provider.
     """
     provider = get_current_provider()
-    print(f"Processing message with provider: {provider}")
-    if provider == "openai":
-        return await _process_with_openai(messages)
-    elif provider == "google":
-        return await _process_with_gemini(messages)
-    else:
-        return {"content": f"Error: Unknown LLM_PROVIDER '{provider}'. Please set to 'google' or 'openai'."}
+    logger.info(f"Processing message with provider: {provider}")
+    
+    try:
+        if provider == "openai":
+            logger.info("Using OpenAI provider")
+            result = await _process_with_openai(messages)
+            logger.info(f"OpenAI response type: {type(result)}, keys: {list(result.keys()) if isinstance(result, dict) else 'N/A'}")
+            return result
+        elif provider == "google":
+            logger.info("Using Google provider")
+            return await _process_with_gemini(messages)
+        else:
+            error_msg = f"Error: Unknown LLM_PROVIDER '{provider}'. Please set to 'google' or 'openai'."
+            logger.error(error_msg)
+            return {"content": error_msg}
+    except Exception as e:
+        error_msg = f"Error in process_chat_message: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        return {"content": f"An unexpected error occurred: {str(e)}"}
