@@ -6,7 +6,6 @@ import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import SettingsPage from "./pages/SettingsPage";
-// Removed NetworkVisualizationPage and LayoutRecommendationPage as part of migration to MCP-based design
 import NetworkChatPage from "./pages/NetworkChatPage";
 import useAuthStore from "./services/authStore";
 import websocketService from "./services/websocketService";
@@ -72,7 +71,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            {/* Routes for /network and /recommend have been removed as part of migration to MCP-based design */}
             <Route
               path="/chat"
               element={
@@ -81,8 +79,6 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            {/* Development-only route to load NetworkChatPage without auth for UI testing */}
-            <Route path="/debug-network" element={<NetworkChatPage />} />
           </Routes>
         </main>
       </div>

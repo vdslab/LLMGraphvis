@@ -12,6 +12,53 @@ const coerceNumber = (v) => {
   return Number.isNaN(n) ? v : n;
 };
 
+// Centralized sample network generation
+const generateSampleNetwork = () => {
+  const sampleNodes = [];
+  const sampleEdges = [];
+  const samplePositions = [];
+
+  // Center node
+  sampleNodes.push({
+    id: "0",
+    label: "Center Node",
+  });
+
+  samplePositions.push({
+    id: "0",
+    label: "Center Node",
+    x: 0,
+    y: 0,
+    size: 8,
+    color: "#1d4ed8",
+  });
+
+  // 10 satellite nodes in circular arrangement
+  for (let i = 1; i <= 10; i++) {
+    sampleNodes.push({
+      id: i.toString(),
+      label: `Node ${i}`,
+    });
+
+    sampleEdges.push({
+      source: "0",
+      target: i.toString(),
+    });
+
+    const angle = (i - 1) * ((2 * Math.PI) / 10);
+    samplePositions.push({
+      id: i.toString(),
+      label: `Node ${i}`,
+      x: Math.cos(angle),
+      y: Math.sin(angle),
+      size: 5,
+      color: "#1d4ed8",
+    });
+  }
+
+  return { sampleNodes, sampleEdges, samplePositions };
+};
+
 const useNetworkStore = create((set, get) => ({
   nodes: [],
   edges: [],
@@ -23,12 +70,66 @@ const useNetworkStore = create((set, get) => ({
   centralityInfo: null, // Store information about applied centrality calculations
   isLoading: false,
   error: null,
-  recommendation: null,
+  initialLoadComplete: false,
   visualProperties: {
     node_size: 5,
     node_color: "#1d4ed8",
     edge_width: 1,
     edge_color: "#94a3b8",
+  },
+
+  // Initialize network with sample data if no data exists
+  initializeNetwork: () => {
+    const { nodes, positions, initialLoadComplete } = get();
+
+    if (initialLoadComplete || (positions?.length > 0 && nodes?.length > 0)) {
+      return true;
+    }
+
+    const { sampleNodes, sampleEdges, samplePositions } =
+      generateSampleNetwork();
+
+    set({
+      nodes: sampleNodes,
+      edges: sampleEdges,
+      positions: samplePositions,
+      layout: "spring",
+      isLoading: false,
+      error: null,
+      initialLoadComplete: true,
+    });
+
+    return true;
+  },
+
+  // Load sample network using API (same as initializeNetwork but can force reload)
+  loadSampleNetwork: async () => {
+    console.log("Generating static sample network");
+    set({ isLoading: true, error: null });
+
+    try {
+      const { sampleNodes, sampleEdges, samplePositions } =
+        generateSampleNetwork();
+
+      set({
+        nodes: sampleNodes,
+        edges: sampleEdges,
+        positions: samplePositions,
+        layout: "spring",
+        isLoading: false,
+        error: null,
+        initialLoadComplete: true,
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Error generating static sample network:", error);
+      set({
+        isLoading: false,
+        error: "Failed to generate sample network",
+      });
+      return false;
+    }
   },
 
   // Set network data
@@ -118,120 +219,6 @@ const useNetworkStore = create((set, get) => ({
 
   // Apply layout using MCP client with GraphML
   applyLayout: async () => {
-    return await get().calculateLayout();
-  },
-
-  // Load sample network using API
-  loadSampleNetwork: async () => {
-    console.log("Generating static sample network");
-    set({ isLoading: true, error: null });
-
-    try {
-      const sampleNodes = [];
-      const sampleEdges = [];
-      const samplePositions = [];
-
-      // Center node
-      sampleNodes.push({
-        id: "0",
-        label: "Center Node",
-      });
-
-      samplePositions.push({
-        id: "0",
-        label: "Center Node",
-        x: 0,
-        y: 0,
-        size: 8,
-        color: "#1d4ed8",
-      });
-
-      // 10 satellite nodes
-      for (let i = 1; i <= 10; i++) {
-        sampleNodes.push({
-          id: i.toString(),
-          label: `Node ${i}`,
-        });
-
-        sampleEdges.push({
-          source: "0",
-          target: i.toString(),
-        });
-
-        const angle = (i - 1) * ((2 * Math.PI) / 10);
-        samplePositions.push({
-          id: i.toString(),
-          label: `Node ${i}`,
-          x: Math.cos(angle),
-          y: Math.sin(angle),
-          size: 5,
-          color: "#1d4ed8",
-        });
-      }
-
-      set({
-        nodes: sampleNodes,
-        edges: sampleEdges,
-        positions: samplePositions,
-        layout: "spring",
-        isLoading: false,
-        error: null,
-      });
-
-      return true;
-    } catch (error) {
-      console.error("Error generating static sample network:", error);
-      set({
-        isLoading: false,
-        error: "Failed to generate sample network",
-      });
-      return false;
-    }
-  },
-
-  // Get layout recommendation
-  getLayoutRecommendation: async (description, purpose) => {
-    set({ isLoading: true, error: null });
-    try {
-      const response = await networkAPI.getLayoutRecommendation(
-        description,
-        purpose,
-      );
-      const result = response.data;
-
-      if (result && result.success) {
-        set({
-          recommendation: result,
-          isLoading: false,
-          error: null,
-        });
-        return true;
-      } else {
-        throw new Error("Failed to get layout recommendation");
-      }
-    } catch (error) {
-      console.error("Error getting layout recommendation:", error);
-      set({
-        isLoading: false,
-        error: error.message || "Failed to get layout recommendation",
-      });
-      return false;
-    }
-  },
-
-  // Apply recommended layout
-  applyRecommendedLayout: async () => {
-    const { recommendation } = get();
-    if (!recommendation) {
-      set({ error: "No recommendation available" });
-      return false;
-    }
-
-    set({
-      layout: recommendation.recommended_layout,
-      layoutParams: recommendation.recommended_parameters || {},
-    });
-
     return await get().calculateLayout();
   },
 
@@ -481,8 +468,8 @@ const useNetworkStore = create((set, get) => ({
       positions: [],
       centrality: null,
       centralityType: null,
-      recommendation: null,
       error: null,
+      initialLoadComplete: false,
     });
   },
 

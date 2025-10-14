@@ -1,130 +1,107 @@
-# NetworkX MCP Server - Best Practices Architecture
+# NetworkXMCP MCP Server Architecture
 
-This document describes the redesigned NetworkX MCP server that follows Model Context Protocol best practices while maintaining FastAPI compatibility.
+This document outlines the architecture and best practices for the NetworkXMCP server, following the Model Context Protocol (MCP) specification for reliable, modular, and secure AI agent integration.
 
-## Architecture Overview
-
-The new architecture separates concerns properly and follows MCP design patterns:
+## File Structure
 
 ```
 NetworkXMCP/
-├── server.py                    # Pure MCP server (recommended)
-├── main.py                     # FastAPI app exposing HTTP tools (current)
-├── main.py                     # Legacy FastAPI server
-├── core/                       # Core utilities and context
+├── server.py                  # Pure MCP server entrypoint (recommended)
+├── main.py                    # FastAPI HTTP server (compatibility layer)
+├── core/                      # Core utilities and context management
 │   ├── __init__.py
-│   ├── context.py             # Server context and caching
+│   ├── context.py             # Server context, caching, lifespan
 │   └── graph_utils.py         # Graph processing utilities
-├── tools/                      # MCP tools (organized by function)
+├── tools/                     # MCP tools (by function)
 │   ├── __init__.py
 │   ├── network_operations.py  # Network creation tools
 │   ├── layout_algorithms.py   # Layout computation tools
 │   ├── centrality_metrics.py  # Centrality calculation tools
-│   ├── graph_io.py            # Import/export tools
-│   ├── visualization.py       # Visualization tools
-│   └── centrality_persistence.py # Legacy centrality tools
-└── resources/                  # MCP resources (read-only data)
-    ├── __init__.py
-    ├── graph_resources.py      # Cached graph access
-    └── cache_resources.py      # Cache statistics
+│   ├── graph_io.py            # Import/export, format conversion
+│   └── visualization.py       # Visualization tools
+├── resources/                 # MCP resources (read-only data)
+│   ├── __init__.py
+│   ├── graph_resources.py     # Cached graph access
+│   └── cache_resources.py     # Cache statistics
+└── ... (tests, Dockerfile, etc.)
 ```
 
-## Key Improvements
+## MCP Best Practices
 
-### 1. **Proper MCP Logging**
+### Logging
 
-- Uses `stderr` for all logging (MCP requirement)
-- Structured logging with proper levels
-- No `print()` or `stdout` usage that corrupts JSON-RPC
+- All logs **MUST** go to `stderr` (never `stdout`)
+- Use structured logging with log levels
+- Rate limit log messages
+- Include relevant context in log data
+- Use consistent logger names
+- Remove or mask sensitive information
 
-### 2. **Modular Tool Organization**
+### Security
 
-- **Network Operations**: Random graphs, small-world, scale-free
-- **Layout Algorithms**: Spring, circular, hierarchical layouts
-- **Centrality Metrics**: Degree, betweenness, closeness, eigenvector, PageRank
-- **Graph I/O**: Import, export, format conversion, statistics
-- **Visualization**: Color schemes, node sizing, legends
+- Validate all resource URIs
+- Implement access controls for sensitive resources
+- Properly encode binary data
+- Check resource permissions before operations
 
-### 3. **MCP Resources**
+### Error Handling
 
-- `graph://cached/{graph_id}` - Access cached graphs
-- `graph://list` - List all cached graphs
-- `cache://stats` - Cache statistics
-- `cache://centrality` - Centrality calculations
+- Use consistent error response format
+- Propagate exceptions with context
+- Graceful fallback if dependencies are missing
 
-### 4. **Proper Context Management**
+### Modularity
 
-- Server-wide context with lifespan management
-- Shared caching across tools
-- Type-safe context access
+- Tools organized by function (network, layout, centrality, I/O, visualization)
+- Resources separated from tools
+- Core utilities separated from business logic
 
-### 5. **Error Handling**
+### Type Safety
 
-- Consistent error response format
-- Proper exception propagation
-- Graceful fallbacks when dependencies missing
+- Use Pydantic models for requests/responses
+- Type hints throughout codebase
 
-## Usage Patterns
+## Usage
 
-### Pure MCP Server (Recommended)
+**Pure MCP server (recommended):**
 
 ```python
-# Use server.py for pure MCP implementation
 from server import mcp
-
 if __name__ == "__main__":
     mcp.run()
 ```
 
-### FastAPI HTTP Server (Current)
+**FastAPI HTTP server (compatibility):**
 
 ```python
-# Use main.py for the FastAPI HTTP server
 import uvicorn
 from main import app
-
 uvicorn.run(app, host="0.0.0.0", port=8001)
 ```
 
-## MCP Tools
-
-### Network Creation Tools
+## Example MCP Tools
 
 ```python
 @mcp.tool()
-def create_random_graph(num_nodes: int = 20, edge_probability: float = 0.2, seed: Optional[int] = None) -> Dict[str, Any]:
+def create_random_graph(num_nodes: int = 20, edge_probability: float = 0.2, seed: Optional[int] = None) -> dict:
     """Create a random graph using Erdős–Rényi model."""
-```
 
-### Layout Tools
-
-```python
 @mcp.tool()
-def apply_spring_layout(graphml_content: str, k: Optional[float] = None, iterations: int = 50) -> Dict[str, Any]:
+def apply_spring_layout(graphml_content: str, k: float = None, iterations: int = 50) -> dict:
     """Apply spring layout algorithm."""
-```
 
-### Centrality Tools
-
-```python
 @mcp.tool()
-def calculate_degree_centrality(graphml_content: str) -> Dict[str, Any]:
+def calculate_degree_centrality(graphml_content: str) -> dict:
     """Calculate degree centrality for all nodes."""
 ```
 
-## MCP Resources
-
-### Graph Resources
+## Example MCP Resources
 
 ```python
 @mcp.resource("graph://cached/{graph_id}")
 def get_cached_graph(graph_id: str) -> str:
     """Access cached graph by ID."""
-```
 
-### Cache Resources
-
-```python
 @mcp.resource("cache://stats")
 def get_cache_statistics() -> str:
     """Get cache usage statistics."""
@@ -132,133 +109,85 @@ def get_cache_statistics() -> str:
 
 ## FastAPI Compatibility
 
-The FastAPI-MCP hybrid maintains backward compatibility:
+The FastAPI-MCP hybrid maintains backward compatibility. Example endpoints:
 
-### Endpoints
+- `GET /` — Server info
+- `GET /health` — Health check
+- `GET /resources/graphs` — List cached graphs
+- `POST /tools/create_network` — Create network
+- `POST /tools/apply_layout` — Apply layout
+- `POST /tools/calculate_centrality` — Calculate centrality
 
-- `GET /` - Server information
-- `GET /health` - Health check
-- `GET /resources/graphs` - List cached graphs
-- `POST /tools/create_network` - Create network
-- `POST /tools/apply_layout` - Apply layout
-- `POST /tools/calculate_centrality` - Calculate centrality
-
-### Request/Response Format
-
-All endpoints use the standardized `MCPResponse` format:
+All endpoints use a standardized response format:
 
 ```json
 {
-  "success": true,
-  "data": { ... },
-  "error": null,
-  "timestamp": "2025-10-10T23:24:00.000Z"
+    "success": true,
+    "data": { ... },
+    "error": null,
+    "timestamp": "2025-10-10T23:24:00.000Z"
 }
 ```
 
-## Best Practices Implemented
+## Summary of Best Practices
 
-### 1. **Separation of Concerns**
+- **Separation of concerns:** Core, tools, and resources are modular
+- **Consistent error handling:** Standardized error format, exception logging
+- **Type safety:** Pydantic models, type hints, validation
+- **Caching:** Server-wide context, efficient storage, cache stats
+- **Logging:** stderr-only, structured, rate-limited, sensitive info masked
 
-- Core utilities separated from business logic
-- Tools organized by functionality
-- Resources separated from tools
+## Development & Testing
 
-### 2. **Proper Error Handling**
-
-- Consistent error response format
-- Proper exception logging
-- Graceful degradation
-
-### 3. **Type Safety**
-
-- Pydantic models for all requests/responses
-- Type hints throughout codebase
-- Structured data validation
-
-### 4. **Caching Strategy**
-
-- Server-wide context management
-- Efficient data storage
-- Cache statistics and monitoring
-
-### 5. **Logging Best Practices**
-
-- stderr-only logging (MCP requirement)
-- Structured log messages
-- Appropriate log levels
-
-## Development and Testing
-
-### Structure Validation
-
-```bash
-python validate_structure.py
-```
-
-### Running the Server
-
-```bash
-# Pure MCP server
-python server.py
-
-# FastAPI HTTP server (current)
-python main.py
-
-# Legacy FastAPI (fallback)
-python main.py
-```
-
-### Docker Integration
-
-The new architecture is fully compatible with the existing Docker setup:
-
-```yaml
-# docker-compose.yml remains unchanged
-services:
-  networkx-mcp:
-    build: ./NetworkXMCP
-    ports:
-      - "8001:8001"
-```
+- **Validate structure:**
+  ```bash
+  python validate_structure.py
+  ```
+- **Run MCP server:**
+  ```bash
+  python server.py
+  ```
+- **Run FastAPI server:**
+  ```bash
+  python main.py
+  ```
+- **Docker:**
+  ```yaml
+  services:
+    networkx-mcp:
+      build: ./NetworkXMCP
+      ports:
+        - "8001:8001"
+  ```
 
 ## Migration Guide
 
-### For Existing Users
-
-1. Current FastAPI endpoints remain functional
-2. New MCP tools provide enhanced functionality
-3. Gradual migration path available
-
-### For New Deployments
-
-1. Use `server.py` for pure MCP implementation
-2. Use `main_fastapi_mcp.py` for FastAPI compatibility
-3. Follow MCP client integration patterns
+- **Existing users:** FastAPI endpoints remain functional; MCP tools add new features
+- **New deployments:** Use `server.py` for pure MCP, `main.py` for FastAPI compatibility
 
 ## Dependencies
 
-### Required
+**Required:**
 
-- `networkx` - Graph analysis
-- `pydantic` - Data validation
-- `fastapi` - Web framework (if using FastAPI mode)
+- `networkx` — Graph analysis
+- `pydantic` — Data validation
+- `fastapi` — Web framework (if using FastAPI)
 
-### Optional
+**Optional:**
 
-- `mcp` - Pure MCP server functionality
-- `fastapi-mcp` - FastAPI-MCP integration
-- `uvicorn` - ASGI server
+- `mcp` — Pure MCP server
+- `fastapi-mcp` — FastAPI-MCP integration
+- `uvicorn` — ASGI server
 
 ## Conclusion
 
-This redesigned architecture provides:
+This architecture ensures:
 
-- ✅ MCP best practices compliance
-- ✅ Backward compatibility with FastAPI
-- ✅ Proper separation of concerns
-- ✅ Type safety and validation
-- ✅ Comprehensive error handling
-- ✅ Efficient caching and context management
+- MCP best practices compliance
+- Backward compatibility with FastAPI
+- Modular, extensible design
+- Type safety and validation
+- Robust error handling
+- Secure, efficient context and resource management
 
-The modular design makes it easy to extend functionality while maintaining clean interfaces and proper MCP protocol compliance.
+Follow this structure to maintain a reliable, maintainable, and standards-compliant MCP server implementation.
