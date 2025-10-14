@@ -184,6 +184,21 @@ class WebSocketService {
       return;
     }
 
+    // Check if this is a centrality calculation update with visualization data
+    if (
+      data.network_update &&
+      data.network_update.type === "calculate_and_store_centrality" &&
+      data.network_update.visualization_data
+    ) {
+      console.log("Processing centrality visualization update from WebSocket");
+      try {
+        this.handleCentralityVisualizationUpdate(data.network_update);
+      } catch (error) {
+        console.error("Error handling centrality visualization update from WebSocket:", error);
+      }
+      return;
+    }
+
     try {
       // 最新のネットワークデータを取得
       console.log(`Fetching updated network data for network ID: ${networkId}`);
@@ -305,6 +320,41 @@ class WebSocketService {
       }
     } catch (error) {
       console.error("Error processing layout update:", error);
+    }
+  }
+
+  /**
+   * Handle centrality visualization update with visualization data
+   * @param {object} networkUpdate - Network update data containing visualization_data
+   */
+  handleCentralityVisualizationUpdate(networkUpdate) {
+    console.log(
+      "🎨 Processing centrality visualization update:",
+      networkUpdate,
+    );
+
+    try {
+      const { visualization_data, centrality_type, calculation_id } = networkUpdate;
+
+      if (!visualization_data || typeof visualization_data !== "object") {
+        console.error("Invalid visualization_data in centrality update:", visualization_data);
+        return;
+      }
+
+      const networkStore = useNetworkStore.getState();
+
+      // Use the existing applyCentralityVisualizationData action from networkStore
+      networkStore.applyCentralityVisualizationData(
+        visualization_data,
+        centrality_type,
+        calculation_id
+      );
+
+      console.log(
+        `✅ Successfully applied ${centrality_type} centrality visualization to graph`,
+      );
+    } catch (error) {
+      console.error("Error processing centrality visualization update:", error);
     }
   }
 }
