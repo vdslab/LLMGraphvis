@@ -17,6 +17,53 @@
 
 ### 3.2. バックエンド (Backend)
 
+```mermaid
+graph TD
+    subgraph "Frontend"
+        WebApp[React App w/ D3.js]
+    end
+
+    subgraph "Backend (FastAPI)"
+        APIGateway[API Gateway]
+        AuthService[Auth Service]
+        Orchestrator[Orchestrator / LLM Service]
+        ComputeEngine[Compute Engine]
+        StateManager[State Manager]
+    end
+
+    subgraph "Data Stores"
+        PostgresDB[PostgreSQL]
+        Neo4jDB[Neo4j]
+        RedisDB[Redis]
+    end
+
+    subgraph "External Services"
+        LLM_API["LLM API (Gemini)"]
+        RabbitMQ_Broker["RabbitMQ Message Broker"]
+    end
+
+    WebApp -- HTTP / WebSocket --> APIGateway
+    APIGateway -- Authenticate --> AuthService
+    APIGateway -- Route Requests --> Orchestrator
+    APIGateway -- Manage Connections --> StateManager
+
+    AuthService -- Access User Data --> PostgresDB
+
+    Orchestrator -- Send Prompts --> LLM_API
+    Orchestrator -- Dispatch Tasks --> RabbitMQ_Broker
+    Orchestrator -- Update State --> StateManager
+    Orchestrator -- Access Project Data --> PostgresDB
+
+    RabbitMQ_Broker -- Deliver Tasks --> ComputeEngine
+
+    ComputeEngine -- Read Graph --> Neo4jDB
+    ComputeEngine -- Write Results --> RedisDB
+
+    StateManager -- Push State (WebSocket) --> WebApp
+    StateManager -- Read Graph/Data --> Neo4jDB
+    StateManager -- Read Cache/State --> RedisDB
+```
+
 - **フレームワーク**: **FastAPI**
   - **選定理由**: ネイティブな非同期サポートにより、HTTPリクエスト、WebSocket接続、非同期タスクキュー(Celery)といった複数のI/Oバウンド処理を単一イベントループ内で効率的に並行処理できる。API中心のアーキテクチャに最適であり、自動APIドキュメント生成やPydanticによる厳格な型検証機能が開発効率と堅牢性を高める。
   - **技術詳細**: Starletteを基盤とし、Pydanticによるデータ検証・シリアライズ、依存性注入 (Dependency Injection) によるクリーンなコード構造、OpenAPI (Swagger UI/ReDoc) による自動APIドキュメント生成が特徴。非同期処理には`async/await`構文を全面的に採用。
@@ -43,14 +90,19 @@
 #### C. チャット / LLMサービス (Orchestrator)
 
 - **責務**:
-  - システムの中核。ユーザーの自然言語指示を解釈し、必要な処理をオーケストレーションする。
+  - システムの中核。ユーザーの自然言語指示を**LLMが直接解釈し、可視化結果に反映させるための**必要な処理をオーケストレーションする。
   - **LLM Function Calling** を活用し、ユーザーの意図を具体的な関数呼び出しに変換する。
+  - フロントエンドからのチャットメッセージを受信 (WebSocket)。
+  - LLM API（例: Gemini）に対し、プロンプト（会話履歴、Function定義）とユーザーメッセージを送信する。
+  - LLMの応答（テキストまたはFunction Call要求）を処理する。
 - **LLM連携フロー**:
   1.  ユーザーのクエリと定義済み関数スキーマをLLMに送信。関数スキーマはPydanticモデルで厳密に定義し、LLMに提供する。
   2.  LLMが返すJSON(呼び出すべき関数と引数)を解析・検証。Pydanticモデルによる厳格なバリデーションを適用する。
   3.  対応する内部サービス(計算サービス、状態管理サービス)を呼び出す。
 - **プロンプトエンジニアリング**:
-  - 「重要なノード」のような曖昧な指示に対し、LLMが明確化のための質問(例: 「重要性を判断する指標はどれですか？」)を返すようにプロンプトを設計する(**Ask-when-Needed**)。
+  - **曖昧な指示の推測と明確化**:
+    - 「友達が多い人」→「次数中心性」、「橋渡しになっている人」→「媒介中心性」のように、曖昧な指示でも**特定のグラフ指標に推測可能な場合は、LLMが自動的に推測し可視化に反映**する。
+    - 一方、「重要なノード」のような**推測が困難な真に曖昧な指示に対し、LLMが明確化のための質問** (例: 「重要性を判断する指標はどれですか？」) を返すようにプロンプトを設計する(**Ask-when-Needed**)。
   - 複雑なタスクには、思考の連鎖(**Chain-of-Thought**)を促し、複数の関数呼び出しを計画・実行させる。
 - **セキュリティ**:
   - LLMが生成した関数呼び出しは**信頼できない入力**として扱う。実行前に、関数名のホワイトリスト検証、引数の型・値の厳格な検証(Pydanticモデル使用)、入力のサニタイズを徹底する。

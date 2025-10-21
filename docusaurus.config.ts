@@ -45,7 +45,7 @@ const config: Config = {
       'classic',
       {
         docs: {
-          path: 'docs', // Point to the new docs directory
+          path: 'design_docs', // Point to the new docs directory
           routeBasePath: '/', // Serve docs at the site's root
           sidebarPath: require.resolve('./sidebars.ts'), // Keep the existing sidebars.ts for now
           // Please change this to your repo.
