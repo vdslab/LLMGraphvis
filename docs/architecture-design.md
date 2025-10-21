@@ -20,7 +20,7 @@ graph TD
     end
 
     subgraph "Frontend"
-        WebApp[React App w/ Sigma.js]
+        WebApp[React App w/ D3.js]
     end
 
     subgraph "Backend (FastAPI)"
