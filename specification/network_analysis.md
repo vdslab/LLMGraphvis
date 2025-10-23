@@ -1,14 +1,14 @@
-# グラフ計算サービス仕様 (NetworkXMCP)
+# グラフ計算サービス仕様 (NetworkX Model Context Protocol)
 
 ## 1. 概要と役割
 
-`NetworkXMCP` (NetworkX Model Context Protocol) は、グラフの計算処理に特化したステートレスなマイクロサービスです。
+`NetworkX Model Context Protocol` (NetworkXMCP) は、グラフの計算処理に特化したステートレスなマイクロサービスです。
 
 - **技術スタック**: FastAPI, NetworkX, Python
 - **主な役割**:
-    - `API`サービスからCPU負荷の高い計算処理をオフロードする。
+    - `API`サービスからCPU (Central Processing Unit) 負荷の高い計算処理をオフロードする。
     - `NetworkX`ライブラリを利用して、各種グラフ計算（レイアウト、指標分析）を実行する。
-    - 様々な形式のGraphMLファイルを受け取り、システムで一貫して扱える標準形式に変換・正規化する。
+    - 様々な形式のGraphML (Graph Markup Language) ファイルを受け取り、システムで一貫して扱える標準形式に変換・正規化する。
 
 ## 2. APIエンドポイント一覧
 
@@ -16,12 +16,14 @@
 
 | Method | Path | 説明 |
 |:---|:---|:---|
+| `GET` | `/health` | サービスのヘルスチェックを行う。 |
+| `GET` | `/info` | サービス名、バージョン、利用可能なツールの一覧を返す。 |
+| `GET` | `/get_sample_network` | サンプルのランダムネットワークをGraphML形式で生成して返す。 |
 | `POST` | `/tools/change_layout` | 指定されたレイアウトアルゴリズムに基づき、グラフのノード座標を計算し、座標情報が追加されたGraphMLを返す。 |
 | `POST` | `/tools/calculate_centrality` | 指定された中心性指標（次数、近接、媒介など）を計算し、各ノードの指標値を返す。 |
 | `POST` | `/tools/convert_graphml` | アップロードされたGraphMLファイルを解析・修正し、標準的な属性（`name`, `color`, `size`など）と主要な中心性指標を持つ正規化されたGraphMLを返す。 |
 | `POST` | `/tools/import_graphml` | GraphMLをパースし、ノードとエッジのリストをJSON形式で返す。 |
 | `POST` | `/tools/export_graphml` | グラフデータをGraphML形式の文字列としてエクスポートする。 |
-| `GET` | `/get_sample_network` | サンプルのランダムネットワークをGraphML形式で生成して返す。 |
 
 ## 3. 主要機能とデータフロー
 
@@ -31,7 +33,7 @@
 
 1.  **入力**: `API`サービスが、ユーザーがアップロードしたGraphMLファイルの内容（文字列）をリクエストボディに含めて `POST /tools/convert_graphml` を呼び出す。
 2.  **処理**:
-    - 不完全なXML構造（ヘッダー、名前空間、閉じタグなど）を自動修正する。
+    - 不完全なXML (Extensible Markup Language) 構造（ヘッダー、名前空間、閉じタグなど）を自動修正する。
     - `nx.read_graphml`でパースを試みる。
     - ノードの属性名（`label`, `node_color`など）を標準名（`name`, `color`）にマッピング・統一する。
     - `x`, `y`座標や`size`などの必須属性が存在しない場合は、デフォルト値やランダム値を補完する。
