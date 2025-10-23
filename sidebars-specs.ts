@@ -23,7 +23,7 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'doc',
-      id: '1_Architecture',
+      id: 'Architecture',
       label: '1. アーキテクチャ設計',
     },
     {
@@ -32,24 +32,24 @@ const sidebars: SidebarsConfig = {
       items: [
         {
           type: 'doc',
-          id: '2_Backend',
+          id: 'Backend',
           label: '2.1. バックエンド (API)',
         },
         {
           type: 'doc',
-          id: '2_Frontend',
-          label: '2.2. フロントエンド',
+          id: 'Frontend',
+          label: '2.2. フロントエンド仕様',
         },
         {
           type: 'doc',
-          id: '2_NetworkXMCP',
-          label: '2.3. グラフ計算サービス (NetworkXMCP)',
+          id: 'NetworkXMCP',
+          label: '2.3. グラフ計算サービス仕様 (NetworkXMCP)',
         },
       ],
     },
     {
         type: 'doc',
-        id: '3_Interactions',
+        id: 'Interactions',
         label: '3. 主要な処理フロー',
     }
   ],
