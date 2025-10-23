@@ -125,7 +125,8 @@ graph TD
         - ユーザーアカウント情報（ハッシュ化されたパスワードを含む）
         - 各ユーザーの会話履歴
         - メッセージ（ユーザーの発言、LLMの応答）
-        - アップロードされたGraphMLデータとそのメタ情報
+        - GraphMLデータ本体
+        - 計算結果のキャッシュ（レイアウト座標、中心性指標など）
     - **役割**: アプリケーションのコアとなるデータを安全に保管し、ユーザーセッションを跨いで状態を維持します。
 
 - **クライアントサイド (Web Browser)**:
@@ -136,7 +137,9 @@ graph TD
 
 ## 4. シーケンス図
 
-### 4.1. ユーザー認証とグラフレイアウト計算
+### 4.1. レイアウト計算とキャッシュ利用のフロー
+
+ユーザーがレイアウト計算を要求した際の、キャッシュを利用した効率的な処理フローを示します。
 
 ```mermaid
 sequenceDiagram
@@ -146,17 +149,146 @@ sequenceDiagram
     participant DB as Database
     participant N as NetworkXMCP
 
+    U->>F: レイアウト計算を要求 (例: spring layout)
+    F->>B: POST /network/layout (layout_type: "spring")
+
+    B->>DB: "spring"レイアウトのキャッシュがあるか確認
+    
+    alt キャッシュが存在する場合
+        DB-->>B: キャッシュされた座標データを返す
+        B-->>F: 計算結果 (キャッシュ)
+        F->>U: グラフを再描画
+    else キャッシュが存在しない場合
+        DB-->>B: キャッシュなし
+        B->>N: /tools/change_layout (GraphML, "spring")
+        N-->>B: 計算結果 (新しい座標と更新されたGraphML)
+        B->>DB: 新しい座標をキャッシュに保存し、更新されたGraphMLも保存
+        DB-->>B: 保存成功
+        B-->>F: 計算結果 (新規)
+        F->>U: グラフを再描画
+    end
+```
+
+### 4.2. データ永続化のフロー
+
+ユーザー登録、ログイン時のJWT保存、ファイルアップロード時のデータ保存といった、クライアントとサーバー双方でのデータ永続化の流れを示します。
+
+```mermaid
+sequenceDiagram
+    participant U as ユーザー
+    participant F as Frontend
+    participant LS as Browser Local Storage
+    participant B as API Service
+    participant DB as Database
+
+    U->>F: 新規登録情報入力
+    F->>B: POST /auth/register (username, password)
+    B->>DB: ユーザー情報をハッシュ化して保存
+    DB-->>B: 保存成功
+    B-->>F: 登録完了
+
     U->>F: ログイン情報入力
-    F->>B: /auth/token (ユーザー名, パスワード)
+    F->>B: POST /auth/token (username, password)
     B->>DB: ユーザー情報検証
     DB-->>B: 検証結果
-    B-->>F: JSON Web Token
-    F->>F: トークンをStoreとlocalStorageに保存
-    U->>F: レイアウト計算を要求 (GraphMLデータ)
-    F->>B: /network/layout (JWT, GraphML)
-    B->>B: 認証チェック
-    B->>N: /layout (GraphML, アルゴリズム)
-    N-->>B: 計算結果 (座標データ)
-    B-->>F: 計算結果
-    F->>U: グラフを描画
+    B-->>F: JSON Web Token (JWT)
+    F->>LS: JWTを保存
+    LS-->>F: 保存成功
+
+    U->>F: GraphMLファイルアップロード
+    F->>B: POST /network/upload (JWT, GraphML)
+    B->>B: JWT検証
+    B->>DB: GraphMLデータ、会話情報などを保存
+    DB-->>B: 保存成功
+    B-->>F: アップロード成功
+```
+
+### 4.3. チャットによる分析とキャッシュ利用フロー
+
+ユーザーの指示による分析処理において、キャッシュの利用と結果の永続化がどのように行われるかを示します。
+
+```mermaid
+sequenceDiagram
+    participant U as ユーザー
+    participant F as Frontend
+    participant B as API Service
+    participant DB as Database
+    participant LLM as LLM Service
+    participant N as NetworkXMCP
+
+    U->>F: チャットで指示を入力 ("次数中心性を計算して")
+    F->>B: POST /chat/process (message)
+    B->>DB: ユーザーメッセージを保存
+
+    B->>LLM: ユーザーの指示とツール定義を送信
+    LLM-->>B: ツール呼び出しを要求 (calculate_centrality, type:"degree")
+
+    B->>DB: "degree"中心性のキャッシュがあるか確認
+
+    alt キャッシュが存在する場合
+        DB-->>B: キャッシュされた中心性データを返す
+        B->>LLM: ツール実行結果(キャッシュ)を送信
+    else キャッシュが存在しない場合
+        DB-->>B: キャッシュなし
+        B->>N: /tools/calculate_centrality (GraphML, "degree")
+        N-->>B: 計算結果 (新規)
+        
+        rect rgb(230, 240, 255)
+            note over B: 分析結果の永続化
+            B->>DB: 新しい中心性データをキャッシュに保存
+            B->>DB: (オプション)計算結果をGraphML属性に反映して保存
+        end
+
+        B->>LLM: ツール実行結果(新規)を送信
+    end
+
+    LLM-->>B: 最終的な応答メッセージを生成
+    B->>DB: LLMの応答メッセージを保存
+
+    B-->>F: 最終応答と計算結果(networkUpdate)
+    F->>F: チャット履歴とグラフ表示を更新
+```
+
+### 4.4. 複数ツール呼び出しによる連続処理フロー
+
+一度の指示で複数の分析や操作が必要な場合の、連続的なツール呼び出しフローを示します。
+
+```mermaid
+sequenceDiagram
+    participant U as ユーザー
+    participant F as Frontend
+    participant B as API Service
+    participant DB as Database
+    participant LLM as LLM Service
+    participant N as NetworkXMCP
+
+    U->>F: 「次数中心性を計算し、上位5ノードを赤色に変えて」
+    F->>B: POST /chat/process (message)
+
+    B->>LLM: ユーザーの指示と会話履歴を送信
+    LLM-->>B: 1回目のツール呼び出しを要求 (calculate_centrality)
+
+    B->>DB: 中心性キャッシュを確認
+    alt キャッシュなし
+        B->>N: /tools/calculate_centrality を実行
+        N-->>B: 計算結果
+        B->>DB: 結果をキャッシュに保存
+    else キャッシュあり
+        DB-->>B: キャッシュされたデータを返す
+    end
+
+    B->>LLM: 1回目のツール実行結果を送信
+    LLM-->>B: 2回目のツール呼び出しを要求 (change_node_attributes)
+    note right of B: LLMは中心性データから上位5ノードを特定し、<br>次のツールの引数(node_ids, color)を生成する
+
+    B->>B: change_node_attributes を実行
+    note right of B: GraphML内のノード属性を直接変更
+    B->>DB: 属性が更新されたGraphMLを保存
+
+    B->>LLM: 2回目のツール実行結果を送信
+    LLM-->>B: 最終的な応答メッセージを生成
+
+    B->>DB: LLMの応答メッセージを保存
+    B-->>F: 最終応答と更新されたグラフ情報
+    F->>U: 応答と、ノードが赤色に変化したグラフを表示
 ```

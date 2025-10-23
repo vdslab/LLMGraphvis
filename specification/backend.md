@@ -35,7 +35,7 @@ FastAPIで構築されたバックエンドAPI。主な責務は以下の通り�
 | `GET` | `/conversations/{id}/messages` | **必要** | 特定の会話のメッセージ一覧を取得する。 |
 | `POST` | `/conversations/{id}/messages` | **必要** | 会話に新しいメッセージを追加し、LLMによる非同期のバックグラウンド処理を開始する。 |
 | `POST` | `/recommend-layout` | **必要** | ネットワークの概要に基づき、LLMが最適なレイアウトを推薦する。 |
-| `POST` | `/process` | **必要** | チャットUIからのメッセージを処理し、LLMやツール呼び出しを含む一連の対話を実行し、最終結果を返す。 |
+| `POST` | `/process` | **必要** | チャットUIからのメッセージを同期的に処理し、LLMやツール呼び出しを含む一連の対話を実行して最終結果を返す。 |
 
 ### 3.3. ネットワーク (`/network`)
 
@@ -45,7 +45,7 @@ FastAPIで構築されたバックエンドAPI。主な責務は以下の通り�
 | `GET` | `/{network_id}/export` | **必要** | ネットワークをGraphMLファイルとしてダウンロードする。 |
 | `POST` | `/upload` | **必要** | GraphMLファイルをアップロードし、新しい会話とネットワークを作成する。 |
 | `POST` | `/{conversation_id}/upload` | **必要** | 既存の会話に紐づくネットワークをGraphMLファイルで上書きする。 |
-| `POST` | `/{network_id}/layout` | **必要** | `NetworkXMCP`を呼び出し、指定されたアルゴリズムでグラフレイアウトを計算する。 |
+| `POST` | `/{network_id}/layout` | **必要** | `NetworkXMCP`を呼び出してレイアウトを計算し、結果の座標でGraphMLを更新してデータベースに保存する。 |
 
 ## 4. 主要なデータモデル
 
@@ -56,7 +56,7 @@ APIで利用される主要なデータスキーマ（Pydanticモデル）。
 - **`Token`**: JSON Web Tokenを表す。(`access_token`, `token_type`)
 - **`Conversation`**: チャットの会話セッションを表す。(`id`, `title`, `user_id`, `created_at`)
 - **`ChatMessage`**: 会話内の各メッセージを表す。(`id`, `content`, `role`, `created_at`)
-- **`Network`**: グラフデータを表す。(`id`, `name`, `graphml_content`, `conversation_id`)
+- **`Network`**: グラフデータを表す。(`id`, `name`, `graphml_content`, `conversation_id`, `layout_cache`, `centrality_cache`)
 
 ## 5. 認証フロー
 
