@@ -9,7 +9,6 @@ FastAPIで構築されたバックエンドAPI。主な責務は以下の通り�
 - データベースとのやり取り (PostgreSQL)
 - `NetworkX Model Context Protocol` サービスとの連携によるグラフ計算
 - 大規模言語モデル (LLM) サービスとの連携による機能提供 (OpenAI API, Google Gemini)
-- `Frontend`へのWebSocketによるリアルタイム通知
 
 ## 2. データ永続化
 
@@ -34,27 +33,19 @@ FastAPIで構築されたバックエンドAPI。主な責務は以下の通り�
 | `GET` | `/conversations` | **必要** | ユーザーの会話一覧を取得する。 |
 | `GET` | `/conversations/{id}` | **必要** | 特定の会話の詳細を取得する。 |
 | `GET` | `/conversations/{id}/messages` | **必要** | 特定の会話のメッセージ一覧を取得する。 |
-| `POST` | `/conversations/{id}/messages` | **必要** | 会話に新しいメッセージを追加し、LLMによる非同期処理を開始する。 |
+| `POST` | `/conversations/{id}/messages` | **必要** | 会話に新しいメッセージを追加し、LLMによる非同期のバックグラウンド処理を開始する。 |
 | `POST` | `/recommend-layout` | **必要** | ネットワークの概要に基づき、LLMが最適なレイアウトを推薦する。 |
-| `POST` | `/process` | **必要** | チャットUIからのメッセージを処理し、LLMやツール呼び出しを含む一連の対話を実行する。 |
+| `POST` | `/process` | **必要** | チャットUIからのメッセージを処理し、LLMやツール呼び出しを含む一連の対話を実行し、最終結果を返す。 |
 
 ### 3.3. ネットワーク (`/network`)
 
 | Method | Path | 認証 | 説明 |
 |:---|:---|:---:|:---|
-| `GET` | `/{id}/cytoscape` | **必要** | ネットワークデータをCytoscape.js形式のJSONで取得する。 |
-| `GET` | `/{id}/export` | **必要** | ネットワークをGraphMLファイルとしてダウンロードする。 |
+| `GET` | `/{network_id}/cytoscape` | **必要** | ネットワークデータをCytoscape.js形式のJSONで取得する。 |
+| `GET` | `/{network_id}/export` | **必要** | ネットワークをGraphMLファイルとしてダウンロードする。 |
 | `POST` | `/upload` | **必要** | GraphMLファイルをアップロードし、新しい会話とネットワークを作成する。 |
-| `POST` | `/{conv_id}/upload` | **必要** | 既存の会話に紐づくネットワークをGraphMLファイルで上書きする。 |
-| `POST` | `/{id}/layout` | **必要** | `NetworkXMCP`を呼び出し、指定されたアルゴリズムでグラフレイアウトを計算する。 |
-
-### 3.4. その他
-
-| Method | Path | 認証 | 説明 |
-|:---|:---|:---:|:---|
-| `GET` | `/` | 不要 | APIのルートエンドポイント。 |
-| `GET` | `/health` | 不要 | APIとデータベースのヘルスチェックを行う。 |
-| `WebSocket` | `/ws` | **必要** | WebSocket接続を確立する。トークンによる認証が必須。 |
+| `POST` | `/{conversation_id}/upload` | **必要** | 既存の会話に紐づくネットワークをGraphMLファイルで上書きする。 |
+| `POST` | `/{network_id}/layout` | **必要** | `NetworkXMCP`を呼び出し、指定されたアルゴリズムでグラフレイアウトを計算する。 |
 
 ## 4. 主要なデータモデル
 
@@ -81,7 +72,7 @@ APIで利用される主要なデータスキーマ（Pydanticモデル）。
 
 - **役割**: CPU負荷の高いグラフ計算（レイアウト計算、指標分析、フォーマット変換など）を専門に扱うマイクロサービス。
 - **連携方法**: APIサービスはHTTPリクエストで`NetworkXMCP`の各エンドポイントを呼び出す。
-    - 例: レイアウト計算時、APIは `POST /network/{id}/layout` を受け取ると、現在のGraphMLデータとレイアウト種別を `NetworkXMCP` の `/tools/change_layout` に送信し、計算結果（座標が更新されたGraphML）を受け取る。
+    - 例: レイアウト計算時、APIは `POST /network/{network_id}/layout` を受け取ると、現在のGraphMLデータとレイアウト種別を `NetworkXMCP` の `/tools/change_layout` に送信し、計算結果（座標が更新されたGraphML）を受け取る。
 - **エンドポイント**: `http://networkx-mcp:8001` (Docker内部)
 
 ### 6.2. 大規模言語モデル (LLM) サービス
@@ -92,13 +83,3 @@ APIで利用される主要なデータスキーマ（Pydanticモデル）。
     1.  **レイアウト推薦**: `POST /chat/recommend-layout` で、ユーザーが記述したネットワークの特徴と目的に基づき、最適なレイアウトアルゴリズムとパラメータを推薦する。
     2.  **ツール呼び出し**: チャットでのユーザーの指示を解釈し、「中心性を計算して」「コミュニティを検出して」といった指示を`NetworkXMCP`を呼び出すためのJSON形式のツールコールに変換する。
     3.  **結果の要約**: `NetworkXMCP`から返された計算結果（数値データなど）を解釈し、自然言語でユーザーに分かりやすく説明する。
-
-## 7. WebSocket通信
-
-- **エンドポイント**: `/ws?token={jwt_token}`
-- **目的**: `Frontend`に対して、サーバーサイドで発生したイベント（例: LLMによる分析完了、ネットワーク更新）をリアルタイムに通知する。
-- **接続フロー**:
-    1. `Frontend`は認証後に取得したJWTトークンをクエリパラメータに付与してWebSocket接続を要求する。
-    2. サーバーはトークンを検証し、有効であれば接続を確立する。
-    3. `ConnectionManager`がクライアントごとの接続を管理する。
-- **通知**: バックグラウンドタスク（LLM処理など）が完了すると、`app.state.ws_manager.broadcast()` を通じて接続中の全クライアント（または特定のクライアント）に更新情報を送信する。

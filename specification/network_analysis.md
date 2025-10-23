@@ -16,12 +16,14 @@
 
 | Method | Path | 説明 |
 |:---|:---|:---|
+| `GET` | `/health` | サービスのヘルスチェックを行う。 |
+| `GET` | `/info` | サービス名、バージョン、利用可能なツールの一覧を返す。 |
+| `GET` | `/get_sample_network` | サンプルのランダムネットワークをGraphML形式で生成して返す。 |
 | `POST` | `/tools/change_layout` | 指定されたレイアウトアルゴリズムに基づき、グラフのノード座標を計算し、座標情報が追加されたGraphMLを返す。 |
 | `POST` | `/tools/calculate_centrality` | 指定された中心性指標（次数、近接、媒介など）を計算し、各ノードの指標値を返す。 |
 | `POST` | `/tools/convert_graphml` | アップロードされたGraphMLファイルを解析・修正し、標準的な属性（`name`, `color`, `size`など）と主要な中心性指標を持つ正規化されたGraphMLを返す。 |
 | `POST` | `/tools/import_graphml` | GraphMLをパースし、ノードとエッジのリストをJSON形式で返す。 |
 | `POST` | `/tools/export_graphml` | グラフデータをGraphML形式の文字列としてエクスポートする。 |
-| `GET` | `/get_sample_network` | サンプルのランダムネットワークをGraphML形式で生成して返す。 |
 
 ## 3. 主要機能とデータフロー
 

@@ -8,7 +8,6 @@ React (Vite) で構築されたシングルページアプリケーション (SP
 - グラフのインタラクティブな可視化 (Cytoscape.js)
 - ユーザー入力のハンドリング
 - バックエンドAPIとの通信 (Hypertext Transfer Protocolリクエスト)
-- WebSocketによるリアルタイム更新の受信と反映
 
 ## 2. 画面一覧と画面遷移
 
@@ -58,7 +57,7 @@ graph TD
     - `Navbar.jsx`: 全ページ共通のナビゲーションバー。認証状態に応じて表示を切り替える。
     - `ProtectedRoute.jsx`: 認証が必要なルートを保護するラッパーコンポーネント。未認証の場合はログインページにリダイレクトする。
     - `FileUploadButton.jsx`: GraphMLファイルをアップロードするためのボタンコンポーネント。
-- **`services/`**: API通信、状態管理、WebSocketなど、UIから分離されたロジック。
+- **`services/`**: API通信、状態管理など、UIから分離されたロジック。
 
 ## 4. 状態管理とデータ永続化
 
@@ -79,18 +78,10 @@ graph TD
 - **永続化されるデータ**: 認証用のJSON Web Token (JWT)。
 - **目的**: ユーザーがブラウザをリロードしたり、再訪問したりした際に、ログイン状態を維持するため。`authStore`はアプリケーションの初期化時に`localStorage`からトークンを読み込み、認証状態を復元します。
 
-## 5. API・WebSocket連携
+## 5. API連携
 
 ### 5.1. APIクライアント (`services/api.js`)
 
 - `axios`をベースにしたAPIクライアント。
 - 全てのリクエストに`Authorization: Bearer {token}`ヘッダーを自動的に付与するインターセプターを持つ。
 - トークンが失効している場合、自動的にリフレッシュするか、ログインページにリダイレクトする処理も担う。
-
-### 5.2. WebSocket (`services/websocketService.js`)
-
-- **目的**: サーバーからのリアルタイム通知（分析完了、ネットワーク更新など）を待ち受ける。
-- **ライフサイクル**:
-    1.  **接続**: ユーザーがログインに成功すると(`authStore`の`isAuthenticated`が`true`になる)、`App.jsx`が`websocketService.connect()`を呼び出す。
-    2.  **メッセージ受信**: サーバーからメッセージを受信すると、イベントの種類に応じて関連するストアのアクション（例: `networkStore.updateNodePositions`）を呼び出し、状態を更新する。
-    3.  **切断**: ユーザーがログアウトするか、アプリケーションを閉じると`disconnect()`が呼ばれ、接続が終了する。
