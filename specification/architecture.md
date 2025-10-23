@@ -45,6 +45,7 @@ graph TD
     F -- "API (HTTPS)" --> B
     B -- "API (HTTP)" --> N
     B -- "PostgreSQL" --> DB
+    N -- "PostgreSQL" --> DB
     B -- "API (HTTPS)" --> LLM[LLM Services]
 
     style F fill:#82b3ff,stroke:#333,stroke-width:2px
@@ -56,9 +57,9 @@ graph TD
 | コンテナ | 説明 | 技術スタック |
 |:---|:---|:---|
 | **Frontend** | ユーザーインターフェースを提供し、バックエンドと通信するシングルページアプリケーション。 | React, Vite |
-| **API Service** | ビジネスロジック、認証、外部API連携を担当するバックエンド。 | FastAPI, Python |
-| **NetworkX Model Context Protocol (NetworkXMCP)** | グラフ計算やレイアウト処理に特化した計算サービス。 | FastAPI, NetworkX, Python |
-| **Database** | ユーザー情報やセッションデータを永続化するデータベース。 | PostgreSQL |
+| **API Service** | ビジネスロジック、認証、外部API連携を担当するバックエンド。`NetworkXMCP`へのリクエストをプロキシする。 | FastAPI, Python |
+| **NetworkX Model Context Protocol (NetworkXMCP)** | グラフ計算やレイアウト処理に特化した**ステートフルな**計算サービス。データベースに接続し、計算結果をキャッシュする。 | FastAPI, NetworkX, Python, SQLAlchemy |
+| **Database** | ユーザー情報、グラフデータ、計算結果のキャッシュなどを永続化するデータベース。 | PostgreSQL |
 
 ## 2. コンポーネント図 (Component Diagram)
 
@@ -146,25 +147,27 @@ sequenceDiagram
     participant U as ユーザー
     participant F as Frontend
     participant B as API Service
-    participant DB as Database
     participant N as NetworkXMCP
+    participant DB as Database
 
     U->>F: レイアウト計算を要求 (例: spring layout)
-    F->>B: POST /network/layout (layout_type: "spring")
+    F->>B: POST /network/layout (network_id, layout_type)
 
-    B->>DB: "spring"レイアウトのキャッシュがあるか確認
+    B->>N: /tools/change_layout (network_id, layout_type)
+    N->>DB: "spring"レイアウトのキャッシュがあるか確認
     
     alt キャッシュが存在する場合
-        DB-->>B: キャッシュされた座標データを返す
-        B-->>F: 計算結果 (キャッシュ)
+        DB-->>N: キャッシュされた座標データを返す
+        N-->>B: 計算結果 (キャッシュ)
+        B-->>F: 計算結果
         F->>U: グラフを再描画
     else キャッシュが存在しない場合
-        DB-->>B: キャッシュなし
-        B->>N: /tools/change_layout (GraphML, "spring")
-        N-->>B: 計算結果 (新しい座標と更新されたGraphML)
-        B->>DB: 新しい座標をキャッシュに保存し、更新されたGraphMLも保存
-        DB-->>B: 保存成功
-        B-->>F: 計算結果 (新規)
+        DB-->>N: キャッシュなし
+        note over N: DBからGraphMLを読み込み、計算を実行
+        N->>DB: 新しい座標をキャッシュに保存し、更新されたGraphMLも保存
+        DB-->>N: 保存成功
+        N-->>B: 計算結果 (新規)
+        B-->>F: 計算結果
         F->>U: グラフを再描画
     end
 ```
@@ -212,36 +215,32 @@ sequenceDiagram
     participant U as ユーザー
     participant F as Frontend
     participant B as API Service
-    participant DB as Database
     participant LLM as LLM Service
     participant N as NetworkXMCP
+    participant DB as Database
 
     U->>F: チャットで指示を入力 ("次数中心性を計算して")
-    F->>B: POST /chat/process (message)
+    F->>B: POST /chat/process (message, conversation_id)
     B->>DB: ユーザーメッセージを保存
 
     B->>LLM: ユーザーの指示とツール定義を送信
     LLM-->>B: ツール呼び出しを要求 (calculate_centrality, type:"degree")
 
-    B->>DB: "degree"中心性のキャッシュがあるか確認
+    B->>N: /tools/calculate_centrality (network_id, type:"degree")
+    N->>DB: "degree"中心性のキャッシュがあるか確認
 
     alt キャッシュが存在する場合
-        DB-->>B: キャッシュされた中心性データを返す
-        B->>LLM: ツール実行結果(キャッシュ)を送信
+        DB-->>N: キャッシュされた中心性データを返す
+        N-->>B: 計算結果 (キャッシュ)
     else キャッシュが存在しない場合
-        DB-->>B: キャッシュなし
-        B->>N: /tools/calculate_centrality (GraphML, "degree")
+        DB-->>N: キャッシュなし
+        note over N: DBからGraphMLを読み込み、計算を実行
+        N->>DB: 新しい中心性データをキャッシュに保存
+        DB-->>N: 保存成功
         N-->>B: 計算結果 (新規)
-        
-        rect rgb(230, 240, 255)
-            note over B: 分析結果の永続化
-            B->>DB: 新しい中心性データをキャッシュに保存
-            B->>DB: (オプション)計算結果をGraphML属性に反映して保存
-        end
-
-        B->>LLM: ツール実行結果(新規)を送信
     end
 
+    B->>LLM: ツール実行結果を送信
     LLM-->>B: 最終的な応答メッセージを生成
     B->>DB: LLMの応答メッセージを保存
 
@@ -251,44 +250,39 @@ sequenceDiagram
 
 ### 4.4. 複数ツール呼び出しによる連続処理フロー
 
-一度の指示で複数の分析や操作が必要な場合の、連続的なツール呼び出しフローを示します。
+「計算」と「可視化」を分離し、連続したツール呼び出しで実現するフローを示します。
 
 ```mermaid
 sequenceDiagram
     participant U as ユーザー
     participant F as Frontend
     participant B as API Service
-    participant DB as Database
     participant LLM as LLM Service
     participant N as NetworkXMCP
+    participant DB as Database
 
-    U->>F: 「次数中心性を計算し、上位5ノードを赤色に変えて」
-    F->>B: POST /chat/process (message)
+    U->>F: 「友達が多い人を大きく表示して」
+    F->>B: POST /chat/process (message, conversation_id)
 
     B->>LLM: ユーザーの指示と会話履歴を送信
-    LLM-->>B: 1回目のツール呼び出しを要求 (calculate_centrality)
+    LLM-->>B: 1. ツール呼び出しを要求 (calculate_centrality)
 
-    B->>DB: 中心性キャッシュを確認
-    alt キャッシュなし
-        B->>N: /tools/calculate_centrality を実行
-        N-->>B: 計算結果
-        B->>DB: 結果をキャッシュに保存
-    else キャッシュあり
-        DB-->>B: キャッシュされたデータを返す
-    end
+    B->>N: /tools/calculate_centrality (network_id, type:"degree")
+    note over N: 計算し、結果をDBにキャッシュ
+    N-->>B: 計算成功の応答
 
-    B->>LLM: 1回目のツール実行結果を送信
-    LLM-->>B: 2回目のツール呼び出しを要求 (change_node_attributes)
-    note right of B: LLMは中心性データから上位5ノードを特定し、<br>次のツールの引数(node_ids, color)を生成する
+    B->>LLM: 1. のツール実行結果を送信
+    LLM-->>B: 2. ツール呼び出しを要求 (apply_metric_to_visual)
+    note right of B: LLMは「友達が多い」を「次数中心性」と解釈し、<br>「大きく表示」を「ノードサイズ」に割り当てる判断をする
 
-    B->>B: change_node_attributes を実行
-    note right of B: GraphML内のノード属性を直接変更
-    B->>DB: 属性が更新されたGraphMLを保存
+    B->>N: /tools/apply_metric_to_visual (network_id, metric:"degree_centrality", visual:"node_size")
+    note over N: キャッシュから中心性データを読み込み、<br>ノードサイズを更新したGraphMLを生成してDBに保存
+    N-->>B: 実行成功の応答
 
-    B->>LLM: 2回目のツール実行結果を送信
+    B->>LLM: 2. のツール実行結果を送信
     LLM-->>B: 最終的な応答メッセージを生成
 
     B->>DB: LLMの応答メッセージを保存
     B-->>F: 最終応答と更新されたグラフ情報
-    F->>U: 応答と、ノードが赤色に変化したグラフを表示
+    F->>U: 応答と、ノードサイズが変化したグラフを表示
 ```
