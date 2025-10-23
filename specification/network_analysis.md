@@ -2,13 +2,14 @@
 
 ## 1. 概要と役割
 
-`NetworkX Model Context Protocol` (NetworkXMCP) は、グラフの計算処理に特化したステートレスなマイクロサービスです。
+`NetworkX Model Context Protocol` (NetworkXMCP) は、グラフの計算処理に特化した**ステートフル**なマイクロサービスです。
 
-- **技術スタック**: FastAPI, NetworkX, Python
+- **技術スタック**: FastAPI, NetworkX, Python, SQLAlchemy
 - **主な役割**:
-    - `API`サービスからCPU (Central Processing Unit) 負荷の高い計算処理をオフロードする。
-    - `NetworkX`ライブラリを利用して、各種グラフ計算（レイアウト、指標分析）を実行する。
-    - 様々な形式のGraphML (Graph Markup Language) ファイルを受け取り、システムで一貫して扱える標準形式に変換・正規化する。
+    - `API`サービスからCPU負荷の高い計算処理をオフロードする。
+    - **データベースに直接接続**し、計算結果（レイアウト座標、中心性指標など）を永続的にキャッシュする。
+    - キャッシュが存在しない場合のみ`NetworkX`ライブラリを利用して計算を実行する。
+    - 様々な形式のGraphMLファイルをシステムで一貫して扱える標準形式に変換・正規化する。
 
 ## 2. APIエンドポイント一覧
 
@@ -17,45 +18,33 @@
 | Method | Path | 説明 |
 |:---|:---|:---|
 | `GET` | `/health` | サービスのヘルスチェックを行う。 |
-| `GET` | `/info` | サービス名、バージョン、利用可能なツールの一覧を返す。 |
-| `GET` | `/get_sample_network` | サンプルのランダムネットワークをGraphML形式で生成して返す。 |
-| `POST` | `/tools/change_layout` | 指定されたレイアウトアルゴリズムに基づき、グラフのノード座標を計算し、座標情報が追加されたGraphMLを返す。 |
-| `POST` | `/tools/calculate_centrality` | 指定された中心性指標（次数、近接、媒介など）を計算し、各ノードの指標値を返す。 |
-| `POST` | `/tools/convert_graphml` | アップロードされたGraphMLファイルを解析・修正し、標準的な属性（`name`, `color`, `size`など）と主要な中心性指標を持つ正規化されたGraphMLを返す。 |
-| `POST` | `/tools/import_graphml` | GraphMLをパースし、ノードとエッジのリストをJSON形式で返す。 |
-| `POST` | `/tools/export_graphml` | グラフデータをGraphML形式の文字列としてエクスポートする。 |
+| `POST` | `/tools/calculate_centrality` | 中心性指標を**計算**し、結果をキャッシュに保存する。可視化は変更しない。 |
+| `POST` | `/tools/apply_metric_to_visual` | キャッシュされた計算結果を、ノードのサイズや色などの**可視化**に反映させる。 |
+| `POST` | `/tools/change_layout` | グラフレイアウトを計算またはキャッシュから取得し、ノードの**座標**を更新する。 |
+| `POST` | `/tools/convert_graphml` | アップロードされたGraphMLファイルを解析・修正し、正規化されたGraphMLを返す。（ステートレス） |
 
 ## 3. 主要機能とデータフロー
 
-### 3.1. GraphMLの正規化 (`/tools/convert_graphml`)
+### 3.1. 計算と可視化の分離
 
-ユーザーがGraphMLファイルをアップロードした際の、最も重要な初期処理です。
+本システムは、LLMの複数ツール呼び出し機能を活用し、「計算」と「可視化への反映」を明確に分離しています。これにより、ユーザーは「次数中心性を計算して」といった分析の指示と、「その結果をノードの大きさで表現して」といった可視化の指示を、自然な対話の中で組み合わせることができます。
 
-1.  **入力**: `API`サービスが、ユーザーがアップロードしたGraphMLファイルの内容（文字列）をリクエストボディに含めて `POST /tools/convert_graphml` を呼び出す。
-2.  **処理**:
-    - 不完全なXML (Extensible Markup Language) 構造（ヘッダー、名前空間、閉じタグなど）を自動修正する。
-    - `nx.read_graphml`でパースを試みる。
-    - ノードの属性名（`label`, `node_color`など）を標準名（`name`, `color`）にマッピング・統一する。
-    - `x`, `y`座標や`size`などの必須属性が存在しない場合は、デフォルト値やランダム値を補完する。
-    - `degree_centrality`などの主要な中心性指標を事前に計算し、ノード属性として追加する。
-3.  **出力**: 全てのノードとエッジが標準的な属性を持つ、正規化されたGraphML文字列を`API`サービスに返す。
+### 3.2. 中心性計算 (`/tools/calculate_centrality`)
 
-### 3.2. レイアウト計算 (`/tools/change_layout`)
+1.  **責務**: 中心性指標を計算し、将来利用するために結果をデータベースにキャッシュする。
+2.  **入力**: `network_id`, `centrality_type`
+3.  **処理**: 
+    - `centrality_cache` を確認し、キャッシュがあればそれを返す。
+    - キャッシュがなければ`NetworkX`で計算を実行し、結果を `centrality_cache` に保存する。
+4.  **出力**: 計算された中心性データ (`centrality_values`)。この時点ではグラフの見た目に変化はない。
 
-`Frontend`からの要求に応じて、グラフの見た目を動的に変更します。
+### 3.3. 可視化への適用 (`/tools/apply_metric_to_visual`)
 
-1.  **入力**: `API`サービスが、現在のGraphMLデータ、レイアウト種別（`spring`, `circular`など）、およびパラメータ（`iterations`など）を `POST /tools/change_layout` に送信する。
-2.  **処理**:
-    - `NetworkX`の対応するレイアウト関数（`nx.spring_layout`など）を呼び出し、全ノードの新しい`(x, y)`座標を計算する。
-    - 計算された座標をグラフのノード属性に上書きする。
-3.  **出力**: レスポンスには2つの主要な情報が含まれる。
-    - `positions`: 全ノードのIDと新しい座標のマップ。`Frontend`はこれを使って既存のグラフのノードを即座にアニメーションさせる。
-    - `graphml_content`: 座標が更新された完全なGraphML文字列。`API`サービスはこれをデータベースに保存し、永続化する。
-
-### 3.3. 中心性計算 (`/tools/calculate_centrality`)
-
-LLMとの対話を通じて、特定のネットワーク指標を計算します。
-
-1.  **入力**: `API`サービスが、現在のGraphMLデータと計算したい中心性の種類（`degree`, `betweenness`など）を `POST /tools/calculate_centrality` に送信する。
-2.  **処理**: `NetworkX`の対応する関数（`nx.degree_centrality`など）を呼び出し、各ノードの中心性スコアを計算する。
-3.  **出力**: 全ノードのIDと計算された中心性スコアのマップを返す。`API`サービスは、この数値データをLLMに渡し、「中心性が最も高いノードは…」といった自然言語の要約を生成させる。
+1.  **責務**: 指定された計算指標を、指定された視覚的特徴（ノードのサイズや色）に割り当てる。
+2.  **入力**: `network_id`, `metric_name` (例: `degree_centrality`), `visual_property` (例: `node_size`)
+3.  **処理**:
+    - `centrality_cache` から `metric_name` で指定された計算結果を読み込む。
+    - 計算結果の値を、指定された視覚的特徴（例: 0から1の値をノードサイズ10から50）にマッピングする。
+    - 全ノードの視覚的属性（`size`や`color`）を更新した新しいGraphML文字列を生成する。
+    - 更新されたGraphMLをデータベースに保存する。
+4.  **出力**: 視覚的に更新されたグラフの新しいGraphML文字列。

@@ -70,9 +70,9 @@ APIで利用される主要なデータスキーマ（Pydanticモデル）。
 
 ### 6.1. NetworkX Model Context Protocol (NetworkXMCP) サービス
 
-- **役割**: CPU負荷の高いグラフ計算（レイアウト計算、指標分析、フォーマット変換など）を専門に扱うマイクロサービス。
-- **連携方法**: APIサービスはHTTPリクエストで`NetworkXMCP`の各エンドポイントを呼び出す。
-    - 例: レイアウト計算時、APIは `POST /network/{network_id}/layout` を受け取ると、現在のGraphMLデータとレイアウト種別を `NetworkXMCP` の `/tools/change_layout` に送信し、計算結果（座標が更新されたGraphML）を受け取る。
+- **役割**: グラフ計算と結果のキャッシュを管理するステートフルなマイクロサービス。
+- **連携方法**: APIサービスは、計算が必要なリクエストを単純に`NetworkXMCP`の各エンドポイントに転送（プロキシ）する。
+    - 例: レイアウト計算時、APIは `POST /network/{network_id}/layout` を受け取ると、リクエスト内容をそのまま`NetworkXMCP`の `/tools/change_layout` に送信する。実際の計算やキャッシュ管理は`NetworkXMCP`側で行われる。
 - **エンドポイント**: `http://networkx-mcp:8001` (Docker内部)
 
 ### 6.2. 大規模言語モデル (LLM) サービス
