@@ -55,6 +55,8 @@ services:
       ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
     environment:
       - LOG_LEVEL=DEBUG
+    env_file:
+      - ./.env
 
   frontend:
     build:

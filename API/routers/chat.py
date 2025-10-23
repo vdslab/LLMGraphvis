@@ -371,48 +371,30 @@ async def process_chat(
     try:
         body = await request.json()
         message_content = body.get("message", "")
-        conversation_id = body.get("conversation_id") # Allow specifying conversation
+        conversation_id = body.get("conversation_id")
+        model = body.get("model")
 
-        # メッセージが辞書型の場合は文字列に変換
-        if isinstance(message_content, dict):
-            message_content = json.dumps(message_content)
-        # メッセージが文字列でない場合も文字列に変換する
-        elif not isinstance(message_content, str):
-            message_content = str(message_content)
-        
         if not message_content:
             raise HTTPException(status_code=400, detail="Message is required")
 
-        # Find or create a conversation
         if conversation_id:
             db_conversation = db.query(models.Conversation).filter(
-                models.Conversation.id == conversation_id,
-                models.Conversation.user_id == current_user.id
+                models.Conversation.id == conversation_id, models.Conversation.user_id == current_user.id
             ).first()
             if not db_conversation:
                 raise HTTPException(status_code=404, detail="Conversation not found")
         else:
-            db_conversation = db.query(models.Conversation).filter(
-                models.Conversation.user_id == current_user.id
-            ).order_by(models.Conversation.created_at.desc()).first()
-            if not db_conversation:
-                db_conversation = models.Conversation(title="New Conversation", user_id=current_user.id)
-                db.add(db_conversation)
-                db.commit()
-                db.refresh(db_conversation)
-                # Create an associated empty network
-                db_network = models.Network(
-                    name="Initial Network",
-                    conversation_id=db_conversation.id,
-                    graphml_content=create_empty_graphml()
-                )
-                db.add(db_network)
-                db.commit()
-                db.refresh(db_conversation)
+            db_conversation = models.Conversation(title="New Conversation", user_id=current_user.id)
+            db.add(db_conversation)
+            db.commit()
+            db.refresh(db_conversation)
+            db_network = models.Network(name="Initial Network", conversation_id=db_conversation.id, graphml_content=create_empty_graphml())
+            db.add(db_network)
+            db.commit()
+            db.refresh(db_conversation)
 
-        # Save user message
         db_message = models.ChatMessage(
-            content=message_content,
+            content=json.dumps(message_content) if isinstance(message_content, dict) else str(message_content),
             role="user",
             user_id=current_user.id,
             conversation_id=db_conversation.id
@@ -420,74 +402,60 @@ async def process_chat(
         db.add(db_message)
         db.commit()
 
-        # --- Start Conversation Loop ---
-        
-        # 1. Get history
-        history = db.query(models.ChatMessage).filter(
-            models.ChatMessage.conversation_id == db_conversation.id
-        ).order_by(models.ChatMessage.created_at).all()
+        history = db.query(models.ChatMessage).filter(models.ChatMessage.conversation_id == db_conversation.id).order_by(models.ChatMessage.created_at).all()
         formatted_history = [{"role": msg.role, "content": msg.content} for msg in history]
 
-        # 2. Call LLM
-        llm_response = await process_chat_message(formatted_history)
+        llm_response = await process_chat_message(formatted_history, model=model)
         tool_calls = llm_response.get("tool_calls")
         
         final_assistant_content = ""
         network_update_info = None
 
         if tool_calls:
-            # 3. Execute Tool
             tool_call = tool_calls[0]
             tool_name = tool_call["function"]["name"]
             tool_args = tool_call["function"]["arguments"]
 
+            # Add network_id to the payload for the stateful MCP service
             mcp_payload = {
-                "graphml_content": db_conversation.network.graphml_content if db_conversation.network else create_empty_graphml(),
+                "network_id": db_conversation.network.id,
                 **tool_args
             }
 
-            tool_result_for_llm = {}
             async with httpx.AsyncClient() as client:
                 url = f"{NETWORKX_MCP_URL}/tools/{tool_name}"
-                print(f"Calling MCP Tool: {url} with args: {tool_args}")
                 response = await client.post(url, json=mcp_payload, timeout=60.0)
-
+                
                 if response.status_code == 200:
                     mcp_result = response.json().get("result", {})
-                    tool_result_for_llm = {"status": "success", "details": mcp_result}
+                    tool_result_for_llm = mcp_result.get("centrality_values", mcp_result) # Pass the core result to LLM
                     if mcp_result.get("success"):
                         network_update_info = {"type": tool_name, **mcp_result}
-                        # Potentially update graphml in DB here if needed
                 else:
                     error_detail = response.text
-                    tool_result_for_llm = {"status": "error", "details": f"Tool execution failed with status {response.status_code}: {error_detail}"}
-            
-            # 4. Send tool result back to LLM
-            # We need to reconstruct the history for the final summarization call
+                    tool_result_for_llm = {"status": "error", "details": f"Tool execution failed: {error_detail}"}
+
             final_history = formatted_history + [
                 {"role": "assistant", "content": json.dumps({"tool_calls": tool_calls})},
                 {"role": "tool", "content": json.dumps(tool_result_for_llm)}
             ]
             
-            final_response_from_llm = await process_chat_message(final_history)
+            final_response_from_llm = await process_chat_message(final_history, model=model)
             final_assistant_content = final_response_from_llm.get("content", "I have completed the requested action.")
 
         else:
-            # No tool call, just a direct response
             final_assistant_content = llm_response.get("content", "I'm not sure how to respond.")
 
-        # 5. Save final assistant response
         db_response = models.ChatMessage(
             content=final_assistant_content,
             role="assistant",
             user_id=current_user.id,
             conversation_id=db_conversation.id,
-            meta_data=json.dumps(llm_response) # Store initial response for debug
+            meta_data=json.dumps(llm_response)
         )
         db.add(db_response)
         db.commit()
 
-        # 6. Return result to frontend
         return {
             "success": True,
             "content": final_assistant_content,
@@ -499,4 +467,5 @@ async def process_chat(
         print(f"Error in /process endpoint: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
+        db.rollback()
         return {"success": False, "content": f"An unexpected error occurred: {str(e)}"}

@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS networks (
     name VARCHAR DEFAULT 'Untitled Network',
     conversation_id INTEGER REFERENCES conversations(id) ON DELETE CASCADE UNIQUE,
     graphml_content TEXT NOT NULL,
+    layout_cache TEXT DEFAULT '{}',
+    centrality_cache TEXT DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE
 );

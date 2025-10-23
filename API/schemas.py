@@ -74,7 +74,7 @@ class ChatMessageBase(BaseModel):
     role: str = "user"
 
 class ChatMessageCreate(ChatMessageBase):
-    pass
+    model: Optional[str] = None
 
 class ChatMessage(ChatMessageBase):
     id: int

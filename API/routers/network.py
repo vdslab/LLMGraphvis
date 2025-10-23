@@ -165,50 +165,30 @@ async def calculate_network_layout(
     db: Session = Depends(get_db)
 ):
     """
-    Calculate layout for a network using NetworkXMCP.
+    Proxies layout calculation requests to the NetworkXMCP service.
     """
-    db_network = get_network_for_user(db, network_id, current_user.id)
+    # First, verify the user has access to this network.
+    get_network_for_user(db, network_id, current_user.id)
     
     try:
-        # Call NetworkXMCP to calculate layout
         async with httpx.AsyncClient() as client:
             url = f"{NETWORKX_MCP_URL}/tools/change_layout"
+            # The new payload now only needs the network_id and layout parameters
             payload = {
-                "graphml_content": db_network.graphml_content,
+                "network_id": network_id,
                 "layout_type": layout_type,
                 "layout_params": layout_params
             }
-            print(f"Calling NetworkXMCP for layout calculation: {url}")
+            print(f"Proxying layout request to NetworkXMCP: {url} with payload: {payload}")
             
             response = await client.post(url, json=payload, timeout=60.0)
-            print(f"Response status: {response.status_code}")
             
             if response.status_code != 200:
-                error_msg = f"Error from NetworkXMCP: {response.text}"
-                print(f"Error: {error_msg}")
-                raise HTTPException(status_code=500, detail=error_msg)
+                raise HTTPException(status_code=response.status_code, detail=f"Error from NetworkXMCP: {response.text}")
             
-            result = response.json().get("result", {})
-            print(f"Response from NetworkXMCP: {result}")
-            
-            if not result.get("success"):
-                error_msg = result.get("error", "Unknown error from NetworkXMCP")
-                print(f"Error: {error_msg}")
-                raise HTTPException(status_code=500, detail=error_msg)
-            
-            # Update the network with new GraphML if provided
-            if "graphml_content" in result:
-                db_network.graphml_content = result["graphml_content"]
-                db.commit()
-                db.refresh(db_network)
-            
-            return {
-                "result": {
-                    "success": True,
-                    "layout_type": result.get("layout_type", layout_type),
-                    "positions": result.get("positions", {})
-                }
-            }
+            # Return the exact response from the MCP service
+            return response.json()
+
     except HTTPException as e:
         raise e
     except Exception as e:

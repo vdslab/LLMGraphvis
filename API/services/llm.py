@@ -97,7 +97,7 @@ You have access to a set of tools to perform network operations. When a user ask
 **Your Final Output should be either a direct text response OR a tool call.**
 """
 
-async def _process_with_gemini(messages: List[Dict[str, str]]) -> Dict[str, Any]:
+async def _process_with_gemini(messages: List[Dict[str, str]], model_name: str = "gemini-2.5-flash") -> Dict[str, Any]:
     """Process messages using Google Gemini."""
     if not gemini_client:
         return {"content": "Error: Gemini client is not initialized."}
@@ -124,7 +124,7 @@ async def _process_with_gemini(messages: List[Dict[str, str]]) -> Dict[str, Any]
             }
             gemini_tools.append(gemini_tool)
 
-        chat = gemini_client.chats.create(model="gemini-2.5-pro", history=gemini_history)
+        chat = gemini_client.chats.create(model=model_name, history=gemini_history)
         response = chat.send_message(
             user_prompt,
             config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT, tools=gemini_tools)
@@ -188,14 +188,21 @@ async def _process_with_openai(messages: List[Dict[str, str]]) -> Dict[str, Any]
         return {"content": f"Error with OpenAI: {e}"}
 
 
-async def process_chat_message(messages: List[Dict[str, str]]) -> Dict[str, Any]:
+ALLOWED_GEMINI_MODELS = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"]
+
+async def process_chat_message(messages: List[Dict[str, str]], model: str = "gemini-2.5-flash") -> Dict[str, Any]:
     """
     Process chat messages by routing to the configured LLM provider.
     """
     print(f"Processing message with provider: {LLM_PROVIDER}")
     if LLM_PROVIDER == "openai":
+        # OpenAIのモデル選択も同様に拡張可能
         return await _process_with_openai(messages)
     elif LLM_PROVIDER == "google":
-        return await _process_with_gemini(messages)
+        if model not in ALLOWED_GEMINI_MODELS:
+            # 安全なデフォルト値にフォールバック
+            model = "gemini-2.5-flash"
+            print(f"Warning: Invalid model '{model}' requested. Falling back to default 'gemini-2.5-flash'.")
+        return await _process_with_gemini(messages, model_name=model)
     else:
         return {"content": f"Error: Unknown LLM_PROVIDER '{LLM_PROVIDER}'. Please set to 'google' or 'openai'."}

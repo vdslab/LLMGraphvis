@@ -172,9 +172,9 @@ export const networkChatAPI = {
     console.log("Deleting conversation:", conversationId);
     return axios.delete(`${API_URL}/chat/conversations/${conversationId}`);
   },
-  processChatMessage: (message) => {
-    console.log("Processing chat message via API:", message);
+  processChatMessage: (payload) => {
+    console.log("Processing chat message via API:", payload);
     // APIサーバーを経由してチャットメッセージを処理
-    return axios.post(`${API_URL}/chat/process`, { message });
+    return axios.post(`${API_URL}/chat/process`, payload);
   }
 };
