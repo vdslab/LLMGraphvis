@@ -60,6 +60,19 @@ const config: Config = {
     ],
   ],
 
+  plugins: [
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'specification',
+        path: 'specification',
+        routeBasePath: 'specification',
+        sidebarPath: require.resolve('./sidebars-specs.ts'),
+        editUrl: 'https://github.com/vdslab/GraphVisAgent/tree/main/',
+      },
+    ],
+  ],
+
   themeConfig: {
     // Replace with your project's social card
     image: 'img/docusaurus-social-card.jpg',
@@ -77,7 +90,12 @@ const config: Config = {
           type: 'docSidebar',
           sidebarId: 'tutorialSidebar',
           position: 'left',
+          label: 'Design Docs',
+        },
+        {
+          to: '/specification',
           label: 'Specification',
+          position: 'left',
         },
         {
           href: 'https://github.com/vdslab/GraphVisAgent',
@@ -93,8 +111,12 @@ const config: Config = {
           title: 'Docs',
           items: [
             {
-              label: 'Specification',
+              label: 'Design Docs',
               to: '/',
+            },
+            {
+              label: 'Specification',
+              to: '/specification',
             },
           ],
         },
