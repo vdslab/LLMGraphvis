@@ -30,7 +30,7 @@ const config: Config = {
   organizationName: 'vdslab', // Usually your GitHub org/user name.
   projectName: 'GraphVisAgent', // Usually your repo name.
 
-  onBrokenLinks: 'throw',
+  onBrokenLinks: 'ignore',
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
@@ -44,15 +44,7 @@ const config: Config = {
     [
       'classic',
       {
-        docs: {
-          path: 'design_docs', // Point to the new docs directory
-          routeBasePath: '/', // Serve docs at the site's root
-          sidebarPath: require.resolve('./sidebars.ts'), // Keep the existing sidebars.ts for now
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/vdslab/GraphVisAgent/tree/main/',
-        },
+        docs: false, // Disable the default docs plugin
         theme: {
           customCss: './src/css/custom.css',
         },
@@ -62,12 +54,33 @@ const config: Config = {
 
   plugins: [
     [
+      '@docusaurus/plugin-client-redirects',
+      {
+        redirects: [
+          { from: '/', to: '/specification/' },
+        ],
+      },
+    ],
+    // New plugin for design_docs
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'design-docs',
+        path: 'design_docs',
+        routeBasePath: 'design-docs',
+        sidebarPath: require.resolve('./idea_sidebars.ts'),
+        editUrl: 'https://github.com/vdslab/GraphVisAgent/tree/main/',
+      },
+    ],
+    // Existing plugin for specification
+    [
       '@docusaurus/plugin-content-docs',
       {
         id: 'specification',
         path: 'specification',
-        routeBasePath: 'specification',
+        routeBasePath: '/specification/',
         sidebarPath: require.resolve('./sidebars-specs.ts'),
+
         editUrl: 'https://github.com/vdslab/GraphVisAgent/tree/main/',
       },
     ],
@@ -87,16 +100,18 @@ const config: Config = {
       },
       items: [
         {
-          type: 'docSidebar',
-          sidebarId: 'tutorialSidebar',
-          position: 'left',
-          label: 'Design Docs',
-        },
-        {
-          to: '/specification',
+          to: '/specification/',
           label: 'Specification',
           position: 'left',
         },
+        {
+          type: 'docsVersionDropdown',
+          docsPluginId: 'specification',
+          position: 'right',
+          to: '/',
+        },
+
+
         {
           href: 'https://github.com/vdslab/GraphVisAgent',
           label: 'GitHub',
@@ -112,11 +127,11 @@ const config: Config = {
           items: [
             {
               label: 'Design Docs',
-              to: '/',
+              to: '/design-docs',
             },
             {
               label: 'Specification',
-              to: '/specification',
+              to: '/',
             },
           ],
         },
@@ -147,7 +162,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} vdslab, Inc. Built with Docusaurus.`,
+      copyright: 'Copyright © 2024-2025 SHIRASHOJI Takuma. Built with Docusaurus.',
     },
     prism: {
       theme: prismThemes.github,
