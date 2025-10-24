@@ -92,3 +92,35 @@ sequenceDiagram
     F->>U: 応答と、ノードサイズが変化したグラフを表示
 ```
 
+## 3.3. ツール呼び出し失敗時のエラーハンドリングフロー
+
+LLMが要求したツールが何らかの理由（例: サポートされていない計算、不正なパラメータ）で失敗した場合のフローです。システムは失敗の事実をLLMに伝え、LLMがユーザーに対して状況を説明し、代替案を提示する機会を与えます。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as ユーザー
+    participant F as Frontend
+    participant B as API Service
+    participant LLM as LLM Service
+    participant N as NetworkXMCP
+
+    U->>F: 「PageRankを計算して」
+    F->>B: POST /chat/process (message, conversation_id)
+
+    B->>LLM: ユーザーの指示を送信
+    LLM-->>B: ツール呼び出しを要求 (calculate_centrality, type:"pagerank")
+
+    B->>N: /tools/calculate_centrality (network_id, type:"pagerank")
+    note over N: "pagerank" は未実装のためエラーを返す
+    N-->>B: 実行失敗の応答 (エラーメッセージ)
+
+    B->>LLM: ツールの実行結果（失敗）を送信
+    note right of LLM: LLMは失敗を認識し、
+    note right of LLM: ユーザーへの説明と代替案を生成する。
+    LLM-->>B: 最終的な応答メッセージを生成 (例: 「申し訳ありません、PageRankの計算に失敗しました。次数中心性など、他の指標ではいかがでしょうか？」)
+
+    B->>F: 最終応答
+    F->>U: グラフは変更せず、LLMからのメッセージを表示
+```
+
