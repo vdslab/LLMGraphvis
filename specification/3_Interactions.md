@@ -36,39 +36,6 @@ sequenceDiagram
     B-->>F: アップロード成功
 ```
 
-## 3.2. レイアウト計算とキャッシュ利用フロー
-
-キャッシュを利用した効率的なレイアウト計算処理のフローです。
-
-```mermaid
-sequenceDiagram
-    participant U as ユーザー
-    participant F as Frontend
-    participant B as API Service
-    participant N as NetworkXMCP
-    participant DB as Database
-
-    U->>F: レイアウト計算を要求 (例: spring layout)
-    F->>B: POST /network/layout (network_id, layout_type)
-
-    B->>N: /tools/change_layout (network_id, layout_type)
-    N->>DB: "spring"レイアウトのキャッシュがあるか確認
-    
-    alt キャッシュが存在する場合
-        DB-->>N: キャッシュされた座標データを返す
-        N-->>B: 計算結果 (キャッシュ)
-        B-->>F: 計算結果
-        F->>U: グラフを再描画
-    else キャッシュが存在しない場合
-        DB-->>N: キャッシュなし
-        note over N: DBからGraphMLを読み込み、計算を実行
-        N->>DB: 新しい座標をキャッシュに保存し、更新されたGraphMLも保存
-        DB-->>N: 保存成功
-        N-->>B: 計算結果 (新規)
-        B-->>F: 計算結果
-        F->>U: グラフを再描画
-    end
-```
 
 ## 3.3. チャットによる分析とキャッシュ利用フロー
 
