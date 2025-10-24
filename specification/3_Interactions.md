@@ -112,9 +112,9 @@ sequenceDiagram
     F->>F: チャット履歴とグラフ表示を更新
 ```
 
-## 3.4. 複数ツール呼び出しによる連続処理フロー
+## 3.4. LLMによる複数ツール呼び出しフロー
 
-「計算」と「可視化」を分離し、連続したツール呼び出しで実現するフローです。
+ユーザーの自然言語指示に対し、LLMが一度の推論で複数のツール呼び出しを生成し、連続して処理を実行するフローです。
 
 ```mermaid
 sequenceDiagram
@@ -129,21 +129,21 @@ sequenceDiagram
     F->>B: POST /chat/process (message, conversation_id)
 
     B->>LLM: ユーザーの指示と会話履歴を送信
-    LLM-->>B: 1. ツール呼び出しを要求 (calculate_centrality)
+    note right of LLM: LLMは「友達が多い」を「次数中心性」と解釈し、
+    note right of LLM: 「大きく表示」を「ノードサイズ」に割り当てる判断を一度の推論で行う。
+    LLM-->>B: ツール呼び出しを要求 (calculate_centrality, apply_metric_to_visual)
+    note right of B: LLMは複数のツール呼び出しを一度に生成する
 
     B->>N: /tools/calculate_centrality (network_id, type:"degree")
     note over N: 計算し、結果をDBにキャッシュ
     N-->>B: 計算成功の応答
 
-    B->>LLM: 1. のツール実行結果を送信
-    LLM-->>B: 2. ツール呼び出しを要求 (apply_metric_to_visual)
-    note right of B: LLMは「友達が多い」を「次数中心性」と解釈し、<br>「大きく表示」を「ノードサイズ」に割り当てる判断をする
-
     B->>N: /tools/apply_metric_to_visual (network_id, metric:"degree_centrality", visual:"node_size")
-    note over N: キャッシュから中心性データを読み込み、<br>ノードサイズを更新したGraphMLを生成してDBに保存
+    note over N: キャッシュから中心性データを読み込み、
+    note over N: ノードサイズを更新したGraphMLを生成してDBに保存
     N-->>B: 実行成功の応答
 
-    B->>LLM: 2. のツール実行結果を送信
+    B->>LLM: 全てのツール実行結果を送信
     LLM-->>B: 最終的な応答メッセージを生成
 
     B->>DB: LLMの応答メッセージを保存
