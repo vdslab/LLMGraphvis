@@ -31,24 +31,25 @@ graph TD
 
 ```mermaid
 graph TD
-    subgraph "Web Browser"
-        F[Frontend]
-    end
+    U[ユーザー] -- "HTTPS" --> WB[Web Browser]
 
     subgraph "Docker Environment"
+        FS[Frontend Service]
         B[API Service]
         N[NetworkX MCP]
         DB[(Database)]
     end
 
-    U[ユーザー] -- "HTTPS" --> F
-    F -- "API (HTTPS)" --> B
+    WB -- "Loads SPA (HTTPS)" --> FS
+    WB -- "API (HTTPS)" --> B
+
     B -- "API (HTTP)" --> N
     B -- "PostgreSQL" --> DB
     N -- "PostgreSQL" --> DB
     B -- "API (HTTPS)" --> LLM[LLM Services]
 
-    style F fill:#82b3ff,stroke:#333,stroke-width:2px
+    style WB fill:#d1e0ff,stroke:#333,stroke-width:2px
+    style FS fill:#82b3ff,stroke:#333,stroke-width:2px
     style B fill:#94e2d5,stroke:#333,stroke-width:2px
     style N fill:#f5c2e7,stroke:#333,stroke-width:2px
     style DB fill:#f9e2af,stroke:#333,stroke-width:2px
@@ -56,7 +57,7 @@ graph TD
 
 | コンテナ | 説明 | 技術スタック |
 |:---|:---|:---|
-| **Frontend** | ユーザーインターフェースを提供し、バックエンドと通信するシングルページアプリケーション。 | React, Vite, react-force-graph-2d, Zustand, axios |
+| **Frontend Service** | ユーザーにUIを提供するためのSPA（Single Page Application）を配信するWebサーバー。 | React, Vite, react-force-graph-2d, Zustand, axios |
 | **API Service** | ビジネスロジック、認証、外部API連携を担当するバックエンド。`NetworkXMCP`へのリクエストをプロキシする。 | FastAPI, SQLAlchemy, (LLM SDKs) |
 | **NetworkX Model Context Protocol (NetworkXMCP)** | グラフ計算やレイアウト処理に特化した**ステートフルな**計算サービス。データベースに接続し、計算結果をキャッシュする。 | FastAPI, NetworkX, Python, SQLAlchemy |
 | **Database** | ユーザー情報、グラフデータ、計算結果のキャッシュなどを永続化するデータベース。 | PostgreSQL |
