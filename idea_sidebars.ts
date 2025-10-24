@@ -4,6 +4,10 @@ const sidebars: SidebarsConfig = {
   tutorialSidebar: [
     {
       type: 'category',
+      label: 'Overview',
+      items: ['index'],
+    },    {
+      type: 'category',
       label: 'Requirements',
       items: [
         'requirements/system-overview',
