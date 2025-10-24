@@ -56,9 +56,9 @@ function App() {
   
   return (
     <Router>
-      <div className="min-h-screen bg-gray-100">
+      <div className="h-screen bg-gray-100 flex flex-col">
         <Navbar />
-        <main>
+        <main className="flex-grow">
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />

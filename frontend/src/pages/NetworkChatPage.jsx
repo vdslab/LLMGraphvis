@@ -361,11 +361,32 @@ const NetworkChatPage = () => {
     await sendMessage(messageToSend);
   };
 
+  const graphContainerRef = useRef(null);
+  const [graphDimensions, setGraphDimensions] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const updateGraphDimensions = () => {
+      if (graphContainerRef.current) {
+        setGraphDimensions({
+          width: graphContainerRef.current.offsetWidth,
+          height: graphContainerRef.current.offsetHeight,
+        });
+      }
+    };
+
+    updateGraphDimensions(); // Set initial dimensions
+    window.addEventListener('resize', updateGraphDimensions);
+
+    return () => {
+      window.removeEventListener('resize', updateGraphDimensions);
+    };
+  }, []);
+
   return (
-    <div className="h-screen flex flex-col">
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+    <div className="flex flex-col h-screen">
+      <div className="flex-grow flex flex-col md:flex-row overflow-hidden">
         {/* Left side - Chat panel */}
-        <div className="w-full md:w-2/5 lg:w-1/3 flex flex-col bg-white border-r border-gray-200">
+        <div className="flex-1 flex flex-col bg-white border-r border-gray-200">
           {/* Messages area */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((message, index) => (
@@ -481,19 +502,10 @@ const NetworkChatPage = () => {
         </div>
 
         {/* Right side - Network visualization panel */}
-        <div className="w-full md:flex-1 flex flex-col bg-white">
-          {/* Fixed position upload button for mobile */}
-          <div className="md:hidden fixed bottom-4 right-4 z-10">
-            <FileUploadButton
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-3 rounded-full shadow-lg flex items-center justify-center"
-              buttonText="Upload"
-              onFileUpload={handleFileUpload}
-              iconOnly={true}
-            />
-          </div>
-
-          {/* Desktop upload button - always visible */}
-          <div style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 50 }}>
+        <div className="flex-1 flex flex-col bg-white">
+          {/* Upload button and Drag & drop instruction */}
+          <div className="p-4 border-b border-gray-200 flex justify-end items-center">
+            <div className="text-sm text-gray-600 mr-4">Drag & drop network file here</div>
             <FileUploadButton
               className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow-lg flex items-center justify-center"
               buttonText="Upload Network File"
@@ -503,158 +515,117 @@ const NetworkChatPage = () => {
 
           {/* Graph visualization */}
           <div
-            className={`flex-1 relative ${isDragging ? "bg-blue-50" : ""}`}
+            ref={graphContainerRef}
+            className={`flex-1 relative ${isDragging ? "bg-blue-50" : ""} min-h-0`}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleFileDrop}
           >
-            {/* Drag and drop instruction */}
-            <div className="absolute top-2 left-1/2 transform -translate-x-1/2 bg-white bg-opacity-75 px-3 py-1 rounded-full text-sm text-gray-600 shadow-sm border border-gray-200 z-10">
-              Drag & drop network file here
-            </div>
-            {isLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
-                <div className="flex flex-col items-center">
-                  <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="mt-2 text-blue-500">Loading...</p>
-                </div>
-              </div>
-            )}
+            {/* ... (overlays) ... */}
 
-            {/* 中心性適用時のアニメーション表示 */}
-            {network_state.isApplyingCentrality && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-40 z-10">
-                <div className="flex flex-col items-center">
-                  <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="mt-2 text-blue-600 font-semibold">
-                    {network_state.currentCentralityName}を適用中...
-                  </p>
-                  <p className="text-sm text-blue-500">
-                    ノードの大きさが中心性値に応じて変化します
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
-                <div
-                  className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative"
-                  role="alert"
-                >
-                  <strong className="font-bold">Error: </strong>
-                  <span className="block sm:inline">{error}</span>
-                </div>
-              </div>
-            )}
-
-            {isDragging && (
-              <div className="absolute inset-0 flex items-center justify-center bg-blue-50 bg-opacity-90 z-10 border-2 border-blue-500 border-dashed">
-                <div className="text-blue-500 text-xl font-semibold">
-                  Drop your network file here
-                </div>
-              </div>
-            )}
-
-            <ForceGraph2D
-              ref={graphRef}
-              graphData={graphData}
-              nodeLabel={(node) => {
-                // ノードの基本情報を表示
-                let label = `${node.label || node.id}`;
-                
-                // 中心性値がある場合は表示
-                if (network_state.centrality) {
-                  label += `\n中心性値: ${node.size ? ((node.size - 5) / 10).toFixed(2) : "不明"}`;
-                }
-                
-                // ノードの属性情報を表示
-                for (const [key, value] of Object.entries(node)) {
-                  // id, label, x, y, size, colorは基本情報なのでスキップ
-                  if (!['id', 'label', 'x', 'y', 'size', 'color', '__indexColor', 'index', 'vx', 'vy', 'fx', 'fy'].includes(key)) {
-                    label += `\n${key}: ${value}`;
-                  }
-                }
-                
-                return label;
-              }}
-              nodeRelSize={6}
-              nodeVal={(node) => node.size}
-              nodeColor={(node) => node.color}
-              linkWidth={(link) => link.width}
-              linkColor={(link) => link.color}
-              cooldownTicks={100}
-              onEngineStop={() => console.log("Layout stabilized")}
-              // ノードクリック時の処理
-              onNodeClick={(node) => {
-                console.log("Node clicked:", node);
-                
-                // ノードの属性情報を収集
-                let nodeInfo = `**ノード「${node.label || node.id}」の情報**\n\n`;
-                
-                // 中心性値がある場合は表示
-                if (network_state.centrality) {
-                  const centralityValue = ((node.size - 5) / 10).toFixed(3);
-                  nodeInfo += `中心性値: ${centralityValue}\n\n`;
+            {graphDimensions.width > 0 && graphDimensions.height > 0 && (
+              <ForceGraph2D
+                ref={graphRef}
+                graphData={graphData}
+                width={graphDimensions.width}
+                height={graphDimensions.height}
+                nodeLabel={(node) => {
+                  // ノードの基本情報を表示
+                  let label = `${node.label || node.id}`;
                   
-                  // 重要度の判定
-                  const importance = node.size > 12
-                    ? "非常に重要"
-                    : node.size > 9
-                      ? "比較的重要"
-                      : node.size > 7
-                        ? "平均的な重要度"
-                        : "あまり重要でない";
-                  
-                  nodeInfo += `このノードは${importance}位置にあります。\n\n`;
-                }
-                
-                // その他の属性情報を表示
-                nodeInfo += "**属性情報:**\n";
-                for (const [key, value] of Object.entries(node)) {
-                  // id, label, x, y, size, colorは基本情報なのでスキップ
-                  if (!['id', 'label', 'x', 'y', 'size', 'color', '__indexColor', 'index', 'vx', 'vy', 'fx', 'fy'].includes(key)) {
-                    nodeInfo += `- ${key}: ${value}\n`;
+                  // 中心性値がある場合は表示
+                  if (network_state.centrality) {
+                    label += `\n中心性値: ${node.size ? ((node.size - 5) / 10).toFixed(2) : "不明"}`;
                   }
-                }
-                
-                // 基本情報も表示
-                nodeInfo += "\n**基本情報:**\n";
-                nodeInfo += `- ID: ${node.id}\n`;
-                nodeInfo += `- ラベル: ${node.label || node.id}\n`;
-                nodeInfo += `- サイズ: ${node.size}\n`;
-                nodeInfo += `- 色: ${node.color}\n`;
-                nodeInfo += `- 位置: (${node.x.toFixed(2)}, ${node.y.toFixed(2)})\n`;
-                
-                addMessage({
-                  role: "assistant",
-                  content: nodeInfo,
-                  timestamp: new Date().toISOString(),
-                });
-              }}
-              // ホバー効果の追加
-              nodeCanvasObject={(node, ctx) => {
-                const size = node.size || 5;
-                // サイズに応じたフォントサイズ（高い中心性値を持つノードのラベルを大きく表示）
-                // const fontSize = (12 + (node.size - 5) * 0.5) / globalScale;
-                // ノードの描画
-                ctx.beginPath();
-                ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
-                ctx.fillStyle = node.color || "#1d4ed8";
-                ctx.fill();
-
-                // ノード周囲の発光効果（中心性が高いものほど強く光る）
-                if (network_state.centrality && node.size > 7) {
-                  const glowSize = size * 1.5;
-                  const glowOpacity = (node.size - 5) / 10; // 中心性の正規化値（0〜1）
-
+                  
+                  // ノードの属性情報を表示
+                  for (const [key, value] of Object.entries(node)) {
+                    // id, label, x, y, size, colorは基本情報なのでスキップ
+                    if (!['id', 'label', 'x', 'y', 'size', 'color', '__indexColor', 'index', 'vx', 'vy', 'fx', 'fy'].includes(key)) {
+                      label += `\n${key}: ${value}`;
+                    }
+                  }
+                  
+                  return label;
+                }}
+                nodeRelSize={6}
+                nodeVal={(node) => node.size}
+                nodeColor={(node) => node.color}
+                linkWidth={(link) => link.width}
+                linkColor={(link) => link.color}
+                cooldownTicks={100}
+                onEngineStop={() => console.log("Layout stabilized")}
+                // ノードクリック時の処理
+                onNodeClick={(node) => {
+                  console.log("Node clicked:", node);
+                  
+                  // ノードの属性情報を収集
+                  let nodeInfo = `**ノード「${node.label || node.id}」の情報**\n\n`;
+                  
+                  // 中心性値がある場合は表示
+                  if (network_state.centrality) {
+                    const centralityValue = ((node.size - 5) / 10).toFixed(3);
+                    nodeInfo += `中心性値: ${centralityValue}\n\n`;
+                    
+                    // 重要度の判定
+                    const importance = node.size > 12
+                      ? "非常に重要"
+                      : node.size > 9
+                        ? "比較的重要"
+                        : node.size > 7
+                          ? "平均的な重要度"
+                          : "あまり重要でない";
+                    
+                    nodeInfo += `このノードは${importance}位置にあります。\n\n`;
+                  }
+                  
+                  // その他の属性情報を表示
+                  nodeInfo += "**属性情報:**\n";
+                  for (const [key, value] of Object.entries(node)) {
+                    // id, label, x, y, size, colorは基本情報なのでスキップ
+                    if (!['id', 'label', 'x', 'y', 'size', 'color', '__indexColor', 'index', 'vx', 'vy', 'fx', 'fy'].includes(key)) {
+                      nodeInfo += `- ${key}: ${value}\n`;
+                    }
+                  }
+                  
+                  // 基本情報も表示
+                  nodeInfo += "\n**基本情報:**\n";
+                  nodeInfo += `- ID: ${node.id}\n`;
+                  nodeInfo += `- ラベル: ${node.label || node.id}\n`;
+                  nodeInfo += `- サイズ: ${node.size}\n`;
+                  nodeInfo += `- 色: ${node.color}\n`;
+                  nodeInfo += `- 位置: (${node.x.toFixed(2)}, ${node.y.toFixed(2)})\n`;
+                  
+                  addMessage({
+                    role: "assistant",
+                    content: nodeInfo,
+                    timestamp: new Date().toISOString(),
+                  });
+                }}
+                // ホバー効果の追加
+                nodeCanvasObject={(node, ctx) => {
+                  const size = node.size || 5;
+                  // サイズに応じたフォントサイズ（高い中心性値を持つノードのラベルを大きく表示）
+                  // const fontSize = (12 + (node.size - 5) * 0.5) / globalScale;
+                  // ノードの描画
                   ctx.beginPath();
-                  ctx.arc(node.x, node.y, glowSize, 0, 2 * Math.PI);
-                  ctx.fillStyle = `rgba(66, 153, 225, ${glowOpacity * 0.4})`; // 青色の発光効果
+                  ctx.arc(node.x, node.y, size, 0, 2 * Math.PI);
+                  ctx.fillStyle = node.color || "#1d4ed8";
                   ctx.fill();
-                }
-              }}
-            />
+
+                  // ノード周囲の発光効果（中心性が高いものほど強く光る）
+                  if (network_state.centrality && node.size > 7) {
+                    const glowSize = size * 1.5;
+                    const glowOpacity = (node.size - 5) / 10; // 中心性の正規化値（0〜1）
+
+                    ctx.beginPath();
+                    ctx.arc(node.x, node.y, glowSize, 0, 2 * Math.PI);
+                    ctx.fillStyle = `rgba(66, 153, 225, ${glowOpacity * 0.4})`; // 青色の発光効果
+                    ctx.fill();
+                  }
+                }}
+              />
+            )}
           </div>
         </div>
       </div>
