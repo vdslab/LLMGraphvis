@@ -8,6 +8,7 @@
 
 ```mermaid
 sequenceDiagram
+    autonumber
     participant U as ユーザー
     participant F as Frontend
     participant LS as Browser Local Storage
@@ -17,20 +18,21 @@ sequenceDiagram
     U->>F: 新規登録情報入力
     F->>B: POST /auth/register (username, password)
     B->>DB: ユーザー情報をハッシュ化して保存
-    DB-->>B: 保存成功
+    DB-->>B: ユーザー登録結果
     B-->>F: 登録完了
 
     U->>F: ログイン情報入力
     F->>B: POST /auth/token (username, password)
     B->>DB: ユーザー情報検証
-    DB-->>B: 検証結果
+    DB-->>B: 検証結果 (ユーザー情報)
+    B->>B: JWTを生成
     B-->>F: JSON Web Token (JWT)
     F->>LS: JWTを保存
     LS-->>F: 保存成功
 
     U->>F: GraphMLファイルアップロード
     F->>B: POST /network/upload (JWT, GraphML)
-    B->>B: JWT検証
+    B->>B: JWTを検証
     B->>DB: GraphMLデータ、会話情報などを保存
     DB-->>B: 保存成功
     B-->>F: アップロード成功
@@ -43,6 +45,7 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
+    autonumber
     participant U as ユーザー
     participant F as Frontend
     participant B as API Service
@@ -68,7 +71,9 @@ sequenceDiagram
         N-->>B: 計算結果 (キャッシュ)
     else キャッシュが存在しない場合
         DB-->>N: キャッシュなし
-        note over N: DBからGraphMLを読み込み、計算を実行
+        N->>DB: GraphMLを読み込み
+        DB-->>N: GraphMLデータ
+        note over N: 計算を実行
         N->>DB: 新しい中心性データをキャッシュに保存
         DB-->>N: 保存成功
         N-->>B: 計算結果 (新規)
