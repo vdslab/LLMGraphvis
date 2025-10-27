@@ -1,13 +1,13 @@
-import {themes as prismThemes} from 'prism-react-renderer';
-import type {Config} from '@docusaurus/types';
-import type * as Preset from '@docusaurus/preset-classic';
+import { themes as prismThemes } from "prism-react-renderer";
+import type { Config } from "@docusaurus/types";
+import type * as Preset from "@docusaurus/preset-classic";
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
 const config: Config = {
-  title: 'GraphVisAgent Specification',
-  tagline: 'Graph Visualization Agent Specification',
-  favicon: 'img/favicon.ico',
+  title: "GraphVisAgent Specification",
+  tagline: "Graph Visualization Agent Specification",
+  favicon: "img/favicon.ico",
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
@@ -15,38 +15,38 @@ const config: Config = {
   },
 
   // Set the production url of your site here
-  url: 'https://your-docusaurus-site.example.com',
+  url: "https://your-docusaurus-site.example.com",
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/',
+  baseUrl: "/",
 
-  themes: ['@docusaurus/theme-mermaid'],
+  themes: ["@docusaurus/theme-mermaid"],
   markdown: {
     mermaid: true,
   },
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'vdslab', // Usually your GitHub org/user name.
-  projectName: 'GraphVisAgent', // Usually your repo name.
+  organizationName: "shirashoji", // Usually your GitHub org/user name.
+  projectName: "GraphVisAgent", // Usually your repo name.
 
-  onBrokenLinks: 'ignore',
+  onBrokenLinks: "ignore",
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
   // may want to replace "en" with "zh-Hans".
   i18n: {
-    defaultLocale: 'en',
-    locales: ['en'],
+    defaultLocale: "en",
+    locales: ["en"],
   },
 
   presets: [
     [
-      'classic',
+      "classic",
       {
         docs: false, // Disable the default docs plugin
         theme: {
-          customCss: './src/css/custom.css',
+          customCss: "./src/css/custom.css",
         },
       } satisfies Preset.Options,
     ],
@@ -54,115 +54,113 @@ const config: Config = {
 
   plugins: [
     [
-      '@docusaurus/plugin-client-redirects',
+      "@docusaurus/plugin-client-redirects",
       {
-        redirects: [
-          { from: '/', to: '/specification/' },
-        ],
+        redirects: [{ from: "/", to: "/specification/" }],
       },
     ],
     // New plugin for design_docs
     [
-      '@docusaurus/plugin-content-docs',
+      "@docusaurus/plugin-content-docs",
       {
-        id: 'design-docs',
-        path: 'design_docs',
-        routeBasePath: 'design-docs',
-        sidebarPath: require.resolve('./idea_sidebars.ts'),
-        editUrl: 'https://github.com/vdslab/GraphVisAgent/tree/main/',
+        id: "design-docs",
+        path: "design_docs",
+        routeBasePath: "design-docs",
+        sidebarPath: require.resolve("./idea_sidebars.ts"),
+        editUrl: "https://github.com/shirashoji/GraphVisAgent/tree/main/",
       },
     ],
     // Existing plugin for specification
     [
-      '@docusaurus/plugin-content-docs',
+      "@docusaurus/plugin-content-docs",
       {
-        id: 'specification',
-        path: 'specification',
-        routeBasePath: '/specification/',
-        sidebarPath: require.resolve('./sidebars-specs.ts'),
+        id: "specification",
+        path: "specification",
+        routeBasePath: "/specification/",
+        sidebarPath: require.resolve("./sidebars-specs.ts"),
 
-        editUrl: 'https://github.com/vdslab/GraphVisAgent/tree/main/',
+        editUrl: "https://github.com/shirashoji/GraphVisAgent/tree/main/",
       },
     ],
   ],
 
   themeConfig: {
     // Replace with your project's social card
-    image: 'img/docusaurus-social-card.jpg',
+    image: "img/docusaurus-social-card.jpg",
     colorMode: {
       respectPrefersColorScheme: true,
     },
     navbar: {
-      title: 'GraphVisAgent Specification',
+      title: "GraphVisAgent Specification",
       logo: {
-        alt: 'GraphVisAgent Logo',
-        src: 'img/logo.svg',
+        alt: "GraphVisAgent Logo",
+        src: "img/logo.svg",
       },
       items: [
         {
-          to: '/specification/',
-          label: 'Specification',
-          position: 'left',
+          to: "/specification/",
+          label: "Specification",
+          position: "left",
         },
         {
-          type: 'docsVersionDropdown',
-          docsPluginId: 'specification',
-          position: 'right',
-          to: '/',
+          type: "docsVersionDropdown",
+          docsPluginId: "specification",
+          position: "right",
+          to: "/",
         },
 
-
         {
-          href: 'https://github.com/vdslab/GraphVisAgent',
-          label: 'GitHub',
-          position: 'right',
+          href: "https://github.com/shirashoji/GraphVisAgent",
+          label: "GitHub",
+          position: "right",
         },
       ],
     },
     footer: {
-      style: 'dark',
+      style: "dark",
       links: [
         {
-          title: 'Docs',
+          title: "Docs",
           items: [
             {
-              label: 'Design Docs',
-              to: '/design-docs',
+              label: "Design Docs",
+              to: "/design-docs",
             },
             {
-              label: 'Specification',
-              to: '/',
+              label: "Specification",
+              to: "/",
             },
           ],
         },
         {
-          title: 'Community',
+          title: "Community",
           items: [
             {
-              label: 'Stack Overflow',
-              href: 'https://stackoverflow.com/questions/tagged/docusaurus',
+              label: "Stack Overflow",
+              href: "https://stackoverflow.com/questions/tagged/docusaurus",
             },
             {
-              label: 'Discord',
-              href: 'https://discordapp.com/invite/docusaurus',
+              label: "Discord",
+              href: "https://discordapp.com/invite/docusaurus",
             },
             {
-              label: 'X',
-              href: 'https://x.com/docusaurus',
+              label: "X",
+              href: "https://x.com/docusaurus",
             },
           ],
         },
         {
-          title: 'More',
+          title: "More",
           items: [
             {
-              label: 'GitHub',
-              href: 'https://github.com/vdslab/GraphVisAgent',
+              label: "GitHub",
+              href: "https://github.com/shirashoji/GraphVisAgent",
             },
           ],
         },
       ],
-      copyright: 'Copyright © 2024-2025 SHIRASHOJI Takuma. Built with Docusaurus.',
+      copyright:
+        "Copyright © 2024-2025 SHIRASHOJI Takuma. Built with Docusaurus.",
     },
     prism: {
       theme: prismThemes.github,
