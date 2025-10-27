@@ -1,4 +1,4 @@
-import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
+import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
 
 /**
  * Creating a sidebar enables you to:
@@ -17,41 +17,62 @@ const sidebars: SidebarsConfig = {
   // But we can create a sidebar manually
   specsSidebar: [
     {
-      type: 'doc',
-      id: 'README',
-      label: 'はじめに',
+      type: "doc",
+      id: "README",
+      label: "はじめに",
     },
     {
-      type: 'doc',
-      id: 'Architecture',
-      label: '1. アーキテクチャ設計',
+      type: "doc",
+      id: "Architecture",
+      label: "1. アーキテクチャ設計",
     },
     {
-      type: 'category',
-      label: '2. コンポーネント仕様',
+      type: "category",
+      label: "2. コンポーネント仕様",
       items: [
         {
-          type: 'doc',
-          id: 'Backend',
-          label: '2.1. バックエンド (API)',
+          type: "doc",
+          id: "Backend",
+          label: "2.1. バックエンド (API)",
         },
         {
-          type: 'doc',
-          id: 'Frontend',
-          label: '2.2. フロントエンド仕様',
+          type: "doc",
+          id: "Frontend",
+          label: "2.2. フロントエンド仕様",
         },
         {
-          type: 'doc',
-          id: 'NetworkXMCP',
-          label: '2.3. グラフ計算サービス仕様 (NetworkXMCP)',
+          type: "doc",
+          id: "NetworkXMCP",
+          label: "2.3. グラフ計算サービス仕様 (NetworkXMCP)",
         },
       ],
     },
     {
-        type: 'doc',
-        id: 'Interactions',
-        label: '3. 主要な処理フロー',
-    }
+      type: "doc",
+      id: "Interactions",
+      label: "3. 主要な処理フロー",
+    },
+    {
+      type: "doc",
+      id: "rendering-data-flow",
+      label: "レンダリング用データ生成フロー",
+    },
+    {
+      type: "category",
+      label: "DeepResearch",
+      items: [
+        {
+          type: "doc",
+          id: "DeepResearch/database",
+          label: "NetworkX 計算結果の永続化（DB 指針）",
+        },
+        {
+          type: "doc",
+          id: "DeepResearch/degree-centrality-format",
+          label: "Degree 中心性の格納フォーマット",
+        },
+      ],
+    },
   ],
 };
 
