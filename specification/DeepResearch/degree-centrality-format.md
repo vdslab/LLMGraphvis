@@ -1,87 +1,61 @@
-## Degree（次数）中心性の格納フォーマット
+## 次数中心性 (Degree Centrality) の格納フォーマット
 
-このドキュメントでは、グラフ解析の出力（ここでは degree 中心性の計算結果）をデータベースに保存する際の推奨フォーマットを示します。保存形式は後続の解析や可視化で再利用しやすい構造にします。
+このドキュメントでは、グラフの次数中心性の計算結果をデータベースに保存する際の推奨フォーマットを、[DB設計指針](./database.md)に基づき具体的に示します。
 
-### 目的の要約
+### 基本方針
 
-- ノードごとの degree 値を保存しておき、後で可視化やフィルタリング、統計に利用できるようにする。
-- 計算の発生源（どのグラフ、どの手法、いつ計算したか）を明確にする。
+- **データ型**: `jsonb` を使用します。
+- **構造**: ノードとスコアのペアを「オブジェクトの配列」として格納します。
+- **メタデータ**: 計算の発生源（どのグラフ、どの手法か）をリレーショナルカラムで明確にします。
 
-### 推奨スキーマ（SQL 例）
+### 推奨スキーマ (`centrality_results` テーブル)
+
+[DB設計指針](./database.md)で推奨されている `centrality_results` テーブルを基本とします。
 
 ```sql
-CREATE TABLE degree_centrality (
-  id BIGSERIAL PRIMARY KEY,
-  graph_id TEXT NOT NULL,
-  node_id TEXT NOT NULL,
-  degree INTEGER NOT NULL,
-  normalized_degree DOUBLE PRECISION, -- 必要なら正規化値
-  method TEXT NOT NULL DEFAULT 'degree',
-  metadata JSONB,                     -- オプション: 計算パラメータなど
-  computed_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-  UNIQUE(graph_id, node_id, method)
+CREATE TABLE centrality_results (
+    id SERIAL PRIMARY KEY,
+    graph_id INT NOT NULL,          -- 外部キーとしてグラフテーブルに関連付け
+    datatype TEXT NOT NULL,         -- 'degree_centrality', 'pagerank' などの指標名
+    data JSONB NOT NULL,            -- 計算結果の本体
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(graph_id, datatype)
 );
 
--- 検索を速くするための索引
-CREATE INDEX idx_degree_graph ON degree_centrality(graph_id);
-CREATE INDEX idx_degree_node ON degree_centrality(node_id);
+-- 高速な検索のためのGINインデックス
+CREATE INDEX idx_gin_centrality_data ON centrality_results USING GIN (data);
 ```
 
-### JSON ドキュメント形式（APIやNoSQL保存向け）
+### `data` カラムの具体的なJSONB構造
 
-1 レコードの例:
+次数中心性の計算結果（NetworkXの `degree_centrality()` の出力など）は、以下のJSON構造に変換して `data` カラムに格納します。
 
-```json
-{
-  "graph_id": "G1",
-  "node_id": "n1",
-  "degree": 12,
-  "normalized_degree": 0.24,
-  "method": "degree",
-  "metadata": { "note": "undirected simple graph", "edge_count": 240 },
-  "computed_at": "2025-10-27T12:34:56Z"
-}
-```
+- **キーの短縮**: ストレージ効率のため、キーは `"n"` (node) と `"s"` (score) に短縮します。
+- **形式**: `[{"n": "node_id", "s": score}, ...]`
 
-バルク挿入の例（配列）:
+**JSONBデータ格納例:**
 
 ```json
 [
   {
-    "graph_id": "G1",
-    "node_id": "n1",
-    "degree": 12,
-    "normalized_degree": 0.24,
-    "method": "degree"
+    "n": "node_1",
+    "s": 0.24
   },
   {
-    "graph_id": "G1",
-    "node_id": "n2",
-    "degree": 8,
-    "normalized_degree": 0.16,
-    "method": "degree"
+    "n": "node_2",
+    "s": 0.16
+  },
+  {
+    "n": "node_3",
+    "s": 0.31
   }
 ]
 ```
 
-### 正規化方法の例
+この構造により、[DB設計指針](./database.md)で示されているように、スコア (`s`) に基づくフィルタリングやソートが効率的に行えます。
 
-- 正規化は文脈に依存します。代表例:
-  - divide by (n-1): normalized = degree / (N-1)
-  - min-max: (degree - minDegree) / (maxDegree - minDegree)
+### 運用上の注意
 
-保存時にはどの正規化を使ったかを `metadata` または別カラム `normalization` に格納してください。
-
-### 運用上の注意とエッジケース
-
-- マルチグラフや有向グラフの場合、`degree` の定義を明確にする（入次数/出次数/無向での合算など）。`metadata` に `directed: true` や `count_method: "in|out|both"` を入れるとよい。
-- 局所的に頻繁に再計算される場合は、一意キー (graph_id,node_id,method) を上書きする戦略を採る。
-- 大規模グラフではバルクインサートとバッチ処理で書き込みを行い、必要ならタイムスタンプでバージョン管理を行う。
-
-### 利用例（フロントでの使い方）
-
-- フロントがノードの色・サイズを degree によって決めたい場合、描画 API に入れる前に degree_centrality テーブルから最新の degree 値を取得し、ノードの `style.size` や `style.color` を決定するためのルールに変換して `rendering-data` を生成します。
-
----
-
-このフォーマットは軽量かつ再利用しやすいことを優先しています。別の中心性（PageRank, betweenness 等）を追加する場合は `method` を拡張し、必要なら `metric_name` として保存してください。
+- **正規化**: `degree_centrality` のように正規化された値か、単なる `degree`（次数の生カウント）かは `datatype` フィールドで明確に区別してください。（例: `datatype = 'degree'` vs `datatype = 'normalized_degree_centrality'`）
+- **有向グラフ**: 入次数と出次数を別々に保存する場合は、`datatype` を `in_degree_centrality` と `out_degree_centrality` のように分けてください。
+- **更新**: 既存の計算結果を更新する場合は、`ON CONFLICT (graph_id, datatype) DO UPDATE` を使用してアトミックに上書きします。

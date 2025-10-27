@@ -47,25 +47,90 @@ graph TD
 | `GET` | `/conversations` | ユーザーの会話一覧を取得する。 |
 | `GET` | `/conversations/{id}` | 特定の会話の詳細を取得する。 |
 | `GET` | `/conversations/{id}/messages` | 特定の会話のメッセージ一覧を取得する。 |
-| `POST` | `/process` | チャットUIからのメッセージを同期的に処理し、LLMやツール呼び出しを実行して最終結果を返す。 |
+| `POST` | `/process` | チャットUIからのメッセージを処理し、LLMやツール呼び出しを実行して最終結果を返す。 |
 | `POST` | `/recommend-layout` | ネットワーク概要に基づき、LLMが最適なレイアウトを推薦する。 |
+
+#### `/chat/process` の詳細
+
+- **Request Body:**
+
+```json
+{
+  "conversation_id": "conv_12345",
+  "message": {
+    "role": "user",
+    "content": "次数中心性を計算して、重要なノードを大きく表示してください。"
+  }
+}
+```
+
+- **Response Body (Success):**
+
+```json
+{
+  "message": {
+    "role": "assistant",
+    "content": "次数中心性を計算し、ノードのサイズに反映しました。"
+  },
+  "graph_updated": true,
+  "new_cytoscape_data": { ... } // 更新後のグラフデータ
+}
+```
 
 ### ネットワーク (`/network`)
 
 | Method | Path | 説明 |
 |:---|:---|:---|
-| `POST` | `/upload` | GraphMLファイルをアップロードし、新しい会話とネットワークを作成する。 |
+| `POST` | `/upload` | GraphMLファイルをアップロードし、新しい会話とネットワークを作成する。 `multipart/form-data` を使用。 |
 | `GET` | `/{network_id}/cytoscape` | ネットワークをCytoscape.js形式のJSONで取得する。 |
 | `POST` | `/{network_id}/layout` | `NetworkXMCP`を呼び出してレイアウトを計算・適用する。 |
 | `GET` | `/{network_id}/export` | ネットワークをGraphMLファイルとしてダウンロードする。 |
 
-## 主要なデータモデル
+## 主要なデータモデル (Pydantic Schemas)
 
-- **`User`**: ユーザー情報 (`id`, `username`)
-- **`Token`**: JWTアクセストークン (`access_token`, `token_type`)
-- **`Conversation`**: 会話セッション (`id`, `title`, `user_id`)
-- **`ChatMessage`**: 会話内のメッセージ (`id`, `content`, `role`)
-- **`Network`**: グラフデータ (`id`, `name`, `graphml_content`, `layout_cache`, `centrality_cache`)
+APIで送受信される主要なデータ構造です。
+
+- **User**
+
+| フィールド名 | 型 | 説明 |
+|:---|:---|:---|
+| `id` | `int` | ユーザーID |
+| `username` | `str` | ユーザー名 |
+
+- **Token**
+
+| フィールド名 | 型 | 説明 |
+|:---|:---|:---|
+| `access_token` | `str` | JWTアクセストークン |
+| `token_type` | `str` | トークン種別 (例: "bearer") |
+
+- **Conversation**
+
+| フィールド名 | 型 | 説明 |
+|:---|:---|:---|
+| `id` | `str` | 会話ID |
+| `title` | `str` | 会話のタイトル |
+| `user_id` | `int` | この会話を所有するユーザーのID |
+| `created_at` | `datetime` | 作成日時 |
+
+- **ChatMessage**
+
+| フィールド名 | 型 | 説明 |
+|:---|:---|:---|
+| `id` | `str` | メッセージID |
+| `conversation_id` | `str` | 所属する会話のID |
+| `role` | `str` | 発言者の役割 (`user` or `assistant`) |
+| `content` | `str` | メッセージの本文 |
+| `created_at` | `datetime` | 作成日時 |
+
+- **Network** (DBモデル)
+
+| フィールド名 | 型 | 説明 |
+|:---|:---|:---|
+| `id` | `str` | ネットワークID |
+| `name` | `str` | ネットワーク名 |
+| `graphml_content` | `str` | GraphML形式の元データ |
+| `conversation_id` | `str` | 関連付けられた会話のID |
 
 ## 外部サービス連携
 

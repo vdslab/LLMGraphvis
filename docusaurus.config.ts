@@ -98,6 +98,11 @@ const config: Config = {
       },
       items: [
         {
+          to: "/design-docs/",
+          label: "Design Docs",
+          position: "left",
+        },
+        {
           to: "/specification/",
           label: "Specification",
           position: "left",
