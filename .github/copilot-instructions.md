@@ -57,3 +57,7 @@ LLMGraph-vis is a web application for interactive graph (network) visualization 
 ---
 
 For unclear or missing conventions, consult `specification/README.md` and versioned docs. Please ask for feedback if any section is ambiguous or incomplete.
+
+注意: Docusaurusのドキュメント（サイトに公開される仕様ページ）を編集する場合は、必ずNextバージョンである`specification/`ディレクトリを編集してください。名前に`_versioned_docs/`を含むディレクトリ（例:`specification_versioned_docs/`や`versioned_docs/`）は過去版のドキュメントを格納するためのものであり、編集しないでください。`build/`（ビルド済みファイル）も直接編集しないでください。
+
+補足: `GEMINI.md`と`.github/copilot-instructions.md`はDocusaurusのドキュメントではありません。これらはリポジトリ内の補助文書（運用メモやローカル参照用）です。Docusaurus上の仕様ページを更新したい場合は、必ず`specification/`を編集してください。
