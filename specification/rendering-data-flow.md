@@ -1,35 +1,12 @@
-## レンダリング用データ生成フロー（シーケンス図）
+## レンダリング用データ生成フロー
 
-次は、フロントエンドでグラフを描画するためにAPIが返す「描画に必要な最小データ」を生成して配信する流れをシーケンス図で表したものです。
+ここでは、フロントエンドでグラフを描画するために API が返す「描画に必要な最小データ」を生成して配信する流れ（設計指針）を記載します。
 
 ### 契約（入力／出力）
 
 - 入力: フロントエンドからのレンダリング要求（例: graph_id, layout 指定, フィルタ条件）
 - 出力: フロントエンドがそのまま描画できる JSON ペイロード（nodes, edges の配列）。描画に不要な内部メタデータは含めない。
 - エラー: 不整合や未計算のキャッシュなどは 4xx/5xx と簡潔なメッセージで返却。
-
-### シーケンス図 (Mermaid)
-
-```mermaid
-sequenceDiagram
-    participant F as Frontend
-    participant A as Backend API
-    participant X as NetworkXMCP / Calc
-    participant DB as Database / Cache
-
-    F->>A: GET /render-data?graph_id=G1&layout=force
-    A->>DB: check cached render-data for (G1,layout)
-    alt cache hit
-        DB-->>A: cached nodes/edges
-    else cache miss
-        A->>X: request compute (graph G1, layout=force)
-        X->>DB: store intermediate results (optional)
-        X-->>A: nodes/edges (rendering fields only)
-        A->>DB: cache render-data
-    end
-    A-->>F: 200 OK + { nodes: [...], edges: [...] }
-    F->>F: render(nodes, edges)  %% frontend side rendering
-```
 
 ### 説明（要点）
 

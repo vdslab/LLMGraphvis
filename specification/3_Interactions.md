@@ -84,8 +84,8 @@ sequenceDiagram
     N-->>B: 実行成功の応答
 
     %% ここからレンダリング用データをまとめてフロントへ返す処理を追加
-    B->>DB: GET /{network_id}/render-data (現在の可視化属性をコンパイル)
-    DB-->>B: { nodes: [...], edges: [...] }
+    B->>DB: レンダリング用データをクエリ（ORM/SQLで現在の可視化属性を取得）
+    DB-->>B: { nodes: [...], edges: [...] }  %% DBは直接クエリでデータを返す（HTTP経由ではない）
     B-->>F: 200 OK + { nodes, edges }  %% フロントは受け取り次第描画
     F->>F: render(nodes, edges)
 

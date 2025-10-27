@@ -49,6 +49,11 @@ const sidebars: SidebarsConfig = {
       label: "3. 主要な処理フロー",
     },
     {
+      type: "doc",
+      id: "rendering-data-flow",
+      label: "描画データ生成フロー",
+    },
+    {
       type: "category",
       label: "DeepResearch",
       items: [
