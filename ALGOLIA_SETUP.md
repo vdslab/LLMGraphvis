@@ -13,6 +13,8 @@
 -   `apiKey`
 -   `indexName`
 
+**重要:** ここで発行される`apiKey`は、**検索専用（Search-Only）**のキーです。このキーは、データの追加や削除などの書き込み操作は許可されておらず、公開されても安全です。
+
 ## 2. 環境変数の設定 (ローカル環境)
 
 受け取ったAlgoliaの認証情報を安全に管理するため、プロジェクトのルートディレクトリに`.env`という名前のファイルを作成します。
@@ -84,6 +86,8 @@ npm start
 
 ## 5. Netlifyへのデプロイ
 
+### 環境変数の設定
+
 Netlifyなどのホスティングサービスにデプロイする際には、ローカルの`.env`ファイルは読み込まれません。そのため、サービスの管理画面で環境変数を設定する必要があります。
 
 Netlifyの場合、「Site settings」>「Build & deploy」>「Environment」>「Environment variables」から、以下の3つの環境変数を設定してください。
@@ -92,6 +96,21 @@ Netlifyの場合、「Site settings」>「Build & deploy」>「Environment」>�
 -   `ALGOLIA_API_KEY`
 -   `ALGOLIA_INDEX_NAME`
 
-これらの値を設定することで、本番環境でもAlgolia DocSearchが有効になります。
+### シークレットスキャンの設定
+
+Netlifyは、ビルド後のファイルにAPIキーなどの機密情報が含まれていると、セキュリティ上の理由からデプロイを自動的に停止する「シークレットスキャン」機能を備えています。
+
+Docusaurusの仕様上、AlgoliaのAPIキーはビルドされたHTMLファイルに埋め込まれます。前述の通り、このキーは検索専用で公開されても安全ですが、Netlifyのスキャナーはそれを区別できないため、デプロイが失敗します。
+
+この問題を解決するため、プロジェクトのルートに`netlify.toml`ファイルを作成し、特定の値がスキャンされてもエラーにしないよう設定しています。
+
+```toml
+# netlify.toml
+
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = ["ALGOLIA_API_KEY", "ALGOLIA_APP_ID", "ALGOLIA_INDEX_NAME", "REVIEW_ID"]
+```
+
+これにより、Netlifyは指定されたキーをシークレットとは見なさなくなり、ビルドが正常に完了します。
 
 **注意:** Algoliaのクローラーがあなたのサイトをクロールするまで、検索機能は正しく動作しません。クロールのスケジュールはAlgoliaのダッシュボードから確認・変更できます。
