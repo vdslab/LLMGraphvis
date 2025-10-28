@@ -60,17 +60,6 @@ const config: Config = {
         redirects: [{ from: "/", to: "/specification/" }],
       },
     ],
-    // New plugin for design_docs
-    [
-      "@docusaurus/plugin-content-docs",
-      {
-        id: "design-docs",
-        path: "design_docs",
-        routeBasePath: "design-docs",
-        sidebarPath: require.resolve("./idea_sidebars.ts"),
-        editUrl: "https://github.com/shirashoji/GraphVisAgent/tree/main/",
-      },
-    ],
     // Existing plugin for specification
     [
       "@docusaurus/plugin-content-docs",
@@ -109,11 +98,6 @@ const config: Config = {
       },
       items: [
         {
-          to: "/design-docs/",
-          label: "Design Docs",
-          position: "left",
-        },
-        {
           to: "/specification/",
           label: "Specification",
           position: "left",
@@ -139,12 +123,8 @@ const config: Config = {
           title: "Docs",
           items: [
             {
-              label: "Design Docs",
-              to: "/design-docs",
-            },
-            {
               label: "Specification",
-              to: "/",
+              to: "/specification/",
             },
           ],
         },
