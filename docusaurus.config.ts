@@ -91,15 +91,16 @@ const config: Config = {
     colorMode: {
       respectPrefersColorScheme: true,
     },
-    algolia: {
-      // The application ID provided by Algolia
-      appId: process.env.ALGOLIA_APP_ID!,
-      // Public API key: it is safe to commit it
-      apiKey: process.env.ALGOLIA_API_KEY!,
-      indexName: process.env.ALGOLIA_INDEX_NAME!,
-      // Optional: see doc section below
-      contextualSearch: true,
-    },
+    ...(process.env.ALGOLIA_APP_ID
+      ? {
+          algolia: {
+            appId: process.env.ALGOLIA_APP_ID,
+            apiKey: process.env.ALGOLIA_API_KEY!,
+            indexName: process.env.ALGOLIA_INDEX_NAME!,
+            contextualSearch: true,
+          },
+        }
+      : {}),
     navbar: {
       title: "GraphVisAgent Specification",
       logo: {

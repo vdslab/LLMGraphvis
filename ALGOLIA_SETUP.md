@@ -13,7 +13,7 @@
 -   `apiKey`
 -   `indexName`
 
-## 2. 環境変数の設定
+## 2. 環境変数の設定 (ローカル環境)
 
 受け取ったAlgoliaの認証情報を安全に管理するため、プロジェクトのルートディレクトリに`.env`という名前のファイルを作成します。
 
@@ -35,7 +35,9 @@ ALGOLIA_INDEX_NAME=YOUR_INDEX_NAME
 
 ## 3. Docusaurusの設定確認
 
-`docusaurus.config.ts`ファイルには、`.env`ファイルから環境変数を読み込み、Algolia DocSearchを有効にするための設定が既に記述されています。
+`docusaurus.config.ts`ファイルには、環境変数を読み込み、Algolia DocSearchを有効にするための設定が記述されています。
+
+環境変数(`ALGOLIA_APP_ID`など)が設定されている場合にのみAlgoliaの機能が有効になるように、設定は条件付きで読み込まれます。これにより、環境変数が設定されていない環境でもサイトのビルドが失敗することはありません。
 
 ```typescript
 // docusaurus.config.ts
@@ -47,14 +49,16 @@ const config: Config = {
   // ...
   themeConfig: {
     // ...
-    algolia: {
-      // The application ID provided by Algolia
-      appId: process.env.ALGOLIA_APP_ID!,
-      // Public API key: it is safe to commit it
-      apiKey: process.env.ALGOLIA_API_KEY!,
-      indexName: process.env.ALGOLIA_INDEX_NAME!,
-      contextualSearch: true,
-    },
+    ...(process.env.ALGOLIA_APP_ID
+      ? {
+          algolia: {
+            appId: process.env.ALGOLIA_APP_ID,
+            apiKey: process.env.ALGOLIA_API_KEY!,
+            indexName: process.env.ALGOLIA_INDEX_NAME!,
+            contextualSearch: true,
+          },
+        }
+      : {}),
     // ...
   },
   // ...
@@ -65,9 +69,7 @@ export default config;
 
 `import "dotenv/config";`という行がファイルの先頭に追加されており、これにより`process.env`オブジェクトを通じて`.env`ファイルの値にアクセスできるようになっています。
 
-`themeConfig.algolia`オブジェクトで、Algoliaの検索機能を設定しています。
-
-## 4. 動作確認
+## 4. 動作確認 (ローカル環境)
 
 設定が完了したら、ローカル環境で開発サーバーを起動して、検索バーが正しく表示されるか確認します。
 
@@ -79,5 +81,17 @@ npm start
 ```
 
 ブラウザで`http://localhost:3030`にアクセスし、サイトのヘッダーに検索バーが表示されていれば、設定は成功です。
+
+## 5. Netlifyへのデプロイ
+
+Netlifyなどのホスティングサービスにデプロイする際には、ローカルの`.env`ファイルは読み込まれません。そのため、サービスの管理画面で環境変数を設定する必要があります。
+
+Netlifyの場合、「Site settings」>「Build & deploy」>「Environment」>「Environment variables」から、以下の3つの環境変数を設定してください。
+
+-   `ALGOLIA_APP_ID`
+-   `ALGOLIA_API_KEY`
+-   `ALGOLIA_INDEX_NAME`
+
+これらの値を設定することで、本番環境でもAlgolia DocSearchが有効になります。
 
 **注意:** Algoliaのクローラーがあなたのサイトをクロールするまで、検索機能は正しく動作しません。クロールのスケジュールはAlgoliaのダッシュボードから確認・変更できます。
