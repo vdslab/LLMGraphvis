@@ -22,11 +22,6 @@ engine_args = {
     "pool_recycle": 3600,
 }
 
-# Add connect_timeout only for PostgreSQL connections
-if DATABASE_URL.startswith("postgresql"):
-    engine_args["connect_args"] = {"connect_timeout": 10}
-    logger.info("PostgreSQL detected, adding connect_timeout argument.")
-
 engine = create_engine(DATABASE_URL, **engine_args)
 
 # Create session factory
