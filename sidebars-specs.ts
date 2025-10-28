@@ -59,6 +59,11 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: "doc",
+          id: "Authentication",
+          label: "認証フロー",
+        },
+        {
+          type: "doc",
           id: "rendering-data-flow",
           label: "LLM Function Callingによるレンダリングデータ生成フロー",
         },

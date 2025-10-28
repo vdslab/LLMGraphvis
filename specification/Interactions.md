@@ -2,6 +2,8 @@
 
 このドキュメントでは、主要なユースケースにおけるコンポーネント間の動的なやり取りをシーケンス図で示します。
 
+認証に関するフローは、[認証フロー](./Authentication.md)を参照してください。
+
 ## 3.1. 初期グラフ表示フロー
 
 **目的:** ユーザーがGraphMLファイルをアップロードした後、チャットで指示を出す前のデフォルトのグラフ表示処理を定義します。
@@ -44,45 +46,7 @@ sequenceDiagram
     F->>F: Spring Layoutが適用された初期グラフを描画
 ```
 
-## 3.2. 認証とデータ永続化フロー
-
-**目的:** ユーザーが安全にシステムを利用し、作業内容（グラフデータなど）を保存できるようにするための基本的なフローです。
-
-ユーザー登録、ログイン、ファイルアップロード時のやり取りを示します。
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant U as ユーザー
-    participant F as Frontend
-    participant LS as Browser Local Storage
-    participant B as API Service
-    participant DB as Database
-
-    U->>F: 新規登録情報入力
-    F->>B: POST /auth/register (username, password)
-    B->>DB: ユーザー情報をハッシュ化して保存
-    DB-->>B: ユーザー登録結果
-    B-->>F: 登録完了
-
-    U->>F: ログイン情報入力
-    F->>B: POST /auth/token (username, password)
-    B->>DB: ユーザー情報検証
-    DB-->>B: 検証結果 (ユーザー情報)
-    B->>B: JWTを生成
-    B-->>F: JSON Web Token (JWT)
-    F->>LS: JWTを保存
-    LS-->>F: 保存成功
-
-    U->>F: GraphMLファイルアップロード
-    F->>B: POST /network/upload (JWT, GraphML)
-    B->>B: JWTを検証
-    B->>DB: GraphMLデータ、会話情報などを保存
-    DB-->>B: 保存成功
-    B-->>F: アップロード成功
-```
-
-## 3.3. LLMによる複数ツール呼び出しとキャッシュ利用フロー
+## 3.2. 対話によるグラフ操作フロー
 
 **目的:** ユーザーの曖昧な自然言語指示（例:「重要なノードを大きくして」）から、LLMが具体的な「計算」と「可視化」のツール呼び出しを推論し、実行する、本システムの最も中心的なフローです。
 
@@ -99,61 +63,44 @@ sequenceDiagram
     participant N as NetworkXMCP (Tool Service)
     participant DB as Database
 
+    %% WebSocket Connection
+    F->>B: WebSocket接続要求 (/chat/ws)
+    B-->>F: 接続確立
+
     %% Step 1: User sends a message
     U->>F: 「友達が多い人を大きく表示して」
-    F->>B: POST /chat/process (message, conversation_id)
+    F->>B: WebSocketメッセージ送信 (message, conversation_id)
     B->>DB: ユーザーメッセージを保存
 
     %% Step 2: Backend invokes LLM
     B->>LLM: ユーザーの指示と会話履歴を送信
     note right of LLM: LLMは「友達が多い」を「次数中心性」と解釈し、<br/>「大きく表示」を「ノードサイズ」に割り当てる判断を行う。
     LLM-->>B: ツール呼び出しを要求 (calculate_centrality → apply_metric_to_visual)
-    note right of B: LLMは一度の推論で複数のツール呼び出しを順次返すことがある
 
-    %% Step 3: Backend calls the first tool: calculation
+    %% Step 3: Backend calls tools
     B->>N: /tools/calculate_centrality (network_id, type:"degree")
+    N-->>B: 実行成功
+    B->>N: /tools/apply_metric_to_visual (network_id, metric:"degree_centrality", visual:"node_size")
+    N-->>B: 実行成功
 
-    %% Step 4: NetworkXMCP checks cache, computes if needed, and saves to cache
-    N->>DB: キャッシュ有無を確認 (degree centrality)
-    alt キャッシュが存在する場合
-        DB-->>N: キャッシュ済み中心性データを返す
-        N-->>B: 計算結果 (キャッシュ)
-    else キャッシュが存在しない場合
-        DB-->>N: キャッシュなし
-        N->>DB: GraphML等の原データを読み込み
-        DB-->>N: GraphML データ
-        note over N: 中心性計算を実行 (例: degree)
-        N->>DB: 新しい中心性データをキャッシュに保存
-        DB-->>N: 保存成功
-        N-->>B: 計算結果 (新規)
-    end
+    %% Step 4: Backend sends a notification via WebSocket
+    note right of B: グラフデータが更新されたことを通知する
+    B-->>F: WebSocketメッセージ (type: "graph_updated")
 
-    %% Step 5: Backend calls the second tool: visualization mapping
-    B->>N: /tools/apply_metric_to_visual (network_id, metric:"degree_centrality", visual:"node_size", mapping:{scale:"linear", range:[8,32]})
-    note over N: このツールの目的は、計算された指標（metric）を<br/>具体的な見た目（visual）に変換すること。
-
-    %% Step 6: NetworkXMCP's behavior (implementation choice)
-    alt 推奨モデル: NetworkXMCPが可視化属性をDBに保存
-        N->>DB: ノード毎のvisual属性を保存 (例: size, color)
-        DB-->>N: 保存成功
-        N-->>B: 実行成功応答
-    else 代替モデル: NetworkXMCPが属性を直接Backendに返す
-        N-->>B: 実行結果 (ノードIDとvisual属性の配列)
-    end
-
-    %% Step 7: Backend assembles rendering data and returns to Frontend
-    note right of B: 重要な設計: レンダリング用データの最終的な組み立ては<br/>Backendの責務である。
-    B->>DB: レンダリング用データをクエリ（位置, visual属性, ラベル等）
+    %% Step 5: Frontend fetches the updated graph data via HTTP
+    note left of F: 通知を受け、HTTPで最新のグラフデータを取得
+    F->>B: GET /network/{network_id}/cytoscape
+    B->>DB: レンダリングに必要なデータをクエリ
     DB-->>B: { nodes: [...], edges: [...] }
     B-->>F: 200 OK + { nodes, edges }
     F->>F: render(nodes, edges)
 
-    %% Step 8: Backend informs LLM of tool results and gets final response
+    %% Step 6: Backend gets final response from LLM and sends it via WebSocket
     B->>LLM: 全てのツール実行結果を送信
     LLM-->>B: 最終的な応答メッセージを生成
     B->>DB: LLMの応答メッセージを保存
-    B-->>F: 最終応答と更新されたグラフ情報
-    F->>U: 応答と、ノードサイズが変化したグラフを表示
+    B-->>F: WebSocketメッセージ (type: "llm_response", payload: { ... })
+    F->>U: LLMからの応答を画面に表示
 ```
 
 ### フローの補足
@@ -170,7 +117,7 @@ sequenceDiagram
 - **レンダリングデータ生成**
   - フローの最終段階でBackendがレンダリング用データを組み立てるプロセスと、そのJSONデータの具体的な仕様は、「[LLM Function Callingによるレンダリングデータ生成フロー](./rendering-data-flow.md)」で定義されています。
 
-## 3.4. ツール呼び出し失敗時のエラーハンドリングフロー
+## 3.3. ツール呼び出し失敗時のエラーハンドリングフロー
 
 **目的:** システムが予期せぬ状況（例: 未実装の計算）に陥った場合でも、LLMが状況を理解し、ユーザーに代替案を提示することで、対話を継続できるようにします。
 
