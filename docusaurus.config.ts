@@ -1,6 +1,7 @@
 import { themes as prismThemes } from "prism-react-renderer";
 import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
+import "dotenv/config";
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
@@ -90,6 +91,16 @@ const config: Config = {
     colorMode: {
       respectPrefersColorScheme: true,
     },
+    ...(process.env.ALGOLIA_APP_ID
+      ? {
+          algolia: {
+            appId: process.env.ALGOLIA_APP_ID,
+            apiKey: process.env.ALGOLIA_API_KEY!,
+            indexName: process.env.ALGOLIA_INDEX_NAME!,
+            contextualSearch: true,
+          },
+        }
+      : {}),
     navbar: {
       title: "GraphVisAgent Specification",
       logo: {
