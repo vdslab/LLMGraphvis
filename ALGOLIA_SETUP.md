@@ -108,7 +108,7 @@ Docusaurusの仕様上、AlgoliaのAPIキーはビルドされたHTMLファイ�
 # netlify.toml
 
 [build.environment]
-  SECRETS_SCAN_OMIT_KEYS = ["ALGOLIA_API_KEY", "ALGOLIA_APP_ID", "ALGOLIA_INDEX_NAME", "REVIEW_ID"]
+  SECRETS_SCAN_OMIT_KEYS = "ALGOLIA_API_KEY,ALGOLIA_APP_ID,ALGOLIA_INDEX_NAME,REVIEW_ID"
 ```
 
 これにより、Netlifyは指定されたキーをシークレットとは見なさなくなり、ビルドが正常に完了します。
