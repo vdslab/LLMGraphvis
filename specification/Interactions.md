@@ -2,7 +2,49 @@
 
 このドキュメントでは、主要なユースケースにおけるコンポーネント間の動的なやり取りをシーケンス図で示します。
 
-## 3.1. 認証とデータ永続化フロー
+## 3.1. 初期グラフ表示フロー
+
+**目的:** ユーザーがGraphMLファイルをアップロードした後、チャットで指示を出す前のデフォルトのグラフ表示処理を定義します。
+
+**方針:** アップロード処理の一環として、非同期または同期的にデフォルトのレイアウト（Spring Layout）を計算し、その結果を初期表示に利用します。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as ユーザー
+    participant F as Frontend
+    participant B as API Service (Backend)
+    participant N as NetworkXMCP (Tool Service)
+    participant DB as Database
+
+    %% Step 1: User uploads a file
+    U->>F: GraphMLファイルをアップロード
+    F->>B: POST /network/upload (GraphMLデータ)
+
+    %% Step 2: Backend saves initial data and requests default layout calculation
+    B->>DB: GraphML、会話、ネットワーク情報を保存
+    DB-->>B: 保存成功 (network_id)
+    B->>N: POST /tools/change_layout (network_id, name:"spring")
+    note over N: デフォルトのSpring Layoutを計算
+
+    %% Step 3: NetworkXMCP computes and saves layout
+    N->>DB: 計算したノード座標 (position) を保存
+    DB-->>N: 保存成功
+    N-->>B: 実行成功応答
+    B-->>F: アップロード成功 (network_id, conversation_id)
+
+    %% Step 4: Frontend navigates and fetches the initial graph data
+    F->>F: チャットページへ遷移
+    F->>B: GET /network/{network_id}/cytoscape
+    B->>DB: レンダリングに必要なデータをクエリ (ノード, エッジ, 計算済みのposition)
+    DB-->>B: { nodes: [...], edges: [...] }
+    B-->>F: 200 OK + { nodes, edges }
+
+    %% Step 5: Frontend renders the initial graph
+    F->>F: Spring Layoutが適用された初期グラフを描画
+```
+
+## 3.2. 認証とデータ永続化フロー
 
 **目的:** ユーザーが安全にシステムを利用し、作業内容（グラフデータなど）を保存できるようにするための基本的なフローです。
 
@@ -40,7 +82,7 @@ sequenceDiagram
     B-->>F: アップロード成功
 ```
 
-## 3.2. LLMによる複数ツール呼び出しとキャッシュ利用フロー
+## 3.3. LLMによる複数ツール呼び出しとキャッシュ利用フロー
 
 **目的:** ユーザーの曖昧な自然言語指示（例:「重要なノードを大きくして」）から、LLMが具体的な「計算」と「可視化」のツール呼び出しを推論し、実行する、本システムの最も中心的なフローです。
 
@@ -128,7 +170,7 @@ sequenceDiagram
 - **レンダリングデータ生成**
   - フローの最終段階でBackendがレンダリング用データを組み立てるプロセスと、そのJSONデータの具体的な仕様は、「[LLM Function Callingによるレンダリングデータ生成フロー](./rendering-data-flow.md)」で定義されています。
 
-## 3.3. ツール呼び出し失敗時のエラーハンドリングフロー
+## 3.4. ツール呼び出し失敗時のエラーハンドリングフロー
 
 **目的:** システムが予期せぬ状況（例: 未実装の計算）に陥った場合でも、LLMが状況を理解し、ユーザーに代替案を提示することで、対話を継続できるようにします。
 

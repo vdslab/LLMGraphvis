@@ -49,14 +49,20 @@ const sidebars: SidebarsConfig = {
       label: "3. 主要な処理フロー",
     },
     {
-      type: "doc",
-      id: "database-schema",
-      label: "4. データベーススキーマ仕様",
-    },
-    {
-      type: "doc",
-      id: "rendering-data-flow",
-      label: "5. LLM Function Callingによるレンダリングデータ生成フロー",
+      type: "category",
+      label: "4. 補足仕様",
+      items: [
+        {
+          type: "doc",
+          id: "database-schema",
+          label: "データベーススキーマ仕様",
+        },
+        {
+          type: "doc",
+          id: "rendering-data-flow",
+          label: "LLM Function Callingによるレンダリングデータ生成フロー",
+        },
+      ],
     },
   ],
 };
