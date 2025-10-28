@@ -77,6 +77,10 @@ graph TD
 }
 ```
 
+このエンドポイントが呼び出された際の、Backend、LLM、NetworkXMCP間のより詳細な連携フローについては、以下のドキュメントを参照してください。
+- **[3. 主要な処理フロー](./Interactions.md)**: 全体のやり取りをシーケンス図で解説しています。
+- **[LLM Function Callingによるレンダリングデータ生成フロー](./rendering-data-flow.md)**: Function Callingにおけるデータの流れと責務を詳細に定義しています。
+
 ### ネットワーク (`/network`)
 
 | Method | Path | 説明 |

@@ -56,7 +56,7 @@ const sidebars: SidebarsConfig = {
     {
       type: "doc",
       id: "rendering-data-flow",
-      label: "5. 描画データ生成フロー",
+      label: "5. LLM Function Callingによるレンダリングデータ生成フロー",
     },
   ],
 };

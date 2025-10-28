@@ -59,10 +59,10 @@ graph TD
 
 | コンテナ | 説明 | 技術スタック |
 |:---|:---|:---|
-| **Frontend Service** | ユーザーにUIを提供するためのSPA（Single Page Application）を配信するWebサーバー。 | React, Vite, react-force-graph-2d, Zustand, axios |
-| **API Service** | ビジネスロジック、認証、外部API連携を担当するバックエンド。`NetworkXMCP`へのリクエストをプロキシする。 | FastAPI, SQLAlchemy, (LLM SDKs) |
-| **NetworkX Model Context Protocol (NetworkXMCP)** | グラフ計算やレイアウト処理に特化した計算サービス。**ステートフル**であることで、計算結果をキャッシュし、高コストな再計算を回避します。 | FastAPI, NetworkX, Python, SQLAlchemy |
-| **Database** | ユーザー情報、グラフデータ、計算結果のキャッシュなどを永続化するデータベース。 | PostgreSQL |
+| **Frontend Service** | ユーザーにUIを提供するためのSPA（Single Page Application）を配信するWebサーバー。詳細は[フロントエンド仕様](./Frontend.md)を参照。 | React, Vite, react-force-graph-2d, Zustand, axios |
+| **API Service** | ビジネスロジック、認証、外部API連携を担当するバックエンド。詳細は[バックエンド仕様](./Backend.md)を参照。 | FastAPI, SQLAlchemy, (LLM SDKs) |
+| **NetworkX Model Context Protocol (NetworkXMCP)** | グラフ計算やレイアウト処理に特化した計算サービス。**ステートフル**であることで、計算結果をキャッシュし、高コストな再計算を回避します。詳細は[グラフ計算サービス仕様](./NetworkXMCP.md)を参照。 | FastAPI, NetworkX, Python, SQLAlchemy |
+| **Database** | ユーザー情報、グラフデータ、計算結果のキャッシュなどを永続化するデータベース。詳細は[データベーススキーマ仕様](./database-schema.md)を参照。 | PostgreSQL |
 
 ## 1.2. データ永続化
 
@@ -77,6 +77,7 @@ graph TD
         - メッセージ（ユーザーの発言、LLMの応答）
         - GraphMLデータ本体
         - 計算結果のキャッシュ（レイアウト座標、中心性指標など）
+    - **補足**: 主要なテーブルの構造については、[データベーススキーマ仕様](./database-schema.md)で詳細を定義しています。
 
 - **クライアントサイド (Web Browser)**:
     - **目的**: ユーザーの利便性向上。再ログインの手間を省き、シームレスな認証状態を維持する。
