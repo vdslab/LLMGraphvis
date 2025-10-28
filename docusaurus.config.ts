@@ -1,6 +1,7 @@
 import { themes as prismThemes } from "prism-react-renderer";
 import type { Config } from "@docusaurus/types";
 import type * as Preset from "@docusaurus/preset-classic";
+import "dotenv/config";
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
@@ -89,6 +90,15 @@ const config: Config = {
     image: "img/docusaurus-social-card.jpg",
     colorMode: {
       respectPrefersColorScheme: true,
+    },
+    algolia: {
+      // The application ID provided by Algolia
+      appId: process.env.ALGOLIA_APP_ID!,
+      // Public API key: it is safe to commit it
+      apiKey: process.env.ALGOLIA_API_KEY!,
+      indexName: process.env.ALGOLIA_INDEX_NAME!,
+      // Optional: see doc section below
+      contextualSearch: true,
     },
     navbar: {
       title: "GraphVisAgent Specification",
