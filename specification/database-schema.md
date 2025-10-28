@@ -2,7 +2,60 @@
 
 このドキュメントでは、LLMGraph-visアプリケーションで使用される主要なデータベーススキーマを定義します。
 
-## 4.1. 計算結果キャッシュ (`calculation_results`)
+## 4.1. ER図
+
+```mermaid
+erDiagram
+    users ||--o{ projects : "has"
+    projects ||--o{ graphs : "contains"
+    projects ||--o{ chat_history : "records"
+    graphs ||--o{ calculation_results : "caches"
+
+    users {
+        UUID id PK
+        VARCHAR username UK
+        VARCHAR email UK
+        VARCHAR hashed_password
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+
+    projects {
+        UUID id PK
+        UUID user_id FK
+        VARCHAR name
+        TEXT description
+        UUID current_graph_id
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
+
+    graphs {
+        UUID id PK
+        UUID project_id FK
+        VARCHAR name
+        VARCHAR file_type
+        TIMESTAMP uploaded_at
+    }
+
+    chat_history {
+        UUID id PK
+        UUID project_id FK
+        VARCHAR role
+        TEXT content
+        TIMESTAMP timestamp
+    }
+
+    calculation_results {
+        INTEGER id PK
+        UUID graph_id FK
+        TEXT datatype
+        JSONB data
+        TIMESTAMP created_at
+    }
+```
+
+## 4.2. 計算結果キャッシュ (`calculation_results`)
 
 NetworkX等で計算された中心性指標などの分析結果を永続化するためのテーブルです。高コストな計算の再実行を防ぐことを目的とします。
 

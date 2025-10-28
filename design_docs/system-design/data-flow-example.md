@@ -27,3 +27,33 @@
 9.  **フロントエンド**: 新しい描画JSONを受信し、画面のグラフを更新(ノードサイズが変わる)。
 10. **Orchestrator**: (並行して)LLMからのテキスト応答「次数中心性をノードサイズに割り当てました。」をフロントエンドに送信。
 11. **フロントエンド**: チャット欄に応答テキストを表示する。
+
+```mermaid
+sequenceDiagram
+    participant FE as フロントエンド
+    participant API as API Gateway
+    participant Orch as Orchestrator
+    participant LLM as LLM API
+    participant Compute as Compute Engine
+    participant State as State Manager
+    participant DBs as データストア (Neo4j/Redis)
+
+    FE->>API: WebSocket: "友達が多い人を可視化して"
+    API->>Orch: メッセージ転送
+    Orch->>LLM: 意図解釈を依頼
+    LLM-->>Orch: Function Call: calculate_metric('degree_centrality')
+    Orch->>Compute: 次数中心性の計算を依頼
+    Compute->>DBs: グラフデータを取得・計算
+    Compute->>DBs: 計算結果を保存
+    DBs-->>Compute: 完了
+    Compute-->>Orch: 計算結果を返す
+    Orch->>LLM: 計算結果と元の指示を渡し、可視化方法を依頼
+    LLM-->>Orch: Function Call: map_visual_property('node_size', 'degree_centrality')
+    Orch->>State: 可視化状態の更新を依頼
+    State->>DBs: 描画に必要なデータを取得
+    DBs-->>State: データ
+    State->>FE: WebSocket: 描画用JSONをプッシュ
+    FE-->>FE: グラフを更新 (ノードサイズ変更)
+    Orch-->>FE: WebSocket: テキスト応答を送信
+    FE-->>FE: チャットに応答を表示
+```
