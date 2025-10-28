@@ -114,66 +114,9 @@ sequenceDiagram
     F->>U: 応答と、ノードサイズが変化したグラフを表示
 ```
 
-### データベーススキーマと実装モデル
+### データベーススキーマ
 
-上記のシーケンス図 `Step 6` では、**推奨モデル**（`NetworkXMCP`が直接データベースに書き込む）を採用した場合のスキーマ例を示します。このモデルは、計算サービス(`NetworkXMCP`)とAPIサービス(`Backend`)の責務が明確に分離されるため、システム全体の関心事がクリーンに保たれるという利点があります。
-
-#### 1. `calculation_cache` テーブル
-
-純粋な計算結果（数値）を保存し、高コストな再計算を回避するためのキャッシュテーブルです。
-
-- **目的**: 計算結果そのものを保持する。
-- **主なカラム**:
-    - `metric_name`: 計算の種類（例: 'degree_centrality', 'pagerank'）
-    - `value`: 計算された数値スコア
-- **SQL定義**:
-```sql
--- 計算結果そのもの（数値）を保存するキャッシュテーブル
-CREATE TABLE calculation_cache (
-    id SERIAL PRIMARY KEY,
-    network_id UUID NOT NULL,
-    node_id TEXT NOT NULL,
-    metric_name TEXT NOT NULL,       -- 例: 'degree_centrality'
-    value DOUBLE PRECISION NOT NULL,
-    computed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    UNIQUE (network_id, node_id, metric_name)
-);
-```
-
-#### 2. `visual_attributes` テーブル
-
-計算結果をどのように見せるか（可視化）の属性を保存するテーブルです。
-
-- **目的**: 描画に必要なスタイル属性（サイズ、色など）を保持する。
-- **主なカラム**:
-    - `visual_attrs`: スタイル情報を格納する `JSONB` フィールド。
-- **SQL定義**:
-```sql
--- 計算結果をどう見せるか（可視化）の属性を保存するテーブル
-CREATE TABLE visual_attributes (
-    id SERIAL PRIMARY KEY,
-    network_id UUID NOT NULL,
-    node_id TEXT NOT NULL,
-    visual_attrs JSONB NOT NULL,     -- 例: {"size": 18, "color": "#4A90E2"}
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-    UNIQUE (network_id, node_id)
-);
-```
-
-**`visual_attrs` のJSONデータ例:**
-
-```json
-{
-  "size": 24,
-  "color": "#F5A623",
-  "borderColor": "#8A5A00",
-  "borderWidth": 1,
-  "note": "mapped from degree_centrality"
-}
-```
-
-**運用上の注意:**
-Backendは、フロントエンドに描画データを返す際、この`visual_attributes`テーブルを参照して最終的なスタイル情報を組み立てます。
+計算結果のキャッシュや可視化属性の永続化に使用されるデータベーススキーマの詳細は、新しく作成された[データベーススキーマ仕様](./database-schema.md)を参照してください。このドキュメントで、`calculation_results`テーブルなどの設計方針と具体的な構造を定義しています。
 
 ## 3.3. ツール呼び出し失敗時のエラーハンドリングフロー
 
