@@ -44,36 +44,19 @@ const sidebars: SidebarsConfig = {
       ],
     },
     {
-      type: "category",
+      type: "doc",
+      id: "Interactions",
       label: "3. 主要な処理フロー",
-      items: [
-        {
-          type: "doc",
-          id: "Interactions",
-          label: "3.1. 主要シーケンス",
-        },
-        {
-          type: "doc",
-          id: "rendering-data-flow",
-          label: "3.2. 描画データ生成フロー",
-        },
-      ],
     },
     {
-      type: "category",
-      label: "4. 詳細設計・調査 (DeepResearch)",
-      items: [
-        {
-          type: "doc",
-          id: "DeepResearch/database",
-          label: "4.1. データベース設計指針",
-        },
-        {
-          type: "doc",
-          id: "DeepResearch/degree-centrality-format",
-          label: "4.2. 次数中心性フォーマット例",
-        },
-      ],
+      type: "doc",
+      id: "database-schema",
+      label: "4. データベーススキーマ仕様",
+    },
+    {
+      type: "doc",
+      id: "rendering-data-flow",
+      label: "5. 描画データ生成フロー",
     },
   ],
 };
