@@ -30,8 +30,6 @@ services:
       db:
         condition: service_healthy
     restart: always
-    command:
-      ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     environment:
       # These are now managed in the .env file
       # - DATABASE_URL=postgresql://postgres:postgres@db:5432/networkvis
