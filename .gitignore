@@ -181,3 +181,8 @@ cython_debug/
 logs/
 API/.venv/
 NetworkXMCP/.venv/
+
+# Local development artifacts
+.env
+test.db
+*.log

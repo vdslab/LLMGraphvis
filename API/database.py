@@ -11,14 +11,14 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db:5432/graphvis")
 
 # Create SQLAlchemy engine with specific connection parameters
-engine = create_engine(
-    DATABASE_URL,
-    pool_pre_ping=True,  # 接続前にpingを実行し、接続が生きているか確認
-    pool_recycle=3600,   # 1時間ごとに接続をリサイクル
-    connect_args={
-        "connect_timeout": 10,  # 接続タイムアウトを10秒に設定
-    }
-)
+engine_args = {
+    "pool_pre_ping": True,
+    "pool_recycle": 3600,
+}
+if "sqlite" not in DATABASE_URL:
+    engine_args["connect_args"] = {"connect_timeout": 10}
+
+engine = create_engine(DATABASE_URL, **engine_args)
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
