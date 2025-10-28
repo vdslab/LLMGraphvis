@@ -116,10 +116,17 @@ sequenceDiagram
 
 ### データベーススキーマと実装モデル
 
-上記のシーケンス図 `Step 6` では、`NetworkXMCP`が可視化属性をどう扱うかについて2つのモデル（推奨、代替）を提示しています。ここでは**推奨モデル**（`NetworkXMCP`が直接データベースに書き込む）を採用した場合のスキーマ例を示します。
+上記のシーケンス図 `Step 6` では、**推奨モデル**（`NetworkXMCP`が直接データベースに書き込む）を採用した場合のスキーマ例を示します。このモデルは、計算サービス(`NetworkXMCP`)とAPIサービス(`Backend`)の責務が明確に分離されるため、システム全体の関心事がクリーンに保たれるという利点があります。
 
-このモデルの利点は、計算サービス(`NetworkXMCP`)とAPIサービス(`Backend`)の責務が明確に分離される点にあります。
+#### 1. `calculation_cache` テーブル
 
+純粋な計算結果（数値）を保存し、高コストな再計算を回避するためのキャッシュテーブルです。
+
+- **目的**: 計算結果そのものを保持する。
+- **主なカラム**:
+    - `metric_name`: 計算の種類（例: 'degree_centrality', 'pagerank'）
+    - `value`: 計算された数値スコア
+- **SQL定義**:
 ```sql
 -- 計算結果そのもの（数値）を保存するキャッシュテーブル
 CREATE TABLE calculation_cache (
@@ -131,7 +138,17 @@ CREATE TABLE calculation_cache (
     computed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     UNIQUE (network_id, node_id, metric_name)
 );
+```
 
+#### 2. `visual_attributes` テーブル
+
+計算結果をどのように見せるか（可視化）の属性を保存するテーブルです。
+
+- **目的**: 描画に必要なスタイル属性（サイズ、色など）を保持する。
+- **主なカラム**:
+    - `visual_attrs`: スタイル情報を格納する `JSONB` フィールド。
+- **SQL定義**:
+```sql
 -- 計算結果をどう見せるか（可視化）の属性を保存するテーブル
 CREATE TABLE visual_attributes (
     id SERIAL PRIMARY KEY,
@@ -142,11 +159,6 @@ CREATE TABLE visual_attributes (
     UNIQUE (network_id, node_id)
 );
 ```
-
-**運用上の注意:**
-
-- `calculation_cache`は純粋な計算結果（数値）を保持し、再計算を避けるために利用します。
-- `visual_attributes`には描画に必要な属性（size, colorなど）をJSONBとして格納します。Backendはレンダリングデータを組み立てる際にこのテーブルを参照します。
 
 **`visual_attrs` のJSONデータ例:**
 
@@ -159,6 +171,9 @@ CREATE TABLE visual_attributes (
   "note": "mapped from degree_centrality"
 }
 ```
+
+**運用上の注意:**
+Backendは、フロントエンドに描画データを返す際、この`visual_attributes`テーブルを参照して最終的なスタイル情報を組み立てます。
 
 ## 3.3. ツール呼び出し失敗時のエラーハンドリングフロー
 
