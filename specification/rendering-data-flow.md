@@ -17,12 +17,21 @@
 
 Backendは、LLMに対してユーザーの指示、会話履歴、そして利用可能なツール（関数）の定義を渡します。
 
-- **入力**:
-    - ユーザーのメッセージ: `「友達が多い人を大きく表示して」`
-    - 利用可能なツールの定義（[NetworkXMCP](./NetworkXMCP.md)のエンドポイントに対応）:
-        - `calculate_centrality(type: str)` (例: 'degree', 'pagerank', 'betweenness', 'closeness', 'eigenvector', 'load', 'edge_betweenness', 'clustering', 'transitivity', 'modularity')
+- **入力 (コンテキスト情報)**:
+    - **ユーザーのメッセージ**: `「友達が多い人を大きく表示して」`
+    - **会話履歴**: 過去のやり取り。
+    - **利用可能なツール定義**:
+        - `calculate_centrality(type: str)`
         - `apply_metric_to_visual(metric: str, visual: str, mapping: dict)`
         - `change_layout(name: str)`
+        - `highlight_nodes(metric: str, criteria: str)`
+    - **現在のグラフ状態** (オプション):
+        - `current_layout`: `spring`
+        - `visual_mappings`: `{ "node_size": { "metric": "degree_centrality" } }`
+    - **計算済みの指標リスト** (オプション): `['degree_centrality', 'pagerank']`
+    - **グラフデータのスキーマ** (オプション):
+        - `node_attributes`: `['name', 'department']`
+        - `edge_attributes`: `['weight']`
 
 #### 2. LLM → Backend: 実行すべきツールリストの返却
 

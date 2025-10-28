@@ -4,9 +4,9 @@
 
 認証に関するフローは、[認証フロー](./Authentication.md)を参照してください。
 
-## 3.1. 初期グラフ表示フロー
+## 3.1. 新規会話開始（グラフアップロード）フロー
 
-**目的:** ユーザーがGraphMLファイルをアップロードした後、チャットで指示を出す前のデフォルトのグラフ表示処理を定義します。
+**目的:** ユーザーが新しい分析サイクルを開始するために、GraphMLファイルをアップロードして新規会話を作成する処理を定義します。
 
 **方針:** アップロード処理の一環として、非同期または同期的にデフォルトのレイアウト（Spring Layout）を計算し、その結果を初期表示に利用します。
 
@@ -63,7 +63,7 @@ sequenceDiagram
     participant N as NetworkXMCP (Tool Service)
     participant DB as Database
 
-    %% WebSocket Connection
+    note over F, B: チャットページ表示時にWebSocket接続を確立
     F->>B: WebSocket接続要求 (/chat/ws)
     B-->>F: 接続確立
 

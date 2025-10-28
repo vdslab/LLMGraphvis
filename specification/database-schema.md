@@ -17,7 +17,7 @@ NetworkX等で計算された中心性指標などの分析結果を永続化す
 ```sql
 CREATE TABLE calculation_results (
     id SERIAL PRIMARY KEY,
-    graph_id INT NOT NULL,          -- 外部キーとしてグラフテーブルに関連付け
+    graph_id TEXT NOT NULL,          -- 外部キーとしてグラフテーブルに関連付け
     datatype TEXT NOT NULL,         -- 'degree_centrality', 'pagerank', 'betweenness_centrality', 'closeness_centrality', 'eigenvector_centrality', 'load_centrality', 'edge_betweenness_centrality', 'clustering', 'transitivity', 'modularity' などの指標名
     data JSONB NOT NULL,            -- 計算結果の本体
     created_at TIMESTAMPTZ DEFAULT NOW(),
