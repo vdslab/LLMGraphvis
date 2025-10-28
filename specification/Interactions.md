@@ -67,9 +67,9 @@ sequenceDiagram
     F->>B: WebSocket接続要求 (/chat/ws)
     B-->>F: 接続確立
 
-    %% Step 1: User sends a message
+    %% Step 1: User sends a message (HTTP POST)
     U->>F: 「友達が多い人を大きく表示して」
-    F->>B: WebSocketメッセージ送信 (message, conversation_id)
+    F->>B: POST /chat/process (message, conversation_id)
     B->>DB: ユーザーメッセージを保存
 
     %% Step 2: Backend invokes LLM
@@ -95,11 +95,11 @@ sequenceDiagram
     B-->>F: 200 OK + { nodes, edges }
     F->>F: render(nodes, edges)
 
-    %% Step 6: Backend gets final response from LLM and sends it via WebSocket
+    %% Step 6: Backend gets final response from LLM and sends it via HTTP response
     B->>LLM: 全てのツール実行結果を送信
     LLM-->>B: 最終的な応答メッセージを生成
     B->>DB: LLMの応答メッセージを保存
-    B-->>F: WebSocketメッセージ (type: "llm_response", payload: { ... })
+    B-->>F: 200 OK + { message: LLMからの応答 }
     F->>U: LLMからの応答を画面に表示
 ```
 

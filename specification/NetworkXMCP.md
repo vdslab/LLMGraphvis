@@ -16,7 +16,7 @@
 | Method | Path | 説明 |
 |:---|:---|:---|
 | `GET` | `/health` | サービスのヘルスチェックを行う。 |
-| `POST` | `/tools/calculate_centrality` | 中心性指標を**計算**し、結果をキャッシュに保存する。可視化は変更しない。 |
+| `POST` | `/tools/calculate_centrality` | 中心性指標（例: 次数中心性、媒介中心性、近接中心性、PageRankなど）を**計算**し、結果をキャッシュに保存する。可視化は変更しない。 |
 | `POST` | `/tools/apply_metric_to_visual` | キャッシュされた計算結果を、ノードのサイズや色などの**可視化**に反映させる。 |
 | `POST` | `/tools/change_layout` | グラフレイアウトを計算またはキャッシュから取得し、ノードの**座標**を更新する。GraphMLアップロード時の初期レイアウト計算にも使用される。 |
 | `POST` | `/tools/convert_graphml` | アップロードされたGraphMLファイルを解析・修正し、正規化されたGraphMLを返す。（ステートレス） |

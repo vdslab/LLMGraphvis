@@ -20,7 +20,7 @@ Backendは、LLMに対してユーザーの指示、会話履歴、そして利�
 - **入力**:
     - ユーザーのメッセージ: `「友達が多い人を大きく表示して」`
     - 利用可能なツールの定義（[NetworkXMCP](./NetworkXMCP.md)のエンドポイントに対応）:
-        - `calculate_centrality(type: str)`
+        - `calculate_centrality(type: str)` (例: 'degree', 'pagerank', 'betweenness', 'closeness', 'eigenvector', 'load', 'edge_betweenness', 'clustering', 'transitivity', 'modularity')
         - `apply_metric_to_visual(metric: str, visual: str, mapping: dict)`
         - `change_layout(name: str)`
 
