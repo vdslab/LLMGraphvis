@@ -55,7 +55,7 @@ graph TD
 | Method | Path | 説明 |
 |:---|:---|:---|
 | `POST` | `/upload` | GraphMLファイルをアップロードし、新しい会話とネットワークを作成する。 |
-| `GET` | `/{network_id}/cytoscape` | ネットワークをCytoscape.js形式のJSONで取得する。 |
+| `GET` | `/{network_id}/visdata` | ネットワークを可視化ライブラリ（Cytoscape.js, D3.jsなど）で描画可能な汎用JSON形式で取得する。 |
 | `POST` | `/{network_id}/layout` | `NetworkXMCP`を呼び出してレイアウトを計算・適用する。 |
 | `GET` | `/{network_id}/export` | ネットワークをGraphMLファイルとしてダウンロードする。 |
 
