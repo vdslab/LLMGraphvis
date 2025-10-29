@@ -82,6 +82,13 @@ const config: Config = {
             apiKey: process.env.ALGOLIA_API_KEY!,
             indexName: process.env.ALGOLIA_INDEX_NAME!,
             contextualSearch: true,
+            ...(process.env.ALGOLIA_ASK_AI_ASSISTANT_ID
+              ? {
+                  askAi: {
+                    assistantId: process.env.ALGOLIA_ASK_AI_ASSISTANT_ID,
+                  },
+                }
+              : {}),
           },
         }
       : {}),
