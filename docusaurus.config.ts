@@ -5,6 +5,52 @@ import "dotenv/config";
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 
+// Helper function to create Algolia config
+const createAlgoliaConfig = () => {
+  const {
+    ALGOLIA_APP_ID,
+    ALGOLIA_API_KEY,
+    ALGOLIA_INDEX_NAME,
+    ALGOLIA_ASK_AI_ASSISTANT_ID,
+  } = process.env;
+
+  const requiredEnvVars = [
+    "ALGOLIA_APP_ID",
+    "ALGOLIA_API_KEY",
+    "ALGOLIA_INDEX_NAME",
+  ];
+  const missingEnvVars = requiredEnvVars.filter((v) => !process.env[v]);
+
+  if (missingEnvVars.length > 0) {
+    console.warn(
+      `\n[Algolia] Search is disabled because the following environment variables are missing: ${missingEnvVars.join(
+        ", "
+      )}`
+    );
+    console.warn(
+      "[Algolia] Please create a .env file at the root of the project and add the missing variables.\n"
+    );
+    return {};
+  }
+
+  // If all required env vars are present, return the algolia config object.
+  return {
+    algolia: {
+      appId: ALGOLIA_APP_ID,
+      apiKey: ALGOLIA_API_KEY,
+      indexName: ALGOLIA_INDEX_NAME,
+      contextualSearch: true,
+      ...(ALGOLIA_ASK_AI_ASSISTANT_ID
+        ? {
+            askAi: {
+              assistantId: ALGOLIA_ASK_AI_ASSISTANT_ID,
+            },
+          }
+        : {}),
+    },
+  };
+};
+
 const config: Config = {
   title: "GraphVisAgent Specification",
   tagline: "Graph Visualization Agent Specification",
@@ -81,25 +127,7 @@ const config: Config = {
     colorMode: {
       respectPrefersColorScheme: true,
     },
-    ...(process.env.ALGOLIA_APP_ID &&
-    process.env.ALGOLIA_API_KEY &&
-    process.env.ALGOLIA_INDEX_NAME
-      ? {
-          algolia: {
-            appId: process.env.ALGOLIA_APP_ID,
-            apiKey: process.env.ALGOLIA_API_KEY,
-            indexName: process.env.ALGOLIA_INDEX_NAME,
-            contextualSearch: true,
-            ...(process.env.ALGOLIA_ASK_AI_ASSISTANT_ID
-              ? {
-                  askAi: {
-                    assistantId: process.env.ALGOLIA_ASK_AI_ASSISTANT_ID,
-                  },
-                }
-              : {}),
-          },
-        }
-      : {}),
+    ...createAlgoliaConfig(),
     navbar: {
       title: "GraphVisAgent Specification",
       logo: {
