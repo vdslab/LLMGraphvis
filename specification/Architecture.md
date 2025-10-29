@@ -14,7 +14,8 @@ graph TD
         A[Web Application]
     end
 
-    U[ユーザー] -- "グラフの可視化・分析" --> A
+    U -- "自然言語によるグラフ操作コマンド" --> A
+    A -- "グラフ構造の可視化表示" --> U
     A -- "レイアウト推薦・チャット" --> LLM[LLM Services]
 
     style U fill:#d1e0ff,stroke:#333,stroke-width:2px
