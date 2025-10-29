@@ -45,9 +45,9 @@ graph TD
     WB -- "Loads SPA (HTTPS)" --> FS
     WB -- "API (HTTPS)" --> B
 
-    B -- "API (HTTP)" --> N
-    B -- "PostgreSQL" --> DB
-    N -- "PostgreSQL" --> DB
+    B -- "Triggers Computation (API)" --> N
+    B -- "Reads/Writes State (PostgreSQL)" --> DB
+    N -- "Writes Computation Results (PostgreSQL)" --> DB
     B -- "API (HTTPS)" --> LLM[LLM Services]
 
     style WB fill:#d1e0ff,stroke:#333,stroke-width:2px
