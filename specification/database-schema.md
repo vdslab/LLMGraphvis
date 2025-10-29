@@ -46,7 +46,7 @@ erDiagram
     }
 
     calculation_results {
-        INTEGER id PK
+        UUID id PK
         UUID graph_id FK
         TEXT datatype
         JSONB data
@@ -78,7 +78,7 @@ NetworkX等で計算された中心性指標などの分析結果を永続化す
 
 ```sql
 CREATE TABLE calculation_results (
-    id SERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY,
     graph_id UUID NOT NULL,          -- 外部キーとしてgraphsテーブルに関連付け
     datatype TEXT NOT NULL,         -- 'degree_centrality', 'pagerank', 'betweenness_centrality', 'closeness_centrality', 'eigenvector_centrality', 'load_centrality', 'edge_betweenness_centrality', 'clustering', 'transitivity', 'modularity' などの指標名
     data JSONB NOT NULL,            -- 計算結果の本体
