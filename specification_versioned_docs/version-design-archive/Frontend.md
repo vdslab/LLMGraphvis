@@ -55,7 +55,7 @@ graph TD
 
 - **状態:** `networkId`, `nodes`, `edges`, `layout`
 - **主要なアクションと連携API:**
-    - `fetchNetwork(networkId)`: `GET /network/{networkId}/cytoscape` を呼び出し、取得したデータで `nodes` と `edges` を更新する。
+    - `fetchNetwork(networkId)`: `GET /network/{networkId}/visdata` を呼び出し、取得したデータで `nodes` と `edges` を更新する。
     - `uploadNetwork(file)`: `POST /network/upload` を呼び出す。
     - `applyLayout(layoutName)`: `POST /network/{networkId}/layout` を呼び出す。
 
@@ -100,7 +100,7 @@ export const useChatStore = create((set, get) => ({
 
       // グラフが更新された場合、networkStoreのアクションを呼び出す
       if (response.data.graph_updated) {
-        useNetworkStore.getState().setNetworkData(response.data.new_cytoscape_data);
+        useNetworkStore.getState().setNetworkData(response.data.new_vis_data);
       }
     } catch (error) {
       console.error("Failed to send message:", error);

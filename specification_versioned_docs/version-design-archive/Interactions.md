@@ -37,7 +37,7 @@ sequenceDiagram
 
     %% Step 4: Frontend navigates and fetches the initial graph data
     F->>F: チャットページへ遷移
-    F->>B: GET /network/{network_id}/cytoscape
+    F->>B: GET /network/{network_id}/visdata
     B->>DB: レンダリングに必要なデータをクエリ (ノード, エッジ, 計算済みのposition)
     DB-->>B: { nodes: [...], edges: [...] }
     B-->>F: 200 OK + { nodes, edges }
@@ -89,7 +89,7 @@ sequenceDiagram
 
     %% Step 5: Frontend fetches the updated graph data via HTTP
     note left of F: 通知を受け、HTTPで最新のグラフデータを取得
-    F->>B: GET /network/{network_id}/cytoscape
+    F->>B: GET /network/{network_id}/visdata
     B->>DB: レンダリングに必要なデータをクエリ
     DB-->>B: { nodes: [...], edges: [...] }
     B-->>F: 200 OK + { nodes, edges }
