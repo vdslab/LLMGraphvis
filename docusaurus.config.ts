@@ -75,12 +75,14 @@ const config: Config = {
     colorMode: {
       respectPrefersColorScheme: true,
     },
-    ...(process.env.ALGOLIA_APP_ID
+    ...(process.env.ALGOLIA_APP_ID &&
+    process.env.ALGOLIA_API_KEY &&
+    process.env.ALGOLIA_INDEX_NAME
       ? {
           algolia: {
             appId: process.env.ALGOLIA_APP_ID,
-            apiKey: process.env.ALGOLIA_API_KEY!,
-            indexName: process.env.ALGOLIA_INDEX_NAME!,
+            apiKey: process.env.ALGOLIA_API_KEY,
+            indexName: process.env.ALGOLIA_INDEX_NAME,
             contextualSearch: true,
             ...(process.env.ALGOLIA_ASK_AI_ASSISTANT_ID
               ? {
