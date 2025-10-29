@@ -11,14 +11,15 @@
 ```mermaid
 graph TD
     subgraph "LLMGraph-vis"
-        A[Web Application]
+        webApplication["Web Application"]
     end
 
-    U[ユーザー] -- "グラフの可視化・分析" --> A
-    A -- "レイアウト推薦・チャット" --> LLM[LLM Services]
+    user["ユーザー"] -- "自然言語によるグラフ操作コマンド" --> webApplication
+    webApplication -- "グラフ構造の可視化表示" --> user
+    webApplication -- "レイアウト推薦・チャット" --> llmServices["LLM Services"]
 
-    style U fill:#d1e0ff,stroke:#333,stroke-width:2px
-    style LLM fill:#ffccd1,stroke:#333,stroke-width:2px
+    style user fill:#d1e0ff,stroke:#333,stroke-width:2px
+    style llmServices fill:#ffccd1,stroke:#333,stroke-width:2px
 ```
 
 | 要素 | 説明 |
@@ -33,28 +34,28 @@ graph TD
 
 ```mermaid
 graph TD
-    U[ユーザー] -- "HTTPS" --> WB[Web Browser]
+    user[ユーザー] -- "HTTPS" --> webBrowser["Web Browser"]
 
     subgraph "Docker Environment"
-        FS[Frontend Service]
-        B[API Service]
-        N[NetworkX MCP]
-        DB[(Database)]
+        frontendService["Frontend Service"]
+        apiService["API Service"]
+        networkXMCP["NetworkX MCP"]
+        database[("Database")]
     end
 
-    WB -- "Loads SPA (HTTPS)" --> FS
-    WB -- "API (HTTPS)" --> B
+    webBrowser -- "Loads SPA (HTTPS)" --> frontendService
+    webBrowser -- "API (HTTPS)" --> apiService
 
-    B -- "Triggers Computation (API)" --> N
-    B -- "Reads/Writes State (PostgreSQL)" --> DB
-    N -- "Writes Computation Results (PostgreSQL)" --> DB
-    B -- "API (HTTPS)" --> LLM[LLM Services]
+    apiService -- "API (HTTP)" --> networkXMCP
+    apiService -- "PostgreSQL" --> database
+    networkXMCP -- "PostgreSQL" --> database
+    apiService -- "API (HTTPS)" --> llmService[LLM Services]
 
-    style WB fill:#d1e0ff,stroke:#333,stroke-width:2px
-    style FS fill:#82b3ff,stroke:#333,stroke-width:2px
-    style B fill:#94e2d5,stroke:#333,stroke-width:2px
-    style N fill:#f5c2e7,stroke:#333,stroke-width:2px
-    style DB fill:#f9e2af,stroke:#333,stroke-width:2px
+    style webBrowser fill:#d1e0ff,stroke:#333,stroke-width:2px
+    style frontendService fill:#82b3ff,stroke:#333,stroke-width:2px
+    style apiService fill:#94e2d5,stroke:#333,stroke-width:2px
+    style networkXMCP fill:#f5c2e7,stroke:#333,stroke-width:2px
+    style database fill:#f9e2af,stroke:#333,stroke-width:2px
 ```
 
 | コンテナ | 説明 | 技術スタック |
