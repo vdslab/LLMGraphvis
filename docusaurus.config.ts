@@ -54,12 +54,7 @@ const config: Config = {
   ],
 
   plugins: [
-    [
-      "@docusaurus/plugin-client-redirects",
-      {
-        redirects: [{ from: "/", to: "/specification/" }],
-      },
-    ],
+
     // Existing plugin for specification
     [
       "@docusaurus/plugin-content-docs",

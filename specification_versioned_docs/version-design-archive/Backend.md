@@ -85,7 +85,7 @@ graph TD
 
 | Method | Path | 説明 |
 |:---|:---|:---|
-| `POST` | `/upload` | GraphMLファイルをアップロードし、新しい会話とネットワークを作成する。 `multipart/form-data` を使用。また、この処理の中でNetworkXMCPを呼び出し、デフォルトのレイアウト（Spring Layout）を計算して初期座標を保存する。詳細は[初期グラフ表示フロー](./Interactions.md#31-初期グラフ表示フロー)を参照。 |
+| `POST` | `/upload` | GraphMLファイルをアップロードし、新しい会話とネットワークを作成する。 `multipart/form-data` を使用。また、この処理の中でNetworkXMCPを呼び出し、デフォルトのレイアウト（Spring Layout）を計算して初期座標を保存する。詳細は[初期グラフ表示フロー](./Interactions.md#31-新規会話開始グラフアップロードフロー)を参照。 |
 | `GET` | `/{network_id}/cytoscape` | ネットワークをCytoscape.js形式のJSONで取得する。 |
 | `POST` | `/{network_id}/layout` | `NetworkXMCP`を呼び出してレイアウトを計算・適用する。 |
 | `GET` | `/{network_id}/export` | ネットワークをGraphMLファイルとしてダウンロードする。 |
