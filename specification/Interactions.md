@@ -77,17 +77,29 @@ sequenceDiagram
     note right of LLM: LLMは「友達が多い」を「次数中心性」と解釈し、<br/>「大きく表示」を「ノードサイズ」に割り当てる判断を行う。
     LLM-->>B: ツール呼び出しを要求 (calculate_centrality → apply_metric_to_visual)
 
-    %% Step 3: Backend calls tools
+    %% Step 3: Backend calls calculation tool (with cache logic)
     B->>N: /tools/calculate_centrality (network_id, type:"degree")
+    
+    alt キャッシュが存在する場合
+        N->>DB: 計算結果 (degree_centrality) を問い合わせ
+        DB-->>N: キャッシュされた結果を返す
+    else キャッシュが存在しない場合
+        N->>N: NetworkXで次数中心性を計算
+        N->>DB: 計算結果を `calculation_results` に保存
+        DB-->>N: 保存成功
+    end
+    
     N-->>B: 実行成功
+
+    %% Step 4: Backend calls visualization tool
     B->>N: /tools/apply_metric_to_visual (network_id, metric:"degree_centrality", visual:"node_size")
     N-->>B: 実行成功
 
-    %% Step 4: Backend sends a notification via WebSocket
+    %% Step 5: Backend sends a notification via WebSocket
     note right of B: グラフデータが更新されたことを通知する
     B-->>F: WebSocketメッセージ (type: "graph_updated")
 
-    %% Step 5: Frontend fetches the updated graph data via HTTP
+    %% Step 6: Frontend fetches the updated graph data via HTTP
     note left of F: 通知を受け、HTTPで最新のグラフデータを取得
     F->>B: GET /network/{network_id}/visdata
     B->>DB: レンダリングに必要なデータをクエリ
@@ -95,7 +107,7 @@ sequenceDiagram
     B-->>F: 200 OK + { nodes, edges }
     F->>F: render(nodes, edges)
 
-    %% Step 6: Backend gets final response from LLM and sends it via HTTP response
+    %% Step 7: Backend gets final response from LLM and sends it via HTTP response
     B->>LLM: 全てのツール実行結果を送信
     LLM-->>B: 最終的な応答メッセージを生成
     B->>DB: LLMの応答メッセージを保存

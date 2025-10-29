@@ -51,22 +51,22 @@ graph TD
 
 ### `networkStore`
 
-表示中のグラフデータやレイアウト情報を管理します。
+表示中のグラフデータ（ノード、エッジ、レイアウト情報）の状態を管理します。このストアは、バックエンドから受け取った最新のグラフデータを保持し、可視化コンポーネントに提供する責務を持ちます。
 
 - **状態:** `networkId`, `nodes`, `edges`, `layout`
 - **主要なアクションと連携API:**
-    - `fetchNetwork(networkId)`: `GET /network/{networkId}/visdata` を呼び出し、取得したデータで `nodes` と `edges` を更新する。
-    - `uploadNetwork(file)`: `POST /network/upload` を呼び出す。
-    - `applyLayout(layoutName)`: `POST /network/{networkId}/layout` を呼び出す。
+    - `fetchNetwork(networkId)`: `GET /network/{networkId}/visdata` を呼び出し、初期表示やリロード時にグラフデータを取得する。
+    - `uploadNetwork(file)`: `POST /network/upload` を呼び出し、新規グラフをアップロードする。
+    - `setNetworkData(visData)`: `chatStore`のアクション経由で取得した、更新後のグラフデータで状態を上書きする。
 
 ### `chatStore`
 
-会話の履歴やメッセージ一覧を管理します。
+会話の履歴やメッセージ一覧を管理します。**グラフに対する操作は、すべてこのストアの`sendMessage`アクションが起点となります。**
 
 - **状態:** `conversationId`, `messages`, `isLoading`
 - **主要なアクションと連携API:**
     - `fetchHistory(conversationId)`: `GET /conversations/{id}/messages` を呼び出し、`messages` 状態を更新する。
-    - `sendMessage(messageContent)`: `POST /chat/process` を呼び出し、UIのローディング状態を管理しつつ、返信メッセージとグラフの更新情報を受け取る。
+    - `sendMessage(messageContent)`: ユーザーの自然言語による指示（計算、可視化、レイアウト変更など）をバックエンドの `POST /chat/process` へ送信する。バックエンドでの処理の結果、グラフが更新された場合は、`networkStore` の状態も更新されます。
 
 #### コード例: `sendMessage` アクションの実装イメージ
 
