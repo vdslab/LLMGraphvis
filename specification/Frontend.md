@@ -53,11 +53,11 @@ graph TD
 
 表示中のグラフデータ（ノード、エッジ、レイアウト情報）の状態を管理します。このストアは、バックエンドから受け取った最新のグラフデータを保持し、可視化コンポーネントに提供する責務を持ちます。
 
-- **状態:** `networkId`, `nodes`, `edges`, `layout`
+- **状態:** `networkId`, `nodes`, `edges` (ノードの座標、スタイル、エッジのスタイルなど、すべてのレンダリングデータを含む)
 - **主要なアクションと連携API:**
-    - `fetchNetwork(networkId)`: `GET /network/{networkId}/visdata` を呼び出し、初期表示やリロード時にグラフデータを取得する。
+    - `fetchNetwork(networkId)`: `GET /network/{networkId}/visdata` を呼び出し、`visual_styles`テーブルから最終レンダリングデータを取得する。
     - `uploadNetwork(file)`: `POST /network/upload` を呼び出し、新規グラフをアップロードする。
-    - `setNetworkData(visData)`: `chatStore`のアクション経由で取得した、更新後のグラフデータで状態を上書きする。
+    - `setNetworkData(visData)`: `chatStore`のアクション経由で取得した、更新後の最終レンダリングデータで状態を上書きする。
 
 ### `chatStore`
 
@@ -98,7 +98,7 @@ export const useChatStore = create((set, get) => ({
       const assistantMessage = response.data.message;
       set((state) => ({ messages: [...state.messages, assistantMessage] }));
 
-      // グラフが更新された場合、networkStoreのアクションを呼び出す
+      // グラフが更新された場合、networkStoreのアクションを呼び出す (new_vis_dataは最終レンダリングデータ)
       if (response.data.graph_updated) {
         useNetworkStore.getState().setNetworkData(response.data.new_vis_data);
       }

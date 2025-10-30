@@ -9,7 +9,7 @@
 1.  **Backend**がユーザーの指示を受け取り、LLMに送信します。
 2.  **LLM**は、指示を解釈し、実行すべき**ツール（関数）**のリストをBackendに返します。
 3.  **Backend**は、LLMの指示に従い、**NetworkXMCP**が提供するツールAPIを順次呼び出します。
-4.  ツール実行後、**Backend**はデータベースから最新の状態を取得し、最終的なレンダリング用JSONを組み立てて**Frontend**に返します。
+4.  ツール実行後、**Backend**はNetworkXMCPから返された、または自身で生成した最終的なレンダリング用JSONを`visual_styles`テーブルに保存し、Frontendに返します。
 
 ### データフローと責務
 
@@ -25,13 +25,6 @@ Backendは、LLMに対してユーザーの指示、会話履歴、そして利�
         - `apply_metric_to_visual(metric: str, visual: str, mapping: dict)`
         - `change_layout(name: str)`
         - `highlight_nodes(metric: str, criteria: str)`
-    - **現在のグラフ状態** (オプション): (これらはLLMへのプロンプトの一部、またはツール呼び出しのコンテキストとして渡されます)
-        - `current_layout`: `spring`
-        - `visual_mappings`: `{ "node_size": { "metric": "degree_centrality" } }`
-    - **計算済みの指標リスト** (オプション): `['degree_centrality', 'pagerank']`
-    - **グラフデータのスキーマ** (オプション): (LLMがツール引数を決定する際の判断材料となります)
-        - `node_attributes`: `['name', 'department']`
-        - `edge_attributes`: `['weight']`
 
 #### 2. LLM → Backend: 実行すべきツールリストの返却
 
@@ -60,14 +53,14 @@ LLMは、ユーザーの指示を解釈し、どのツールをどの引数で�
 
 #### 3. Backend → NetworkXMCP: ツール実行
 
-Backendは、LLMから受け取った指示に基づき、NetworkXMCPのAPIを呼び出します。このとき、NetworkXMCPは計算結果や可視化属性をデータベースに永続化します。
+Backendは、LLMから受け取った指示に基づき、NetworkXMCPのAPIを呼び出します。NetworkXMCPは、計算結果や、それらを適用した最終的なレンダリングデータを生成し、Backendに返します。Backendはこのデータを`visual_styles`テーブルに永続化します。
 
 - `POST /tools/calculate_centrality` (引数: `{"type": "degree"}`)
 - `POST /tools/apply_metric_to_visual` (引数: `{"metric": "degree_centrality", ...}`)
 
 #### 4. Backend → Frontend: 最終レンダリングデータの返却
 
-全てのツール実行が完了した後、Backendは**最終的な描画責任**を持ちます。データベースからノードの位置情報、ラベル、そしてツールによって更新された**スタイル情報**（サイズ、色など）をすべて取得し、Frontendがそのまま描画できる単一のJSONペイロードを組み立てて返します。
+全てのツール実行が完了した後、Backendは`visual_styles`テーブルに保存された最終的なレンダリングデータ（`nodes_data`と`edges_data`）を読み込み、Frontendに返します。
 
 - **出力 (BackendからFrontendへのレスポンス)**:
 
@@ -78,7 +71,7 @@ Backendは、LLMから受け取った指示に基づき、NetworkXMCPのAPIを�
       "id": "n1",
       "position": { "x": 120.5, "y": 300.2 },
       "label": "Zachary",
-      "style": { // これらのスタイルプロパティは、`visual_styles`テーブルとその`mapping_config`から導出されます。
+      "style": { // これらのスタイルプロパティは、`visual_styles`テーブルの`nodes_data`に直接保存されています。
         "size": 32, // apply_metric_to_visualの結果が反映されている
         "color": "#4A90E2",
         "borderColor": "#0F172A",
@@ -111,9 +104,14 @@ Backendは、LLMから受け取った指示に基づき、NetworkXMCPのAPIを�
 
 ### 設計上の要点
 
-- **責務の分離**:
-    - **LLM**: 自然言語を構造化されたツールコールに**変換**する。
-    - **NetworkXMCP**: グラフに関する**計算と属性更新**に特化する。
-    - **Backend**: LLMとツールの**オーケストレーション**と、最終的な**レンダリングデータの組み立て**を行う。
-- **データの最小性**: Frontendに返すJSONには、描画に直接必要な `position` や `style` のみを含め、計算途中のスコアなどの内部データは含めません。
-- **状態の永続化**: グラフのレイアウトやスタイル属性は、ツール実行のたびにデータベースに保存・更新されるため、状態が維持されます。
+*   **責務の分離**:
+
+    *   **LLM**: 自然言語を構造化されたツールコールに**変換**する。
+
+    *   **NetworkXMCP**: グラフに関する**計算と最終レンダリングデータの生成**に特化する。
+
+    *   **Backend**: LLMとツールの**オーケストレーション**と、NetworkXMCPから受け取った**最終レンダリングデータの`visual_styles`テーブルへの永続化**、およびFrontendへの返却を行う。
+
+*   **データの最小性**: Frontendに返すJSONは、`visual_styles`テーブルに保存された最終レンダリングデータそのものです。
+
+*   **状態の永続化**: グラフの最終レンダリングデータは、ツール実行のたびに`visual_styles`テーブルに保存・更新されるため、状態が維持されます。

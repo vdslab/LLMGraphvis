@@ -73,7 +73,7 @@ graph TD
     "content": "次数中心性を計算し、ノードのサイズに反映しました。"
   },
   "graph_updated": true,
-  "new_vis_data": { ... } // 更新後のグラフデータ。構造は[LLM Function Callingによるレンダリングデータ生成フロー](./rendering-data-flow.md)で定義。
+  "new_vis_data": { ... } // `visual_styles`テーブルに保存された最終レンダリングデータ
 }
 ```
 
@@ -85,8 +85,8 @@ graph TD
 
 | Method | Path | 説明 |
 |:---|:---|:---|
-| `POST` | `/upload` | GraphMLファイルをアップロードし、新しい会話とネットワークを作成する。 `multipart/form-data` を使用。また、この処理の中でNetworkXMCPを呼び出し、デフォルトのレイアウト（Spring Layout）を計算して初期座標を保存する。詳細は[初期グラフ表示フロー](./Interactions.md#31-新規会話開始グラフアップロードフロー)を参照。 |
-| `GET` | `/{network_id}/visdata` | ネットワークを可視化ライブラリ（Cytoscape.js, D3.jsなど）で描画可能な汎用JSON形式で取得する。 |
+| `POST` | `/upload` | GraphMLファイルをアップロードし、新しい会話とネットワークを作成する。 `multipart/form-data` を使用。この処理の中でNetworkXMCPを呼び出し、デフォルトのレイアウトを適用した初期レンダリングデータを生成し、`visual_styles`テーブルに保存する。詳細は[初期グラフ表示フロー](./Interactions.md#31-新規会話開始グラフアップロードフロー)を参照。 |
+| `GET` | `/{network_id}/visdata` | ネットワークの最終レンダリングデータ（`nodes_data`と`edges_data`）を`visual_styles`テーブルから取得する。 |
 | `GET` | `/{network_id}/export` | ネットワークをGraphMLファイルとしてダウンロードする。 |
 
 ## 主要なデータモデル (Pydantic Schemas)

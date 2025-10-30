@@ -14,7 +14,7 @@ erDiagram
     conversations }|--|| graphs : "is about"
     conversations ||--o{ messages : "records"
     graphs ||--o{ calculation_results : "caches"
-    graphs ||--o{ visual_styles : "defines"
+    graphs ||--|| visual_styles : "has_visual_representation"
 
     users {
         UUID id PK
@@ -56,10 +56,9 @@ erDiagram
 
     visual_styles {
         UUID id PK
-        UUID graph_id FK
-        TEXT visual_property
-        TEXT metric_type
-        JSONB mapping_config
+        UUID graph_id FK "one-to-one"
+        JSONB nodes_data
+        JSONB edges_data
         TIMESTAMP created_at
         TIMESTAMP updated_at
     }
@@ -74,7 +73,7 @@ erDiagram
 | `graphml_content` | `str` | ユーザーがアップロードしたGraphML形式の元データ、またはNetworkXMCPによって正規化されたGraphMLデータ。 |
 | `messages` | `conversations` に含まれる個々のメッセージ（ユーザーの発言、アシスタントの応答）を時系列で記録します。 |
 | `calculation_results` | NetworkX等で計算された中心性指標などの分析結果を永続化するためのキャッシュテーブルです。 |
-| `visual_styles` | グラフの視覚的なスタイル設定（ノードサイズ、色など）を、適用された指標とマッピング設定と共に永続化します。 |
+| `visual_styles` | グラフの最終的な視覚表現（ノードの座標、スタイル、エッジなど）をFrontendに送るデータ形式でキャッシュします。BackendがFrontendに返すレンダリングデータをそのまま保存します。 |
 
 ## 4.3. 計算結果キャッシュ (`calculation_results`)
 
@@ -142,17 +141,16 @@ CREATE INDEX idx_gin_calculation_data ON calculation_results USING GIN (data);
 ```sql
 CREATE TABLE visual_styles (
     id UUID PRIMARY KEY,
-    graph_id UUID NOT NULL,          -- 外部キーとしてgraphsテーブルに関連付け
-    visual_property TEXT NOT NULL,  -- 'node_size', 'node_color' など
-    metric_type TEXT NOT NULL,      -- 'degree_centrality', 'pagerank' など
-    mapping_config JSONB NOT NULL,  -- マッピング設定 (例: {"scale": "linear", "range": [8, 32]}, {"scale": "categorical", "map": {"groupA": "red", "groupB": "blue"}}, {"scale": "log", "base": 10, "range": [4, 64]})
+    graph_id UUID NOT NULL UNIQUE,   -- 外部キーとしてgraphsテーブルに関連付け、1対1対応
+    nodes_data JSONB NOT NULL,        -- Frontendに送るノードデータ（座標、スタイルなどを含む）
+    edges_data JSONB NOT NULL,        -- Frontendに送るエッジデータ（スタイルなどを含む）
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(graph_id, visual_property),
     FOREIGN KEY (graph_id) REFERENCES graphs(id)
 );
 
--- 高速な検索のためのGINインデックス
-CREATE INDEX idx_gin_visual_styles_config ON visual_styles USING GIN (mapping_config);
+-- nodes_dataとedges_data内の検索を高速化するためのGINインデックス（必要に応じて）
+-- CREATE INDEX idx_gin_visual_styles_nodes_data ON visual_styles USING GIN (nodes_data);
+-- CREATE INDEX idx_gin_visual_styles_edges_data ON visual_styles USING GIN (edges_data);
 ```
 
