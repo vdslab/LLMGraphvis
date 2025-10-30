@@ -53,6 +53,16 @@ erDiagram
         JSONB data
         TIMESTAMP created_at
     }
+
+    visual_styles {
+        UUID id PK
+        UUID graph_id FK
+        TEXT visual_property
+        TEXT metric_type
+        JSONB mapping_config
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
+    }
 ```
 
 ### テーブル定義
