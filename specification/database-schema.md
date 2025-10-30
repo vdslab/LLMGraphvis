@@ -61,7 +61,7 @@ erDiagram
 |:---|:---|
 | `users` | アプリケーションのユーザー情報を格納します。 |
 | `conversations` | ユーザーが行う個々の分析セッション（会話）を管理します。各会話は必ず1つのグラフに紐付きます。 |
-| `graphs` | ユーザーがアップロードしたグラフの元データ（GraphML形式）を格納します。 |
+| `graphml_content` | `str` | ユーザーがアップロードしたGraphML形式の元データ、またはNetworkXMCPによって正規化されたGraphMLデータ。 |
 | `messages` | `conversations` に含まれる個々のメッセージ（ユーザーの発言、アシスタントの応答）を時系列で記録します。 |
 | `calculation_results` | NetworkX等で計算された中心性指標などの分析結果を永続化するためのキャッシュテーブルです。 |
 | `visual_styles` | グラフの視覚的なスタイル設定（ノードサイズ、色など）を、適用された指標とマッピング設定と共に永続化します。 |
@@ -135,7 +135,7 @@ CREATE TABLE visual_styles (
     graph_id UUID NOT NULL,          -- 外部キーとしてgraphsテーブルに関連付け
     visual_property TEXT NOT NULL,  -- 'node_size', 'node_color' など
     metric_type TEXT NOT NULL,      -- 'degree_centrality', 'pagerank' など
-    mapping_config JSONB NOT NULL,  -- マッピング設定 (例: {"scale": "linear", "range": [8, 32]})
+    mapping_config JSONB NOT NULL,  -- マッピング設定 (例: {"scale": "linear", "range": [8, 32]}, {"scale": "categorical", "map": {"groupA": "red", "groupB": "blue"}}, {"scale": "log", "base": 10, "range": [4, 64]})
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(graph_id, visual_property),

@@ -73,7 +73,7 @@ graph TD
     "content": "次数中心性を計算し、ノードのサイズに反映しました。"
   },
   "graph_updated": true,
-  "new_vis_data": { ... } // 更新後のグラフデータ
+  "new_vis_data": { ... } // 更新後のグラフデータ。構造は[LLM Function Callingによるレンダリングデータ生成フロー](./rendering-data-flow.md)で定義。
 }
 ```
 
@@ -137,5 +137,5 @@ APIで送受信される主要なデータ構造です。
 
 ## 外部サービス連携
 
-- **NetworkXMCP**: グラフ計算が必要なリクエストを `http://networkx-mcp:8001` に転送（プロキシ）します。
+- **NetworkXMCP**: グラフ計算が必要なリクエストを `http://networkx-mcp:8001` に転送（プロキシ）します。（このURLは環境変数で設定可能であるべきです。）
 - **LLMサービス**: ユーザーの指示解釈、ツールコール変換、結果の要約のために外部LLM（OpenAI, Gemini等）のAPIを呼び出します。

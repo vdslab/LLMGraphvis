@@ -25,11 +25,11 @@ Backendは、LLMに対してユーザーの指示、会話履歴、そして利�
         - `apply_metric_to_visual(metric: str, visual: str, mapping: dict)`
         - `change_layout(name: str)`
         - `highlight_nodes(metric: str, criteria: str)`
-    - **現在のグラフ状態** (オプション):
+    - **現在のグラフ状態** (オプション): (これらはLLMへのプロンプトの一部、またはツール呼び出しのコンテキストとして渡されます)
         - `current_layout`: `spring`
         - `visual_mappings`: `{ "node_size": { "metric": "degree_centrality" } }`
     - **計算済みの指標リスト** (オプション): `['degree_centrality', 'pagerank']`
-    - **グラフデータのスキーマ** (オプション):
+    - **グラフデータのスキーマ** (オプション): (LLMがツール引数を決定する際の判断材料となります)
         - `node_attributes`: `['name', 'department']`
         - `edge_attributes`: `['weight']`
 
@@ -44,7 +44,7 @@ LLMは、ユーザーの指示を解釈し、どのツールをどの引数で�
   {
     "tool_name": "calculate_centrality",
     "arguments": {
-      "type": "degree"
+      "type": "degree" // この`type`は、`calculation_results`テーブルの`datatype`および`visual_styles`テーブルの`metric_type`と一貫している必要があります。
     }
   },
   {
@@ -78,7 +78,7 @@ Backendは、LLMから受け取った指示に基づき、NetworkXMCPのAPIを�
       "id": "n1",
       "position": { "x": 120.5, "y": 300.2 },
       "label": "Zachary",
-      "style": {
+      "style": { // これらのスタイルプロパティは、`visual_styles`テーブルとその`mapping_config`から導出されます。
         "size": 32, // apply_metric_to_visualの結果が反映されている
         "color": "#4A90E2",
         "borderColor": "#0F172A",

@@ -26,7 +26,7 @@ graph TD
 |:---|:---|
 | **ユーザー** | グラフの可視化や分析を行う研究者や開発者。 |
 | **Web Application** | 本システムのコア機能を提供するWebアプリケーション。 |
-| **LLM Services** | グラフのレイアウト推薦やチャット機能のために利用する外部の大規模言語モデルサービス。(OpenAI API, Google Geminiなど) |
+| **LLM Services** | グラフのレイアウト推薦やチャット機能のために利用する外部の大規模言語モデルサービス。(OpenAI API, Google Geminiなど) | 外部LLM API (例: OpenAI, Google Gemini) |
 
 ### 1.1.2. コンテナ図 (Container Diagram)
 

@@ -104,7 +104,7 @@ export const useChatStore = create((set, get) => ({
       }
     } catch (error) {
       console.error("Failed to send message:", error);
-      // エラー処理
+      // エラー処理: ユーザーへの通知、ログ記録、必要に応じたリトライなどを実装
     } finally {
       set({ isLoading: false });
     }
