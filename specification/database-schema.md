@@ -11,7 +11,7 @@
 ```mermaid
 erDiagram
     users ||--o{ conversations : "has"
-    conversations }|--|| graphs : "is about"
+    conversations ||--|| graphs : "is about"
     conversations ||--o{ messages : "records"
     graphs ||--o{ calculation_results : "caches"
     graphs ||--|| visual_styles : "has_visual_representation"
