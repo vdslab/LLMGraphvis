@@ -18,6 +18,7 @@ const createAlgoliaConfig = () => {
     "ALGOLIA_APP_ID",
     "ALGOLIA_API_KEY",
     "ALGOLIA_INDEX_NAME",
+    "ALGOLIA_ASK_AI_ASSISTANT_ID",
   ];
   const missingEnvVars = requiredEnvVars.filter((v) => !process.env[v]);
 
