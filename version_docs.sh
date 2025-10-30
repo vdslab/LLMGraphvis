@@ -16,7 +16,7 @@ VERSIONS_FILE="versions.json"
 echo "Creating new version: $NEW_VERSION_DATE for plugin: $PLUGIN_ID"
 
 # Create the new Docusaurus version
-npm run docusaurus docs:version "$NEW_VERSION_DATE" --plugin-id "$PLUGIN_ID"
+npm run docusaurus docs:version:$PLUGIN_ID "$NEW_VERSION_DATE"
 
 echo "Version $NEW_VERSION_DATE created successfully."
 
