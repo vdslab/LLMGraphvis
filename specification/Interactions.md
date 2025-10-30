@@ -93,6 +93,8 @@ sequenceDiagram
 
     %% Step 4: Backend calls visualization tool
     B->>N: /tools/apply_metric_to_visual (network_id, metric:"degree_centrality", visual:"node_size")
+    N->>DB: visual_stylesにマッピング設定を保存
+    DB-->>N: 保存成功
     N-->>B: 実行成功
 
     %% Step 5: Backend sends a notification via WebSocket

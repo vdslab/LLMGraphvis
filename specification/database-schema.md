@@ -14,6 +14,7 @@ erDiagram
     conversations }|--|| graphs : "is about"
     conversations ||--o{ messages : "records"
     graphs ||--o{ calculation_results : "caches"
+    graphs ||--o{ visual_styles : "defines"
 
     users {
         UUID id PK
@@ -63,6 +64,7 @@ erDiagram
 | `graphs` | ユーザーがアップロードしたグラフの元データ（GraphML形式）を格納します。 |
 | `messages` | `conversations` に含まれる個々のメッセージ（ユーザーの発言、アシスタントの応答）を時系列で記録します。 |
 | `calculation_results` | NetworkX等で計算された中心性指標などの分析結果を永続化するためのキャッシュテーブルです。 |
+| `visual_styles` | グラフの視覚的なスタイル設定（ノードサイズ、色など）を、適用された指標とマッピング設定と共に永続化します。 |
 
 ## 4.3. 計算結果キャッシュ (`calculation_results`)
 
@@ -120,4 +122,27 @@ CREATE INDEX idx_gin_calculation_data ON calculation_results USING GIN (data);
 ```
 
 この構造により、スコア (`s`) に基づくフィルタリング、ソート、集計が効率的に行えます。
+
+## 4.4. 視覚スタイル (`visual_styles`)
+
+グラフの視覚的なスタイル設定（ノードサイズ、色など）を、適用された指標とマッピング設定と共に永続化するためのテーブルです。
+
+### 推奨スキーマ
+
+```sql
+CREATE TABLE visual_styles (
+    id UUID PRIMARY KEY,
+    graph_id UUID NOT NULL,          -- 外部キーとしてgraphsテーブルに関連付け
+    visual_property TEXT NOT NULL,  -- 'node_size', 'node_color' など
+    metric_type TEXT NOT NULL,      -- 'degree_centrality', 'pagerank' など
+    mapping_config JSONB NOT NULL,  -- マッピング設定 (例: {"scale": "linear", "range": [8, 32]})
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(graph_id, visual_property),
+    FOREIGN KEY (graph_id) REFERENCES graphs(id)
+);
+
+-- 高速な検索のためのGINインデックス
+CREATE INDEX idx_gin_visual_styles_config ON visual_styles USING GIN (mapping_config);
+```
 
