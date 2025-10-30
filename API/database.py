@@ -1,3 +1,9 @@
+"""
+Database configuration for the FastAPI application.
+
+This file sets up the SQLAlchemy engine, session factory, and a dependency
+for creating database sessions.
+"""
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
@@ -32,6 +38,12 @@ Base = declarative_base()
 
 # Function to get database session
 def get_db():
+    """
+    Provides a database session for dependency injection.
+
+    Yields:
+        A new database session.
+    """
     db = SessionLocal()
     try:
         yield db

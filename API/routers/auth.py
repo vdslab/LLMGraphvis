@@ -1,3 +1,9 @@
+"""
+API endpoints for user authentication.
+
+This module provides routes for user registration, login, and retrieving
+the current user's information.
+"""
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -14,7 +20,16 @@ router = APIRouter(
 
 @router.post("/register", response_model=schemas.User)
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    """Register a new user."""
+    """
+    Registers a new user.
+
+    Args:
+        user: The user's registration information.
+        db: The database session.
+
+    Returns:
+        The newly created user.
+    """
     # Check if username already exists
     db_user = auth.get_user(db, username=user.username)
     if db_user:
@@ -42,7 +57,16 @@ async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    """Generate a JWT token for authentication."""
+    """
+    Logs in a user and returns an access token.
+
+    Args:
+        form_data: The user's login credentials.
+        db: The database session.
+
+    Returns:
+        An access token and token type.
+    """
     # Authenticate user
     user = auth.authenticate_user(db, form_data.username, form_data.password)
     if not user:
@@ -63,5 +87,13 @@ async def login_for_access_token(
 
 @router.get("/users/me", response_model=schemas.User)
 async def read_users_me(current_user: models.User = Depends(auth.get_current_active_user)):
-    """Get current user information."""
+    """
+    Returns the current authenticated user's information.
+
+    Args:
+        current_user: The current authenticated user.
+
+    Returns:
+        The current user's information.
+    """
     return current_user

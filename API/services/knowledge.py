@@ -1,13 +1,16 @@
 """
-Knowledge service for the API.
+This module provides knowledge base information about network visualization.
+
+It includes functions that return detailed information about network layouts,
+centrality metrics, and other concepts related to network analysis.
 """
 
 def get_network_visualization_knowledge() -> str:
     """
-    Get knowledge about network visualization.
-    
+    Returns a string containing a knowledge base on network visualization.
+
     Returns:
-        String with knowledge about network visualization
+        A string with detailed information about network visualization concepts.
     """
     return """
 # Network Visualization Knowledge
@@ -189,10 +192,10 @@ Recommendations for effective network visualization:
 
 def get_layout_descriptions() -> dict:
     """
-    Get descriptions of network layout algorithms.
-    
+    Returns a dictionary of network layout algorithm descriptions.
+
     Returns:
-        Dictionary mapping layout names to descriptions
+        A dictionary where keys are layout names and values are their descriptions.
     """
     return {
         "spring": "Spring layout uses a physical simulation of forces to position nodes. Nodes repel each other, while edges act as springs. Good for general-purpose visualization and tends to place connected nodes closer together.",
@@ -210,10 +213,11 @@ def get_layout_descriptions() -> dict:
 
 def get_centrality_descriptions() -> dict:
     """
-    Get descriptions of centrality metrics.
-    
+    Returns a dictionary of centrality metric descriptions.
+
     Returns:
-        Dictionary mapping centrality names to descriptions
+        A dictionary where keys are centrality metric names and values are their
+        descriptions.
     """
     return {
         "degree": "Degree centrality measures the number of connections a node has. It's simple and intuitive, with higher values indicating nodes with many connections.",

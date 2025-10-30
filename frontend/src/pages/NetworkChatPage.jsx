@@ -6,6 +6,15 @@ import ReactMarkdown from "react-markdown";
 import { networkAPI } from "../services/api";
 import FileUploadButton from "../components/FileUploadButton";
 
+/**
+ * The main chat page for network visualization and analysis.
+ *
+ * This component integrates a chat interface with a 2D force-directed graph
+ * visualization. Users can interact with the network through chat commands
+ * and file uploads.
+ *
+ * @returns {JSX.Element} The rendered network chat page.
+ */
 const NetworkChatPage = () => {
   const {
     nodes,
@@ -37,7 +46,11 @@ const NetworkChatPage = () => {
   const graphRef = useRef();
   const messagesEndRef = useRef();
 
-  // Handle file upload
+  /**
+   * Handles the file upload process.
+   *
+   * @param {File} file - The file to upload.
+   */
   const handleFileUpload = async (file) => {
     setFileUploadError(null);
 
@@ -117,7 +130,11 @@ const NetworkChatPage = () => {
     }
   };
 
-  // Handle file drop
+  /**
+   * Handles the file drop event.
+   *
+   * @param {React.DragEvent<HTMLDivElement>} e - The drag event.
+   */
   const handleFileDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
@@ -129,12 +146,19 @@ const NetworkChatPage = () => {
     }
   };
 
-  // Handle drag events
+  /**
+   * Handles the drag-over event.
+   *
+   * @param {React.DragEvent<HTMLDivElement>} e - The drag event.
+   */
   const handleDragOver = (e) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
+  /**
+   * Handles the drag-leave event.
+   */
   const handleDragLeave = () => {
     setIsDragging(false);
   };
@@ -350,7 +374,11 @@ const NetworkChatPage = () => {
   // The logic is now handled inside chatStore.js, which directly updates networkStore.
   // This component will automatically re-render when networkStore's state (like positions) changes.
 
-  // Handle message submission
+  /**
+   * Handles the submission of the chat message form.
+   *
+   * @param {React.FormEvent<HTMLFormElement>} e - The form submission event.
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!inputMessage.trim() || isProcessing) {

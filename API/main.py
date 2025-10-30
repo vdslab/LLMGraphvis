@@ -1,3 +1,10 @@
+"""
+Main application file for the FastAPI server.
+
+This file initializes the FastAPI application, sets up middleware,
+and includes the necessary routers for different API endpoints.
+It also manages WebSocket connections for real-time communication.
+"""
 import time
 import logging
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Depends, WebSocket, WebSocketDisconnect
@@ -15,20 +22,41 @@ import auth
 
 # WebSocket接続マネージャー
 class ConnectionManager:
+    """Manages active WebSocket connections."""
     def __init__(self):
+        """Initializes the ConnectionManager."""
         self.active_connections: Dict[str, WebSocket] = {}
     
     async def connect(self, websocket: WebSocket, client_id: str):
+        """
+        Accepts a new WebSocket connection and adds it to the list of active connections.
+
+        Args:
+            websocket: The WebSocket connection to add.
+            client_id: The unique identifier for the client.
+        """
         await websocket.accept()
         self.active_connections[client_id] = websocket
         logging.info(f"Client {client_id} connected. Total: {len(self.active_connections)}")
     
     def disconnect(self, client_id: str):
+        """
+        Removes a WebSocket connection from the list of active connections.
+
+        Args:
+            client_id: The unique identifier for the client to disconnect.
+        """
         if client_id in self.active_connections:
             del self.active_connections[client_id]
             logging.info(f"Client {client_id} disconnected. Total: {len(self.active_connections)}")
     
     async def broadcast(self, message: Dict[str, Any]):
+        """
+        Sends a message to all active WebSocket connections.
+
+        Args:
+            message: The message to send.
+        """
         for connection in self.active_connections.values():
             await connection.send_json(message)
 
@@ -83,10 +111,17 @@ app.state.ws_manager = ConnectionManager()
 
 @app.get("/")
 async def root():
+    """Returns a welcome message for the API root."""
     return {"message": "Network Visualization API is running"}
 
 @app.get("/health")
 async def health_check():
+    """
+    Checks the health of the API and its database connection.
+
+    Returns:
+        A dictionary with the health status.
+    """
     try:
         with engine.connect():
             return {"status": "healthy", "database": "connected"}
@@ -96,9 +131,12 @@ async def health_check():
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """
-    WebSocketエンドポイント。
-    認証済みクライアントからの接続を受け付け、接続を管理する。
-    実際のイベント通知は他のルーターから `ws_manager` を介して行われる。
+    Handles WebSocket connections for real-time communication.
+
+    Authenticates clients using a token and manages the connection lifecycle.
+
+    Args:
+        websocket: The WebSocket connection.
     """
     ws_manager = websocket.app.state.ws_manager
     token = websocket.query_params.get("token")

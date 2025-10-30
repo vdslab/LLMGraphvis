@@ -1,6 +1,8 @@
 """
-Chat router for the API.
-Handles conversations, messages, and orchestrates interactions with the LLM and NetworkXMCP.
+API endpoints for chat-based network analysis.
+
+This module provides routes for managing conversations, messages, and
+interacting with the network analysis tools through a chat interface.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
@@ -30,7 +32,12 @@ router = APIRouter(
 NETWORKX_MCP_URL = os.environ.get("NETWORKX_MCP_URL", "http://networkx-mcp:8001")
 
 def create_empty_graphml() -> str:
-    """Creates an empty GraphML string."""
+    """
+    Creates an empty GraphML string.
+
+    Returns:
+        A string containing an empty GraphML graph.
+    """
     G = nx.Graph()
     output = io.BytesIO()
     nx.write_graphml(G, output)
@@ -43,7 +50,15 @@ async def create_conversation(
     db: Session = Depends(get_db)
 ):
     """
-    Create a new conversation and an associated empty network.
+    Creates a new conversation.
+
+    Args:
+        conversation: The conversation to create.
+        current_user: The current authenticated user.
+        db: The database session.
+
+    Returns:
+        The newly created conversation.
     """
     db_conversation = models.Conversation(
         title=conversation.title,
@@ -71,7 +86,14 @@ async def get_conversations(
     db: Session = Depends(get_db)
 ):
     """
-    Get all conversations for the current user.
+    Retrieves all conversations for the current user.
+
+    Args:
+        current_user: The current authenticated user.
+        db: The database session.
+
+    Returns:
+        A list of conversations.
     """
     return db.query(models.Conversation).filter(models.Conversation.user_id == current_user.id).all()
 
@@ -82,7 +104,15 @@ async def get_conversation(
     db: Session = Depends(get_db)
 ):
     """
-    Get a specific conversation by ID.
+    Retrieves a specific conversation by ID.
+
+    Args:
+        conversation_id: The ID of the conversation to retrieve.
+        current_user: The current authenticated user.
+        db: The database session.
+
+    Returns:
+        The conversation with the specified ID.
     """
     db_conversation = db.query(models.Conversation).filter(
         models.Conversation.id == conversation_id,
@@ -101,7 +131,15 @@ async def get_messages(
     db: Session = Depends(get_db)
 ):
     """
-    Get all messages for a conversation.
+    Retrievess all messages for a given conversation.
+
+    Args:
+        conversation_id: The ID of the conversation.
+        current_user: The current authenticated user.
+        db: The database session.
+
+    Returns:
+        A list of messages in the conversation.
     """
     # Check if conversation exists and belongs to user
     db_conversation = db.query(models.Conversation).filter(
@@ -125,7 +163,17 @@ async def create_message(
     db: Session = Depends(get_db)
 ):
     """
-    Create a new message, process it with the LLM, and potentially trigger network operations.
+    Creates a new message in a conversation.
+
+    Args:
+        conversation_id: The ID of the conversation.
+        message: The message to create.
+        background_tasks: FastAPI background tasks.
+        current_user: The current authenticated user.
+        db: The database session.
+
+    Returns:
+        The newly created message.
     """
     db_conversation = db.query(models.Conversation).filter(
         models.Conversation.id == conversation_id,
@@ -163,8 +211,15 @@ async def create_message(
 
 async def process_and_respond(db: Session, conversation_id: int, user_message_content):
     """
-    Process user message, interact with LLM and NetworkXMCP, and save the response.
-    This version handles the full conversation loop including tool calls and feedback.
+    Processes a user's message in the background.
+
+    This function interacts with the LLM and the NetworkXMCP service to
+    generate a response, which is then saved to the database.
+
+    Args:
+        db: The database session.
+        conversation_id: The ID of the conversation.
+        user_message_content: The content of the user's message.
     """
     # メッセージが辞書型の場合は文字列に変換
     if isinstance(user_message_content, dict):
@@ -273,8 +328,15 @@ async def recommend_layout(
     db: Session = Depends(get_db)
 ):
     """
-    Recommend a layout algorithm based on network description and visualization purpose.
-    Uses LLM to analyze the requirements and suggest the best layout.
+    Recommends a network layout algorithm based on a description and purpose.
+
+    Args:
+        request: The incoming request.
+        current_user: The current authenticated user.
+        db: The database session.
+
+    Returns:
+        A dictionary with the recommended layout and an explanation.
     """
     try:
         body = await request.json()
@@ -365,8 +427,18 @@ async def process_chat(
     db: Session = Depends(get_db)
 ):
     """
-    Process a chat message from the frontend, handling the full conversation loop.
-    This endpoint is the primary interaction point for the chat UI.
+    Processes a chat message and returns the response.
+
+    This endpoint handles the main chat functionality, including conversation
+    creation, message history, and interaction with the LLM and network tools.
+
+    Args:
+        request: The incoming request.
+        current_user: The current authenticated user.
+        db: The database session.
+
+    Returns:
+        A dictionary with the response and any network updates.
     """
     try:
         body = await request.json()
