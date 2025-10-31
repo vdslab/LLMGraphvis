@@ -38,6 +38,7 @@ sequenceDiagram
     %% Step 4: Frontend navigates and fetches the initial graph data
     F->>F: チャットページへ遷移
     F->>B: GET /network/{network_id}/visdata
+    note left of F: 可視化データを要求
     B->>DB: レンダリングに必要なデータをクエリ (ノード, エッジ, 計算済みのposition)
     DB-->>B: { nodes: [...], edges: [...] }
     B-->>F: 200 OK + { nodes, edges }
@@ -70,15 +71,17 @@ sequenceDiagram
     %% Step 1: User sends a message (HTTP POST)
     U->>F: 「友達が多い人を大きく表示して」
     F->>B: POST /chat/process (message, conversation_id)
+    note right of F: ユーザーの指示をバックエンドに送信
     B->>DB: ユーザーメッセージを保存
 
     %% Step 2: Backend invokes LLM
     B->>LLM: ユーザーの指示と会話履歴を送信
-    note right of LLM: LLMは「友達が多い」を「次数中心性」と解釈し、<br/>「大きく表示」を「ノードサイズ」に割り当てる判断を行う。
+    note right of LLM: ユーザーの曖昧な指示を具体的なツール実行計画に変換する。<br/>「友達が多い」＝「次数中心性で計算する」<br/>「大きく表示」＝「計算結果をノードサイズに割り当てる」と判断。
     LLM-->>B: ツール呼び出しを要求 (calculate_centrality → apply_metric_to_visual)
 
     %% Step 3: Backend calls calculation tool (with cache logic)
     B->>N: /tools/calculate_centrality (network_id, type:"degree")
+    note over N: 「次数中心性」を計算するツールを呼び出す。<br/>各ノードの次数（つながりの数）を計算する。
     
     alt キャッシュが存在する場合
         N->>DB: 計算結果 (degree_centrality) を問い合わせ
@@ -93,6 +96,7 @@ sequenceDiagram
 
     %% Step 4: Backend calls visualization tool
     B->>N: /tools/apply_metric_to_visual (network_id, metric:"degree_centrality", visual:"node_size")
+    note over N: 計算指標を可視的特徴量に割り当てるツールを呼び出す。<br/>ここでは「次数中心性」の値を「ノードのサイズ」に反映させる。
     N->>DB: visual_stylesにマッピング設定を保存
     DB-->>N: 保存成功
     N-->>B: 実行成功
@@ -104,6 +108,7 @@ sequenceDiagram
     %% Step 6: Frontend fetches the updated graph data via HTTP
     note left of F: 通知を受け、HTTPで最新のグラフデータを取得
     F->>B: GET /network/{network_id}/visdata
+    note left of F: 更新された可視化データを要求
     B->>DB: レンダリングに必要なデータをクエリ
     DB-->>B: { nodes: [...], edges: [...] }
     B-->>F: 200 OK + { nodes, edges }
@@ -146,6 +151,7 @@ sequenceDiagram
 
     U->>F: 「PageRankを計算して」
     F->>B: POST /chat/process (message, conversation_id)
+    note right of F: ユーザーの指示をバックエンドに送信
 
     B->>LLM: ユーザーの指示を送信
     LLM-->>B: ツール呼び出しを要求 (calculate_centrality, type:"pagerank")
