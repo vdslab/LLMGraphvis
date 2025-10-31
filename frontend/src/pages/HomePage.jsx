@@ -1,6 +1,13 @@
 import { Link } from 'react-router-dom';
 import useAuthStore from '../services/authStore';
 
+/**
+ * The home page component.
+ *
+ * This component displays a welcome message and provides links to get started.
+ *
+ * @returns {JSX.Element} The rendered home page.
+ */
 const HomePage = () => {
   const { isAuthenticated } = useAuthStore();
 

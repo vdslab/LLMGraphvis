@@ -1,8 +1,8 @@
 """
-レイアウト計算関数モジュール
-===================
+NetworkX Layout Functions.
 
-NetworkXを使用したグラフのレイアウト計算関数を提供します。
+This module provides a set of functions for calculating graph layouts using
+different algorithms from the NetworkX library.
 """
 
 import networkx as nx
@@ -15,23 +15,24 @@ logger = logging.getLogger("networkx_mcp.layouts.layout")
 
 def calculate_spring_layout(G, k=None, pos=None, fixed=None, iterations=50, threshold=1e-4, weight='weight', scale=1.0, center=None, dim=2, seed=None):
     """
-    スプリングレイアウトを計算する
-    
+    Calculates the spring layout of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        k (float, optional): バネの強さ
-        pos (dict, optional): 初期位置
-        fixed (list, optional): 固定するノードのリスト
-        iterations (int, optional): 反復回数
-        threshold (float, optional): 収束閾値
-        weight (str, optional): エッジの重みの属性名
-        scale (float, optional): スケール
-        center (tuple, optional): 中心座標
-        dim (int, optional): 次元数
-        seed (int, optional): 乱数シード
-        
+        G: The NetworkX graph.
+        k: The optimal distance between nodes.
+        pos: Initial positions for nodes.
+        fixed: Nodes to keep fixed at their initial positions.
+        iterations: The number of iterations of the algorithm.
+        threshold: The threshold for stopping the algorithm.
+        weight: The edge attribute that holds the numerical value used for
+            the edge weight.
+        scale: The scale factor for the layout.
+        center: The center of the layout.
+        dim: The dimension of the layout.
+        seed: The random seed.
+
     Returns:
-        dict: ノードIDをキー、位置を値とする辞書
+        A dictionary of positions keyed by node.
     """
     try:
         return nx.spring_layout(G, k=k, pos=pos, fixed=fixed, iterations=iterations, threshold=threshold, weight=weight, scale=scale, center=center, dim=dim, seed=seed)
@@ -42,16 +43,16 @@ def calculate_spring_layout(G, k=None, pos=None, fixed=None, iterations=50, thre
 
 def calculate_circular_layout(G, scale=1, center=None, dim=2):
     """
-    円形レイアウトを計算する
-    
+    Calculates the circular layout of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        scale (float, optional): スケール
-        center (tuple, optional): 中心座標
-        dim (int, optional): 次元数
-        
+        G: The NetworkX graph.
+        scale: The scale factor for the layout.
+        center: The center of the layout.
+        dim: The dimension of the layout.
+
     Returns:
-        dict: ノードIDをキー、位置を値とする辞書
+        A dictionary of positions keyed by node.
     """
     try:
         return nx.circular_layout(G, scale=scale, center=center, dim=dim)
@@ -62,16 +63,16 @@ def calculate_circular_layout(G, scale=1, center=None, dim=2):
 
 def calculate_random_layout(G, center=None, dim=2, seed=None):
     """
-    ランダムレイアウトを計算する
-    
+    Calculates the random layout of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        center (tuple, optional): 中心座標
-        dim (int, optional): 次元数
-        seed (int, optional): 乱数シード
-        
+        G: The NetworkX graph.
+        center: The center of the layout.
+        dim: The dimension of the layout.
+        seed: The random seed.
+
     Returns:
-        dict: ノードIDをキー、位置を値とする辞書
+        A dictionary of positions keyed by node.
     """
     try:
         return nx.random_layout(G, center=center, dim=dim, seed=seed)
@@ -85,17 +86,18 @@ def calculate_random_layout(G, center=None, dim=2, seed=None):
 
 def calculate_spectral_layout(G, weight='weight', scale=1, center=None, dim=2):
     """
-    スペクトルレイアウトを計算する
-    
+    Calculates the spectral layout of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        weight (str, optional): エッジの重みの属性名
-        scale (float, optional): スケール
-        center (tuple, optional): 中心座標
-        dim (int, optional): 次元数
-        
+        G: The NetworkX graph.
+        weight: The edge attribute that holds the numerical value used for
+            the edge weight.
+        scale: The scale factor for the layout.
+        center: The center of the layout.
+        dim: The dimension of the layout.
+
     Returns:
-        dict: ノードIDをキー、位置を値とする辞書
+        A dictionary of positions keyed by node.
     """
     try:
         return nx.spectral_layout(G, weight=weight, scale=scale, center=center, dim=dim)
@@ -106,17 +108,17 @@ def calculate_spectral_layout(G, weight='weight', scale=1, center=None, dim=2):
 
 def calculate_shell_layout(G, nlist=None, scale=1, center=None, dim=2):
     """
-    シェルレイアウトを計算する
-    
+    Calculates the shell layout of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        nlist (list, optional): ノードのリストのリスト
-        scale (float, optional): スケール
-        center (tuple, optional): 中心座標
-        dim (int, optional): 次元数
-        
+        G: The NetworkX graph.
+        nlist: A list of lists of nodes, representing the shells.
+        scale: The scale factor for the layout.
+        center: The center of the layout.
+        dim: The dimension of the layout.
+
     Returns:
-        dict: ノードIDをキー、位置を値とする辞書
+        A dictionary of positions keyed by node.
     """
     try:
         # nlistが指定されていない場合は、連結成分ごとにノードをグループ化
@@ -136,19 +138,20 @@ def calculate_shell_layout(G, nlist=None, scale=1, center=None, dim=2):
 
 def calculate_kamada_kawai_layout(G, dist=None, pos=None, weight='weight', scale=1, center=None, dim=2):
     """
-    カマダ・カワイレイアウトを計算する
-    
+    Calculates the Kamada-Kawai layout of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        dist (dict, optional): ノード間の距離
-        pos (dict, optional): 初期位置
-        weight (str, optional): エッジの重みの属性名
-        scale (float, optional): スケール
-        center (tuple, optional): 中心座標
-        dim (int, optional): 次元数
-        
+        G: The NetworkX graph.
+        dist: A dictionary of distances between nodes.
+        pos: Initial positions for nodes.
+        weight: The edge attribute that holds the numerical value used for
+            the edge weight.
+        scale: The scale factor for the layout.
+        center: The center of the layout.
+        dim: The dimension of the layout.
+
     Returns:
-        dict: ノードIDをキー、位置を値とする辞書
+        A dictionary of positions keyed by node.
     """
     try:
         return nx.kamada_kawai_layout(G, dist=dist, pos=pos, weight=weight, scale=scale, center=center, dim=dim)
@@ -159,23 +162,24 @@ def calculate_kamada_kawai_layout(G, dist=None, pos=None, weight='weight', scale
 
 def calculate_fruchterman_reingold_layout(G, k=None, pos=None, fixed=None, iterations=50, threshold=1e-4, weight='weight', scale=1, center=None, dim=2, seed=None):
     """
-    フルクターマン・レインゴールドレイアウトを計算する
-    
+    Calculates the Fruchterman-Reingold layout of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        k (float, optional): 最適距離
-        pos (dict, optional): 初期位置
-        fixed (list, optional): 固定するノードのリスト
-        iterations (int, optional): 反復回数
-        threshold (float, optional): 収束閾値
-        weight (str, optional): エッジの重みの属性名
-        scale (float, optional): スケール
-        center (tuple, optional): 中心座標
-        dim (int, optional): 次元数
-        seed (int, optional): 乱数シード
-        
+        G: The NetworkX graph.
+        k: The optimal distance between nodes.
+        pos: Initial positions for nodes.
+        fixed: Nodes to keep fixed at their initial positions.
+        iterations: The number of iterations of the algorithm.
+        threshold: The threshold for stopping the algorithm.
+        weight: The edge attribute that holds the numerical value used for
+            the edge weight.
+        scale: The scale factor for the layout.
+        center: The center of the layout.
+        dim: The dimension of the layout.
+        seed: The random seed.
+
     Returns:
-        dict: ノードIDをキー、位置を値とする辞書
+        A dictionary of positions keyed by node.
     """
     try:
         return nx.fruchterman_reingold_layout(G, k=k, pos=pos, fixed=fixed, iterations=iterations, threshold=threshold, weight=weight, scale=scale, center=center, dim=dim, seed=seed)
@@ -186,18 +190,18 @@ def calculate_fruchterman_reingold_layout(G, k=None, pos=None, fixed=None, itera
 
 def calculate_spiral_layout(G, scale=1, center=None, dim=2, resolution=0.35, equidistant=False):
     """
-    スパイラルレイアウトを計算する
-    
+    Calculates the spiral layout of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        scale (float, optional): スケール
-        center (tuple, optional): 中心座標
-        dim (int, optional): 次元数
-        resolution (float, optional): 解像度
-        equidistant (bool, optional): 等間隔にするかどうか
-        
+        G: The NetworkX graph.
+        scale: The scale factor for the layout.
+        center: The center of the layout.
+        dim: The dimension of the layout.
+        resolution: The tightness of the spiral.
+        equidistant: Whether to space the nodes equidistantly.
+
     Returns:
-        dict: ノードIDをキー、位置を値とする辞書
+        A dictionary of positions keyed by node.
     """
     try:
         return nx.spiral_layout(G, scale=scale, center=center, dim=dim, resolution=resolution, equidistant=equidistant)
@@ -208,17 +212,17 @@ def calculate_spiral_layout(G, scale=1, center=None, dim=2, resolution=0.35, equ
 
 def calculate_multipartite_layout(G, subset_key='subset', align='vertical', scale=1, center=None):
     """
-    多部グラフレイアウトを計算する
-    
+    Calculates the multipartite layout of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        subset_key (str, optional): 部分集合を示すノード属性のキー
-        align (str, optional): 配置方向
-        scale (float, optional): スケール
-        center (tuple, optional): 中心座標
-        
+        G: The NetworkX graph.
+        subset_key: The node attribute key that identifies the subset.
+        align: The alignment of the subsets.
+        scale: The scale factor for the layout.
+        center: The center of the layout.
+
     Returns:
-        dict: ノードIDをキー、位置を値とする辞書
+        A dictionary of positions keyed by node.
     """
     try:
         # ノードに部分集合属性がない場合は、次数に基づいて割り当て
@@ -234,17 +238,17 @@ def calculate_multipartite_layout(G, subset_key='subset', align='vertical', scal
 
 def calculate_bipartite_layout(G, nodes, align='vertical', scale=1, center=None):
     """
-    二部グラフレイアウトを計算する
-    
+    Calculates the bipartite layout of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        nodes (list): 一方の部分集合のノードのリスト
-        align (str, optional): 配置方向
-        scale (float, optional): スケール
-        center (tuple, optional): 中心座標
-        
+        G: The NetworkX graph.
+        nodes: The nodes in one partition of the graph.
+        align: The alignment of the partitions.
+        scale: The scale factor for the layout.
+        center: The center of the layout.
+
     Returns:
-        dict: ノードIDをキー、位置を値とする辞書
+        A dictionary of positions keyed by node.
     """
     try:
         return nx.bipartite_layout(G, nodes, align=align, scale=scale, center=center)
@@ -255,13 +259,13 @@ def calculate_bipartite_layout(G, nodes, align='vertical', scale=1, center=None)
 
 def get_layout_function(layout_type):
     """
-    レイアウトタイプに基づいてレイアウト計算関数を取得する
-    
+    Returns the layout function for a given layout type.
+
     Args:
-        layout_type (str): レイアウトタイプ
-        
+        layout_type: The name of the layout type.
+
     Returns:
-        function: レイアウト計算関数
+        The layout function.
     """
     layout_functions = {
         "spring": calculate_spring_layout,

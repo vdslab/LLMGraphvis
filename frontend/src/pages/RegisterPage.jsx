@@ -3,6 +3,13 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import useAuthStore from '../services/authStore';
 
+/**
+ * The registration page component.
+ *
+ * This component displays a registration form and handles the registration process.
+ *
+ * @returns {JSX.Element} The rendered registration page.
+ */
 const RegisterPage = () => {
   const { register: registerUser, isLoading, error } = useAuthStore();
   const [registerError, setRegisterError] = useState(null);
@@ -11,6 +18,11 @@ const RegisterPage = () => {
   const { register, handleSubmit, formState: { errors }, watch } = useForm();
   const password = watch('password');
   
+  /**
+   * Handles the form submission.
+   *
+   * @param {object} data - The form data.
+   */
   const onSubmit = async (data) => {
     setRegisterError(null);
     const success = await registerUser(data.username, data.password);

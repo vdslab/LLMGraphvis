@@ -1,6 +1,8 @@
 """
-Network router for the API.
-Handles network data operations like import, export, and formatting for visualization.
+API endpoints for managing network data.
+
+This module provides routes for uploading, exporting, and retrieving
+network data in various formats.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Response
@@ -28,7 +30,17 @@ router = APIRouter(
 )
 
 def get_network_for_user(db: Session, network_id: int, user_id: int) -> models.Network:
-    """Helper to get a network and verify ownership."""
+    """
+    Retrieves a network for a given user, ensuring ownership.
+
+    Args:
+        db: The database session.
+        network_id: The ID of the network to retrieve.
+        user_id: The ID of the user requesting the network.
+
+    Returns:
+        The network object.
+    """
     db_network = db.query(models.Network).filter(
         models.Network.id == network_id
     ).first()
@@ -49,7 +61,15 @@ async def get_network_cytoscape_format(
     db: Session = Depends(get_db)
 ):
     """
-    Get network data in Cytoscape.js JSON format.
+    Retrieves a network in Cytoscape.js JSON format.
+
+    Args:
+        network_id: The ID of the network to retrieve.
+        current_user: The current authenticated user.
+        db: The database session.
+
+    Returns:
+        A dictionary containing the network data in Cytoscape.js format.
     """
     db_network = get_network_for_user(db, network_id, current_user.id)
     
@@ -77,7 +97,15 @@ async def export_network_graphml(
     db: Session = Depends(get_db)
 ):
     """
-    Export the network as a GraphML file.
+    Exports a network as a GraphML file.
+
+    Args:
+        network_id: The ID of the network to export.
+        current_user: The current authenticated user.
+        db: The database session.
+
+    Returns:
+        A GraphML file as a response.
     """
     db_network = get_network_for_user(db, network_id, current_user.id)
     return Response(
@@ -93,8 +121,15 @@ async def upload_new_network(
     db: Session = Depends(get_db)
 ):
     """
-    Upload a GraphML file to create a new conversation and network.
-    The file is first sent to NetworkXMCP for normalization.
+    Uploads a new network from a GraphML file.
+
+    Args:
+        file: The GraphML file to upload.
+        current_user: The current authenticated user.
+        db: The database session.
+
+    Returns:
+        A dictionary with the new conversation and network IDs.
     """
     if not file.filename.endswith(".graphml"):
         raise HTTPException(status_code=400, detail="Invalid file type. Please upload a .graphml file.")
@@ -165,7 +200,19 @@ async def calculate_network_layout(
     db: Session = Depends(get_db)
 ):
     """
-    Proxies layout calculation requests to the NetworkXMCP service.
+    Calculates the layout for a network.
+
+    This endpoint proxies the layout calculation to the NetworkXMCP service.
+
+    Args:
+        network_id: The ID of the network.
+        layout_type: The type of layout to apply.
+        layout_params: Parameters for the layout algorithm.
+        current_user: The current authenticated user.
+        db: The database session.
+
+    Returns:
+        The result of the layout calculation from the NetworkXMCP service.
     """
     # First, verify the user has access to this network.
     get_network_for_user(db, network_id, current_user.id)
@@ -203,7 +250,16 @@ async def upload_and_overwrite_network(
     db: Session = Depends(get_db)
 ):
     """
-    Upload a GraphML file to overwrite an existing network associated with a conversation.
+    Uploads a GraphML file to overwrite an existing network.
+
+    Args:
+        conversation_id: The ID of the conversation containing the network.
+        file: The GraphML file to upload.
+        current_user: The current authenticated user.
+        db: The database session.
+
+    Returns:
+        The updated network.
     """
     if not file.filename.endswith(".graphml"):
         raise HTTPException(status_code=400, detail="Invalid file type. Please upload a .graphml file.")

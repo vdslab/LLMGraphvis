@@ -1,8 +1,8 @@
 """
-ネットワーク操作ツールモジュール
-===================
+NetworkX Graph Manipulation Tools.
 
-NetworkXを使用したグラフの操作ツールを提供します。
+This module provides a set of tools for creating, parsing, and manipulating
+NetworkX graphs.
 """
 
 import networkx as nx
@@ -18,15 +18,16 @@ logger = logging.getLogger("networkx_mcp.tools.network")
 
 def create_random_network(num_nodes=20, edge_probability=0.2, seed=None):
     """
-    ランダムネットワークを作成する
-    
+    Creates a random network.
+
     Args:
-        num_nodes (int, optional): ノード数
-        edge_probability (float, optional): エッジ確率
-        seed (int, optional): 乱数シード
-        
+        num_nodes: The number of nodes in the network.
+        edge_probability: The probability of an edge between any two nodes.
+        seed: The random seed to use for generation.
+
     Returns:
-        tuple: (NetworkXグラフ, ノードリスト, エッジリスト)
+        A tuple containing the NetworkX graph, a list of nodes, and a list of
+        edges.
     """
     try:
         # 乱数シードの設定
@@ -96,13 +97,14 @@ def create_random_network(num_nodes=20, edge_probability=0.2, seed=None):
 
 def parse_graphml_string(graphml_content):
     """
-    GraphML文字列をパースしてNetworkXグラフとノード・エッジ情報を抽出する
-    
+    Parses a GraphML string and extracts graph data.
+
     Args:
-        graphml_content (str): GraphML文字列
-        
+        graphml_content: The GraphML content as a string.
+
     Returns:
-        dict: 処理結果を含む辞書
+        A dictionary containing the parsing result, including the NetworkX
+        graph, nodes, and edges.
     """
     try:
         # Parse the GraphML content
@@ -190,13 +192,16 @@ def parse_graphml_string(graphml_content):
 
 def fix_graphml_structure(graphml_content):
     """
-    GraphMLの構造を修正する
-    
+    Fixes the structure of a GraphML string.
+
+    This function adds missing XML headers, namespace declarations, and
+    other attributes to ensure the GraphML is well-formed.
+
     Args:
-        graphml_content (str): GraphML文字列
-        
+        graphml_content: The GraphML content as a string.
+
     Returns:
-        str: 修正されたGraphML文字列
+        The fixed GraphML string.
     """
     # デバッグログ
     logger.debug("Fixing GraphML structure")
@@ -266,13 +271,18 @@ def fix_graphml_structure(graphml_content):
 
 def convert_to_standard_graphml(graphml_content):
     """
-    あらゆるGraphMLデータを標準形式に変換し、主要な中心性指標を計算して属性として追加する
-    
+    Converts a GraphML string to a standard format.
+
+    This function parses a GraphML string, calculates centrality metrics,
+    and adds them as node attributes. It also standardizes other attributes
+    like name, color, and size.
+
     Args:
-        graphml_content (str): GraphML文字列
-        
+        graphml_content: The GraphML content as a string.
+
     Returns:
-        dict: 処理結果を含む辞書
+        A dictionary containing the result of the conversion, including the
+        standardized GraphML content.
     """
     try:
         # デバッグ情報を記録
@@ -646,15 +656,15 @@ def convert_to_standard_graphml(graphml_content):
 
 def export_network_as_graphml(G, positions=None, visual_properties=None):
     """
-    ネットワークをGraphML形式でエクスポートする
-    
+    Exports a NetworkX graph to GraphML format.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        positions (list, optional): ノードの位置情報
-        visual_properties (dict, optional): ビジュアルプロパティ
-        
+        G: The NetworkX graph to export.
+        positions: A list of node positions.
+        visual_properties: A dictionary of visual properties for the graph.
+
     Returns:
-        dict: 処理結果を含む辞書
+        A dictionary containing the exported GraphML content.
     """
     try:
         # Create a copy of the graph to avoid modifying the original
@@ -729,13 +739,14 @@ def export_network_as_graphml(G, positions=None, visual_properties=None):
 
 def get_network_info(G):
     """
-    ネットワークの基本情報を取得する
-    
+    Retrieves basic information about a network.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        
+        G: The NetworkX graph.
+
     Returns:
-        dict: ネットワーク情報
+        A dictionary containing information about the network, such as the
+        number of nodes and edges, density, and connectivity.
     """
     try:
         # 基本的なネットワーク指標を計算
@@ -771,16 +782,15 @@ def get_network_info(G):
 
 def calculate_centrality(G, centrality_type="degree", **kwargs):
     """
-    指定された中心性指標を計算し、グラフのノード属性として追加する
+    Calculates a specified centrality metric for a graph.
 
     Args:
-        G (nx.Graph): NetworkXグラフ
-        centrality_type (str): 計算する中心性の種類
-            (degree, closeness, betweenness, eigenvector, pagerank)
-        **kwargs: 各中心性計算関数に渡す追加の引数
+        G: The NetworkX graph.
+        centrality_type: The type of centrality to calculate.
+        **kwargs: Additional arguments to pass to the centrality function.
 
     Returns:
-        dict: 処理結果を含む辞書
+        A dictionary containing the result of the centrality calculation.
     """
     try:
         centrality_calculators = {
@@ -830,15 +840,16 @@ def calculate_centrality(G, centrality_type="degree", **kwargs):
 
 def apply_layout_to_graphml(graphml_content, layout_type="spring", layout_params=None):
     """
-    GraphMLにレイアウトを適用し、ノードの位置情報を更新する
-    
+    Applies a layout to a GraphML graph.
+
     Args:
-        graphml_content (str): GraphML文字列
-        layout_type (str): レイアウトアルゴリズムの種類
-        layout_params (dict, optional): レイアウトアルゴリズムのパラメータ
-        
+        graphml_content: The GraphML content as a string.
+        layout_type: The type of layout to apply.
+        layout_params: Parameters for the layout algorithm.
+
     Returns:
-        dict: 処理結果を含む辞書
+        A dictionary containing the updated GraphML content and node
+        positions.
     """
     try:
         if layout_params is None:

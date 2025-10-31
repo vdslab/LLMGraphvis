@@ -1,8 +1,18 @@
+/**
+ * @file Zustand store for managing network state.
+ * @module stores/network
+ */
 import { create } from "zustand";
 import { networkAPI } from "./api";
 import useChatStore from "./chatStore";
 
-// Helper function to generate colors based on centrality values
+/**
+ * Generates a color based on a centrality value.
+ *
+ * @param {number} value - The centrality value.
+ * @param {number} maxValue - The maximum centrality value.
+ * @returns {string} The RGB color string.
+ */
 const getCentralityColor = (value, maxValue) => {
   // Generate a color from blue (low) to red (high)
   const ratio = value / maxValue;
@@ -11,17 +21,33 @@ const getCentralityColor = (value, maxValue) => {
   return `rgb(${r}, 70, ${b})`;
 };
 
+/**
+ * Zustand store for network data.
+ *
+ * @returns {object} The network store.
+ */
 const useNetworkStore = create((set, get) => ({
+  /** @type {Array<object>} The nodes of the network. */
   nodes: [],
+  /** @type {Array<object>} The edges of the network. */
   edges: [],
+  /** @type {string} The current layout algorithm. */
   layout: "spring",
+  /** @type {object} The parameters for the current layout algorithm. */
   layoutParams: {},
+  /** @type {Array<object>} The positions of the nodes. */
   positions: [],
+  /** @type {object|null} The current centrality values. */
   centrality: null,
+  /** @type {string|null} The type of the current centrality metric. */
   centralityType: null,
+  /** @type {boolean} Whether the network is currently loading. */
   isLoading: false,
+  /** @type {string|null} The current error message. */
   error: null,
+  /** @type {object|null} The current layout recommendation. */
   recommendation: null,
+  /** @type {object} The visual properties of the network. */
   visualProperties: {
     node_size: 5,
     node_color: "#1d4ed8",
@@ -29,27 +55,48 @@ const useNetworkStore = create((set, get) => ({
     edge_color: "#94a3b8",
   },
 
-  // Set network data
+  /**
+   * Sets the network data.
+   *
+   * @param {Array<object>} nodes - The nodes of the network.
+   * @param {Array<object>} edges - The edges of the network.
+   */
   setNetworkData: (nodes, edges) => {
     set({ nodes, edges });
   },
 
-  // Set layout type
+  /**
+   * Sets the layout algorithm.
+   *
+   * @param {string} layout - The name of the layout algorithm.
+   */
   setLayout: (layout) => {
     set({ layout });
   },
 
-  // Set positions
+  /**
+   * Sets the node positions.
+   *
+   * @param {Array<object>} positions - The positions of the nodes.
+   */
   setPositions: (positions) => {
     set({ positions });
   },
 
-  // Set layout parameters
+  /**
+   * Sets the layout parameters.
+   *
+   * @param {object} layoutParams - The parameters for the layout algorithm.
+   */
   setLayoutParams: (layoutParams) => {
     set({ layoutParams });
   },
 
-  // Calculate layout using API
+  /**
+   * Calculates the layout of the network.
+   *
+   * @returns {Promise<boolean>} Whether the layout was calculated successfully.
+   */
   calculateLayout: async () => {
     const { layout, layoutParams } = get();
     const conversationId = useChatStore.getState().currentConversationId;
@@ -106,12 +153,20 @@ const useNetworkStore = create((set, get) => ({
     }
   },
 
-  // Apply layout using MCP client with GraphML
+  /**
+   * Applies the current layout to the network.
+   *
+   * @returns {Promise<boolean>} Whether the layout was applied successfully.
+   */
   applyLayout: async () => {
     return await get().calculateLayout();
   },
 
-  // Load sample network using API
+  /**
+   * Loads a sample network.
+   *
+   * @returns {Promise<boolean>} Whether the sample network was loaded successfully.
+   */
   loadSampleNetwork: async () => {
     console.log("Generating static sample network");
     set({ isLoading: true, error: null });
@@ -179,7 +234,13 @@ const useNetworkStore = create((set, get) => ({
     }
   },
 
-  // Get layout recommendation
+  /**
+   * Gets a layout recommendation from the API.
+   *
+   * @param {string} description - A description of the network.
+   * @param {string} purpose - The purpose of the visualization.
+   * @returns {Promise<boolean>} Whether the recommendation was retrieved successfully.
+   */
   getLayoutRecommendation: async (description, purpose) => {
     set({ isLoading: true, error: null });
     try {
@@ -206,7 +267,11 @@ const useNetworkStore = create((set, get) => ({
     }
   },
 
-  // Apply recommended layout
+  /**
+   * Applies the recommended layout.
+   *
+   * @returns {Promise<boolean>} Whether the layout was applied successfully.
+   */
   applyRecommendedLayout: async () => {
     const { recommendation } = get();
     if (!recommendation) {
@@ -222,7 +287,12 @@ const useNetworkStore = create((set, get) => ({
     return await get().calculateLayout();
   },
 
-  // Apply centrality values to nodes
+  /**
+   * Applies centrality values to the network nodes.
+   *
+   * @param {object} centralityValues - The centrality values.
+   * @param {string} centralityType - The type of centrality.
+   */
   applyCentralityValues: (centralityValues, centralityType) => {
     const maxValue = Math.max(...Object.values(centralityValues), 1);
     const updatedPositions = get().positions.map((node) => {
@@ -241,7 +311,9 @@ const useNetworkStore = create((set, get) => ({
     });
   },
  
-  // Clear all data
+  /**
+   * Clears all network data.
+   */
   clearData: () => {
     set({
       nodes: [],
@@ -254,7 +326,12 @@ const useNetworkStore = create((set, get) => ({
     });
   },
 
-  // Upload network file using GraphML-based API
+  /**
+   * Uploads a network file.
+   *
+   * @param {File} file - The file to upload.
+   * @returns {Promise<{success: boolean, error?: string}>} The result of the upload.
+   */
   uploadNetworkFile: async (file) => {
     set({ isLoading: true, error: null });
     try {
@@ -317,7 +394,11 @@ const useNetworkStore = create((set, get) => ({
     }
   },
 
-  // Export network as GraphML
+  /**
+   * Exports the network as a GraphML file.
+   *
+   * @returns {Promise<Blob|null>} The exported GraphML data.
+   */
   exportAsGraphML: async () => {
     const { currentConversationId } = useChatStore.getState();
     if (!currentConversationId) {
@@ -342,7 +423,11 @@ const useNetworkStore = create((set, get) => ({
     }
   },
 
-  // Get network information
+  /**
+   * Gets information about the current network.
+   *
+   * @returns {Promise<object|null>} Information about the network.
+   */
   getNetworkInfo: async () => {
     const { currentConversationId } = useChatStore.getState();
     if (!currentConversationId) {

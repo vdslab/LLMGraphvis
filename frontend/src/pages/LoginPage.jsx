@@ -3,6 +3,13 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import useAuthStore from '../services/authStore';
 
+/**
+ * The login page component.
+ *
+ * This component displays a login form and handles the login process.
+ *
+ * @returns {JSX.Element} The rendered login page.
+ */
 const LoginPage = () => {
   const { login, isLoading, error } = useAuthStore();
   const [loginError, setLoginError] = useState(null);
@@ -14,6 +21,11 @@ const LoginPage = () => {
   // Get the return URL from location state or default to chat page
   const from = location.state?.from?.pathname || '/chat';
   
+  /**
+   * Handles the form submission.
+   *
+   * @param {object} data - The form data.
+   */
   const onSubmit = async (data) => {
     setLoginError(null);
     const success = await login(data.username, data.password);

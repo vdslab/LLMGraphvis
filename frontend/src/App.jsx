@@ -10,6 +10,13 @@ import NetworkChatPage from './pages/NetworkChatPage';
 import useAuthStore from './services/authStore';
 import websocketService from './services/websocketService';
 
+/**
+ * The main application component.
+ *
+ * This component sets up the router and handles authentication state.
+ *
+ * @returns {JSX.Element} The rendered application.
+ */
 function App() {
   const { checkAuth, isLoading, isAuthenticated } = useAuthStore();
   const [authInitialized, setAuthInitialized] = useState(false);

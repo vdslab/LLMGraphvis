@@ -1,10 +1,20 @@
 import { Link, useNavigate } from "react-router-dom";
 import useAuthStore from "../services/authStore";
 
+/**
+ * The navigation bar component.
+ *
+ * This component displays the main navigation links and user authentication status.
+ *
+ * @returns {JSX.Element} The rendered navigation bar.
+ */
 const Navbar = () => {
   const { isAuthenticated, user, logout } = useAuthStore();
   const navigate = useNavigate();
 
+  /**
+   * Handles the logout process.
+   */
   const handleLogout = () => {
     logout();
     navigate("/login");

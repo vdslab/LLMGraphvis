@@ -5,6 +5,13 @@ import useNetworkStore from '../services/networkStore';
  * A prominent file upload button component for network files.
  * This component provides a button that opens a file dialog when clicked,
  * and handles the file upload process.
+ *
+ * @param {object} props - The component props.
+ * @param {string} [props.className=''] - Additional CSS classes for the button.
+ * @param {string} [props.buttonText='Upload Network File'] - The text to display on the button.
+ * @param {Function} [props.onFileUpload=null] - A custom file upload handler.
+ * @param {boolean} [props.iconOnly=false] - Whether to display only the icon on small screens.
+ * @returns {JSX.Element} The rendered file upload button.
  */
 const FileUploadButton = ({ 
   className = '', 
@@ -15,7 +22,11 @@ const FileUploadButton = ({
   const { uploadNetworkFile } = useNetworkStore();
   const fileInputRef = useRef(null);
 
-  // Handle file selection
+  /**
+   * Handles the file selection event.
+   *
+   * @param {React.ChangeEvent<HTMLInputElement>} e - The file input change event.
+   */
   const handleFileChange = async (e) => {
     if (e.target.files && e.target.files[0]) {
       try {
@@ -50,7 +61,9 @@ const FileUploadButton = ({
     }
   };
 
-  // Handle button click
+  /**
+   * Handles the button click event, triggering the file input.
+   */
   const handleButtonClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();

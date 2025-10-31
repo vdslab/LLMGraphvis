@@ -1,10 +1,9 @@
 """
-NetworkX MCP Server (Stateful)
-=================================
+Stateful NetworkX MCP Server.
 
-FastAPI Model Context Protocol (MCP) サーバー
-ネットワーク分析と可視化のためのステートフルなAPIを提供します。
-データベースと連携し、計算結果をキャッシュすることで高速な応答を実現します。
+This FastAPI application provides a stateful API for network analysis and
+visualization. It uses a database to cache calculation results for
+improved performance.
 """
 
 import os
@@ -52,6 +51,12 @@ class Network(Base):
 
 # Dependency to get DB session
 def get_db():
+    """
+    Provides a database session for dependency injection.
+
+    Yields:
+        A new database session.
+    """
     db = SessionLocal()
     try:
         yield db
@@ -88,6 +93,15 @@ class GraphMLConvertParams(BaseModel):
 
 # --- Helper Functions ---
 def parse_graphml_string(graphml_content: str) -> nx.Graph:
+    """
+    Parses a GraphML string and returns a NetworkX graph.
+
+    Args:
+        graphml_content: The GraphML content as a string.
+
+    Returns:
+        A NetworkX graph object.
+    """
     try:
         content_io = io.BytesIO(graphml_content.encode('utf-8'))
         return nx.read_graphml(content_io)
@@ -98,10 +112,26 @@ def parse_graphml_string(graphml_content: str) -> nx.Graph:
 # --- API Endpoints ---
 @app.get("/health")
 async def health_check():
+    """
+    Checks the health of the service.
+
+    Returns:
+        A dictionary with the health status.
+    """
     return {"status": "ok"}
 
 @app.post("/tools/change_layout", response_model=Dict[str, Any])
 async def api_change_layout(params: LayoutParams, db: Session = Depends(get_db)):
+    """
+    Changes the layout of a network.
+
+    Args:
+        params: The layout parameters.
+        db: The database session.
+
+    Returns:
+        The result of the layout change operation.
+    """
     db_network = db.query(Network).filter(Network.id == params.network_id).first()
     if not db_network:
         raise HTTPException(status_code=404, detail="Network not found")
@@ -137,6 +167,16 @@ async def api_change_layout(params: LayoutParams, db: Session = Depends(get_db))
 
 @app.post("/tools/calculate_centrality", response_model=Dict[str, Any])
 async def api_calculate_centrality(params: CentralityParams, db: Session = Depends(get_db)):
+    """
+    Calculates a centrality metric for a network.
+
+    Args:
+        params: The centrality calculation parameters.
+        db: The database session.
+
+    Returns:
+        The result of the centrality calculation.
+    """
     db_network = db.query(Network).filter(Network.id == params.network_id).first()
     if not db_network:
         raise HTTPException(status_code=404, detail="Network not found")
@@ -173,6 +213,15 @@ async def api_calculate_centrality(params: CentralityParams, db: Session = Depen
 # Other endpoints like convert_graphml can remain stateless as they don't depend on network_id
 @app.post("/tools/convert_graphml", response_model=Dict[str, Any])
 async def api_convert_graphml(params: GraphMLConvertParams):
+    """
+    Converts a GraphML file to a standard format.
+
+    Args:
+        params: The GraphML content to convert.
+
+    Returns:
+        The converted GraphML content.
+    """
     try:
         from tools.network_tools import convert_to_standard_graphml
         result = convert_to_standard_graphml(params.graphml_content)

@@ -6,10 +6,19 @@
 import useNetworkStore from './networkStore';
 import { networkAPI } from './api';
 
+/**
+ * WebSocket service for real-time communication.
+ */
 class WebSocketService {
+  /**
+   * Creates an instance of WebSocketService.
+   */
   constructor() {
+    /** @type {WebSocket|null} The WebSocket instance. */
     this.socket = null;
+    /** @type {boolean} Whether the WebSocket is connected. */
     this.isConnected = false;
+    /** @type {number} The number of reconnection attempts. */
     this.reconnectAttempts = 0;
     this.maxReconnectAttempts = 5;
     this.reconnectTimeout = null;
@@ -18,7 +27,7 @@ class WebSocketService {
   }
 
   /**
-   * Connect to the WebSocket server
+   * Connects to the WebSocket server.
    */
   connect() {
     // 既に接続されている場合は何もしない
@@ -49,7 +58,7 @@ class WebSocketService {
   }
 
   /**
-   * Disconnect from the WebSocket server
+   * Disconnects from the WebSocket server.
    */
   disconnect() {
     if (this.socket) {
@@ -67,7 +76,7 @@ class WebSocketService {
   }
 
   /**
-   * Handle WebSocket open event
+   * Handles the WebSocket open event.
    */
   onOpen() {
     console.log('WebSocket connected');
@@ -76,8 +85,9 @@ class WebSocketService {
   }
 
   /**
-   * Handle WebSocket message event
-   * @param {MessageEvent} event - WebSocket message event
+   * Handles incoming WebSocket messages.
+   *
+   * @param {MessageEvent} event - The WebSocket message event.
    */
   onMessage(event) {
     try {
@@ -95,7 +105,7 @@ class WebSocketService {
   }
 
   /**
-   * Handle WebSocket close event
+   * Handles the WebSocket close event.
    */
   onClose() {
     console.log('WebSocket connection closed');
@@ -106,8 +116,9 @@ class WebSocketService {
   }
 
   /**
-   * Handle WebSocket error event
-   * @param {Event} error - WebSocket error event
+   * Handles WebSocket errors.
+   *
+   * @param {Event} error - The WebSocket error event.
    */
   onError(error) {
     console.error('WebSocket error:', error);
@@ -115,7 +126,7 @@ class WebSocketService {
   }
 
   /**
-   * Attempt to reconnect to the WebSocket server
+   * Attempts to reconnect to the WebSocket server.
    */
   attemptReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
@@ -132,8 +143,9 @@ class WebSocketService {
   }
 
   /**
-   * Handle graph updated event
-   * @param {object} data - Event data
+   * Handles the `graph_updated` event from the WebSocket.
+   *
+   * @param {object} data - The event data.
    */
   async handleGraphUpdated(data) {
     console.log('Graph updated event received:', data);
