@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import useAuthStore from '../services/authStore';
 
+/**
+ * A component that protects a route from unauthenticated access.
+ *
+ * @param {object} props - The component props.
+ * @param {JSX.Element} props.children - The child components to render if the user is authenticated.
+ * @returns {JSX.Element} The rendered component.
+ */
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading, checkAuth } = useAuthStore();
   const location = useLocation();

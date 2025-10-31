@@ -1,13 +1,32 @@
+/**
+ * @file Zustand store for managing authentication state.
+ * @module stores/auth
+ */
 import { create } from 'zustand';
 import { authAPI } from './api';
 
+/**
+ * Zustand store for authentication.
+ *
+ * @returns {object} The authentication store.
+ */
 const useAuthStore = create((set) => ({
+  /** @type {object|null} The authenticated user. */
   user: null,
+  /** @type {string|null} The authentication token. */
   token: localStorage.getItem('token') || null,
+  /** @type {boolean} Whether the user is authenticated. */
   isAuthenticated: !!localStorage.getItem('token'),
   isLoading: false,
   error: null,
 
+  /**
+   * Logs in a user.
+   *
+   * @param {string} username - The user's username.
+   * @param {string} password - The user's password.
+   * @returns {Promise<boolean>} Whether the login was successful.
+   */
   login: async (username, password) => {
     set({ isLoading: true, error: null });
     try {
@@ -43,6 +62,13 @@ const useAuthStore = create((set) => ({
     }
   },
 
+  /**
+   * Registers a new user.
+   *
+   * @param {string} username - The user's username.
+   * @param {string} password - The user's password.
+   * @returns {Promise<boolean>} Whether the registration was successful.
+   */
   register: async (username, password) => {
     set({ isLoading: true, error: null });
     try {
@@ -63,6 +89,9 @@ const useAuthStore = create((set) => ({
     }
   },
 
+  /**
+   * Logs out the current user.
+   */
   logout: () => {
     localStorage.removeItem('token');
     set({ 
@@ -72,6 +101,11 @@ const useAuthStore = create((set) => ({
     });
   },
 
+  /**
+   * Checks the authentication status of the user.
+   *
+   * @returns {Promise<boolean>} Whether the user is authenticated.
+   */
   checkAuth: async () => {
     const token = localStorage.getItem('token');
     if (!token) {

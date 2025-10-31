@@ -1,8 +1,8 @@
 """
-中心性計算関数モジュール
-===================
+NetworkX Centrality Functions.
 
-NetworkXを使用したグラフの中心性計算関数を提供します。
+This module provides a set of functions for calculating various centrality
+metrics using the NetworkX library.
 """
 
 import networkx as nx
@@ -14,13 +14,13 @@ logger = logging.getLogger("networkx_mcp.metrics.centrality")
 
 def calculate_degree_centrality(G):
     """
-    次数中心性を計算する
-    
+    Calculates the degree centrality of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        
+        G: The NetworkX graph.
+
     Returns:
-        dict: ノードIDをキー、中心性値を値とする辞書
+        A dictionary of nodes with degree centrality as the value.
     """
     try:
         return nx.degree_centrality(G)
@@ -30,13 +30,13 @@ def calculate_degree_centrality(G):
 
 def calculate_closeness_centrality(G):
     """
-    近接中心性を計算する
-    
+    Calculates the closeness centrality of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        
+        G: The NetworkX graph.
+
     Returns:
-        dict: ノードIDをキー、中心性値を値とする辞書
+        A dictionary of nodes with closeness centrality as the value.
     """
     try:
         return nx.closeness_centrality(G)
@@ -46,18 +46,19 @@ def calculate_closeness_centrality(G):
 
 def calculate_betweenness_centrality(G, k=None, normalized=True, weight=None, endpoints=False, seed=None):
     """
-    媒介中心性を計算する
-    
+    Calculates the betweenness centrality of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        k (int, optional): サンプリングするノード数
-        normalized (bool, optional): 正規化するかどうか
-        weight (str, optional): エッジの重みの属性名
-        endpoints (bool, optional): 端点を含めるかどうか
-        seed (int, optional): 乱数シード
-        
+        G: The NetworkX graph.
+        k: The number of nodes to use for sampling.
+        normalized: Whether to normalize the centrality values.
+        weight: The edge attribute that holds the numerical value used for
+            the edge weight.
+        endpoints: Whether to include endpoints in the calculation.
+        seed: The random seed.
+
     Returns:
-        dict: ノードIDをキー、中心性値を値とする辞書
+        A dictionary of nodes with betweenness centrality as the value.
     """
     try:
         return nx.betweenness_centrality(G, k=k, normalized=normalized, weight=weight, endpoints=endpoints, seed=seed)
@@ -67,17 +68,18 @@ def calculate_betweenness_centrality(G, k=None, normalized=True, weight=None, en
 
 def calculate_eigenvector_centrality(G, max_iter=100, tol=1.0e-6, nstart=None, weight=None):
     """
-    固有ベクトル中心性を計算する
-    
+    Calculates the eigenvector centrality of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        max_iter (int, optional): 最大反復回数
-        tol (float, optional): 収束許容誤差
-        nstart (dict, optional): 初期値
-        weight (str, optional): エッジの重みの属性名
-        
+        G: The NetworkX graph.
+        max_iter: The maximum number of iterations.
+        tol: The tolerance for convergence.
+        nstart: The starting vector for power iteration.
+        weight: The edge attribute that holds the numerical value used for
+            the edge weight.
+
     Returns:
-        dict: ノードIDをキー、中心性値を値とする辞書
+        A dictionary of nodes with eigenvector centrality as the value.
     """
     try:
         # 通常の固有ベクトル中心性計算を試みる
@@ -93,20 +95,21 @@ def calculate_eigenvector_centrality(G, max_iter=100, tol=1.0e-6, nstart=None, w
 
 def calculate_pagerank(G, alpha=0.85, personalization=None, max_iter=100, tol=1.0e-6, nstart=None, weight=None, dangling=None):
     """
-    PageRankを計算する
-    
+    Calculates the PageRank of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        alpha (float, optional): ダンピング係数
-        personalization (dict, optional): パーソナライゼーション
-        max_iter (int, optional): 最大反復回数
-        tol (float, optional): 収束許容誤差
-        nstart (dict, optional): 初期値
-        weight (str, optional): エッジの重みの属性名
-        dangling (dict, optional): ダングリングノードの処理
-        
+        G: The NetworkX graph.
+        alpha: The damping parameter for PageRank.
+        personalization: The personalization vector.
+        max_iter: The maximum number of iterations.
+        tol: The tolerance for convergence.
+        nstart: The starting vector for power iteration.
+        weight: The edge attribute that holds the numerical value used for
+            the edge weight.
+        dangling: The dangling node handling strategy.
+
     Returns:
-        dict: ノードIDをキー、中心性値を値とする辞書
+        A dictionary of nodes with PageRank as the value.
     """
     try:
         return nx.pagerank(G, alpha=alpha, personalization=personalization, max_iter=max_iter, tol=tol, nstart=nstart, weight=weight, dangling=dangling)
@@ -116,20 +119,21 @@ def calculate_pagerank(G, alpha=0.85, personalization=None, max_iter=100, tol=1.
 
 def calculate_katz_centrality(G, alpha=0.1, beta=1.0, max_iter=1000, tol=1.0e-6, nstart=None, normalized=True, weight=None):
     """
-    Katz中心性を計算する
-    
+    Calculates the Katz centrality of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        alpha (float, optional): 減衰係数
-        beta (float, optional): 外因性の影響
-        max_iter (int, optional): 最大反復回数
-        tol (float, optional): 収束許容誤差
-        nstart (dict, optional): 初期値
-        normalized (bool, optional): 正規化するかどうか
-        weight (str, optional): エッジの重みの属性名
-        
+        G: The NetworkX graph.
+        alpha: The attenuation factor.
+        beta: The constant scaling factor.
+        max_iter: The maximum number of iterations.
+        tol: The tolerance for convergence.
+        nstart: The starting vector for power iteration.
+        normalized: Whether to normalize the centrality values.
+        weight: The edge attribute that holds the numerical value used for
+            the edge weight.
+
     Returns:
-        dict: ノードIDをキー、中心性値を値とする辞書
+        A dictionary of nodes with Katz centrality as the value.
     """
     try:
         return nx.katz_centrality(G, alpha=alpha, beta=beta, max_iter=max_iter, tol=tol, nstart=nstart, normalized=normalized, weight=weight)
@@ -139,17 +143,18 @@ def calculate_katz_centrality(G, alpha=0.1, beta=1.0, max_iter=1000, tol=1.0e-6,
 
 def calculate_load_centrality(G, v=None, cutoff=None, normalized=True, weight=None):
     """
-    負荷中心性を計算する
-    
+    Calculates the load centrality of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        v (node, optional): 単一ノードの中心性を計算する場合のノード
-        cutoff (int, optional): 最短経路の最大長
-        normalized (bool, optional): 正規化するかどうか
-        weight (str, optional): エッジの重みの属性名
-        
+        G: The NetworkX graph.
+        v: The node for which to calculate the centrality.
+        cutoff: The maximum path length to consider.
+        normalized: Whether to normalize the centrality values.
+        weight: The edge attribute that holds the numerical value used for
+            the edge weight.
+
     Returns:
-        dict: ノードIDをキー、中心性値を値とする辞書
+        A dictionary of nodes with load centrality as the value.
     """
     try:
         return nx.load_centrality(G, v=v, cutoff=cutoff, normalized=normalized, weight=weight)
@@ -159,16 +164,18 @@ def calculate_load_centrality(G, v=None, cutoff=None, normalized=True, weight=No
 
 def calculate_harmonic_centrality(G, nbunch=None, distance=None, weight=None):
     """
-    調和中心性を計算する
-    
+    Calculates the harmonic centrality of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        nbunch (container, optional): 中心性を計算するノードのコンテナ
-        distance (str, optional): 距離の属性名
-        weight (str, optional): エッジの重みの属性名
-        
+        G: The NetworkX graph.
+        nbunch: A container of nodes for which to calculate the centrality.
+        distance: The edge attribute that holds the numerical value used for
+            the edge weight.
+        weight: The edge attribute that holds the numerical value used for
+            the edge weight.
+
     Returns:
-        dict: ノードIDをキー、中心性値を値とする辞書
+        A dictionary of nodes with harmonic centrality as the value.
     """
     try:
         return nx.harmonic_centrality(G, nbunch=nbunch, distance=distance)
@@ -178,13 +185,13 @@ def calculate_harmonic_centrality(G, nbunch=None, distance=None, weight=None):
 
 def calculate_subgraph_centrality(G):
     """
-    部分グラフ中心性を計算する
-    
+    Calculates the subgraph centrality of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        
+        G: The NetworkX graph.
+
     Returns:
-        dict: ノードIDをキー、中心性値を値とする辞書
+        A dictionary of nodes with subgraph centrality as the value.
     """
     try:
         return nx.subgraph_centrality(G)
@@ -194,14 +201,15 @@ def calculate_subgraph_centrality(G):
 
 def calculate_communicability_betweenness_centrality(G, normalized=True):
     """
-    通信媒介中心性を計算する
-    
+    Calculates the communicability betweenness centrality of a graph.
+
     Args:
-        G (nx.Graph): NetworkXグラフ
-        normalized (bool, optional): 正規化するかどうか
-        
+        G: The NetworkX graph.
+        normalized: Whether to normalize the centrality values.
+
     Returns:
-        dict: ノードIDをキー、中心性値を値とする辞書
+        A dictionary of nodes with communicability betweenness centrality as
+        the value.
     """
     try:
         return nx.communicability_betweenness_centrality(G, normalized=normalized)
@@ -211,13 +219,13 @@ def calculate_communicability_betweenness_centrality(G, normalized=True):
 
 def get_centrality_function(centrality_type):
     """
-    中心性タイプに基づいて中心性計算関数を取得する
-    
+    Returns the centrality function for a given centrality type.
+
     Args:
-        centrality_type (str): 中心性タイプ
-        
+        centrality_type: The name of the centrality type.
+
     Returns:
-        function: 中心性計算関数
+        The centrality function.
     """
     centrality_functions = {
         "degree": calculate_degree_centrality,

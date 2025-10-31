@@ -1,25 +1,51 @@
+/**
+ * @file Zustand store for managing chat state.
+ * @module stores/chat
+ */
 import { create } from 'zustand';
 import { networkChatAPI } from './api';
 import useNetworkStore from './networkStore';
 
+/**
+ * Zustand store for chat.
+ *
+ * @returns {object} The chat store.
+ */
 const useChatStore = create((set, get) => ({
+  /** @type {Array<object>} The list of messages in the chat. */
   messages: [],
+  /** @type {boolean} Whether a message is currently being processed. */
   isProcessing: false,
+  /** @type {string|null} The current error message. */
   error: null,
+  /** @type {string|null} The ID of the current conversation. */
   currentConversationId: null,
 
+  /**
+   * Sets the current conversation ID.
+   *
+   * @param {string} conversationId - The ID of the conversation.
+   */
   setCurrentConversationId: (conversationId) => {
     set({ currentConversationId: conversationId, messages: [] }); // Clear messages when changing conversation
   },
 
-  // Add a message to the chat history
+  /**
+   * Adds a message to the chat history.
+   *
+   * @param {object} message - The message to add.
+   */
   addMessage: (message) => {
     set((state) => ({
       messages: [...state.messages, { ...message, timestamp: new Date().toISOString() }],
     }));
   },
 
-  // Send a message to the backend and handle the response
+  /**
+   * Sends a message to the backend and handles the response.
+   *
+   * @param {string} messageContent - The content of the message to send.
+   */
   sendMessage: async (messageContent) => {
     if (!messageContent.trim()) return;
 
@@ -90,7 +116,9 @@ const useChatStore = create((set, get) => ({
     }
   },
 
-  // Clear all messages and reset conversation
+  /**
+   * Clears the chat history and resets the conversation.
+   */
   clearChat: () => {
     set({ messages: [], error: null, currentConversationId: null });
   },

@@ -98,7 +98,16 @@ You have access to a set of tools to perform network operations. When a user ask
 """
 
 async def _process_with_gemini(messages: List[Dict[str, str]], model_name: str = "gemini-2.5-flash") -> Dict[str, Any]:
-    """Process messages using Google Gemini."""
+    """
+    Processes a list of messages using the Google Gemini API.
+
+    Args:
+        messages: A list of messages in the conversation history.
+        model_name: The name of the Gemini model to use.
+
+    Returns:
+        A dictionary containing the response from the Gemini API.
+    """
     if not gemini_client:
         return {"content": "Error: Gemini client is not initialized."}
 
@@ -147,7 +156,15 @@ async def _process_with_gemini(messages: List[Dict[str, str]], model_name: str =
         return {"content": f"Error with Gemini: {e}"}
 
 async def _process_with_openai(messages: List[Dict[str, str]]) -> Dict[str, Any]:
-    """Process messages using OpenAI."""
+    """
+    Processes a list of messages using the OpenAI API.
+
+    Args:
+        messages: A list of messages in the conversation history.
+
+    Returns:
+        A dictionary containing the response from the OpenAI API.
+    """
     if not openai_client:
         return {"content": "Error: OpenAI client is not initialized."}
 
@@ -192,7 +209,14 @@ ALLOWED_GEMINI_MODELS = ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash
 
 async def process_chat_message(messages: List[Dict[str, str]], model: str = "gemini-2.5-flash") -> Dict[str, Any]:
     """
-    Process chat messages by routing to the configured LLM provider.
+    Processes a chat message using the configured LLM provider.
+
+    Args:
+        messages: A list of messages in the conversation history.
+        model: The name of the model to use.
+
+    Returns:
+        A dictionary containing the response from the LLM provider.
     """
     print(f"Processing message with provider: {LLM_PROVIDER}")
     if LLM_PROVIDER == "openai":
