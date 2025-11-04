@@ -1,15 +1,14 @@
-# 2.3. グラフ計算サービス仕様 (NetworkXMCP)
+# 2.3. グラフ計算サービス仕様 (Graph Computation Service / NetworkXMCP)
 
 NetworkXMCPは、グラフの計算処理と、それらを適用した最終的なレンダリングデータの生成に特化した**ステートフル**なマイクロサービスです。
 
 ## 役割
 
 - `API`サービスからCPU負荷の高い計算処理をオフロードする。
-- **データベースに直接接続**し、計算結果（レイアウト座標、中心性指標など）をグラフの属性として永続化する。
+- **データベースに直接接続**し、計算結果（レイアウト座標、中心性指標など）をグラフの**永続的な属性として**永続化する。
 - 属性が未計算の場合のみ`NetworkX`ライブラリを利用して計算を実行する。
 - 視覚マッピングルールを`visual_mapping_rules`テーブルに永続化する。
 - 様々な形式のGraphMLファイルをシステムで一貫して扱える標準形式に変換・正規化する。
-- （オプション）Backendからの依頼に基づき、DBから読み出した各種データから最終的なレンダリングデータを組み立てる。
 
 ## APIエンドポイント一覧
 
@@ -19,11 +18,59 @@ NetworkXMCPは、グラフの計算処理と、それらを適用した最終的
 |:---|:---|:---|
 | `GET` | `/health` | サービスのヘルスチェックを行う。 |
 | `GET` | `/tools/list_attributes` | グラフに存在する属性（計算済みまたは元から存在）の一覧を返す。 |
-| `POST` | `/tools/calculate_centrality` | 中心性指標を**計算**し、その結果を`attributes`および`attribute_values`テーブルに保存する。 |
-| `POST` | `/tools/apply_metric_to_visual` | 指定された指標を視覚プロパティにマッピングするルールを`visual_mapping_rules`テーブルに保存する。 |
-| `POST` | `/tools/change_layout` | グラフレイアウトを計算し、ノードの座標を`calculation_results`テーブルに属性として保存する。GraphMLアップロード時の初期レイアウト計算にも使用される。 |
+| `POST` | `/tools/calculate_centrality` | 中心性指標を**計算**し、その結果を新しい**属性として**`attributes`および`attribute_values`テーブルに保存する。 |
+| `POST` | `/tools/apply_metric_to_visual` | 指定された指標を視覚プロパティにマッピングするルールを`visual_mapping_rules`テーブルに保存（作成または更新）する。 |
+| `POST` | `/tools/change_layout` | グラフレイアウトを計算し、ノードの座標を**属性として**`attributes`および`attribute_values`テーブルに保存する。GraphMLアップロード時の初期レイアウト計算にも使用される。 |
 | `POST` | `/tools/highlight_nodes` | 指定された条件に合うノードをハイライトするためのマッピングルールを`visual_mapping_rules`テーブルに保存する。 |
 | `POST` | `/tools/convert_graphml` | アップロードされたGraphMLファイルを解析・修正し、正規化されたGraphMLを返す。（ステートレス）<br/>正規化には、属性名の標準化、特定のデータ型への変換、欠損値の処理、およびシステムで一貫して扱えるGraphML形式への変換が含まれます。 |
+
+## API詳細
+
+### `/tools/calculate_centrality`
+
+- **Request Body:**
+
+```json
+{
+  "network_id": "net_12345",
+  "centrality_type": "degree"
+}
+```
+
+- **Response Body (Success):**
+
+```json
+{
+  "status": "success",
+  "message": "Degree centrality calculated and saved as 'degree_centrality' attribute."
+}
+```
+
+### `/tools/apply_metric_to_visual`
+
+- **Request Body:**
+
+```json
+{
+  "network_id": "net_12345",
+  "attribute_name": "degree_centrality",
+  "visual_property": "NODE_SIZE",
+  "mapping_options": {
+    "scale_type": "LINEAR",
+    "output_min_float": 1.0,
+    "output_max_float": 20.0
+  }
+}
+```
+
+- **Response Body (Success):**
+
+```json
+{
+  "status": "success",
+  "message": "Visual mapping rule for NODE_SIZE has been created or updated."
+}
+```
 
 ## 設計思想: 計算と可視化の分離
 

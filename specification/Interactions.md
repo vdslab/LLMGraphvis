@@ -22,6 +22,7 @@ sequenceDiagram
     %% Step 1: User uploads a file
     U->>F: GraphMLファイルをアップロード
     F->>B: POST /network/upload (GraphMLデータ)
+    note over B,F: 現在の設計は同期処理であり、大規模グラフでは<br/>タイムアウトの可能性があるため、将来的には<br/>非同期処理（ポーGリング or WebSocket通知）の検討も視野に入れる。
 
     %% Step 2: Backend saves initial data and requests default layout calculation
     B->>DB: GraphML、会話、ネットワーク情報を保存
@@ -30,7 +31,7 @@ sequenceDiagram
     note over N: デフォルトのSpring Layoutを計算
 
     %% Step 3: NetworkXMCP computes and saves layout as an attribute
-    N->>DB: 計算したノード座標を属性として `calculation_results` に保存
+    N->>DB: 計算したノード座標を属性として `attributes` と `attribute_values` に保存
     DB-->>N: 保存成功
     N-->>B: 実行成功応答
     B-->>F: アップロード成功 (network_id, conversation_id)
@@ -82,29 +83,32 @@ sequenceDiagram
 
     %% Step 3: Backend asks LLM for the next step
     B->>LLM: 属性リストをツール実行結果として送信
-    note right of LLM: 「次数中心性」がリストにないことを確認。
+    note right of LLM: 「次数中心性」が属性リストにないことを確認し、
+    note right of LLM: 次のステップとして属性計算を要求する。
     LLM-->>B: ツール呼び出し要求 (2. calculate_centrality)
 
     %% Step 4: Backend executes calculate_centrality
     B->>N: POST /tools/calculate_centrality (type:"degree")
     N->>N: NetworkXで次数中心性を計算
-    N->>DB: 計算結果を`attributes`と`attribute_values`に保存
+    N->>DB: 計算結果を新しい属性として`attributes`と`attribute_values`に保存
     DB-->>N: 保存成功
     N-->>B: 実行成功
 
     %% Step 5: Backend asks LLM for the final step
     B->>LLM: 計算成功をツール実行結果として送信
-    note right of LLM: 属性が用意できたので、視覚マッピングを決定。
+    note right of LLM: 属性が用意できたので、それを視覚的な特徴に
+    note right of LLM: 割り当てるためのマッピングルール作成を要求する。
     LLM-->>B: ツール呼び出し要求 (3. apply_metric_to_visual)
 
     %% Step 6: Backend executes apply_metric_to_visual
     B->>N: POST /tools/apply_metric_to_visual (metric:"degree_centrality", visual:"node_size")
-    N->>DB: `visual_mapping_rules`にマッピング設定を保存
+    N->>DB: `visual_mapping_rules`にマッピング設定を保存または更新
     DB-->>N: 保存成功
     N-->>B: 実行成功
 
     %% Step 7: Backend sends notification and final response to Frontend
-    B-->>F: WebSocketメッセージ (type: "graph_updated")
+    B-->>F: SSEイベント (event: graph_updated)
+    note right of F: サーバーからのSSEイベントを受け取り、<br/>データ再取得をトリガーする
     B->>LLM: 全ツール実行完了を報告
     LLM-->>B: 最終応答メッセージ（「次数中心性を計算し...」）
     B->>DB: LLMの応答を保存
@@ -128,7 +132,7 @@ sequenceDiagram
   - `/tools/calculate_centrality` など、Backendから呼び出される計算サービスのAPIは、「[2.3. グラフ計算サービス仕様 (NetworkXMCP)](./NetworkXMCP.md)」で定義されています。
 
 - **データ永続化**
-  - 属性データ(`calculation_results`)など、このフローで利用されるデータベースのスキーマ設計については、「[4. データベーススキーマ仕様](./database-schema.md)」で詳しく解説しています。
+  - 属性データ(`attributes`, `attribute_values`)など、このフローで利用されるデータベースのスキーマ設計については、「[4. データベーススキーマ仕様](./database-schema.md)」で詳しく解説しています。
 
 - **レンダリングデータ生成**
   - フローの最終段階でBackendがレンダリング用データを組み立てるプロセスと、そのJSONデータの具体的な仕様は、「[LLM Function Callingによるレンダリングデータ生成フロー](./rendering-data-flow.md)」で定義されています。

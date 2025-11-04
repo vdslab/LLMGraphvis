@@ -46,9 +46,9 @@ graph TD
     webBrowser -- "Loads SPA (HTTPS)" --> frontendService
     webBrowser -- "API (HTTPS)" --> apiService
 
-    apiService -- "API (HTTP)" --> networkXMCP
-    apiService -- "PostgreSQL" --> database
-    networkXMCP -- "PostgreSQL" --> database
+    apiService -- "グラフ計算を依頼 (API/HTTP)" --> networkXMCP
+    apiService -- "ユーザーデータ、会話履歴などを保存 (PostgreSQL)" --> database
+    networkXMCP -- "計算結果の属性を保存 (PostgreSQL)" --> database
     apiService -- "API (HTTPS)" --> llmService[LLM Services]
 
     style webBrowser fill:#d1e0ff,stroke:#333,stroke-width:2px
@@ -77,7 +77,7 @@ graph TD
         - 各ユーザーの会話履歴
         - メッセージ（ユーザーの発言、LLMの応答）
         - GraphMLデータ本体
-        - グラフの属性データ（レイアウト座標、計算された中心性指標など）
+        - グラフの永続的な属性データ（元データ由来、または計算によって追加されたレイアウト座標や中心性指標など）
     - **補足**: 主要なテーブルの構造については、[データベーススキーマ仕様](./database-schema.md)で詳細を定義しています。
 
 - **クライアントサイド (Web Browser)**:
@@ -86,3 +86,17 @@ graph TD
     - **永続化されるデータ**:
         - 認証用のJSON Web Token (JWT)
     - **役割**: ユーザーがアプリケーションを再訪問した際に、保存されたトークンを使って自動的に認証を行う。トークンの有効期限が切れた場合は、再認証が要求されます。
+    - **セキュリティ**: `localStorage`はXSS攻撃によってトークンが窃取されるリスクがあります。より高いセキュリティが求められる場合は、`HttpOnly`属性を付与したCookieの利用を検討します。
+
+## 1.3. リアルタイム通信方針
+
+本システムでは、サーバーからクライアントへの非同期な情報通知のために、**Server-Sent Events (SSE)** を採用します。
+
+- **採用理由**: 長時間かかる処理の完了通知や進捗状況のストリーミングにおいて、クライアントが定期的に問い合わせる（ポーリングする）方式よりも効率的です。また、双方向通信が不要な本システムの主なユースケースにおいては、WebSocketよりも実装が容易で、既存のHTTPインフラをそのまま活用できるメリットが大きいためです。
+
+- **主な用途**:
+    - グラフ操作（計算・可視化適用）の完了通知
+    - 大規模グラフにおけるレイアウト計算などの進捗通知
+    - LLMの思考プロセスやツール実行状況のストリーミング
+
+- **将来的な展望**: 共同編集機能など、クライアントからのリアルタイムな通信（双方向通信）が必須となる機能を実装する場合は、その機能のために別途WebSocketの導入を検討します。
