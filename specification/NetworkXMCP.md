@@ -72,6 +72,26 @@ NetworkXMCPは、グラフに関する計算処理と、その結果の永続化
 }
 ```
 
+### `/tools/change_layout`
+
+- **Request Body:**
+
+```json
+{
+  "network_id": "net_12345",
+  "layout_name": "spring"
+}
+```
+
+- **Response Body (Success):**
+
+```json
+{
+  "status": "success",
+  "message": "Layout calculated and node positions saved as attributes."
+}
+```
+
 ## 設計思想: 計算と可視化の分離
 
 本システムは、LLMの複数ツール呼び出し機能を活用し、「計算」と「可視化」の責務を明確に分離しています。NetworkXMCPはグラフの**計算**と、その結果である**属性や視覚ルールの永続化**に責務を持ちます。一方、Backendサービスが、永続化されたデータから最終的な**レンダリングデータを組み立てる**責務を担います。この分離により、ユーザーは「次数中心性を計算して」といった分析の指示と、「その結果をノードの大きさで表現して」といった可視化の指示を、自然な対話の中で組み合わせることができます。

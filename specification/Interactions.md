@@ -38,6 +38,8 @@ sequenceDiagram
 
     %% Step 4: Frontend navigates and fetches the initial graph data
     F->>F: チャットページへ遷移
+    F->>B: GET /chat/stream/{conversation_id}
+    note right of F: サーバーからの更新通知を受け取るため、<br/>SSE接続を確立する
     F->>B: GET /network/{network_id}/visdata
     note left of F: 可視化データを要求
     B->>DB: グラフ構造、属性（座標）をクエリ
@@ -65,6 +67,8 @@ sequenceDiagram
     participant LLM as LLM Service
     participant N as NetworkXMCP (Tool Service)
     participant DB as Database
+
+    note over F, B: このフローが開始される時点で、クライアントは<br/>既にSSE接続を確立済みであるとする。
 
     U->>F: 「友達が多い人を大きく表示して」
     F->>B: POST /chat/process (message, conversation_id)

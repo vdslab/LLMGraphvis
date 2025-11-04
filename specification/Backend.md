@@ -176,14 +176,11 @@ APIで送受信される主要なデータ構造です。
 | `meta_data` | `dict` | 拡張用のメタデータ (JSON) |
 | `created_at` | `datetime` | 作成日時 |
 
-- **Network** (DBモデル)
+- **Graph** (DBモデル)
 
-| フィールド名 | 型 | 説明 |
-|:---|:---|:---|
-| `id` | `str` | ネットワークID |
-| `name` | `str` | ネットワーク名 |
-| `graphml_content` | `str` | GraphML形式の元データ |
-| `conversation_id` | `str` | 関連付けられた会話のID |
+`graphs`テーブルのスキーマ定義は、このドキュメント群における唯一の信頼できる情報源（Single Source of Truth）である **[4. データベーススキーマ仕様](./database-schema.md)** を参照してください。
+
+`conversations`テーブルが`graph_id`を保持し、`graphs`テーブルへの1対1の参照を持ちます。
 
 ## 外部サービス連携
 
