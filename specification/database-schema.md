@@ -15,8 +15,8 @@
 3.  **視覚スタイルの非永続化**:
     ノードの色やサイズといった最終的な視覚スタイルそのものは永続化しません。代わりに、「どの属性を、どのように視覚的特徴に変換するか」という**マッピングルールのみを永続化**します。最終的なレンダリングデータは、このルールと属性値に基づき、リクエストの都度、動的に組み立てられます。これにより、状態の不整合を防ぎ、柔軟な視覚表現の変更を可能にします。
 
-4.  **非JSON型スキーマ**:
-    スキーマの明確性を保ち、将来的なデータ移行や型システムの恩恵を最大化するため、JSON型フィールドは使用しません。すべてのデータ構造は、正規化されたテーブルと明確に型定義されたカラムによって表現されます。
+4.  **拡張性と柔軟性**:
+    将来的な機能拡張に柔軟に対応するため、`messages`テーブルに`meta_data`フィールド（JSONB型）を設けます。これにより、構造化された追加情報をスキーマ変更なしに格納できます。
 
 ## 4.2. ER図
 
@@ -31,18 +31,20 @@ erDiagram
     attributes }|--|| visual_mapping_rules : "is used by"
 
     users {
-        UUID id PK
+        INTEGER id PK "Auto-increment"
         VARCHAR username UK
         VARCHAR hashed_password
         TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
 
     conversations {
         UUID id PK
-        UUID user_id FK
+        INTEGER user_id FK
         VARCHAR title
         UUID graph_id FK "one-to-one"
         TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
 
     graphs {
@@ -57,6 +59,7 @@ erDiagram
         UUID conversation_id FK
         VARCHAR role
         TEXT content
+        JSON meta_data
         TIMESTAMP created_at
     }
 

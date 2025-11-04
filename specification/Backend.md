@@ -39,6 +39,12 @@ graph TD
 | `POST` | `/token` | ユーザー名とパスワードで認証し、JWTアクセストークンを発行する。 |
 | `GET` | `/users/me` | 現在認証中のユーザー情報を取得する。 |
 
+### 運用 (`/ops`)
+
+| Method | Path | 説明 |
+|:---|:---|:---|
+| `GET` | `/health` | サービスのヘルスチェックを行う。 |
+
 ### チャット・LLM連携 (`/chat`)
 
 | Method | Path | 説明 |
@@ -139,7 +145,7 @@ APIで送受信される主要なデータ構造です。
 
 | フィールド名 | 型 | 説明 |
 |:---|:---|:---|
-| `id` | `str` | ユーザーID (UUID) |
+| `id` | `int` | ユーザーID (Auto-increment) |
 | `username` | `str` | ユーザー名 |
 
 - **Token**
@@ -155,8 +161,9 @@ APIで送受信される主要なデータ構造です。
 |:---|:---|:---|
 | `id` | `str` | 会話ID |
 | `title` | `str` | 会話のタイトル |
-| `user_id` | `str` | この会話を所有するユーザーのID (UUID) |
+| `user_id` | `int` | この会話を所有するユーザーのID |
 | `created_at` | `datetime` | 作成日時 |
+| `updated_at` | `datetime` | 更新日時 |
 
 - **ChatMessage**
 
@@ -166,6 +173,7 @@ APIで送受信される主要なデータ構造です。
 | `conversation_id` | `str` | 所属する会話のID |
 | `role` | `str` | 発言者の役割 (`user` or `assistant`) |
 | `content` | `str` | メッセージの本文 |
+| `meta_data` | `dict` | 拡張用のメタデータ (JSON) |
 | `created_at` | `datetime` | 作成日時 |
 
 - **Network** (DBモデル)
