@@ -55,7 +55,7 @@ graph TD
 
 - **状態:** `networkId`, `nodes`, `edges` (ノードの座標、スタイル、エッジのスタイルなど、すべてのレンダリングデータを含む)
 - **主要なアクションと連携API:**
-    - `fetchNetwork(networkId)`: `GET /network/{networkId}/visdata` を呼び出し、`visual_styles`テーブルから最終レンダリングデータを取得する。
+    - `fetchNetwork(networkId)`: `GET /network/{networkId}/visdata` を呼び出し、最終レンダリングデータを取得する。
     - `uploadNetwork(file)`: `POST /network/upload` を呼び出し、新規グラフをアップロードする。
     - `setNetworkData(visData)`: `chatStore`のアクション経由で取得した、更新後の最終レンダリングデータで状態を上書きする。
 

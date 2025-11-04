@@ -85,8 +85,8 @@ graph TD
 
 | Method | Path | 説明 |
 |:---|:---|:---|
-| `POST` | `/upload` | GraphMLファイルをアップロードし、新しい会話とネットワークを作成する。 `multipart/form-data` を使用。この処理の中でNetworkXMCPを呼び出し、デフォルトのレイアウトを適用した初期レンダリングデータを生成し、`visual_styles`テーブルに保存する。詳細は[初期グラフ表示フロー](./Interactions.md#31-新規会話開始グラフアップロードフロー)を参照。 |
-| `GET` | `/{network_id}/visdata` | ネットワークの最終レンダリングデータ（`nodes_data`と`edges_data`）を`visual_styles`テーブルから取得する。 |
+| `POST` | `/upload` | GraphMLファイルをアップロードし、新しい会話とネットワークを作成する。 `multipart/form-data` を使用。この処理の中でNetworkXMCPを呼び出し、デフォルトのレイアウトを計算して属性として保存する。詳細は[初期グラフ表示フロー](./Interactions.md#31-新規会話開始グラフアップロードフロー)を参照。 |
+| `GET` | `/{network_id}/visdata` | グラフの元データ、属性、視覚マッピングルールをDBから読み出し、最終的なレンダリングデータ（`nodes_data`と`edges_data`）を動的に組み立てて返す。 |
 | `GET` | `/{network_id}/export` | ネットワークをGraphMLファイルとしてダウンロードする。 |
 
 ## 主要なデータモデル (Pydantic Schemas)

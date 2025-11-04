@@ -29,8 +29,8 @@ sequenceDiagram
     B->>N: POST /tools/change_layout (network_id, name:"spring")
     note over N: デフォルトのSpring Layoutを計算
 
-    %% Step 3: NetworkXMCP computes and saves layout
-    N->>DB: 計算したノード座標 (position) を保存
+    %% Step 3: NetworkXMCP computes and saves layout as an attribute
+    N->>DB: 計算したノード座標を属性として `calculation_results` に保存
     DB-->>N: 保存成功
     N-->>B: 実行成功応答
     B-->>F: アップロード成功 (network_id, conversation_id)
@@ -39,8 +39,9 @@ sequenceDiagram
     F->>F: チャットページへ遷移
     F->>B: GET /network/{network_id}/visdata
     note left of F: 可視化データを要求
-    B->>DB: レンダリングに必要なデータをクエリ (ノード, エッジ, 計算済みのposition)
-    DB-->>B: { nodes: [...], edges: [...] }
+    B->>DB: グラフ構造、属性（座標）をクエリ
+    DB-->>B: グラフデータ、属性データ
+    B->>B: レンダリングデータを組み立て
     B-->>F: 200 OK + { nodes, edges }
 
     %% Step 5: Frontend renders the initial graph
@@ -51,7 +52,7 @@ sequenceDiagram
 
 **目的:** ユーザーの曖昧な自然言語指示（例:「重要なノードを大きくして」）から、LLMが具体的な「計算」と「可視化」のツール呼び出しを推論し、実行する、本システムの最も中心的なフローです。
 
-このフローでは、計算結果をキャッシュしておくことで、同じ計算を何度も繰り返す無駄を省く仕組みも示されています。
+このフローでは、計算結果をグラフの属性として保存しておくことで、同じ計算を何度も繰り返す無駄を省く仕組みも示されています。
 
 ```mermaid
 sequenceDiagram
@@ -64,62 +65,58 @@ sequenceDiagram
     participant N as NetworkXMCP (Tool Service)
     participant DB as Database
 
-    note over F, B: チャットページ表示時にWebSocket接続を確立
-    F->>B: WebSocket接続要求 (/chat/ws)
-    B-->>F: 接続確立
-
-    %% Step 1: User sends a message (HTTP POST)
     U->>F: 「友達が多い人を大きく表示して」
     F->>B: POST /chat/process (message, conversation_id)
-    note right of F: ユーザーの指示をバックエンドに送信
     B->>DB: ユーザーメッセージを保存
 
-    %% Step 2: Backend invokes LLM
-    B->>LLM: ユーザーの指示と会話履歴を送信
-    note right of LLM: ユーザーの曖昧な指示を具体的なツール実行計画に変換する。<br/>「友達が多い」＝「次数中心性で計算する」<br/>「大きく表示」＝「計算結果をノードサイズに割り当てる」と判断。
-    LLM-->>B: ツール呼び出しを要求 (calculate_centrality → apply_metric_to_visual)
+    %% Step 1: Backend asks LLM for a plan
+    B->>LLM: ユーザー指示、会話履歴、ツールリストを送信
+    note right of LLM: ユーザー指示を解釈し、ツール実行計画を立てる。
+    LLM-->>B: ツール呼び出し要求 (1. list_attributes)
 
-    %% Step 3: Backend calls calculation tool (with cache logic)
-    B->>N: /tools/calculate_centrality (network_id, type:"degree")
-    note over N: 「次数中心性」を計算するツールを呼び出す。<br/>各ノードの次数（つながりの数）を計算する。
-    
-    alt キャッシュが存在する場合
-        N->>DB: 計算結果 (degree_centrality) を問い合わせ
-        DB-->>N: キャッシュされた結果を返す
-    else キャッシュが存在しない場合
-        N->>N: NetworkXで次数中心性を計算
-        N->>DB: 計算結果を `calculation_results` に保存
-        DB-->>N: 保存成功
-    end
-    
-    N-->>B: 実行成功
+    %% Step 2: Backend executes list_attributes
+    B->>N: GET /tools/list_attributes (network_id)
+    N->>DB: `attributes`テーブルから属性名一覧をクエリ
+    DB-->>N: 属性リスト
+    N-->>B: 属性リスト（例: ['weight', 'component_id']）
 
-    %% Step 4: Backend calls visualization tool
-    B->>N: /tools/apply_metric_to_visual (network_id, metric:"degree_centrality", visual:"node_size")
-    note over N: 計算指標を可視的特徴量に割り当てるツールを呼び出す。<br/>ここでは「次数中心性」の値を「ノードのサイズ」に反映させる。
-    N->>DB: visual_stylesにマッピング設定を保存
+    %% Step 3: Backend asks LLM for the next step
+    B->>LLM: 属性リストをツール実行結果として送信
+    note right of LLM: 「次数中心性」がリストにないことを確認。
+    LLM-->>B: ツール呼び出し要求 (2. calculate_centrality)
+
+    %% Step 4: Backend executes calculate_centrality
+    B->>N: POST /tools/calculate_centrality (type:"degree")
+    N->>N: NetworkXで次数中心性を計算
+    N->>DB: 計算結果を`attributes`と`attribute_values`に保存
     DB-->>N: 保存成功
     N-->>B: 実行成功
 
-    %% Step 5: Backend sends a notification via WebSocket
-    note right of B: グラフデータが更新されたことを通知する
-    B-->>F: WebSocketメッセージ (type: "graph_updated")
+    %% Step 5: Backend asks LLM for the final step
+    B->>LLM: 計算成功をツール実行結果として送信
+    note right of LLM: 属性が用意できたので、視覚マッピングを決定。
+    LLM-->>B: ツール呼び出し要求 (3. apply_metric_to_visual)
 
-    %% Step 6: Frontend fetches the updated graph data via HTTP
-    note left of F: 通知を受け、HTTPで最新のグラフデータを取得
+    %% Step 6: Backend executes apply_metric_to_visual
+    B->>N: POST /tools/apply_metric_to_visual (metric:"degree_centrality", visual:"node_size")
+    N->>DB: `visual_mapping_rules`にマッピング設定を保存
+    DB-->>N: 保存成功
+    N-->>B: 実行成功
+
+    %% Step 7: Backend sends notification and final response to Frontend
+    B-->>F: WebSocketメッセージ (type: "graph_updated")
+    B->>LLM: 全ツール実行完了を報告
+    LLM-->>B: 最終応答メッセージ（「次数中心性を計算し...」）
+    B->>DB: LLMの応答を保存
+    B-->>F: 200 OK + { message: LLMからの応答 }
+
+    %% Step 8: Frontend fetches updated data
     F->>B: GET /network/{network_id}/visdata
-    note left of F: 更新された可視化データを要求
-    B->>DB: レンダリングに必要なデータをクエリ
-    DB-->>B: { nodes: [...], edges: [...] }
+    B->>DB: グラフ構造、全属性、視覚ルールをクエリ
+    DB-->>B: 各種データ
+    B->>B: レンダリングデータを動的に組み立て
     B-->>F: 200 OK + { nodes, edges }
     F->>F: render(nodes, edges)
-
-    %% Step 7: Backend gets final response from LLM and sends it via HTTP response
-    B->>LLM: 全てのツール実行結果を送信
-    LLM-->>B: 最終的な応答メッセージを生成
-    B->>DB: LLMの応答メッセージを保存
-    B-->>F: 200 OK + { message: LLMからの応答 }
-    F->>U: LLMからの応答を画面に表示
 ```
 
 ### フローの補足
@@ -131,7 +128,7 @@ sequenceDiagram
   - `/tools/calculate_centrality` など、Backendから呼び出される計算サービスのAPIは、「[2.3. グラフ計算サービス仕様 (NetworkXMCP)](./NetworkXMCP.md)」で定義されています。
 
 - **データ永続化**
-  - 計算結果のキャッシュ(`calculation_results`)など、このフローで利用されるデータベースのスキーマ設計については、「[4. データベーススキーマ仕様](./database-schema.md)」で詳しく解説しています。
+  - 属性データ(`calculation_results`)など、このフローで利用されるデータベースのスキーマ設計については、「[4. データベーススキーマ仕様](./database-schema.md)」で詳しく解説しています。
 
 - **レンダリングデータ生成**
   - フローの最終段階でBackendがレンダリング用データを組み立てるプロセスと、そのJSONデータの具体的な仕様は、「[LLM Function Callingによるレンダリングデータ生成フロー](./rendering-data-flow.md)」で定義されています。

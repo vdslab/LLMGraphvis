@@ -13,8 +13,10 @@ erDiagram
     users ||--o{ conversations : "has"
     conversations ||--|| graphs : "is about"
     conversations ||--o{ messages : "records"
-    graphs ||--o{ calculation_results : "caches"
-    graphs ||--|| visual_styles : "has_visual_representation"
+    graphs ||--o{ attributes : "has"
+    attributes ||--o{ attribute_values : "contains"
+    graphs ||--o{ visual_mapping_rules : "defines"
+    attributes }|--|| visual_mapping_rules : "is used by"
 
     users {
         UUID id PK
@@ -39,28 +41,43 @@ erDiagram
     }
 
     messages {
-        UUID id PK
+        VARCHAR id PK
         UUID conversation_id FK
         VARCHAR role
         TEXT content
         TIMESTAMP created_at
     }
 
-    calculation_results {
+    attributes {
         UUID id PK
         UUID graph_id FK
-        TEXT datatype
-        JSONB data
-        TIMESTAMP created_at
+        VARCHAR name
+        VARCHAR target_type "NODE or EDGE"
+        VARCHAR data_type "FLOAT, STRING, INTEGER, BOOLEAN"
+        UNIQUE(graph_id, name)
     }
 
-    visual_styles {
+    attribute_values {
         UUID id PK
-        UUID graph_id FK "one-to-one"
-        JSONB nodes_data
-        JSONB edges_data
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
+        UUID attribute_id FK
+        VARCHAR element_id "Node or Edge ID"
+        FLOAT value_float
+        TEXT value_string
+        INTEGER value_int
+        BOOLEAN value_bool
+        UNIQUE(attribute_id, element_id)
+    }
+
+    visual_mapping_rules {
+        UUID id PK
+        UUID attribute_id FK
+        VARCHAR visual_property "NODE_SIZE, NODE_COLOR, etc."
+        VARCHAR scale_type "LINEAR, DISCRETE, etc."
+        FLOAT output_min_float
+        FLOAT output_max_float
+        VARCHAR output_min_color
+        VARCHAR output_max_color
+        UNIQUE(attribute_id, visual_property)
     }
 ```
 
@@ -70,87 +87,73 @@ erDiagram
 |:---|:---|
 | `users` | アプリケーションのユーザー情報を格納します。 |
 | `conversations` | ユーザーが行う個々の分析セッション（会話）を管理します。各会話は必ず1つのグラフに紐付きます。 |
-| `graphml_content` | `str` | ユーザーがアップロードしたGraphML形式の元データ、またはNetworkXMCPによって正規化されたGraphMLデータ。 |
+| `graphs` | ユーザーがアップロードしたGraphML形式の元データ、またはNetworkXMCPによって正規化されたGraphMLデータ。 |
 | `messages` | `conversations` に含まれる個々のメッセージ（ユーザーの発言、アシスタントの応答）を時系列で記録します。 |
-| `calculation_results` | NetworkX等で計算された中心性指標などの分析結果を永続化するためのキャッシュテーブルです。 |
-| `visual_styles` | グラフの最終的な視覚表現（ノードの座標、スタイル、エッジなど）をFrontendに送るデータ形式でキャッシュします。BackendがFrontendに返すレンダリングデータをそのまま保存します。 |
+| `attributes` | グラフの属性（列）のメタデータを定義します（例: '次数中心性', 'NODE', 'FLOAT'）。Gephiのデータテーブルの列定義に相当します。 |
+| `attribute_values` | `attributes`で定義された各属性の、個々のノード/エッジにおける実際の値を格納します。 |
+| `visual_mapping_rules` | どの属性をどの視覚的特徴（ノードサイズ、色など）にマッピングするかのルールを定義します。 |
 
-## 4.3. 計算結果キャッシュ (`calculation_results`)
+## 4.3. 属性データ (Attributes & Attribute Values)
 
-NetworkX等で計算された中心性指標などの分析結果を永続化するためのテーブルです。高コストな計算の再実行を防ぐことを目的とします。このテーブルの仕様は変更ありません。
+グラフの属性（Gephiにおけるデータテーブルの列に相当）とその値を格納します。属性のメタデータ（列名やデータ型）と、実際の値（各ノード/エッジの持つ値）を分離して管理することで、正規化を実現します。
 
-### 基本設計方針
+### 4.3.1. `attributes` テーブル
 
-- **ハイブリッドモデル**: 柔軟性とパフォーマンスを両立するため、メタデータをリレーショナルカラムで、変動しやすい計算結果を`JSONB`カラムで管理するハイブリッドアプローチを採用します。
-- **データ型**: 検索性能と柔軟性に優れた `JSONB` 型を計算結果の格納に使用します。
-- **インデックス**: `JSONB` カラムには `GIN` インデックスを作成し、高速な検索を可能にします。
-
-### 推奨スキーマ
+属性のメタデータを定義します。
 
 ```sql
-CREATE TABLE calculation_results (
+CREATE TABLE attributes (
     id UUID PRIMARY KEY,
     graph_id UUID NOT NULL,          -- 外部キーとしてgraphsテーブルに関連付け
-    datatype TEXT NOT NULL,         -- 'degree_centrality', 'pagerank', 'betweenness_centrality', 'closeness_centrality', 'eigenvector_centrality', 'load_centrality', 'edge_betweenness_centrality', 'clustering', 'transitivity', 'modularity' などの指標名
-    data JSONB NOT NULL,            -- 計算結果の本体
+    name VARCHAR(255) NOT NULL,     -- 属性名（'degree_centrality', 'component_id'など）
+    target_type VARCHAR(50) NOT NULL, -- 'NODE' または 'EDGE'
+    data_type VARCHAR(50) NOT NULL,   -- 'FLOAT', 'STRING', 'INTEGER', 'BOOLEAN'
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(graph_id, datatype),
-    FOREIGN KEY (graph_id) REFERENCES graphs(id)
+    FOREIGN KEY (graph_id) REFERENCES graphs(id),
+    UNIQUE(graph_id, name)
 );
-
--- 高速な検索のためのGINインデックス
-CREATE INDEX idx_gin_calculation_data ON calculation_results USING GIN (data);
 ```
 
-### `data` カラムのJSONB構造
+### 4.3.2. `attribute_values` テーブル
 
-計算結果は、分析クエリの効率を最大化するため、以下の「オブジェクトの配列」形式で格納します。
-
-- **キーの短縮**: ストレージ効率のため、キーは `"n"` (node) と `"s"` (score) に短縮します。
-- **形式**: `[{"n": "node_id", "s": score}, ...]`
-
-#### JSONBデータ格納例
-
-`degree_centrality` の計算結果を格納する場合の例です。
-
-```json
-[
-  {
-    "n": "node_1",
-    "s": 0.24
-  },
-  {
-    "n": "node_2",
-    "s": 0.16
-  },
-  {
-    "n": "node_3",
-    "s": 0.31
-  }
-]
-```
-
-この構造により、スコア (`s`) に基づくフィルタリング、ソート、集計が効率的に行えます。
-
-## 4.4. 視覚スタイル (`visual_styles`)
-
-グラフの視覚的なスタイル設定（ノードサイズ、色など）を、適用された指標とマッピング設定と共に永続化するためのテーブルです。このテーブルは、最終的なレンダリングデータそのものではなく、BackendがFrontendに返すレンダリングデータを組み立てる際に使用する「マッピング設定」を保存します。
-
-### 推奨スキーマ
+個々のノード/エッジが持つ属性値を格納します。`data_type`に応じて、対応する`value_*`カラムのいずれか一つに値が格納されます。
 
 ```sql
-CREATE TABLE visual_styles (
+CREATE TABLE attribute_values (
     id UUID PRIMARY KEY,
-    graph_id UUID NOT NULL UNIQUE,   -- 外部キーとしてgraphsテーブルに関連付け、1対1対応
-    nodes_data JSONB NOT NULL,        -- Frontendに送るノードデータ（座標、スタイルなどを含む）
-    edges_data JSONB NOT NULL,        -- Frontendに送るエッジデータ（スタイルなどを含む）
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    FOREIGN KEY (graph_id) REFERENCES graphs(id)
+    attribute_id UUID NOT NULL,      -- 外部キーとしてattributesテーブルに関連付け
+    element_id VARCHAR(255) NOT NULL, -- 対象となるノードIDまたはエッジID
+    value_float FLOAT,
+    value_string TEXT,
+    value_int INTEGER,
+    value_bool BOOLEAN,
+    FOREIGN KEY (attribute_id) REFERENCES attributes(id),
+    UNIQUE(attribute_id, element_id)
 );
-
--- nodes_dataとedges_data内の検索を高速化するためのGINインデックス（必要に応じて）
--- CREATE INDEX idx_gin_visual_styles_nodes_data ON visual_styles USING GIN (nodes_data);
--- CREATE INDEX idx_gin_visual_styles_edges_data ON visual_styles USING GIN (edges_data);
 ```
+
+## 4.4. 視覚マッピングルール (`visual_mapping_rules`)
+
+「どの属性」を「どの視覚的特徴」に「どのようにマッピングするか」というルールを永続化します。このテーブルの定義に基づき、レンダリングデータは動的に生成されます。
+
+```sql
+CREATE TABLE visual_mapping_rules (
+    id UUID PRIMARY KEY,
+    attribute_id UUID NOT NULL,        -- 外部キーとしてattributesテーブルに関連付け
+    visual_property VARCHAR(100) NOT NULL, -- 'NODE_SIZE', 'NODE_COLOR', 'EDGE_WIDTH'など
+    scale_type VARCHAR(50) NOT NULL,      -- 'LINEAR'（線形）, 'DISCRETE'（離散）, 'PASSTHROUGH'（値の直接利用）など
+    
+    -- 線形マッピング用の設定
+    output_min_float FLOAT,               -- 例: NODE_SIZEの最小値
+    output_max_float FLOAT,               -- 例: NODE_SIZEの最大値
+    output_min_color VARCHAR(7),          -- 例: NODE_COLORのグラデーション開始色（#RRGGBB）
+    output_max_color VARCHAR(7),          -- 例: NODE_COLORのグラデーション終了色（#RRGGBB）
+
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    FOREIGN KEY (attribute_id) REFERENCES attributes(id),
+    UNIQUE(attribute_id, visual_property)
+);
+```
+
+**補足:** `DISCRETE`（離散値）マッピング（例: 特定のカテゴリ文字列を特定の色に割り当てる）を厳密に実装する場合、さらに別のテーブル（`discrete_mapping_pairs`など）が必要になりますが、本仕様ではまず連続値マッピングを主眼に置き、スキーマを単純化しています。
 
