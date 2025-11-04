@@ -88,7 +88,7 @@ sequenceDiagram
     LLM-->>B: ツール呼び出し要求 (2. calculate_centrality)
 
     %% Step 4: Backend executes calculate_centrality
-    B->>N: POST /tools/calculate_centrality (type:"degree")
+    B->>N: POST /tools/calculate_centrality (centrality_type:"degree")
     N->>N: NetworkXで次数中心性を計算
     N->>DB: 計算結果を新しい属性として`attributes`と`attribute_values`に保存
     DB-->>N: 保存成功
@@ -155,9 +155,9 @@ sequenceDiagram
     note right of F: ユーザーの指示をバックエンドに送信
 
     B->>LLM: ユーザーの指示を送信
-    LLM-->>B: ツール呼び出しを要求 (calculate_centrality, type:"pagerank")
+    LLM-->>B: ツール呼び出しを要求 (calculate_centrality, centrality_type:"pagerank")
 
-    B->>N: /tools/calculate_centrality (network_id, type:"pagerank")
+    B->>N: /tools/calculate_centrality (network_id, centrality_type:"pagerank")
     note over N: "pagerank" は未実装のためエラーを返す
     N-->>B: 実行失敗の応答 (エラーメッセージ)
 

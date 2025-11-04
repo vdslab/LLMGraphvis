@@ -15,14 +15,18 @@ sequenceDiagram
     participant B as API Service
     participant DB as Database
 
-    %% User Registration
+    %% User Registration & Auto-Login
     U->>F: 新規登録情報入力
     F->>B: POST /auth/register (username, password)
     
     alt 登録成功 (Registration Success)
         B->>DB: ユーザー情報をハッシュ化して保存
         DB-->>B: ユーザー登録成功
-        B-->>F: 201 Created
+        B->>B: JWTを生成
+        B-->>F: 200 OK + JSON Web Token (JWT)
+        F->>LS: JWTを保存
+        LS-->>F: 保存成功
+        note right of F: 登録後、自動的にログイン状態へ遷移
     else ユーザー名が既に存在 (Username already exists)
         B->>DB: ユーザー名重複チェック
         DB-->>B: ユーザー名重複エラー
