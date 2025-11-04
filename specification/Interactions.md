@@ -4,7 +4,7 @@
 
 認証に関するフローは、[認証フロー](./Authentication.md)を参照してください。
 
-## 3.1. 新規会話開始（グラフアップロード）フロー
+## 3.1. 新規会話開始（ネットワークアップロード）フロー
 
 **目的:** ユーザーが新しい分析サイクルを開始するために、GraphMLファイルをアップロードして新規会話を作成する処理を定義します。
 
@@ -22,10 +22,10 @@ sequenceDiagram
     %% Step 1: User uploads a file
     U->>F: GraphMLファイルをアップロード
     F->>B: POST /network/upload (GraphMLデータ)
-    note over B,F: 現在の設計は同期処理であり、大規模グラフでは<br/>タイムアウトの可能性があるため、将来的には<br/>非同期処理（ポーGリング or WebSocket通知）の検討も視野に入れる。
+    note over B,F: 現在の設計は同期処理であり、大規模ネットワークでは<br/>タイムアウトの可能性があるため、将来的には<br/>非同期処理（ポーGリング or WebSocket通知）の検討も視野に入れる。
 
     %% Step 2: Backend saves initial data and requests default layout calculation
-    B->>DB: GraphML、会話、ネットワーク情報を保存
+    B->>DB: ネットワーク、会話情報を保存
     DB-->>B: 保存成功 (network_id)
     B->>N: POST /tools/change_layout (network_id, name:"spring")
     note over N: デフォルトのSpring Layoutを計算
@@ -36,26 +36,26 @@ sequenceDiagram
     N-->>B: 実行成功応答
     B-->>F: アップロード成功 (network_id, conversation_id)
 
-    %% Step 4: Frontend navigates and fetches the initial graph data
+    %% Step 4: Frontend navigates and fetches the initial network data
     F->>F: チャットページへ遷移
     F->>B: GET /chat/stream/{conversation_id}
-    note right of F: サーバーからの更新通知を受け取るため、<br/>SSE接続を確立する
+    note right of F: サーバーからの更新通知を受け取るため、<br/>WebSocket接続を確立する
     F->>B: GET /network/{network_id}/visdata
     note left of F: 可視化データを要求
-    B->>DB: グラフ構造、属性（座標）をクエリ
-    DB-->>B: グラフデータ、属性データ
+    B->>DB: ネットワーク構造、属性（座標）をクエリ
+    DB-->>B: ネットワークデータ、属性データ
     B->>B: レンダリングデータを組み立て
     B-->>F: 200 OK + { nodes, edges }
 
-    %% Step 5: Frontend renders the initial graph
-    F->>F: Spring Layoutが適用された初期グラフを描画
+    %% Step 5: Frontend renders the initial network
+    F->>F: Spring Layoutが適用された初期ネットワークを描画
 ```
 
-## 3.2. 対話によるグラフ操作フロー
+## 3.2. 対話によるネットワーク操作フロー
 
 **目的:** ユーザーの曖昧な自然言語指示（例:「重要なノードを大きくして」）から、LLMが具体的な「計算」と「可視化」のツール呼び出しを推論し、実行する、本システムの最も中心的なフローです。
 
-このフローでは、計算結果をグラフの属性として保存しておくことで、同じ計算を何度も繰り返す無駄を省く仕組みも示されています。
+このフローでは、計算結果をネットワークの属性として保存しておくことで、同じ計算を何度も繰り返す無駄を省く仕組みも示されています。
 
 ```mermaid
 sequenceDiagram
@@ -68,7 +68,7 @@ sequenceDiagram
     participant N as NetworkXMCP (Tool Service)
     participant DB as Database
 
-    note over F, B: このフローが開始される時点で、クライアントは<br/>既にSSE接続を確立済みであるとする。
+    note over F, B: このフローが開始される時点で、クライアントは<br/>既にWebSocket接続を確立済みであるとする。
 
     U->>F: 「友達が多い人を大きく表示して」
     F->>B: POST /chat/process (message, conversation_id)
@@ -111,8 +111,8 @@ sequenceDiagram
     N-->>B: 実行成功
 
     %% Step 7: Backend sends notification and final response to Frontend
-    B-->>F: SSEイベント (event: graph_updated)
-    note right of F: サーバーからのSSEイベントを受け取り、<br/>データ再取得をトリガーする
+    B-->>F: WebSocketイベント (event: graph_updated)
+    note right of F: サーバーからのWebSocketイベントを受け取り、<br/>データ再取得をトリガーする
     B->>LLM: 全ツール実行完了を報告
     LLM-->>B: 最終応答メッセージ（「次数中心性を計算し...」）
     B->>DB: LLMの応答を保存
@@ -120,7 +120,7 @@ sequenceDiagram
 
     %% Step 8: Frontend fetches updated data
     F->>B: GET /network/{network_id}/visdata
-    B->>DB: グラフ構造、全属性、視覚ルールをクエリ
+    B->>DB: ネットワーク構造、全属性、視覚ルールをクエリ
     DB-->>B: 各種データ
     B->>B: レンダリングデータを動的に組み立て
     B-->>F: 200 OK + { nodes, edges }
@@ -133,7 +133,7 @@ sequenceDiagram
 
 - **APIエンドポイント**
   - `POST /chat/process` をはじめとするBackendのAPIについては、「[2.1. バックエンド仕様](./Backend.md)」を参照してください。
-  - `/tools/calculate_centrality` など、Backendから呼び出される計算サービスのAPIは、「[2.3. グラフ計算サービス仕様 (NetworkXMCP)](./NetworkXMCP.md)」で定義されています。
+  - `/tools/calculate_centrality` など、Backendから呼び出される計算サービスのAPIは、「[2.3. ネットワーク計算サービス仕様 (NetworkXMCP)](./NetworkXMCP.md)」で定義されています。
 
 - **データ永続化**
   - 属性データ(`attributes`, `attribute_values`)など、このフローで利用されるデータベースのスキーマ設計については、「[4. データベーススキーマ仕様](./database-schema.md)」で詳しく解説しています。
@@ -170,5 +170,5 @@ sequenceDiagram
     LLM-->>B: 最終的な応答メッセージを生成 (例: 「申し訳ありません、PageRankの計算に失敗しました。次数中心性など、他の指標ではいかがでしょうか？」)
 
     B->>F: 最終応答
-    F->>U: グラフは変更せず、LLMからのメッセージを表示
+    F->>U: ネットワークは変更せず、LLMからのメッセージを表示
 ```

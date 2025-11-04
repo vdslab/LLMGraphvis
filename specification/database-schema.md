@@ -6,11 +6,11 @@
 
 本データベースは、以下の設計方針に基づき、データの永続化を行います。
 
-1.  **会話とグラフの1対1関係**:
-    ユーザーからのフィードバックに基づき、データモデルを単純化します。従来の「プロジェクト」という概念を廃止し、「**1つの会話が1つのグラフを扱う**」という、より直感的な1対1の関係を基本構造とします。
+1.  **会話とネットワークの1対1関係**:
+    ユーザーからのフィードバックに基づき、データモデルを単純化します。従来の「プロジェクト」という概念を廃止し、「**1つの会話が1つのネットワークを扱う**」という、より直感的な1対1の関係を基本構造とします。
 
 2.  **属性の永続化**:
-    グラフの属性（次数中心性などの計算結果や、元データに含まれる属性）は、一時的な「キャッシュ」ではなく、グラフが恒久的に持つ**永続的なデータ（列）**として扱います。これにより、Gephiのデータテーブルのように、一度計算・追加された属性はいつでも再利用可能になります。
+    ネットワークの属性（次数中心性などの計算結果や、元データに含まれる属性）は、一時的な「キャッシュ」ではなく、ネットワークが恒久的に持つ**永続的なデータ（列）**として扱います。これにより、Gephiのデータテーブルのように、一度計算・追加された属性はいつでも再利用可能になります。
 
 3.  **視覚スタイルの非永続化**:
     ノードの色やサイズといった最終的な視覚スタイルそのものは永続化しません。代わりに、「どの属性を、どのように視覚的特徴に変換するか」という**マッピングルールのみを永続化**します。最終的なレンダリングデータは、このルールと属性値に基づき、リクエストの都度、動的に組み立てられます。これにより、状態の不整合を防ぎ、柔軟な視覚表現の変更を可能にします。
@@ -23,11 +23,11 @@
 ```mermaid
 erDiagram
     users ||--o{ conversations : "has"
-    conversations ||--|| graphs : "is about"
+    conversations ||--|| networks : "is about"
     conversations ||--o{ messages : "records"
-    graphs ||--o{ attributes : "has"
+    networks ||--o{ attributes : "has"
     attributes ||--o{ attribute_values : "contains"
-    graphs ||--o{ visual_mapping_rules : "defines"
+    networks ||--o{ visual_mapping_rules : "defines"
     attributes }|--|| visual_mapping_rules : "is used by"
 
     users {
@@ -39,24 +39,24 @@ erDiagram
     }
 
     conversations {
-        UUID id PK
+        INTEGER id PK "Auto-increment"
         INTEGER user_id FK
         VARCHAR title
-        UUID graph_id FK "one-to-one"
+        INTEGER network_id FK "one-to-one"
         TIMESTAMP created_at
         TIMESTAMP updated_at
     }
 
-    graphs {
-        UUID id PK
+    networks {
+        INTEGER id PK "Auto-increment"
         VARCHAR name
         TEXT graphml_content
         TIMESTAMP uploaded_at
     }
 
     messages {
-        VARCHAR id PK
-        UUID conversation_id FK
+        INTEGER id PK "Auto-increment"
+        INTEGER conversation_id FK
         VARCHAR role
         TEXT content
         JSON meta_data
@@ -64,32 +64,38 @@ erDiagram
     }
 
     attributes {
-        UUID id PK
-        UUID graph_id FK
+        INTEGER id PK "Auto-increment"
+        INTEGER network_id FK
         VARCHAR name
         VARCHAR target_type "NODE or EDGE"
         VARCHAR data_type "FLOAT, STRING, INTEGER, BOOLEAN"
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
 
     attribute_values {
-        UUID id PK
-        UUID attribute_id FK
+        INTEGER id PK "Auto-increment"
+        INTEGER attribute_id FK
         VARCHAR element_id "Node or Edge ID"
         FLOAT value_float
         TEXT value_string
         INTEGER value_int
         BOOLEAN value_bool
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
 
     visual_mapping_rules {
-        UUID id PK
-        UUID attribute_id FK
+        INTEGER id PK "Auto-increment"
+        INTEGER attribute_id FK
         VARCHAR visual_property "NODE_SIZE, NODE_COLOR, etc."
         VARCHAR scale_type "LINEAR, DISCRETE, etc."
         FLOAT output_min_float
         FLOAT output_max_float
         VARCHAR output_min_color
         VARCHAR output_max_color
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
 ```
 
@@ -98,16 +104,16 @@ erDiagram
 | テーブル名 | 説明 |
 |:---|:---|
 | `users` | アプリケーションのユーザー情報を格納します。 |
-| `conversations` | ユーザーが行う個々の分析セッション（会話）を管理します。各会話は必ず1つのグラフに紐付きます。 |
-| `graphs` | ユーザーがアップロードしたGraphML形式の元データ、またはNetworkXMCPによって正規化されたGraphMLデータ。 |
+| `conversations` | ユーザーが行う個々の分析セッション（会話）を管理します。各会話は必ず1つのネットワークに紐付きます。 |
+| `networks` | ユーザーがアップロードしたGraphML形式の元データ、またはNetworkXMCPによって正規化されたGraphMLデータ。 |
 | `messages` | `conversations` に含まれる個々のメッセージ（ユーザーの発言、アシスタントの応答）を時系列で記録します。 |
-| `attributes` | グラフの属性（列）のメタデータを定義します。元データ由来か、計算によって追加されたものかを問いません（例: '次数中心性', 'NODE', 'FLOAT'）。Gephiのデータテーブルの列定義に相当します。 |
+| `attributes` | ネットワークの属性（列）のメタデータを定義します。元データ由来か、計算によって追加されたものかを問いません（例: '次数中心性', 'NODE', 'FLOAT'）。Gephiのデータテーブルの列定義に相当します。 |
 | `attribute_values` | `attributes`で定義された各属性の、個々のノード/エッジにおける実際の値を格納します。 |
 | `visual_mapping_rules` | どの属性をどの視覚的特徴（ノードサイズ、色など）にマッピングするかのルールを定義します。このテーブルは常に**最新の**マッピングルールセットを保持し、チャットでの対話を通じてルールは追加・更新されます。最終的な視覚スタイルは、このルールに基づいて動的に生成されます。 |
 
 ## 4.3. 属性データ (Attributes & Attribute Values)
 
-グラフの属性（Gephiにおけるデータテーブルの列に相当）とその値を格納します。属性のメタデータ（列名やデータ型）と、実際の値（各ノード/エッジの持つ値）を分離して管理することで、正規化を実現します。
+ネットワークの属性（Gephiにおけるデータテーブルの列に相当）とその値を格納します。属性のメタデータ（列名やデータ型）と、実際の値（各ノード/エッジの持つ値）を分離して管理することで、正規化を実現します。
 
 ### 4.3.1. `attributes` テーブル
 
@@ -115,14 +121,15 @@ erDiagram
 
 ```sql
 CREATE TABLE attributes (
-    id UUID PRIMARY KEY,
-    graph_id UUID NOT NULL,          -- 外部キーとしてgraphsテーブルに関連付け
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    network_id INTEGER NOT NULL,          -- 外部キーとしてnetworksテーブルに関連付け
     name VARCHAR(255) NOT NULL,     -- 属性名（'degree_centrality', 'component_id'など）
     target_type VARCHAR(50) NOT NULL, -- 'NODE' または 'EDGE'
     data_type VARCHAR(50) NOT NULL,   -- 'FLOAT', 'STRING', 'INTEGER', 'BOOLEAN'
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    FOREIGN KEY (graph_id) REFERENCES graphs(id),
-    UNIQUE(graph_id, name)
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    FOREIGN KEY (network_id) REFERENCES networks(id),
+    UNIQUE(network_id, name)
 );
 ```
 
@@ -132,13 +139,15 @@ CREATE TABLE attributes (
 
 ```sql
 CREATE TABLE attribute_values (
-    id UUID PRIMARY KEY,
-    attribute_id UUID NOT NULL,      -- 外部キーとしてattributesテーブルに関連付け
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    attribute_id INTEGER NOT NULL,      -- 外部キーとしてattributesテーブルに関連付け
     element_id VARCHAR(255) NOT NULL, -- 対象となるノードIDまたはエッジID
     value_float FLOAT,
     value_string TEXT,
     value_int INTEGER,
     value_bool BOOLEAN,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
     FOREIGN KEY (attribute_id) REFERENCES attributes(id),
     UNIQUE(attribute_id, element_id)
 );
@@ -150,8 +159,8 @@ CREATE TABLE attribute_values (
 
 ```sql
 CREATE TABLE visual_mapping_rules (
-    id UUID PRIMARY KEY,
-    attribute_id UUID NOT NULL,        -- 外部キーとしてattributesテーブルに関連付け
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    attribute_id INTEGER NOT NULL,        -- 外部キーとしてattributesテーブルに関連付け
     visual_property VARCHAR(100) NOT NULL, -- 'NODE_SIZE', 'NODE_COLOR', 'EDGE_WIDTH'など
     scale_type VARCHAR(50) NOT NULL,      -- 'LINEAR'（線形）, 'DISCRETE'（離散）, 'PASSTHROUGH'（値の直接利用）など
     
@@ -162,6 +171,7 @@ CREATE TABLE visual_mapping_rules (
     output_max_color VARCHAR(7),          -- 例: NODE_COLORのグラデーション終了色（#RRGGBB）
 
     created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
     FOREIGN KEY (attribute_id) REFERENCES attributes(id),
     UNIQUE(attribute_id, visual_property)
 );

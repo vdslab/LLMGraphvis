@@ -39,7 +39,7 @@ graph TD
 | `POST` | `/token` | ユーザー名とパスワードで認証し、JWTアクセストークンを発行する。 |
 | `GET` | `/users/me` | 現在認証中のユーザー情報を取得する。 |
 
-### 運用 (`/ops`)
+### 運用
 
 | Method | Path | 説明 |
 |:---|:---|:---|
@@ -55,7 +55,7 @@ graph TD
 | `GET` | `/conversations/{id}/messages` | 特定の会話のメッセージ一覧を取得する。 |
 | `POST` | `/process` | チャットUIからのメッセージを処理し、LLMやツール呼び出しを実行して最終結果を返す。 |
 | `POST` | `/recommend-layout` | ネットワーク概要に基づき、LLMが最適なレイアウトを推薦する。 |
-| `GET` | `/stream/{conversation_id}` | Server-Sent Events (SSE) の接続を確立するエンドポイント。グラフの更新通知、計算の進捗、LLMの思考プロセスなどをストリーミングで送信する。 |
+| `GET` | `/stream/{conversation_id}` | WebSocketの接続を確立するエンドポイント。ネットワークの更新通知、計算の進捗、LLMの思考プロセスなどをリアルタイムで送信する。 |
 
 #### `/chat/process` の詳細
 
@@ -93,7 +93,7 @@ graph TD
 | Method | Path | 説明 |
 |:---|:---|:---|
 | `POST` | `/upload` | GraphMLファイルをアップロードし、新しい会話とネットワークを作成する。 `multipart/form-data` を使用。この処理の中でNetworkXMCPを呼び出し、デフォルトのレイアウトを計算して属性として保存する。詳細は[初期グラフ表示フロー](./Interactions.md#31-新規会話開始グラフアップロードフロー)を参照。 |
-| `GET` | `/{network_id}/visdata` | グラフの元データ、永続化された全属性、視覚マッピングルールをDBから読み出し、最終的なレンダリングデータ（`nodes_data`と`edges_data`）を動的に組み立てて返す。 |
+| `GET` | `/{network_id}/visdata` | ネットワークの元データ、永続化された全属性、視覚マッピングルールをDBから読み出し、最終的なレンダリングデータ（`nodes_data`と`edges_data`）を動的に組み立てて返す。 |
 | `GET` | `/{network_id}/export` | ネットワークをGraphMLファイルとしてダウンロードする。 |
 
 #### `/network/upload` の詳細
@@ -113,11 +113,11 @@ graph TD
 
 プロセスは以下のステップで実行されます。
 
-1.  **基礎データ（グラフ構造）の取得**
-    - `graphs` テーブルから、リクエストされた `network_id` に紐づくGraphMLデータを読み込み、基本的なノードとエッジのリストを構築します。
+1.  **基礎データ（ネットワーク構造）の取得**
+    - `networks` テーブルから、リクエストされた `network_id` に紐づくGraphMLデータを読み込み、基本的なノードとエッジのリストを構築します。
 
 2.  **全属性データの取得**
-    - `attributes` および `attribute_values` テーブルから、当該グラフに属するすべての属性（元データ由来、計算結果を含む）を読み込みます。
+    - `attributes` および `attribute_values` テーブルから、当該ネットワークに属するすべての属性（元データ由来、計算結果を含む）を読み込みます。
     - 効率的にアクセスできるよう、データを `{ element_id: { attribute_name: value, ... } }` のようなMap形式に整理します。
 
 3.  **視覚マッピングルールの取得**
@@ -176,11 +176,11 @@ APIで送受信される主要なデータ構造です。
 | `meta_data` | `dict` | 拡張用のメタデータ (JSON) |
 | `created_at` | `datetime` | 作成日時 |
 
-- **Graph** (DBモデル)
+- **Network** (DBモデル)
 
-`graphs`テーブルのスキーマ定義は、このドキュメント群における唯一の信頼できる情報源（Single Source of Truth）である **[4. データベーススキーマ仕様](./database-schema.md)** を参照してください。
+`networks`テーブルのスキーマ定義は、このドキュメント群における唯一の信頼できる情報源（Single Source of Truth）である **[4. データベーススキーマ仕様](./database-schema.md)** を参照してください。
 
-`conversations`テーブルが`graph_id`を保持し、`graphs`テーブルへの1対1の参照を持ちます。
+`conversations`テーブルが`network_id`を保持し、`networks`テーブルへの1対1の参照を持ちます。
 
 ## 外部サービス連携
 

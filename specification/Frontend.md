@@ -33,7 +33,7 @@ graph TD
 | **HomePage** | `/` | 不要 | アプリケーションのトップページ。ログインや新規登録への導線。 |
 | **LoginPage** | `/login` | 不要 | ログインフォーム画面。 |
 | **RegisterPage** | `/register` | 不要 | 新規ユーザー登録フォーム画面。 |
-| **NetworkChatPage** | `/chat` | **必要** | グラフ可視化とチャットUIを統合したメイン画面。 |
+| **NetworkChatPage** | `/chat` | **必要** | ネットワーク可視化とチャットUIを統合したメイン画面。 |
 
 ## 状態管理とAPI連携 (Zustand & Axios)
 
@@ -51,22 +51,22 @@ graph TD
 
 ### `networkStore`
 
-表示中のグラフデータ（ノード、エッジ、レイアウト情報）の状態を管理します。このストアは、バックエンドから受け取った最新のグラフデータを保持し、可視化コンポーネントに提供する責務を持ちます。
+表示中のネットワークデータ（ノード、エッジ、レイアウト情報）の状態を管理します。このストアは、バックエンドから受け取った最新のネットワークデータを保持し、可視化コンポーネントに提供する責務を持ちます。
 
 - **状態:** `networkId`, `nodes`, `edges` (ノードの座標、スタイル、エッジのスタイルなど、すべてのレンダリングデータを含む)
 - **主要なアクションと連携API:**
     - `fetchNetwork(networkId)`: `GET /network/{networkId}/visdata` を呼び出し、最終レンダリングデータを取得する。
-    - `uploadNetwork(file)`: `POST /network/upload` を呼び出し、新規グラフをアップロードする。
+    - `uploadNetwork(file)`: `POST /network/upload` を呼び出し、新規ネットワークをアップロードする。
     - `setNetworkData(visData)`: `chatStore`のアクション経由で取得した、更新後の最終レンダリングデータで状態を上書きする。
 
 ### `chatStore`
 
-会話の履歴やメッセージ一覧を管理します。**グラフに対する操作は、すべてこのストアの`sendMessage`アクションが起点となります。**
+会話の履歴やメッセージ一覧を管理します。**ネットワークに対する操作は、すべてこのストアの`sendMessage`アクションが起点となります。**
 
 - **状態:** `conversationId`, `messages`, `isLoading`
 - **主要なアクションと連携API:**
     - `fetchHistory(conversationId)`: `GET /conversations/{id}/messages` を呼び出し、`messages` 状態を更新する。
-    - `sendMessage(messageContent)`: ユーザーの自然言語による指示（計算、可視化、レイアウト変更など）をバックエンドの `POST /chat/process` へ送信する。バックエンドでの処理の結果、グラフが更新された場合は、`networkStore` の状態も更新されます。
+    - `sendMessage(messageContent)`: ユーザーの自然言語による指示（計算、可視化、レイアウト変更など）をバックエンドの `POST /chat/process` へ送信する。バックエンドでの処理の結果、ネットワークが更新された場合は、`networkStore` の状態も更新されます。
 
 #### コード例: `sendMessage` アクションの実装イメージ
 
@@ -98,7 +98,7 @@ export const useChatStore = create((set, get) => ({
       const assistantMessage = response.data.message;
       set((state) => ({ messages: [...state.messages, assistantMessage] }));
 
-      // グラフが更新された場合、networkStoreのアクションを呼び出す (new_vis_dataは最終レンダリングデータ)
+      // ネットワークが更新された場合、networkStoreのアクションを呼び出す (new_vis_dataは最終レンダリングデータ)
       if (response.data.graph_updated) {
         useNetworkStore.getState().setNetworkData(response.data.new_vis_data);
       }
