@@ -54,7 +54,6 @@ erDiagram
         VARCHAR name
         VARCHAR target_type "NODE or EDGE"
         VARCHAR data_type "FLOAT, STRING, INTEGER, BOOLEAN"
-        UNIQUE(graph_id, name)
     }
 
     attribute_values {
@@ -65,7 +64,6 @@ erDiagram
         TEXT value_string
         INTEGER value_int
         BOOLEAN value_bool
-        UNIQUE(attribute_id, element_id)
     }
 
     visual_mapping_rules {
@@ -77,7 +75,6 @@ erDiagram
         FLOAT output_max_float
         VARCHAR output_min_color
         VARCHAR output_max_color
-        UNIQUE(attribute_id, visual_property)
     }
 ```
 
