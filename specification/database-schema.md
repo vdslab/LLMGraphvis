@@ -42,7 +42,6 @@ erDiagram
         INTEGER id PK "Auto-increment"
         INTEGER user_id FK
         VARCHAR title
-        INTEGER network_id FK "one-to-one"
         TIMESTAMP created_at
         TIMESTAMP updated_at
     }
@@ -50,8 +49,10 @@ erDiagram
     networks {
         INTEGER id PK "Auto-increment"
         VARCHAR name
+        INTEGER conversation_id FK "one-to-one"
         TEXT graphml_content
-        TIMESTAMP uploaded_at
+        TIMESTAMP created_at
+        TIMESTAMP updated_at
     }
 
     messages {

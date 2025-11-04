@@ -63,7 +63,7 @@ graph TD
 
 ```json
 {
-  "conversation_id": "conv_12345",
+  "conversation_id": 12345,
   "message": {
     "role": "user",
     "content": "次数中心性を計算して、重要なノードを大きく表示してください。"
@@ -159,7 +159,7 @@ APIで送受信される主要なデータ構造です。
 
 | フィールド名 | 型 | 説明 |
 |:---|:---|:---|
-| `id` | `str` | 会話ID |
+| `id` | `int` | 会話ID |
 | `title` | `str` | 会話のタイトル |
 | `user_id` | `int` | この会話を所有するユーザーのID |
 | `created_at` | `datetime` | 作成日時 |
@@ -169,7 +169,7 @@ APIで送受信される主要なデータ構造です。
 
 | フィールド名 | 型 | 説明 |
 |:---|:---|:---|
-| `id` | `str` | メッセージID |
+| `id` | `int` | メッセージID |
 | `conversation_id` | `str` | 所属する会話のID |
 | `role` | `str` | 発言者の役割 (`user` or `assistant`) |
 | `content` | `str` | メッセージの本文 |
