@@ -1,15 +1,5 @@
 import type { SidebarsConfig } from "@docusaurus/plugin-content-docs";
 
-/**
- * Creating a sidebar enables you to:
- *  - create an ordered group of docs
- *  - render a sidebar for each doc of that group
- *  - provide next/previous navigation
- *
- * The sidebars can be generated from the filesystem, or explicitly defined here.
- *
- * Create as many sidebars as you want.
- */
 const sidebars: SidebarsConfig = {
   specsSidebar: [
     {
@@ -18,54 +8,61 @@ const sidebars: SidebarsConfig = {
       label: "はじめに",
     },
     {
-      type: "doc",
-      id: "Architecture",
-      label: "1. アーキテクチャ設計",
+      type: "category",
+      label: "エグゼクティブサマリー",
+      link: {
+        type: 'doc',
+        id: 'Executive_Summary/README'
+      },
+      items: [], 
     },
     {
       type: "category",
-      label: "2. コンポーネント仕様",
-      items: [
-        {
-          type: "doc",
-          id: "Backend",
-          label: "2.1. バックエンド (API)",
-        },
-        {
-          type: "doc",
-          id: "Frontend",
-          label: "2.2. フロントエンド仕様",
-        },
-        {
-          type: "doc",
-          id: "NetworkXMCP",
-          label: "2.3. グラフ計算サービス仕様 (NetworkXMCP)",
-        },
-      ],
-    },
-    {
-      type: "doc",
-      id: "Interactions",
-      label: "3. 主要な処理フロー",
+      label: "クイックスタートガイド",
+      link: {
+        type: 'doc',
+        id: 'Quick_Start/README'
+      },
+      items: [], 
     },
     {
       type: "category",
-      label: "4. 補足仕様",
+      label: "詳細技術仕様",
       items: [
         {
           type: "doc",
-          id: "database-schema",
-          label: "データベーススキーマ仕様",
+          id: "Technical_Details/Architecture", 
+          label: "0. アーキテクチャ設計",
         },
         {
           type: "doc",
-          id: "Authentication",
-          label: "認証フロー",
+          id: "Technical_Details/Backend", 
+          label: "1. バックエンド仕様 (API)",
         },
         {
           type: "doc",
-          id: "rendering-data-flow",
-          label: "LLM Function Callingによるレンダリングデータ生成フロー",
+          id: "Technical_Details/Frontend", 
+          label: "2. フロントエンド仕様",
+        },
+        {
+          type: "doc",
+          id: "Technical_Details/NetworkXMCP", 
+          label: "3. ネットワーク計算サービス仕様",
+        },
+        {
+          type: "doc",
+          id: "Technical_Details/Database", 
+          label: "4. データベーススキーマ仕様",
+        },
+        {
+          type: "doc",
+          id: "Technical_Details/Authentication", 
+          label: "5. 認証フロー",
+        },
+        {
+          type: "doc",
+          id: "Technical_Details/Core_Workflows", 
+          label: "6. 主要な処理フローとデータ生成",
         },
       ],
     },

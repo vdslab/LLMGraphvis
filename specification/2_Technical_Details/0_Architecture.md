@@ -1,10 +1,14 @@
-# 1. アーキテクチャ設計
+# 0. アーキテクチャ設計
 
-## 1.1. C4モデル
+**前提知識レベル:**
+- C4モデルに関する基本的な理解
+- Webアプリケーションの一般的な構成（フロントエンド, バックエンド, DB）に関する知識
+
+## 0.1. C4モデル
 
 本ドキュメントでは、システムの構造を段階的に理解しやすくするために「C4モデル」という考え方を採用し、概観（コンテキスト）から詳細（コンテナ）へと掘り下げて説明します。
 
-### 1.1.1. コンテキスト図 (Context Diagram)
+### 0.1.1. コンテキスト図 (Context Diagram)
 
 システム全体の概観を示します。ユーザーがどのようにシステムとやり取りし、どの外部システムと連携するかを表します。
 
@@ -28,7 +32,7 @@ graph TD
 | **Web Application** | 本システムのコア機能を提供するWebアプリケーション。 |
 | **LLM Services** | ネットワークのレイアウト推薦やチャット機能のために利用する外部の大規模言語モデルサービス。(OpenAI API, Google Geminiなど) | 外部LLM API (例: OpenAI, Google Gemini) |
 
-### 1.1.2. コンテナ図 (Container Diagram)
+### 0.1.2. コンテナ図 (Container Diagram)
 
 アプリケーションを構成する主要なコンテナ（サービス）と、それらの間のデータの流れを示します。
 
@@ -60,12 +64,12 @@ graph TD
 
 | コンテナ | 説明 | 技術スタック |
 |:---|:---|:---|
-| **Frontend Service** | ユーザーにUIを提供するためのSPA（Single Page Application）を配信するWebサーバー。詳細は[フロントエンド仕様](./Frontend.md)を参照。 | React, Vite, react-force-graph-2d, Zustand, axios |
-| **API Service** | ビジネスロジック、認証、外部API連携を担当するバックエンド。詳細は[バックエンド仕様](./Backend.md)を参照。 | FastAPI, SQLAlchemy, (LLM SDKs) |
-| **NetworkX Model Context Protocol (NetworkXMCP)** | ネットワーク計算やレイアウト処理に特化した計算サービス。**ステートフル**であることで、計算結果をキャッシュし、高コストな再計算を回避します。詳細は[ネットワーク計算サービス仕様](./NetworkXMCP.md)を参照。 | FastAPI, NetworkX, Python, SQLAlchemy |
-| **Database** | ユーザー情報、ネットワークデータ、計算結果のキャッシュなどを永続化するデータベース。詳細は[データベーススキーマ仕様](./database-schema.md)を参照。 | PostgreSQL |
+| **Frontend Service** | ユーザーにUIを提供するためのSPA（Single Page Application）を配信するWebサーバー。詳細は[フロントエンド仕様](./2_Frontend.md)を参照。 | React, Vite, react-force-graph-2d, Zustand, axios |
+| **API Service** | ビジネスロジック、認証、外部API連携を担当するバックエンド。詳細は[バックエンド仕様](./1_Backend.md)を参照。 | FastAPI, SQLAlchemy, (LLM SDKs) |
+| **NetworkX Model Context Protocol (NetworkXMCP)** | ネットワーク計算やレイアウト処理に特化した計算サービス。**ステートフル**であることで、計算結果をキャッシュし、高コストな再計算を回避します。詳細は[ネットワーク計算サービス仕様](./3_NetworkXMCP.md)を参照。 | FastAPI, NetworkX, Python, SQLAlchemy |
+| **Database** | ユーザー情報、ネットワークデータ、計算結果のキャッシュなどを永続化するデータベース。詳細は[データベーススキーマ仕様](./4_Database.md)を参照。 | PostgreSQL |
 
-## 1.2. データ永続化
+## 0.2. データ永続化
 
 本システムにおけるデータの永続化は、目的の異なる2つの仕組みによって実現されています。
 
@@ -78,7 +82,7 @@ graph TD
         - メッセージ（ユーザーの発言、LLMの応答）
         - GraphMLデータ本体
         - ネットワークの永続的な属性データ（元データ由来、または計算によって追加されたレイアウト座標や中心性指標など）
-    - **補足**: 主要なテーブルの構造については、[データベーススキーマ仕様](./database-schema.md)で詳細を定義しています。
+    - **補足**: 主要なテーブルの構造については、[データベーススキーマ仕様](./4_Database.md)で詳細を定義しています。
 
 - **クライアントサイド (Web Browser)**:
     - **目的**: ユーザーの利便性向上。再ログインの手間を省き、シームレスな認証状態を維持する。
@@ -88,7 +92,7 @@ graph TD
     - **役割**: API Serviceが発行したJWTをブラウザがCookieとして安全に保存する。以降のAPIリクエストでは、ブラウザが自動的にCookieをリクエストヘッダーに含めて送信するため、クライアントサイドのJavaScriptがトークンにアクセスする必要はない。
     - **セキュリティ**: `HttpOnly`属性により、JavaScriptからのCookieへのアクセスが禁止されるため、XSS（クロスサイトスクリプティング）攻撃によるトークン窃取のリスクを大幅に軽減します。これは、`localStorage`を利用する方法よりも安全です。
 
-## 1.3. リアルタイム通信方針
+## 0.3. リアルタイム通信方針
 
 本システムでは、サーバーからクライアントへの非同期な情報通知のために、**WebSocket** を主として利用します。
 

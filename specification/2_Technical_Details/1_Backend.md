@@ -1,8 +1,12 @@
-# 2.1. バックエンド仕様 (API)
+# 1. バックエンド仕様 (API)
+
+**前提知識レベル:**
+- FastAPI, Pydantic, SQLAlchemyに関する開発経験
+- REST API, OAuth2, JWTに関する知識
 
 FastAPIで構築されたバックエンドAPI。主な責務は、認証、ビジネスロジックの実行、外部サービス連携です。
 
-## コンポーネント図
+## 1.1. コンポーネント図
 
 ```mermaid
 graph TD
@@ -29,9 +33,9 @@ graph TD
 | **Database Interface** | SQLAlchemyを使用してデータベースとのやり取りを抽象化する。 |
 | **Auth Logic** | OAuth2/JSON Web Tokenによるユーザー認証・認可のロジックを実装する。 |
 
-## APIエンドポイント一覧
+## 1.2. APIエンドポイント一覧
 
-### 認証 (`/auth`)
+### 1.2.1. 認証 (`/auth`)
 
 | Method | Path | 説明 |
 |:---|:---|:---|
@@ -39,13 +43,13 @@ graph TD
 | `POST` | `/token` | ユーザー名とパスワードで認証し、JWTアクセストークンを発行する。 |
 | `GET` | `/users/me` | 現在認証中のユーザー情報を取得する。 |
 
-### 運用
+### 1.2.2. 運用
 
 | Method | Path | 説明 |
 |:---|:---|:---|
 | `GET` | `/health` | サービスのヘルスチェックを行う。 |
 
-### チャット・LLM連携 (`/chat`)
+### 1.2.3. チャット・LLM連携 (`/chat`)
 
 | Method | Path | 説明 |
 |:---|:---|:---|
@@ -85,14 +89,14 @@ graph TD
 ```
 
 このエンドポイントが呼び出された際の、Backend、LLM、NetworkXMCP間のより詳細な連携フローについては、以下のドキュメントを参照してください。
-- **[3. 主要な処理フロー](./Interactions.md)**: 全体のやり取りをシーケンス図で解説しています。
-- **[LLM Function Callingによるレンダリングデータ生成フロー](./rendering-data-flow.md)**: Function Callingにおけるデータの流れと責務を詳細に定義しています。
+- **[6. 主要な処理フローとデータ生成](./6_Core_Workflows.md)**: 全体のやり取りをシーケンス図で解説しています。
+- **[データフローと責務詳細 (LLM Function Calling)](./6_Core_Workflows.md#632-データフローと責務詳細-llm-function-calling)**: Function Callingにおけるデータの流れと責務を詳細に定義しています。
 
-### ネットワーク (`/network`)
+### 1.2.4. ネットワーク (`/network`)
 
 | Method | Path | 説明 |
 |:---|:---|:---|
-| `POST` | `/upload` | GraphMLファイルをアップロードし、新しい会話とネットワークを作成する。 `multipart/form-data` を使用。この処理の中でNetworkXMCPを呼び出し、デフォルトのレイアウトを計算して属性として保存する。詳細は[初期グラフ表示フロー](./Interactions.md#31-新規会話開始グラフアップロードフロー)を参照。 |
+| `POST` | `/upload` | GraphMLファイルをアップロードし、新しい会話とネットワークを作成する。 `multipart/form-data` を使用。この処理の中でNetworkXMCPを呼び出し、デフォルトのレイアウトを計算して属性として保存する。詳細は[新規会話開始（ネットワークアップロード）フロー](./6_Core_Workflows.md#62-新規会話開始ネットワークアップロードフロー)を参照。 |
 | `GET` | `/{network_id}/visdata` | ネットワークの元データ、永続化された全属性、視覚マッピングルールをDBから読み出し、最終的なレンダリングデータ（`nodes_data`と`edges_data`）を動的に組み立てて返す。 |
 | `GET` | `/{network_id}/export` | ネットワークをGraphMLファイルとしてダウンロードする。 |
 
@@ -107,7 +111,7 @@ graph TD
 }
 ```
 
-### Backendによる動的なレンダリングデータ生成プロセス
+### 1.3. Backendによる動的なレンダリングデータ生成プロセス
 
 `GET /network/{network_id}/visdata` が呼び出された際に、Backendが実行する動的なレンダリングデータ生成プロセスは、本システムの柔軟性を支えるコア機能です。このプロセスは、最終的な視覚スタイルを永続化せず、リクエストの都度、永続化された「データ」と「ルール」から組み立てることで、状態の不整合を防ぎます。
 
@@ -137,7 +141,7 @@ graph TD
 5.  **レスポンス返却**
     - 組み立てられたJSONデータを、APIのレスポンスとしてFrontendに返却します。
 
-## 主要なデータモデル (Pydantic Schemas)
+## 1.4. 主要なデータモデル (Pydantic Schemas)
 
 APIで送受信される主要なデータ構造です。
 
@@ -178,11 +182,11 @@ APIで送受信される主要なデータ構造です。
 
 - **Network** (DBモデル)
 
-`networks`テーブルのスキーマ定義は、このドキュメント群における唯一の信頼できる情報源（Single Source of Truth）である **[4. データベーススキーマ仕様](./database-schema.md)** を参照してください。
+`networks`テーブルのスキーマ定義は、このドキュメント群における唯一の信頼できる情報源（Single Source of Truth）である **[4. データベーススキーマ仕様](./4_Database.md)** を参照してください。
 
 `conversations`テーブルが`network_id`を保持し、`networks`テーブルへの1対1の参照を持ちます。
 
-## 外部サービス連携
+## 1.5. 外部サービス連携
 
 - **NetworkXMCP**: グラフ計算が必要なリクエストを `http://networkx-mcp:8001` に転送（プロキシ）します。（このURLは環境変数で設定可能であるべきです。）
 - **LLMサービス**: ユーザーの指示解釈、ツールコール変換、結果の要約のために外部LLM（OpenAI, Gemini等）のAPIを呼び出します。
