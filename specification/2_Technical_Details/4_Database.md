@@ -92,6 +92,7 @@ erDiagram
 
     visual_mapping_rules {
         INTEGER id PK "Auto-increment"
+        INTEGER network_id FK
         INTEGER attribute_id FK
         VARCHAR visual_property "NODE_SIZE, NODE_COLOR, etc."
         VARCHAR scale_type "LINEAR, DISCRETE, etc."
@@ -165,6 +166,7 @@ CREATE TABLE attribute_values (
 ```sql
 CREATE TABLE visual_mapping_rules (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    network_id INTEGER NOT NULL,          -- 外部キーとしてnetworksテーブルに関連付け
     attribute_id INTEGER NOT NULL,        -- 外部キーとしてattributesテーブルに関連付け
     visual_property VARCHAR(100) NOT NULL, -- 'NODE_SIZE', 'NODE_COLOR', 'EDGE_WIDTH'など
     scale_type VARCHAR(50) NOT NULL,      -- 'LINEAR'（線形）, 'DISCRETE'（離散）, 'PASSTHROUGH'（値の直接利用）など
@@ -177,12 +179,14 @@ CREATE TABLE visual_mapping_rules (
 
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
+    FOREIGN KEY (network_id) REFERENCES networks(id),
     FOREIGN KEY (attribute_id) REFERENCES attributes(id),
-    UNIQUE(attribute_id, visual_property)
+    UNIQUE(network_id, visual_property)
 );
-
-**補足:** `UNIQUE(attribute_id, visual_property)` 制約により、「ある視覚的特徴（例: `NODE_SIZE`）に適用される属性は常に1つである」ことが保証されます。ユーザーが対話の中でマッピング対象の属性を変更した場合（例: 「サイズを次数中心性ではなく媒介中心性で表現して」）、この制約によって既存のルールが新しいルールで**上書き（UPDATE）**されるため、ルールセットは常に最新の状態に保たれます。
 ```
+
+**補足:** `UNIQUE(network_id, visual_property)` 制約により、「あるネットワーク(`network_id`)に対して、特定の視覚的特徴（例: `NODE_SIZE`）のルールは常に1つだけである」ことがデータベースレベルで保証されます。ユーザーが対話の中でマッピング対象の属性を変更した場合（例: 「サイズを次数中心性ではなく媒介中心性で表現して」）、この制約によって既存のルールが新しいルールで**上書き（UPDATE）**されるため、ルールセットは常に最新の状態に保たれます。
+
 
 **補足:** `DISCRETE`（離散値）マッピング（例: 特定のカテゴリ文字列を特定の色に割り当てる）を厳密に実装する場合、さらに別のテーブル（`discrete_mapping_pairs`など）が必要になりますが、本仕様ではまず連続値マッピングを主眼に置き、スキーマを単純化しています。
 

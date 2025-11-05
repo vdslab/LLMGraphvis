@@ -4,7 +4,7 @@
 - React, Zustand, axiosに関する開発経験
 - シングルページアプリケーション (SPA) の状態管理に関する知識
 
-React (Vite) で構築されたシングルページアプリケーション (SPA)。ユーザーインターフェースの提供とバックエンドAPIとの通信を担います。
+React (Vite) で構築されたシングルページアプリケーション (SPA)。ユーザーインターフェースの提供とバックエンドAPIとの通信を担います。**可視化に関する計算処理はすべてバックエンドで実行され、フロントエンドはバックエンドから受け取った最終的なレンダリングデータを表示するのみで、一切の計算を行いません。**
 
 ## 2.1. コンポーネント図
 
@@ -102,10 +102,10 @@ export const useChatStore = create((set, get) => ({
       const assistantMessage = response.data.message;
       set((state) => ({ messages: [...state.messages, assistantMessage] }));
 
-      // ネットワークが更新された場合、networkStoreのアクションを呼び出す (new_vis_dataは最終レンダリングデータ)
-      if (response.data.graph_updated) {
-        useNetworkStore.getState().setNetworkData(response.data.new_vis_data);
-      }
+      // グラフの更新は、このAPIのレスポンスでは行わない。
+      // 代わりに、別途WebSocketのリスナーがサーバーからの `graph_updated` イベントを待ち受け、
+      // それをトリガーに networkStore の fetchNetwork() アクションを呼び出す。
+
     } catch (error) {
       console.error("Failed to send message:", error);
       // エラー処理: ユーザーへの通知、ログ記録、必要に応じたリトライなどを実装

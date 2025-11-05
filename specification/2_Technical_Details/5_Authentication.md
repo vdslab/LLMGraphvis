@@ -8,46 +8,38 @@
 
 認証後のデータ永続化やグラフ操作については、[6. 主要な処理フローとデータ生成](./6_Core_Workflows.md)を参照してください。
 
-## 5.1. シーケンス図
+## 5.1. フローチャート
+
+### 新規登録フロー
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    participant U as ユーザー
-    participant F as Frontend
-    participant B as API Service
-    participant DB as Database
+graph TD
+    A[ユーザーが登録情報を入力] --> B{API: /auth/register};
+    B --> C{ユーザー名が既に存在するか？};
+    C -- Yes --> D[409 Conflictエラーを返す];
+    C -- No --> E[パスワードをハッシュ化];
+    E --> F[ユーザー情報をDBに保存];
+    F --> G[JWTを生成];
+    G --> H[HttpOnly Cookieとして<br/>JWTをセットし、<br/>200 OKを返す];
+    H --> I[ログイン状態に遷移];
 
-    %% User Registration & Auto-Login
-    U->>F: 新規登録情報入力
-    F->>B: POST /auth/register (username, password)
-    
-    alt 登録成功 (Registration Success)
-        B->>DB: ユーザー情報をハッシュ化して保存
-        DB-->>B: ユーザー登録成功
-        B->>B: JWTを生成
-        B-->>F: 200 OK (Set-CookieヘッダーにHttpOnlyのJWTを含める)
-        note right of F: 登録後、自動的にログイン状態へ遷移<br/>ブラウザがCookieを自動で保存
-    else ユーザー名が既に存在 (Username already exists)
-        B->>DB: ユーザー名重複チェック
-        DB-->>B: ユーザー名重複エラー
-        B-->>F: 409 Conflict ({"detail": "Username already registered"})
-        note right of F: ユーザーに具体的なエラーメッセージを表示
-    end
+    style A fill:#d1e0ff,stroke:#333,stroke-width:2px
+    style D fill:#ffcdd2,stroke:#333,stroke-width:2px
+    style I fill:#caffbf,stroke:#333,stroke-width:2px
+```
 
-    %% User Login
-    U->>F: ログイン情報入力
-    F->>B: POST /auth/token (username, password)
+### ログインフロー
 
-    alt 認証成功 (Authentication Success)
-        B->>DB: ユーザー情報検証
-        DB-->>B: 検証成功 (ユーザー情報)
-        B->>B: JWTを生成
-        B-->>F: 200 OK (Set-CookieヘッダーにHttpOnlyのJWTを含める)
-        note right of F: ブラウザがCookieを自動で保存
-    else 認証失敗 (Authentication Failure)
-        B->>DB: ユーザー情報検証
-        DB-->>B: 検証失敗
-        B-->>F: 401 Unauthorized
-    end
+```mermaid
+graph TD
+    A[ユーザーがログイン情報を入力] --> B{API: /auth/token};
+    B --> C{ユーザー情報が正しいか？};
+    C -- Yes --> E[JWTを生成];
+    C -- No --> D[401 Unauthorizedエラーを返す];
+    E --> F[HttpOnly Cookieとして<br/>JWTをセットし、<br/>200 OKを返す];
+    F --> G[ログイン状態に遷移];
+
+    style A fill:#d1e0ff,stroke:#333,stroke-width:2px
+    style D fill:#ffcdd2,stroke:#333,stroke-width:2px
+    style G fill:#caffbf,stroke:#333,stroke-width:2px
 ```

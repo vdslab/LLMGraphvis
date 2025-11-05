@@ -14,13 +14,17 @@
 
 ```mermaid
 graph TD
-    subgraph "LLMGraph-vis"
-        webApplication["Web Application"]
+    user[<div style="font-weight:bold">ユーザー</div><div style="font-size: 80%;">研究者、開発者</div>]
+    
+    subgraph "LLMGraph-vis System"
+        webApplication["<div style="font-weight:bold">Web Application</div><div style="font-size: 80%;">ネットワークの可視化と<br/>対話分析プラットフォーム</div>"]
     end
 
-    user["ユーザー"] -- "自然言語によるネットワーク操作コマンド" --> webApplication
-    webApplication -- "ネットワーク構造の可視化表示" --> user
-    webApplication -- "レイアウト推薦・チャット" --> llmServices["LLM Services"]
+    llmServices[<div style="font-weight:bold">LLM Services</div><div style="font-size: 80%;">OpenAI, Google Gemini等</div>]
+
+    user -- "自然言語による操作・分析指示<br/>(HTTPS)" --> webApplication
+    webApplication -- "可視化されたネットワーク<br/>チャット応答" --> user
+    webApplication -- "指示解釈、ツールプランニング依頼<br/>(API/HTTPS)" --> llmServices
 
     style user fill:#d1e0ff,stroke:#333,stroke-width:2px
     style llmServices fill:#ffccd1,stroke:#333,stroke-width:2px
@@ -30,30 +34,57 @@ graph TD
 |:---|:---|
 | **ユーザー** | ネットワークの可視化や分析を行う研究者や開発者。 |
 | **Web Application** | 本システムのコア機能を提供するWebアプリケーション。 |
-| **LLM Services** | ネットワークのレイアウト推薦やチャット機能のために利用する外部の大規模言語モデルサービス。(OpenAI API, Google Geminiなど) | 外部LLM API (例: OpenAI, Google Gemini) |
+| **LLM Services** | ユーザーの指示解釈、ツールプランニング、応答生成のために利用する外部の大規模言語モデルサービス。 |
 
 ### 0.1.2. コンテナ図 (Container Diagram)
 
-アプリケーションを構成する主要なコンテナ（サービス）と、それらの間のデータの流れを示します。
+アプリケーションを構成する主要なコンテナ（サービス）と、それらの間のデータの流れ、および利用技術を示します。
 
 ```mermaid
 graph TD
-    user[ユーザー] -- "HTTPS" --> webBrowser["Web Browser"]
+    user[ユーザー] -- "HTTPS" --> webBrowser["<div style='font-weight:bold'>Web Browser</div><div style='font-size: 80%;'>SPAクライアント</div>"]
 
     subgraph "Docker Environment"
-        frontendService["Frontend Service"]
-        apiService["API Service"]
-        networkXMCP["NetworkX MCP"]
-        database[("Database")]
+        frontendService["<div style='font-weight:bold'>Frontend Service</div><div style='font-size: 80%;'>UIを提供</div>"]
+        apiService["<div style='font-weight:bold'>API Service</div><div style='font-size: 80%;'>ビジネスロジック担当</div>"]
+        networkXMCP["<div style='font-weight:bold'>NetworkX MCP</div><div style='font-size: 80%;'>ネットワーク計算担当</div>"]
+        database[("<div style='font-weight:bold'>Database</div><div style='font-size: 80%;'>データ永続化</div>")]
+    end
+    
+    llmService[<div style='font-weight:bold'>LLM Services</div><div style='font-size: 80%;'>外部API</div>]
+
+    note right of frontendService
+      **Tech Stack:**
+      - React, Vite
+      - Zustand
+      - react-force-graph-2d
+      - axios
+    end
+    note right of apiService
+      **Tech Stack:**
+      - FastAPI (Python)
+      - SQLAlchemy
+      - Pydantic
+      - LLM SDKs
+    end
+    note right of networkXMCP
+      **Tech Stack:**
+      - FastAPI (Python)
+      - NetworkX
+      - SQLAlchemy
+    end
+    note right of database
+      **Tech Stack:**
+      - PostgreSQL
     end
 
     webBrowser -- "Loads SPA (HTTPS)" --> frontendService
-    webBrowser -- "API (HTTPS)" --> apiService
+    webBrowser -- "API Calls (HTTPS)" --> apiService
 
-    apiService -- "ネットワーク計算を依頼 (API/HTTP)" --> networkXMCP
-    apiService -- "ユーザーデータ、会話履歴などを保存 (PostgreSQL)" --> database
-    networkXMCP -- "計算結果の属性を保存 (PostgreSQL)" --> database
-    apiService -- "API (HTTPS)" --> llmService[LLM Services]
+    apiService -- "ネットワーク計算依頼 (HTTP)" --> networkXMCP
+    apiService -- "データ永続化 (SQL)" --> database
+    networkXMCP -- "計算結果の属性を保存 (SQL)" --> database
+    apiService -- "LLM呼び出し (HTTPS)" --> llmService
 
     style webBrowser fill:#d1e0ff,stroke:#333,stroke-width:2px
     style frontendService fill:#82b3ff,stroke:#333,stroke-width:2px
@@ -61,13 +92,6 @@ graph TD
     style networkXMCP fill:#f5c2e7,stroke:#333,stroke-width:2px
     style database fill:#f9e2af,stroke:#333,stroke-width:2px
 ```
-
-| コンテナ | 説明 | 技術スタック |
-|:---|:---|:---|
-| **Frontend Service** | ユーザーにUIを提供するためのSPA（Single Page Application）を配信するWebサーバー。詳細は[フロントエンド仕様](./2_Frontend.md)を参照。 | React, Vite, react-force-graph-2d, Zustand, axios |
-| **API Service** | ビジネスロジック、認証、外部API連携を担当するバックエンド。詳細は[バックエンド仕様](./1_Backend.md)を参照。 | FastAPI, SQLAlchemy, (LLM SDKs) |
-| **NetworkX Model Context Protocol (NetworkXMCP)** | ネットワーク計算やレイアウト処理に特化した計算サービス。**ステートフル**であることで、計算結果をキャッシュし、高コストな再計算を回避します。詳細は[ネットワーク計算サービス仕様](./3_NetworkXMCP.md)を参照。 | FastAPI, NetworkX, Python, SQLAlchemy |
-| **Database** | ユーザー情報、ネットワークデータ、計算結果のキャッシュなどを永続化するデータベース。詳細は[データベーススキーマ仕様](./4_Database.md)を参照。 | PostgreSQL |
 
 ## 0.2. データ永続化
 
