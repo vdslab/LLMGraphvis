@@ -8,38 +8,56 @@
 
 認証後のデータ永続化やグラフ操作については、[6. 主要な処理フローとデータ生成](./6_Core_Workflows.md)を参照してください。
 
-## 5.1. フローチャート
+## 5.1. シーケンス図
 
-### 新規登録フロー
+### 5.1.1. 新規ユーザー登録フロー
 
 ```mermaid
-graph TD
-    A[ユーザーが登録情報を入力] --> B{API: /auth/register};
-    B --> C{ユーザー名が既に存在するか？};
-    C -- Yes --> D[409 Conflictエラーを返す];
-    C -- No --> E[パスワードをハッシュ化];
-    E --> F[ユーザー情報をDBに保存];
-    F --> G[JWTを生成];
-    G --> H[HttpOnly Cookieとして<br/>JWTをセットし、<br/>200 OKを返す];
-    H --> I[ログイン状態に遷移];
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Backend
+    participant Database
 
-    style A fill:#d1e0ff,stroke:#333,stroke-width:2px
-    style D fill:#ffcdd2,stroke:#333,stroke-width:2px
-    style I fill:#caffbf,stroke:#333,stroke-width:2px
+    User->>Frontend: ユーザー名とパスワードを入力し、登録ボタンをクリック
+    Frontend->>Backend: POST /auth/register (ユーザー情報)
+    Backend->>Database: SELECT ユーザー名
+    alt ユーザー名が既に存在
+        Database-->>Backend: ユーザーが存在
+        Backend-->>Frontend: 409 Conflict
+        Frontend-->>User: エラーメッセージを表示
+    else ユーザー名がユニーク
+        Database-->>Backend: ユーザーが存在しない
+        Backend->>Backend: パスワードをハッシュ化
+        Backend->>Database: INSERT ユーザー情報
+        Database-->>Backend: 登録成功
+        Backend->>Backend: JWTを生成
+        Backend-->>Frontend: 200 OK (Set-CookieヘッダーにHttpOnlyのJWT)
+        Frontend->>User: ログイン後の画面に遷移
+    end
 ```
 
-### ログインフロー
+### 5.1.2. ログインンフロー
 
 ```mermaid
-graph TD
-    A[ユーザーがログイン情報を入力] --> B{API: /auth/token};
-    B --> C{ユーザー情報が正しいか？};
-    C -- Yes --> E[JWTを生成];
-    C -- No --> D[401 Unauthorizedエラーを返す];
-    E --> F[HttpOnly Cookieとして<br/>JWTをセットし、<br/>200 OKを返す];
-    F --> G[ログイン状態に遷移];
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Backend
+    participant Database
 
-    style A fill:#d1e0ff,stroke:#333,stroke-width:2px
-    style D fill:#ffcdd2,stroke:#333,stroke-width:2px
-    style G fill:#caffbf,stroke:#333,stroke-width:2px
+    User->>Frontend: ユーザー名とパスワードを入力し、ログインボタンをクリック
+    Frontend->>Backend: POST /auth/token (ユーザー情報)
+    Backend->>Database: SELECT ユーザー情報
+    alt 認証成功
+        Database-->>Backend: ユーザー情報
+        Backend->>Backend: パスワードハッシュを比較
+        Backend->>Backend: JWTを生成
+        Backend-->>Frontend: 200 OK (Set-CookieヘッダーにHttpOnlyのJWT)
+        Frontend->>User: ログイン後の画面に遷移
+    else 認証失敗
+        Database-->>Backend: ユーザーが存在しない or パスワード不一致
+        Backend-->>Frontend: 401 Unauthorized
+        Frontend-->>User: エラーメッセージを表示
+    end
 ```

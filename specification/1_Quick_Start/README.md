@@ -2,25 +2,25 @@
 
 **前提知識レベル:**
 - 基本的なGit操作
-- Node.js / npm (または yarn)
+- Node.js/npm (またはyarn)
 - DockerおよびDocker Composeの基礎知識
 - React, FastAPIに関する基本的な開発経験
 
 ## 1. 概要
 
-このガイドは、開発者がLLMGraph-visのローカル開発環境をセットアップし、アプリケーションを起動するまでの手順を説明します。
+このガイドは、開発者がGraphVisAgentのローカル開発環境をセットアップし、アプリケーションを起動するまでの手順を説明します。
 
-本システムは、フロントエンド、バックエンド、計算サービス、データベースの複数のコンテナで構成されています。これらはDocker Composeを用いて一括で管理されます。
+本システムは、フロントエンド、バックエンド、計算サービス、データベースの複数のコンテナーで構成されています。これらはDocker Composeを用いて一括で管理されます。
 
-**注意:** このドキュメントリポジトリ (`GraphVisAgent-docs`) は仕様書のみを管理しています。実際のソースコードは本体の `LLMGraph-vis` リポジトリにあります。以下の手順は、本体リポジトリのルートディレクトリで実行することを想定しています。
+**注意:** このドキュメントリポジトリ (`GraphVisAgent-docs`) は仕様書のみを管理しています。実際のソースコードは本体の `GraphVisAgent` リポジトリにあります。以下の手順は、本体リポジトリのルートディレクトリで実行することを想定しています。
 
 ## 2. 環境構築手順
 
 ### ステップ1: リポジトリのクローン
 
 ```bash
-git clone https://github.com/<your-org>/LLMGraph-vis.git
-cd LLMGraph-vis
+git clone https://github.com/<your-org>/GraphVisAgent.git
+cd GraphVisAgent
 ```
 
 ### ステップ2: 環境変数の設定
@@ -31,7 +31,7 @@ cd LLMGraph-vis
 cp .env.example .env
 ```
 
-その後、`.env` ファイルをエディタで開き、外部LLMサービスのAPIキーなど、必要な環境変数を設定してください。
+その後、`.env` ファイルをエディターで開き、外部LLMサービスのAPIキーなど、必要な環境変数を設定してください。
 
 ```dotenv
 # .env
