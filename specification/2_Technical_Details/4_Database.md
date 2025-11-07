@@ -33,180 +33,106 @@
 ```mermaid
 erDiagram
     users ||--o{ networks : "has"
-    
-    %% Node関連（左側）
     networks ||--o{ nodes : "contains"
-    nodes ||--o{ node_attributes : "has"
-    node_attributes ||--o{ node_attribute_values : "has"
-    node_text_attributes ||--|| node_attributes : "extends"
-    node_float_attributes ||--|| node_attributes : "extends"
-    node_attribute_text_values ||--|| node_attribute_values : "extends"
-    node_attribute_float_values ||--|| node_attribute_values : "extends"
-    
-    %% Edge関連（右側）
     networks ||--o{ edges : "contains"
-    edges ||--o{ edge_attributes : "has"
-    edge_attributes ||--o{ edge_attribute_values : "has"
-    edge_text_attributes ||--|| edge_attributes : "extends"
-    edge_float_attributes ||--|| edge_attributes : "extends"
-    edge_attribute_text_values ||--|| edge_attribute_values : "extends"
-    edge_attribute_float_values ||--|| edge_attribute_values : "extends"
-    
-    %% ノードとエッジの関係
     nodes }o--o{ edges : "connects"
 
+    %% Node Attributes & Values
+    nodes ||--o{ node_attributes : "has"
+    node_attributes |o--|| node_text_attributes : "extends"
+    node_attributes |o--|| node_float_attributes : "extends"
+    nodes ||--o{ node_attribute_values : "has"
+    node_attribute_values |o--|| node_attribute_text_values : "extends"
+    node_attribute_values |o--|| node_attribute_float_values : "extends"
+
+    %% Edge Attributes & Values
+    edges ||--o{ edge_attributes : "has"
+    edge_attributes |o--|| edge_text_attributes : "extends"
+    edge_attributes |o--|| edge_float_attributes : "extends"
+    edges ||--o{ edge_attribute_values : "has"
+    edge_attribute_values |o--|| edge_attribute_text_values : "extends"
+    edge_attribute_values |o--|| edge_attribute_float_values : "extends"
+
     users {
-        INTEGER id PK "Auto-increment"
         VARCHAR username UK
         VARCHAR hashed_password
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
     }
-
     networks {
-        INTEGER id PK "Auto-increment"
         VARCHAR name
         INTEGER user_id FK
         TEXT graphml_content
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
     }
-
     nodes {
-        INTEGER id PK "Auto-increment"
         INTEGER network_id FK
-        VARCHAR node_id UK "within network"
+        VARCHAR node_id UK
         VARCHAR label
-        VARCHAR subtype
         FLOAT x
         FLOAT y
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
     }
-
     node_attributes {
-        INTEGER id PK "Auto-increment"
         INTEGER node_id FK
         VARCHAR attribute_name
         VARCHAR display_name
         TEXT description
         VARCHAR data_type
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
     }
-
     node_text_attributes {
-        INTEGER id PK "Auto-increment"
         INTEGER node_attribute_id FK
         TEXT text_value
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
     }
-
     node_float_attributes {
-        INTEGER id PK "Auto-increment"
         INTEGER node_attribute_id FK
         FLOAT float_value
         VARCHAR unit
-        FLOAT range_min
-        FLOAT range_max
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
     }
-
     node_attribute_values {
-        INTEGER id PK "Auto-increment"
         INTEGER node_id FK
         VARCHAR attribute_name
         VARCHAR value_type
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
     }
-
     node_attribute_text_values {
-        INTEGER id PK "Auto-increment"
         INTEGER node_attribute_value_id FK
         TEXT text_value
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
     }
-
     node_attribute_float_values {
-        INTEGER id PK "Auto-increment"
         INTEGER node_attribute_value_id FK
         FLOAT float_value
-        VARCHAR unit
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
     }
-
     edges {
-        INTEGER id PK "Auto-increment"
         INTEGER network_id FK
-        VARCHAR edge_id UK "within network"
+        VARCHAR edge_id UK
         VARCHAR source_node_id FK
         VARCHAR target_node_id FK
-        VARCHAR label
-        VARCHAR subtype
         FLOAT weight
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
     }
-
     edge_attributes {
-        INTEGER id PK "Auto-increment"
         INTEGER edge_id FK
         VARCHAR attribute_name
         VARCHAR display_name
         TEXT description
         VARCHAR data_type
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
     }
-
     edge_text_attributes {
-        INTEGER id PK "Auto-increment"
         INTEGER edge_attribute_id FK
         TEXT text_value
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
     }
-
     edge_float_attributes {
-        INTEGER id PK "Auto-increment"
         INTEGER edge_attribute_id FK
         FLOAT float_value
         VARCHAR unit
-        FLOAT range_min
-        FLOAT range_max
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
     }
-
     edge_attribute_values {
-        INTEGER id PK "Auto-increment"
         INTEGER edge_id FK
         VARCHAR attribute_name
         VARCHAR value_type
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
     }
-
     edge_attribute_text_values {
-        INTEGER id PK "Auto-increment"
         INTEGER edge_attribute_value_id FK
         TEXT text_value
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
     }
-
     edge_attribute_float_values {
-        INTEGER id PK "Auto-increment"
         INTEGER edge_attribute_value_id FK
         FLOAT float_value
-        VARCHAR unit
-        TIMESTAMP created_at
-        TIMESTAMP updated_at
     }
 ```
 
