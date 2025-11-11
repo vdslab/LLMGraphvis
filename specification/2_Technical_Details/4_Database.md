@@ -42,16 +42,16 @@ erDiagram
     node_attributes |o--|| node_text_attributes : "extends"
     node_attributes |o--|| node_float_attributes : "extends"
     nodes ||--o{ node_attribute_values : "has"
-    node_attribute_values |o--|| node_attribute_text_values : "extends"
-    node_attribute_values |o--|| node_attribute_float_values : "extends"
+    node_attribute_values |o--|| node_text_attribute_values : "extends"
+    node_attribute_values |o--|| node_float_attribute_values : "extends"
 
     %% Edge Attributes & Values
     edges ||--o{ edge_attributes : "has"
     edge_attributes |o--|| edge_text_attributes : "extends"
     edge_attributes |o--|| edge_float_attributes : "extends"
     edges ||--o{ edge_attribute_values : "has"
-    edge_attribute_values |o--|| edge_attribute_text_values : "extends"
-    edge_attribute_values |o--|| edge_attribute_float_values : "extends"
+    edge_attribute_values |o--|| edge_text_attribute_values : "extends"
+    edge_attribute_values |o--|| edge_float_attribute_values : "extends"
 
     users {
         VARCHAR username UK
@@ -66,6 +66,7 @@ erDiagram
         INTEGER network_id FK
         VARCHAR node_id UK
         VARCHAR label
+        VARCHAR subtype
         FLOAT x
         FLOAT y
     }
@@ -78,31 +79,33 @@ erDiagram
     }
     node_text_attributes {
         INTEGER node_attribute_id FK
-        TEXT text_value
+        TEXT supplementary_description
     }
     node_float_attributes {
         INTEGER node_attribute_id FK
-        FLOAT float_value
-        VARCHAR unit
+        TEXT supplementary_description
     }
     node_attribute_values {
         INTEGER node_id FK
         VARCHAR attribute_name
         VARCHAR value_type
     }
-    node_attribute_text_values {
+    node_text_attribute_values {
         INTEGER node_attribute_value_id FK
         TEXT text_value
     }
-    node_attribute_float_values {
+    node_float_attribute_values {
         INTEGER node_attribute_value_id FK
         FLOAT float_value
+        VARCHAR unit
     }
     edges {
         INTEGER network_id FK
         VARCHAR edge_id UK
         VARCHAR source_node_id FK
         VARCHAR target_node_id FK
+        VARCHAR label
+        VARCHAR subtype
         FLOAT weight
     }
     edge_attributes {
@@ -114,25 +117,25 @@ erDiagram
     }
     edge_text_attributes {
         INTEGER edge_attribute_id FK
-        TEXT text_value
+        TEXT supplementary_description
     }
     edge_float_attributes {
         INTEGER edge_attribute_id FK
-        FLOAT float_value
-        VARCHAR unit
+        TEXT supplementary_description
     }
     edge_attribute_values {
         INTEGER edge_id FK
         VARCHAR attribute_name
         VARCHAR value_type
     }
-    edge_attribute_text_values {
+    edge_text_attribute_values {
         INTEGER edge_attribute_value_id FK
         TEXT text_value
     }
-    edge_attribute_float_values {
+    edge_float_attribute_values {
         INTEGER edge_attribute_value_id FK
         FLOAT float_value
+        VARCHAR unit
     }
 ```
 
@@ -144,18 +147,18 @@ erDiagram
 | `networks` | ユーザーがアップロードしたGraphML形式の元データ、またはNetworkXMCPによって正規化されたGraphMLデータ。ネットワーク全体の情報を管理します。 |
 | `nodes` | ネットワーク内の各ノード（頂点）の基本情報を管理します。ノードID、ラベル、サブタイプ、座標情報などを格納します。 |
 | `edges` | ネットワーク内の各エッジ（辺）の基本情報を管理します。エッジID、ソースノード、ターゲットノード、ラベル、サブタイプ、重みなどを格納します。 |
-| `node_attributes` | ノードの属性に関する基本情報を管理します。これは抽象的な基底テーブルで、具体的な属性値は子テーブル（サブタイプ）に格納されます。 |
-| `node_text_attributes` | `node_attributes`のサブタイプ。ノードのテキスト型属性値を格納します。 |
-| `node_float_attributes` | `node_attributes`のサブタイプ。ノードの浮動小数点型属性値を格納します。 |
-| `edge_attributes` | エッジの属性に関する基本情報を管理します。これは抽象的な基底テーブルで、具体的な属性値は子テーブル（サブタイプ）に格納されます。 |
-| `edge_text_attributes` | `edge_attributes`のサブタイプ。エッジのテキスト型属性値を格納します。 |
-| `edge_float_attributes` | `edge_attributes`のサブタイプ。エッジの浮動小数点型属性値を格納します。 |
+| `node_attributes` | ノードの属性に関する基本情報を管理します。これは抽象的な基底テーブルで、具体的な属性に関するメタデータは子テーブル（サブタイプ）に格納されます。 |
+| `node_text_attributes` | `node_attributes`のサブタイプ。テキスト型の属性に関する追加の自然言語説明を格納します。 |
+| `node_float_attributes` | `node_attributes`のサブタイプ。浮動小数点型の属性に関する追加の自然言語説明を格納します。 |
+| `edge_attributes` | エッジの属性に関する基本情報を管理します。これは抽象的な基底テーブルで、具体的な属性に関するメタデータは子テーブル（サブタイプ）に格納されます。 |
+| `edge_text_attributes` | `edge_attributes`のサブタイプ。テキスト型の属性に関する追加の自然言語説明を格納します。 |
+| `edge_float_attributes` | `edge_attributes`のサブタイプ。浮動小数点型の属性に関する追加の自然言語説明を格納します。 |
 | `node_attribute_values` | ノードの属性値に関する基本情報を管理します。これは抽象的な基底テーブルで、具体的な属性値は子テーブル（サブタイプ）に格納されます。 |
-| `node_attribute_text_values` | `node_attribute_values`のサブタイプ。ノードのテキスト型属性値を格納します。 |
-| `node_attribute_float_values` | `node_attribute_values`のサブタイプ。ノードの浮動小数点型属性値を格納します。 |
+| `node_text_attribute_values` | `node_attribute_values`のサブタイプ。ノードのテキスト型属性値を格納します。 |
+| `node_float_attribute_values` | `node_attribute_values`のサブタイプ。ノードの浮動小数点型属性値を格納します。 |
 | `edge_attribute_values` | エッジの属性値に関する基本情報を管理します。これは抽象的な基底テーブルで、具体的な属性値は子テーブル（サブタイプ）に格納されます。 |
-| `edge_attribute_text_values` | `edge_attribute_values`のサブタイプ。エッジのテキスト型属性値を格納します。 |
-| `edge_attribute_float_values` | `edge_attribute_values`のサブタイプ。エッジの浮動小数点型属性値を格納します。 |
+| `edge_text_attribute_values` | `edge_attribute_values`のサブタイプ。エッジのテキスト型属性値を格納します。 |
+| `edge_float_attribute_values` | `edge_attribute_values`のサブタイプ。エッジの浮動小数点型属性値を格納します。 |
 
 ## 4.3. 基本テーブル
 
@@ -255,13 +258,13 @@ CREATE TABLE node_attributes (
 
 ### 4.4.2. `node_text_attributes` テーブル（サブタイプ）
 
-ノードのテキスト型属性値を格納します。
+テキスト型の属性に関する追加の自然言語説明を格納します。
 
 ```sql
 CREATE TABLE node_text_attributes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     node_attribute_id INTEGER NOT NULL,
-    text_value TEXT,
+    supplementary_description TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     FOREIGN KEY (node_attribute_id) REFERENCES node_attributes(id)
@@ -270,16 +273,13 @@ CREATE TABLE node_text_attributes (
 
 ### 4.4.3. `node_float_attributes` テーブル（サブタイプ）
 
-ノードの浮動小数点型属性値を格納します。
+浮動小数点型の属性に関する追加の自然言語説明を格納します。
 
 ```sql
 CREATE TABLE node_float_attributes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     node_attribute_id INTEGER NOT NULL,
-    float_value FLOAT,
-    unit VARCHAR(50),
-    range_min FLOAT,
-    range_max FLOAT,
+    supplementary_description TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     FOREIGN KEY (node_attribute_id) REFERENCES node_attributes(id)
@@ -309,13 +309,13 @@ CREATE TABLE edge_attributes (
 
 ### 4.5.2. `edge_text_attributes` テーブル（サブタイプ）
 
-エッジのテキスト型属性値を格納します。
+テキスト型の属性に関する追加の自然言語説明を格納します。
 
 ```sql
 CREATE TABLE edge_text_attributes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     edge_attribute_id INTEGER NOT NULL,
-    text_value TEXT,
+    supplementary_description TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     FOREIGN KEY (edge_attribute_id) REFERENCES edge_attributes(id)
@@ -324,16 +324,13 @@ CREATE TABLE edge_text_attributes (
 
 ### 4.5.3. `edge_float_attributes` テーブル（サブタイプ）
 
-エッジの浮動小数点型属性値を格納します。
+浮動小数点型の属性に関する追加の自然言語説明を格納します。
 
 ```sql
 CREATE TABLE edge_float_attributes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     edge_attribute_id INTEGER NOT NULL,
-    float_value FLOAT,
-    unit VARCHAR(50),
-    range_min FLOAT,
-    range_max FLOAT,
+    supplementary_description TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     FOREIGN KEY (edge_attribute_id) REFERENCES edge_attributes(id)
@@ -359,12 +356,12 @@ CREATE TABLE node_attribute_values (
 );
 ```
 
-### 4.6.2. `node_attribute_text_values` テーブル（サブタイプ）
+### 4.6.2. `node_text_attribute_values` テーブル（サブタイプ）
 
 ノードの属性値のうち、テキスト型の値を格納します。
 
 ```sql
-CREATE TABLE node_attribute_text_values (
+CREATE TABLE node_text_attribute_values (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     node_attribute_value_id INTEGER NOT NULL,
     text_value TEXT,
@@ -374,12 +371,12 @@ CREATE TABLE node_attribute_text_values (
 );
 ```
 
-### 4.6.3. `node_attribute_float_values` テーブル（サブタイプ）
+### 4.6.3. `node_float_attribute_values` テーブル（サブタイプ）
 
 ノードの属性値のうち、浮動小数点型の値を格納します。
 
 ```sql
-CREATE TABLE node_attribute_float_values (
+CREATE TABLE node_float_attribute_values (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     node_attribute_value_id INTEGER NOT NULL,
     float_value FLOAT,
@@ -409,12 +406,12 @@ CREATE TABLE edge_attribute_values (
 );
 ```
 
-### 4.7.2. `edge_attribute_text_values` テーブル（サブタイプ）
+### 4.7.2. `edge_text_attribute_values` テーブル（サブタイプ）
 
 エッジの属性値のうち、テキスト型の値を格納します。
 
 ```sql
-CREATE TABLE edge_attribute_text_values (
+CREATE TABLE edge_text_attribute_values (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     edge_attribute_value_id INTEGER NOT NULL,
     text_value TEXT,
@@ -424,12 +421,12 @@ CREATE TABLE edge_attribute_text_values (
 );
 ```
 
-### 4.7.3. `edge_attribute_float_values` テーブル（サブタイプ）
+### 4.7.3. `edge_float_attribute_values` テーブル（サブタイプ）
 
 エッジの属性値のうち、浮動小数点型の値を格納します。
 
 ```sql
-CREATE TABLE edge_attribute_float_values (
+CREATE TABLE edge_float_attribute_values (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     edge_attribute_value_id INTEGER NOT NULL,
     float_value FLOAT,

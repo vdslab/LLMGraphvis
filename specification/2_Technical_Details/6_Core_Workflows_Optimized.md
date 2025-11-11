@@ -40,7 +40,7 @@ sequenceDiagram
     note over N: デフォルトのSpring Layoutを計算
 
     %% Step 3: NetworkXMCP computes and saves layout as an attribute
-    N->>DB: 計算したノード座標を属性として `attributes` と `attribute_values` に保存
+    N->>DB: 計算したノード座標を、`attributes`に定義を、`attribute_values`に値を保存
     DB-->>N: 保存成功
     N-->>B: 実行成功応答
     B-->>F: アップロード成功 (network_id, conversation_id)
@@ -108,7 +108,7 @@ sequenceDiagram
     %% Step 4: Backend executes calculate_centrality
     B->>N: POST /tools/calculate_centrality (centrality_type:"degree")
     N->>N: NetworkXで次数中心性を計算
-    N->>DB: 計算結果を新しい属性として`attributes`と`attribute_values`に保存
+    N->>DB: 計算結果を、`attributes`に定義を、`attribute_values`に値を保存
     DB-->>N: 保存成功
     N-->>B: 実行成功
 
@@ -158,7 +158,7 @@ BackendとLLMは、以下のような複数回のやり取りを通じて、段�
 Backendは、LLMの要求にしたがってNetworkXMCPのAPIを呼び出し、結果を正規化されたテーブルに永続化します。複数のツール呼び出しが要求された場合は、それらを順番に実行します。
 
 - `GET /tools/list_attributes`: `attributes`テーブルから属性名の一覧を取得します。
-- `POST /tools/calculate_centrality`: 計算結果を`attributes`および`attribute_values`テーブルに書き込みます。
+- `POST /tools/calculate_centrality`: 計算結果の**値**を`attribute_values`系のテーブルに、その**定義**を`attributes`系のテーブルに書き込みます。
 - `POST /tools/apply_metric_to_visual`: マッピングルールを`visual_mapping_rules`テーブルに書き込みます。
 
 #### 3. Backendによる動的なレンダリングデータ生成

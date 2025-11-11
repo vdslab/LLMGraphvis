@@ -23,9 +23,9 @@ NetworkXMCPは、ネットワークに関する計算処理と、その結果の
 |:---|:---|:---|
 | `GET` | `/health` | サービスのヘルスチェックを行う。 |
 | `GET` | `/tools/list_attributes` | ネットワークに存在する属性（計算済みまたは元から存在）の一覧を返す。 |
-| `POST` | `/tools/calculate_centrality` | 中心性指標を**計算**し、その結果を新しい**属性として**`attributes`および`attribute_values`テーブルに保存する。 |
+| `POST` | `/tools/calculate_centrality` | 中心性指標を**計算**し、その結果の**値**を`attribute_values`系のテーブルに、**定義**を`attributes`系のテーブルに保存する。 |
 | `POST` | `/tools/apply_metric_to_visual` | 指定された指標を視覚プロパティにマッピングするルールを`visual_mapping_rules`テーブルに保存（作成または更新）する。 |
-| `POST` | `/tools/change_layout` | ネットワークレイアウトを計算し、ノードの座標を**属性として**`attributes`および`attribute_values`テーブルに保存する。GraphMLアップロード時の初期レイアウト計算にも使用される。 |
+| `POST` | `/tools/change_layout` | ネットワークレイアウトを計算し、ノードの座標の**値**を`attribute_values`系のテーブルに、**定義**を`attributes`系のテーブルに保存する。GraphMLアップロード時の初期レイアウト計算にも使用される。 |
 | `POST` | `/tools/highlight_nodes` | 指定された条件に合うノードをハイライトするためのマッピングルールを`visual_mapping_rules`テーブルに保存する。 |
 | `POST` | `/tools/convert_graphml` | アップロードされたGraphMLファイルを解析・修正し、正規化されたGraphMLを返す。（ステートレス）<br/>正規化には、属性名の標準化、特定のデータ型への変換、欠損値の処理、およびシステムで一貫して扱えるGraphML形式への変換が含まれます。 |
 
