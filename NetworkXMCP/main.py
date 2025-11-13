@@ -88,6 +88,11 @@ class CentralityParams(GraphDataBase):
     centrality_type: str = Field("degree", description="The type of centrality to calculate.")
     centrality_params: Dict[str, Any] = Field({}, description="Parameters for the centrality calculation.")
 
+class VisualMappingParams(GraphDataBase):
+    metric: str = Field("degree_centrality", description="The metric to map (e.g. degree_centrality).")
+    visual: str = Field("node_size", description="The visual attribute to map to (e.g. node_size, node_color).")
+    mapping: Dict[str, Any] = Field({}, description="Mapping parameters (e.g. min_size, max_size).")
+
 class GraphMLConvertParams(BaseModel):
     graphml_content: str = Field(..., description="GraphML content to convert.")
 
@@ -206,9 +211,101 @@ async def api_calculate_centrality(params: CentralityParams, db: Session = Depen
     }
     db_network.centrality_cache = json.dumps(centrality_cache)
     db.commit()
-
+    
     logger.info(f"Cached new centrality '{params.centrality_type}' for network {params.network_id}")
     return {"result": centrality_cache[params.centrality_type]}
+
+@app.post("/tools/apply_metric_to_visual", response_model=Dict[str, Any])
+async def api_apply_metric_to_visual(params: VisualMappingParams, db: Session = Depends(get_db)):
+    """
+    中心性指標などのメトリックをノードの視覚属性（サイズや色など）に適用します。
+    
+    Args:
+        params: 視覚マッピングパラメータ
+        db: データベースセッション
+    
+    Returns:
+        視覚マッピングの結果
+    """
+    db_network = db.query(Network).filter(Network.id == params.network_id).first()
+    if not db_network:
+        raise HTTPException(status_code=404, detail="Network not found")
+
+    # メトリック値の取得（主に中心性指標）
+    try:
+        # キャッシュから中心性指標を取得
+        metric_type = params.metric
+        centrality_type = metric_type.replace("_centrality", "")  # "degree_centrality" -> "degree"
+        
+        centrality_cache = json.loads(db_network.centrality_cache)
+        metric_values = None
+        
+        # キャッシュから値を取得
+        if metric_type in centrality_cache:
+            logger.info(f"Cache hit for metric '{metric_type}' on network {params.network_id}")
+            if centrality_cache[metric_type].get("centrality_values"):
+                metric_values = centrality_cache[metric_type]["centrality_values"]
+        
+        # キャッシュミスの場合、計算してキャッシュ更新
+        if metric_values is None:
+            logger.info(f"Cache miss for metric '{metric_type}'. Calculating...")
+            G = parse_graphml_string(db_network.graphml_content)
+            
+            from tools.network_analysis import calculate_centrality as tools_calculate_centrality
+            result = tools_calculate_centrality(G, centrality_type)
+            
+            if not result.get("success"):
+                raise HTTPException(status_code=400, detail=result.get("error", f"Failed to calculate {metric_type}"))
+            
+            metric_values = result["centrality"]
+            
+            # キャッシュ更新
+            centrality_cache[metric_type] = {
+                "success": True,
+                "centrality_type": metric_type,
+                "centrality_values": metric_values
+            }
+            db_network.centrality_cache = json.dumps(centrality_cache)
+            db.commit()
+            logger.info(f"Cached new metric '{metric_type}' for network {params.network_id}")
+        
+        # 視覚属性へのマッピング
+        from tools.network_tools import apply_metric_to_visual_in_graphml
+        visual_attr = params.visual
+        if visual_attr == "node_size":
+            visual_attr = "size"  # GraphML属性名に変換
+        
+        result = apply_metric_to_visual_in_graphml(
+            db_network.graphml_content,
+            metric_values,
+            visual_attr=visual_attr,
+            mapping=params.mapping
+        )
+        
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Visual mapping failed"))
+        
+        # 更新されたGraphMLを保存
+        db_network.graphml_content = result["graphml_content"]
+        db.commit()
+        
+        return {
+            "result": {
+                "success": True,
+                "metric": params.metric,
+                "visual": params.visual,
+                "mapped_nodes": len(result.get("mapped_values", {}))
+            }
+        }
+    
+    except (json.JSONDecodeError, TypeError) as e:
+        logger.error(f"JSON error in centrality cache: {e}")
+        raise HTTPException(status_code=500, detail=f"Error processing centrality data: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error applying metric to visual: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error applying metric to visual: {str(e)}")
 
 # Other endpoints like convert_graphml can remain stateless as they don't depend on network_id
 @app.post("/tools/convert_graphml", response_model=Dict[str, Any])

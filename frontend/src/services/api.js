@@ -164,6 +164,28 @@ export const networkAPI = {
     console.log("Getting network in Cytoscape format:", networkId);
     return axios.get(`${API_URL}/network/${networkId}/cytoscape`);
   },
+  
+  /**
+   * Gets network data optimized for visualization.
+   * @param {string} networkId - The ID of the network.
+   * @returns {Promise<axios.AxiosResponse>} The axios response with nodes and links.
+   */
+  getNetworkVisData: (networkId) => {
+    console.log("Getting network visualization data:", networkId);
+    return axios.get(`${API_URL}/network/${networkId}/visdata`);
+  },
+  
+  /**
+   * Applies degree centrality to node size.
+   * @param {string} networkId - The ID of the network.
+   * @param {object} [mapping] - Optional mapping parameters (e.g. {min_size: 5, max_size: 20}).
+   * @returns {Promise<axios.AxiosResponse>} The axios response.
+   */
+  applyDegreeCentralityToSize: (networkId, mapping = null) => {
+    console.log("Applying degree centrality to node size:", networkId);
+    return axios.post(`${API_URL}/network/${networkId}/centrality/degree/apply`,
+      mapping ? { mapping } : {});
+  },
   /**
    * Uploads a GraphML file.
    * @param {File} file - The GraphML file to upload.

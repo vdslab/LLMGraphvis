@@ -5,10 +5,11 @@ This module provides routes for uploading, exporting, and retrieving
 network data in various formats.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Response
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Response, Request
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Optional
 import networkx as nx
+import math
 import io
 import json
 import logging
@@ -124,12 +125,26 @@ async def get_network_visualization_data(
         # Prepare nodes data
         nodes_data = []
         for node_id, attrs in G.nodes(data=True):
-            # Extract position from attributes
-            x = float(attrs.get('x', 0))
-            y = float(attrs.get('y', 0))
+            # Extract position from attributes with error handling
+            try:
+                x = float(attrs.get('x', 0))
+                y = float(attrs.get('y', 0))
+                # 不正な座標値をチェック
+                if not math.isfinite(x): x = 0.0
+                if not math.isfinite(y): y = 0.0
+            except (ValueError, TypeError):
+                x, y = 0.0, 0.0
             
-            # Extract or set default visual properties
-            size = float(attrs.get('size', default_node_size))
+            # Extract or set default visual properties with validation
+            try:
+                size_value = attrs.get('size', default_node_size)
+                size = float(size_value)
+                # サイズが負の値や不正値の場合はデフォルトを使用
+                if size <= 0 or not math.isfinite(size):
+                    size = default_node_size
+            except (ValueError, TypeError):
+                size = default_node_size
+                
             color = attrs.get('color', default_node_color)
             label = attrs.get('name', str(node_id))
             
@@ -282,7 +297,6 @@ async def upload_new_network(
         logger.error(f"Unexpected error in upload_new_network: {str(e)}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
-
 @router.post("/{network_id}/layout")
 async def calculate_network_layout(
     network_id: int,
@@ -317,6 +331,80 @@ async def calculate_network_layout(
     except Exception as e:
         logger.error(f"Unexpected error in calculate_network_layout: {str(e)}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
+
+
+@router.post("/{network_id}/centrality/degree/apply", response_model=Dict[str, Any])
+async def apply_degree_centrality_to_size(
+    network_id: int,
+    request: Request,
+    mapping: Optional[Dict[str, Any]] = None,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    次数中心性をノードサイズに適用します。
+    
+    このエンドポイントは、指定されたネットワークの次数中心性を計算し、
+    その値をノードサイズにマッピングします。マッピングパラメータは
+    オプションで指定できます。デフォルトでは、サイズ範囲は5〜20です。
+    
+    Args:
+        network_id: ネットワークID
+        request: リクエストオブジェクト（WebSocketマネージャにアクセスするため）
+        mapping: マッピングパラメータ（例: {"min_size": 5, "max_size": 20}）
+        current_user: 現在の認証済みユーザー
+        db: データベースセッション
+        
+    Returns:
+        適用結果
+    """
+    # ユーザーがこのネットワークにアクセス権を持っているか確認
+    get_network_for_user(db, network_id, current_user.id)
+    
+    try:
+        # マッピングパラメータのデフォルト値設定
+        if mapping is None:
+            mapping = {"min_size": 5, "max_size": 20}
+            
+        # NetworkXMCPサービスに次数中心性の適用をリクエスト
+        result = await mcp_client.apply_metric_to_visual(
+            network_id=network_id,
+            metric="degree_centrality",
+            visual="node_size",
+            mapping=mapping
+        )
+        
+        # WebSocketマネージャーからリアルタイム更新を通知
+        ws_manager = request.app.state.ws_manager
+        if ws_manager:
+            await ws_manager.broadcast({
+                "event": "graph_updated",
+                "data": {
+                    "network_id": network_id,
+                    "updated_by": "degree_centrality"
+                }
+            })
+            logger.info(f"Broadcast graph_updated event for network {network_id}")
+        
+        return {
+            "success": True,
+            "message": "次数中心性をノードサイズに適用しました",
+            "details": result.get("result", {})
+        }
+        
+    except mcp_client.MCPError as e:
+        logger.error(f"MCP error in apply_degree_centrality_to_size: {e.message}")
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+    except Exception as e:
+        logger.error(f"Unexpected error in apply_degree_centrality_to_size: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error_code": "CENTRALITY_APPLICATION_ERROR",
+                "message": f"次数中心性の適用中にエラーが発生しました: {str(e)}",
+                "context": {"network_id": network_id}
+            }
+        )
 
 
 @router.post("/{conversation_id}/upload", response_model=schemas.Network)

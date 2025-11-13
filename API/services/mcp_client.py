@@ -265,6 +265,92 @@ async def calculate_centrality(network_id: int, centrality_type: str, centrality
             context={"url": url, "network_id": network_id, "centrality_type": centrality_type}
         )
 
+async def apply_metric_to_visual(
+    network_id: int,
+    metric: str = "degree_centrality",
+    visual: str = "node_size",
+    mapping: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    メトリック値を視覚属性に適用します。
+    
+    Args:
+        network_id: ネットワークID
+        metric: 適用するメトリック（例：degree_centrality）
+        visual: 適用先の視覚属性（例：node_size, node_color）
+        mapping: マッピングパラメータ（例：{"min_size": 5, "max_size": 20}）
+        
+    Returns:
+        処理結果を含む辞書
+        
+    Raises:
+        MCPError: 処理に失敗した場合
+    """
+    try:
+        url = f"{NETWORKX_MCP_URL}/tools/apply_metric_to_visual"
+        payload = {
+            "network_id": network_id,
+            "metric": metric,
+            "visual": visual,
+            "mapping": mapping or {}
+        }
+        
+        logger.info(f"Applying {metric} to {visual} for network {network_id}")
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, timeout=DEFAULT_TIMEOUT)
+            
+        if response.status_code != 200:
+            error_msg = f"Error from NetworkXMCP: {response.text}"
+            logger.error(error_msg)
+            raise MCPError(
+                message=error_msg,
+                status_code=response.status_code,
+                context={"url": url, "network_id": network_id, "metric": metric, "visual": visual}
+            )
+        
+        result = response.json()
+        
+        # Check if the result contains the expected data
+        if not result.get("result", {}).get("success", True):
+            error_msg = result.get("result", {}).get("error", "Unknown error from NetworkXMCP")
+            logger.error(f"Error: {error_msg}")
+            raise MCPError(
+                message=error_msg,
+                status_code=400,
+                context={"url": url, "network_id": network_id, "metric": metric, "visual": visual}
+            )
+        
+        logger.info(f"Successfully applied {metric} to {visual} for network {network_id}")
+        return result
+    
+    except httpx.TimeoutException:
+        error_msg = "Timeout while connecting to NetworkXMCP"
+        logger.error(error_msg)
+        raise MCPError(
+            message=error_msg,
+            status_code=504,
+            context={"url": url, "network_id": network_id, "metric": metric, "visual": visual}
+        )
+    
+    except httpx.RequestError as e:
+        error_msg = f"Request error while connecting to NetworkXMCP: {str(e)}"
+        logger.error(error_msg)
+        raise MCPError(
+            message=error_msg,
+            status_code=502,
+            context={"url": url, "network_id": network_id, "metric": metric, "visual": visual}
+        )
+    
+    except Exception as e:
+        error_msg = f"Unexpected error in apply_metric_to_visual: {str(e)}"
+        logger.error(error_msg)
+        raise MCPError(
+            message=error_msg,
+            status_code=500,
+            context={"url": url, "network_id": network_id, "metric": metric, "visual": visual}
+        )
+
 async def execute_tool(tool_name: str, network_id: int, **kwargs) -> Dict[str, Any]:
     """
     Execute a tool on the NetworkX MCP service.

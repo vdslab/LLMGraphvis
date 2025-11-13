@@ -1,5 +1,5 @@
 ### レイアウト推薦API - ソーシャルネットワーク例
-POST http://localhost:8000/chatgpt/recommend-layout
+POST http://localhost:8000/chat/recommend-layout
 Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...  # Replace with your token
 
@@ -9,7 +9,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...  # Replace with yo
 }
 
 ### レイアウト推薦API - 階層構造例
-POST http://localhost:8000/chatgpt/recommend-layout
+POST http://localhost:8000/chat/recommend-layout
 Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...  # Replace with your token
 
@@ -19,7 +19,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...  # Replace with yo
 }
 
 ### レイアウト推薦API - 二部グラフ例
-POST http://localhost:8000/chatgpt/recommend-layout
+POST http://localhost:8000/chat/recommend-layout
 Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...  # Replace with your token
 
@@ -29,7 +29,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...  # Replace with yo
 }
 
 ### レイアウト推薦API - 小規模ネットワーク例
-POST http://localhost:8000/chatgpt/recommend-layout
+POST http://localhost:8000/chat/recommend-layout
 Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...  # Replace with your token
 
@@ -39,7 +39,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...  # Replace with yo
 }
 
 ### レイアウト推薦API - 時系列データ例
-POST http://localhost:8000/chatgpt/recommend-layout
+POST http://localhost:8000/chat/recommend-layout
 Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...  # Replace with your token
 
