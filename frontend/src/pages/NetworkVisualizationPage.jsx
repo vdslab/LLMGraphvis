@@ -2,20 +2,26 @@ import { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import ForceGraph2D from 'react-force-graph-2d';
 import useNetworkStore from '../services/networkStore';
+import useChatStore from '../services/chatStore';
 
 const NetworkVisualizationPage = () => {
-  const { 
-    setNetworkData, 
-    setLayout, 
-    setLayoutParams, 
-    calculateLayout, 
-    edges, 
-    positions, 
-    layout, 
-    layoutParams, 
-    isLoading, 
-    error 
+  const {
+    setNetworkData,
+    setLayout,
+    setLayoutParams,
+    calculateLayout,
+    applyDegreeCentralityToSize,
+    fetchVisData,
+    edges,
+    positions,
+    layout,
+    layoutParams,
+    isLoading,
+    error,
+    successMessage
   } = useNetworkStore();
+  
+  const { currentConversationId } = useChatStore();
   
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -234,10 +240,11 @@ const NetworkVisualizationPage = () => {
                       ref={graphRef}
                       graphData={graphData}
                       nodeLabel="label"
-                      nodeColor={() => '#1d4ed8'}
-                      linkColor={() => '#94a3b8'}
-                      nodeRelSize={5}
-                      linkWidth={1}
+                      nodeColor={(node) => node.color || '#1d4ed8'}
+                      linkColor={(link) => link.color || '#94a3b8'}
+                      nodeVal={(node) => node.size || 5} // ← 次数中心性の値がサイズに反映される
+                      nodeRelSize={1} // 相対サイズ係数を小さく設定（nodeValを使用するため）
+                      linkWidth={(link) => link.width || 1}
                       d3AlphaDecay={0}
                       d3VelocityDecay={0.4}
                       cooldownTime={2000}
@@ -272,6 +279,28 @@ const NetworkVisualizationPage = () => {
                       <pre className="mt-1 text-xs text-gray-500 bg-gray-50 p-2 rounded-md">
                         {JSON.stringify(layoutParams, null, 2)}
                       </pre>
+                    </div>
+                  )}
+                  
+                  {/* 次数中心性適用ボタン */}
+                  {currentConversationId && (
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={() => applyDegreeCentralityToSize()}
+                        disabled={isLoading}
+                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-300"
+                      >
+                        {isLoading ? '処理中...' : '次数中心性をノードサイズに適用'}
+                      </button>
+                      
+                      {successMessage && (
+                        <div className="mt-2 rounded-md bg-green-50 p-2">
+                          <p className="text-xs font-medium text-green-800">
+                            {successMessage}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

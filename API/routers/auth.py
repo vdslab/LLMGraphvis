@@ -52,6 +52,8 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     
     return db_user
 
+from fastapi.responses import JSONResponse
+
 @router.post("/token", response_model=schemas.Token)
 async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
@@ -59,13 +61,17 @@ async def login_for_access_token(
 ):
     """
     Logs in a user and returns an access token.
+    
+    Sets the token as an HttpOnly cookie for enhanced security,
+    while also returning it in the response body for backward compatibility.
 
     Args:
         form_data: The user's login credentials.
         db: The database session.
 
     Returns:
-        An access token and token type.
+        A JSONResponse with the access token and token type,
+        and sets an HttpOnly cookie with the token.
     """
     # Authenticate user
     user = auth.authenticate_user(db, form_data.username, form_data.password)
@@ -83,7 +89,24 @@ async def login_for_access_token(
         expires_delta=access_token_expires
     )
     
-    return {"access_token": access_token, "token_type": "bearer"}
+    # Create response with token in body (for backward compatibility)
+    response = JSONResponse(
+        content={"access_token": access_token, "token_type": "bearer"}
+    )
+    
+    # Set HttpOnly cookie with the token
+    cookie_expires = int(access_token_expires.total_seconds())
+    response.set_cookie(
+        key="access_token",
+        value=f"Bearer {access_token}",
+        httponly=True,
+        secure=True,  # Requires HTTPS
+        samesite="lax",  # Protects against CSRF
+        max_age=cookie_expires,
+        path="/"  # Available across the entire domain
+    )
+    
+    return response
 
 @router.get("/users/me", response_model=schemas.User)
 async def read_users_me(current_user: models.User = Depends(auth.get_current_active_user)):

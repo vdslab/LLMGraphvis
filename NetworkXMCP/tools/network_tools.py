@@ -838,6 +838,106 @@ def calculate_centrality(G, centrality_type="degree", **kwargs):
             "error": f"Error calculating {centrality_type} centrality: {str(e)}"
         }
 
+def apply_metric_to_visual_in_graphml(graphml_content, metric_values, visual_attr="size", mapping=None):
+    """
+    線形マッピングを適用して中心性値をビジュアル属性に反映します。
+    
+    Args:
+        graphml_content: GraphML形式の文字列
+        metric_values: ノードIDをキー、メトリック値を値とする辞書
+        visual_attr: 反映先の視覚属性名（例: "size", "color"）
+        mapping: マッピングパラメータ。例: {"min_size": 5, "max_size": 20}
+            
+    Returns:
+        dict: 処理結果（success, graphml_content, mapped_values）
+    """
+    try:
+        # デフォルト値設定
+        if mapping is None:
+            mapping = {}
+        
+        min_value = mapping.get("min_size", 5)
+        max_value = mapping.get("max_size", 20)
+        
+        # GraphMLをパース
+        logger.debug(f"Applying metric to visual attribute '{visual_attr}'")
+        content_io = io.BytesIO(graphml_content.encode('utf-8'))
+        G = nx.read_graphml(content_io)
+        
+        if G.number_of_nodes() == 0:
+            return {
+                "success": False,
+                "error": "Graph has no nodes"
+            }
+        
+        # メトリック値のチェックと正規化
+        valid_values = {}
+        for node, value in metric_values.items():
+            # 不正値チェック（NaN、Inf、負数）
+            if node in G.nodes and isinstance(value, (int, float)) and not np.isnan(value) and not np.isinf(value):
+                valid_values[node] = max(0, value)  # 負数は0に変換
+        
+        if not valid_values:
+            return {
+                "success": False,
+                "error": "No valid metric values found"
+            }
+        
+        # 値の範囲を計算
+        max_metric = max(valid_values.values())
+        min_metric = min(valid_values.values())
+        
+        # 線形マッピングの計算関数
+        def linear_map(val, min_metric=min_metric, max_metric=max_metric, min_value=min_value, max_value=max_value):
+            # max_metric と min_metric が等しい場合（すべての値が同じ場合）は中間値を返す
+            if max_metric == min_metric:
+                return (min_value + max_value) / 2
+            # 線形マッピング
+            normalized = (val - min_metric) / (max_metric - min_metric)
+            return min_value + normalized * (max_value - min_value)
+        
+        # マッピング値を保存
+        mapped_values = {}
+        
+        # 各ノードに視覚属性を適用
+        for node, value in valid_values.items():
+            if node in G.nodes:
+                # 文字列形式のノードIDに対応
+                node_id = node
+                if node not in G.nodes and str(node) in G.nodes:
+                    node_id = str(node)
+                elif node not in G.nodes:
+                    continue
+                
+                # 値を線形マッピング
+                mapped_val = linear_map(value)
+                mapped_values[node] = mapped_val
+                
+                # 視覚属性に値を設定
+                G.nodes[node_id][visual_attr] = str(mapped_val)
+                
+                logger.debug(f"Node {node}: metric={value}, {visual_attr}={mapped_val}")
+        
+        # 更新されたGraphMLを生成
+        output = io.BytesIO()
+        nx.write_graphml(G, output)
+        output.seek(0)
+        updated_graphml = output.read().decode("utf-8")
+        
+        return {
+            "success": True,
+            "graphml_content": updated_graphml,
+            "mapped_values": mapped_values
+        }
+    except Exception as e:
+        logger.error(f"Error applying metric to visual: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return {
+            "success": False,
+            "error": f"Error applying metric to visual: {str(e)}"
+        }
+
 def apply_layout_to_graphml(graphml_content, layout_type="spring", layout_params=None):
     """
     Applies a layout to a GraphML graph.

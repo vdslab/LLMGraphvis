@@ -45,6 +45,8 @@ const useNetworkStore = create((set, get) => ({
   isLoading: false,
   /** @type {string|null} The current error message. */
   error: null,
+  /** @type {string|null} The success message. */
+  successMessage: null,
   /** @type {object|null} The current layout recommendation. */
   recommendation: null,
   /** @type {object} The visual properties of the network. */
@@ -229,6 +231,92 @@ const useNetworkStore = create((set, get) => ({
       set({
         isLoading: false,
         error: "Failed to generate sample network",
+      });
+      return false;
+    }
+  },
+
+  /**
+   * 可視化データを取得して更新する
+   *
+   * @returns {Promise<boolean>} 取得成功か否か
+   */
+  fetchVisData: async () => {
+    const { currentConversationId } = useChatStore.getState();
+    if (!currentConversationId) {
+      set({ error: "アクティブな会話がありません。" });
+      return false;
+    }
+    
+    const networkId = currentConversationId;
+    
+    try {
+      const response = await networkAPI.getNetworkVisData(networkId);
+      const visData = response.data;
+      
+      if (visData && visData.nodes && visData.links) {
+        set({
+          nodes: visData.nodes,
+          edges: visData.links,
+          positions: visData.nodes.map(node => ({
+            id: node.id,
+            x: node.x,
+            y: node.y,
+            size: node.size,
+            color: node.color,
+            label: node.label || node.id
+          })),
+          error: null
+        });
+        return true;
+      } else {
+        throw new Error("無効な可視化データを受信しました");
+      }
+    } catch (error) {
+      console.error("可視化データの取得エラー:", error);
+      set({
+        error: error.message || "可視化データの取得に失敗しました"
+      });
+      return false;
+    }
+  },
+
+  /**
+   * 次数中心性をノードサイズに適用する
+   *
+   * @param {object} [mapping] - マッピングパラメータ (e.g. {min_size: 5, max_size: 20})
+   * @returns {Promise<boolean>} 適用成功か否か
+   */
+  applyDegreeCentralityToSize: async (mapping = null) => {
+    const { currentConversationId } = useChatStore.getState();
+    if (!currentConversationId) {
+      set({ error: "アクティブな会話がありません。" });
+      return false;
+    }
+    
+    const networkId = currentConversationId;
+    
+    set({ isLoading: true, error: null, successMessage: null });
+    
+    try {
+      // 次数中心性を適用
+      await networkAPI.applyDegreeCentralityToSize(networkId, mapping);
+      
+      // 可視化データを再取得して更新
+      const fetchSuccess = await get().fetchVisData();
+      
+      set({
+        isLoading: false,
+        successMessage: fetchSuccess ? "次数中心性をノードサイズに反映しました" : null
+      });
+      
+      return fetchSuccess;
+    } catch (error) {
+      console.error("次数中心性適用エラー:", error);
+      set({
+        isLoading: false,
+        error: error.response?.data?.message || error.message || "次数中心性の適用に失敗しました",
+        successMessage: null
       });
       return false;
     }

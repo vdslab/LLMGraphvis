@@ -76,11 +76,6 @@ TOOLS_DEFINITION = [
             "required": ["layout_type"]
         }
     },
-    {
-        "name": "get_network_info",
-        "description": "Retrieves basic statistics about the network, such as the number of nodes and edges, density, etc.",
-        "parameters": {}
-    },
 ]
 
 # --- System Prompt ---

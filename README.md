@@ -60,7 +60,7 @@ These services are designed to be run in separate containers using Docker Compos
 
 3.  **Build and start the services:**
     ```bash
-    docker-compose up --build
+    docker compose up --build
     ```
 
 The frontend will be available at `http://localhost:3000`, and the API will be at `http://localhost:8000`.

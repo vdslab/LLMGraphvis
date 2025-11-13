@@ -1,7 +1,7 @@
 テスト開始
-Python version: 3.12.10 (main, Apr 19 2025, 23:44:25) [Clang 17.0.0 (clang-1700.0.13.3)]
-Current working directory: /Users/takuma/develop/vdslab/chatgpt-graphvis/LLMGraphvis/NetworkXMCP
-sys.path: ['/Users/takuma/develop/vdslab/chatgpt-graphvis/LLMGraphvis/NetworkXMCP', '/Users/takuma/.pyenv/versions/3.12.10/lib/python312.zip', '/Users/takuma/.pyenv/versions/3.12.10/lib/python3.12', '/Users/takuma/.pyenv/versions/3.12.10/lib/python3.12/lib-dynload', '/Users/takuma/.pyenv/versions/3.12.10/lib/python3.12/site-packages']
+Python version: 3.12.11 (main, Oct  2 2025, 23:05:38) [Clang 17.0.0 (clang-1700.3.19.1)]
+Current working directory: /Users/takuma/develop/vdslab/master/LLMGraphvis/NetworkXMCP
+sys.path: ['/Users/takuma/develop/vdslab/master/LLMGraphvis/NetworkXMCP', '/Users/takuma/.pyenv/versions/3.12.11/lib/python312.zip', '/Users/takuma/.pyenv/versions/3.12.11/lib/python3.12', '/Users/takuma/.pyenv/versions/3.12.11/lib/python3.12/lib-dynload', '/Users/takuma/.pyenv/versions/3.12.11/lib/python3.12/site-packages']
 
 テスト1: グラフ作成モジュールの読み込み
 ✓ create_random_network 関数が正常にインポートされました
@@ -22,10 +22,10 @@ sys.path: ['/Users/takuma/develop/vdslab/chatgpt-graphvis/LLMGraphvis/NetworkXMC
 ✓ __init__.py 経由で全ての関数が正常にインポートされました
 
 テスト6: ランダムネットワーク生成
-✓ ランダムネットワーク生成: ノード数=5, エッジ数=5
+✓ ランダムネットワーク生成: ノード数=5, エッジ数=4
 
 テスト7: ネットワーク情報取得
-✓ ネットワーク情報取得: {'num_nodes': 5, 'num_edges': 5, 'density': 0.5, 'is_connected': True, 'num_components': 1, 'avg_degree': 2.0, 'clustering_coefficient': 0.3333333333333333}
+✓ ネットワーク情報取得: {'num_nodes': 5, 'num_edges': 4, 'density': 0.4, 'is_connected': True, 'num_components': 1, 'avg_degree': 1.6, 'clustering_coefficient': 0.0}
 
 テスト8: 中心性計算
 ✓ 次数中心性計算成功
