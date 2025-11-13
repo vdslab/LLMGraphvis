@@ -192,7 +192,7 @@ async def api_calculate_centrality(params: CentralityParams, db: Session = Depen
     logger.info(f"Cache miss for centrality '{params.centrality_type}'. Calculating...")
     G = parse_graphml_string(db_network.graphml_content)
     
-    from tools.network_tools import calculate_centrality as tools_calculate_centrality
+    from tools.network_analysis import calculate_centrality as tools_calculate_centrality
     result = tools_calculate_centrality(G, params.centrality_type, **params.centrality_params)
 
     if not result.get("success"):
@@ -223,7 +223,7 @@ async def api_convert_graphml(params: GraphMLConvertParams):
         The converted GraphML content.
     """
     try:
-        from tools.network_tools import convert_to_standard_graphml
+        from tools.graphml_converter import convert_to_standard_graphml
         result = convert_to_standard_graphml(params.graphml_content)
 
         if not result.get("success"):
