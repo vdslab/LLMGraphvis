@@ -1,0 +1,68 @@
+{
+  "specsSidebar": [
+    {
+      "type": "doc",
+      "id": "README",
+      "label": "はじめに"
+    },
+    {
+      "type": "category",
+      "label": "エグゼクティブサマリー",
+      "link": {
+        "type": "doc",
+        "id": "Executive_Summary/README"
+      },
+      "items": []
+    },
+    {
+      "type": "category",
+      "label": "クイックスタートガイド",
+      "link": {
+        "type": "doc",
+        "id": "Quick_Start/README"
+      },
+      "items": []
+    },
+    {
+      "type": "category",
+      "label": "詳細技術仕様",
+      "items": [
+        {
+          "type": "doc",
+          "id": "Technical_Details/Architecture",
+          "label": "0. アーキテクチャ設計"
+        },
+        {
+          "type": "doc",
+          "id": "Technical_Details/Backend",
+          "label": "1. バックエンド仕様 (API)"
+        },
+        {
+          "type": "doc",
+          "id": "Technical_Details/Frontend",
+          "label": "2. フロントエンド仕様"
+        },
+        {
+          "type": "doc",
+          "id": "Technical_Details/NetworkXMCP",
+          "label": "3. ネットワーク計算サービス仕様"
+        },
+        {
+          "type": "doc",
+          "id": "Technical_Details/Database",
+          "label": "4. データベーススキーマ仕様"
+        },
+        {
+          "type": "doc",
+          "id": "Technical_Details/Authentication",
+          "label": "5. 認証フロー"
+        },
+        {
+          "type": "doc",
+          "id": "Technical_Details/Core_Workflows",
+          "label": "6. 主要な処理フローとデータ生成"
+        }
+      ]
+    }
+  ]
+}
