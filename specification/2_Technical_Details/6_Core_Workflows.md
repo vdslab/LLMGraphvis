@@ -111,13 +111,10 @@ sequenceDiagram
     DB-->>N: 保存成功
     N-->>B: 実行成功
 
-    %% Step 5: Backend asks LLM for the final step
-    B->>LLM: 計算成功をツール実行結果として送信
-    note right of LLM: 属性が用意できたので、それを視覚的な特徴に
-    note right of LLM: 割り当てるためのマッピングルール作成を要求する。
-    LLM-->>B: ツール呼び出し要求 (3. apply_metric_to_visual)
 
-    %% Step 6: Backend executes apply_metric_to_visual
+
+
+    %% Step 6: Backend executes apply_metric_to_visual (calculate_centralityの結果を受けて自動実行)
     B->>N: POST /tools/apply_metric_to_visual (metric:"degree_centrality", visual:"node_size")
     N->>DB: `visual_mapping_rules`にマッピング設定を保存または更新
     DB-->>N: 保存成功
@@ -155,10 +152,7 @@ BackendとLLMは、以下のような複数回のやり取りを通じて、段�
 - **2回目のLLM呼び出し**:
     - **Backend → LLM**: `list_attributes` の実行結果 `['weight']`
     - **LLM → Backend**: `calculate_centrality(type: "degree")` の呼び出しを要求
-
-- **3回目のLLM呼び出し**:
-    - **Backend → LLM**: `calculate_centrality` の実行成功
-    - **LLM → Backend**: `apply_metric_to_visual(metric: "degree_centrality", visual: "node_size", mapping: {scale: 'linear', ...})` の呼び出しを要求
+    - **Backend**: `calculate_centrality` の実行結果を受けて、自動的に `apply_metric_to_visual(metric: "degree_centrality", visual: "node_size", mapping: {scale: 'linear', ...})` を実行
 
 #### 2. Backendによるツール実行と永続化
 
