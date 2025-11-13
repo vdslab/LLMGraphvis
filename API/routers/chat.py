@@ -27,9 +27,11 @@ router = APIRouter(
     responses={401: {"description": "Unauthorized"}},
 )
 
-# NetworkXMCPサーバーとの通信はproxy.pyを介して行う
-# APIサーバー内部では直接NetworkXMCPサーバーにアクセス
-NETWORKX_MCP_URL = os.environ.get("NETWORKX_MCP_URL", "http://networkx-mcp:8001")
+import logging
+from services import mcp_client
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 def create_empty_graphml() -> str:
     """
@@ -230,7 +232,7 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
         
     db_conversation = db.query(models.Conversation).get(conversation_id)
     if not db_conversation:
-        print(f"Error: Conversation with ID {conversation_id} not found.")
+        logger.error(f"Error: Conversation with ID {conversation_id} not found.")
         return
 
     try:
@@ -251,38 +253,33 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
             tool_name = tool_call["function"]["name"]
             tool_args = tool_call["function"]["arguments"] # Already a dict
 
-            # Prepare payload for NetworkXMCP
+            # Add network_id to the payload for the stateful MCP service
             mcp_payload = {
-                "graphml_content": db_conversation.network.graphml_content if db_conversation.network else create_empty_graphml(),
+                "network_id": db_conversation.network.id,
                 **tool_args
             }
 
             # Call NetworkXMCP
             tool_result_content = ""
-            async with httpx.AsyncClient() as client:
-                url = f"{NETWORKX_MCP_URL}/tools/{tool_name}"
-                print(f"Calling NetworkXMCP: {url} with args {tool_args}")
-                response = await client.post(url, json=mcp_payload, timeout=60.0)
+            try:
+                # Use the mcp_client service instead of direct httpx calls
+                result = await mcp_client.execute_tool(tool_name, db_conversation.network.id, **tool_args)
+                mcp_result = result.get("result", {})
                 
-                if response.status_code == 200:
-                    mcp_result = response.json().get("result", {})
-                    if mcp_result.get("success"):
-                        # Update network or handle data
-                        # This part needs to be robust
-                        if 'positions' in mcp_result:
-                             # ... (update graphml with new positions)
-                            pass
-                        if 'centrality_values' in mcp_result:
-                            # The result is the centrality data itself.
-                            # We'll pass this back to the LLM to summarize.
-                            pass
-                        
-                        # Create a summary of the successful tool result for the LLM
-                        tool_result_content = json.dumps({"status": "success", "details": mcp_result})
-                    else:
-                        tool_result_content = json.dumps({"status": "error", "details": mcp_result.get("error", "Unknown error from tool.")})
+                if mcp_result.get("success", True):
+                    # Create a summary of the successful tool result for the LLM
+                    tool_result_content = json.dumps({"status": "success", "details": mcp_result})
                 else:
-                    tool_result_content = json.dumps({"status": "error", "details": f"Tool execution failed with status {response.status_code}: {response.text}"})
+                    tool_result_content = json.dumps({
+                        "status": "error",
+                        "details": mcp_result.get("error", "Unknown error from tool.")
+                    })
+            except mcp_client.MCPError as e:
+                logger.error(f"MCP error in process_and_respond: {e.message}")
+                tool_result_content = json.dumps({
+                    "status": "error",
+                    "details": f"Tool execution failed: {e.message}"
+                })
 
             # 4. Send the tool result back to the LLM to get a natural language response
             # Append the original llm_response (with the tool call) and the tool result to the history
@@ -308,7 +305,7 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
         db.commit()
 
     except Exception as e:
-        print(f"Error in process_and_respond: {str(e)}")
+        logger.error(f"Error in process_and_respond: {str(e)}")
         # Log and save error message
         error_content = f"An error occurred: {str(e)}"
         db_error = models.ChatMessage(
@@ -324,7 +321,7 @@ async def process_and_respond(db: Session, conversation_id: int, user_message_co
 @router.post("/recommend-layout")
 async def recommend_layout(
     request: Request,
-    current_user: models.User = Depends(auth.get_current_active_user),
+    current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -488,24 +485,28 @@ async def process_chat(
             tool_name = tool_call["function"]["name"]
             tool_args = tool_call["function"]["arguments"]
 
-            # Add network_id to the payload for the stateful MCP service
-            mcp_payload = {
-                "network_id": db_conversation.network.id,
-                **tool_args
-            }
-
-            async with httpx.AsyncClient() as client:
-                url = f"{NETWORKX_MCP_URL}/tools/{tool_name}"
-                response = await client.post(url, json=mcp_payload, timeout=60.0)
+            # Use the mcp_client service instead of direct httpx calls
+            try:
+                result = await mcp_client.execute_tool(tool_name, db_conversation.network.id, **tool_args)
+                mcp_result = result.get("result", {})
                 
-                if response.status_code == 200:
-                    mcp_result = response.json().get("result", {})
-                    tool_result_for_llm = mcp_result.get("centrality_values", mcp_result) # Pass the core result to LLM
-                    if mcp_result.get("success"):
-                        network_update_info = {"type": tool_name, **mcp_result}
+                # Extract the core result for LLM
+                tool_result_for_llm = mcp_result.get("centrality_values", mcp_result)
+                
+                if mcp_result.get("success", True):
+                    network_update_info = {"type": tool_name, **mcp_result}
+                    tool_result_for_llm = {"status": "success", "details": tool_result_for_llm}
                 else:
-                    error_detail = response.text
-                    tool_result_for_llm = {"status": "error", "details": f"Tool execution failed: {error_detail}"}
+                    tool_result_for_llm = {
+                        "status": "error",
+                        "details": mcp_result.get("error", "Unknown error from tool.")
+                    }
+            except mcp_client.MCPError as e:
+                logger.error(f"MCP error in process_chat: {e.message}")
+                tool_result_for_llm = {
+                    "status": "error",
+                    "details": f"Tool execution failed: {e.message}"
+                }
 
             final_history = formatted_history + [
                 {"role": "assistant", "content": json.dumps({"tool_calls": tool_calls})},
@@ -536,8 +537,13 @@ async def process_chat(
         }
 
     except Exception as e:
-        print(f"Error in /process endpoint: {type(e).__name__}: {e}")
+        logger.error(f"Error in /process endpoint: {type(e).__name__}: {e}")
         import traceback
-        traceback.print_exc()
+        logger.error(traceback.format_exc())
         db.rollback()
-        return {"success": False, "content": f"An unexpected error occurred: {str(e)}"}
+        return {
+            "success": False,
+            "content": f"An unexpected error occurred: {str(e)}",
+            "error_code": "PROCESS_ERROR",
+            "context": {"error_type": type(e).__name__}
+        }

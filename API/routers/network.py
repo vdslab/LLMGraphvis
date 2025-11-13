@@ -7,25 +7,24 @@ network data in various formats.
 
 from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Response
 from sqlalchemy.orm import Session
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 import networkx as nx
 import io
 import json
+import logging
 
 import models
 import schemas
 import auth
 from database import get_db
-import os
-import httpx
+from services import mcp_client
 
-# NetworkXMCPサーバーとの通信用URL
-NETWORKX_MCP_URL = os.environ.get("NETWORKX_MCP_URL", "http://networkx-mcp:8001")
+# Configure logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/network",
     tags=["network"],
-    dependencies=[Depends(auth.get_current_active_user)],
     responses={404: {"description": "Not found"}},
 )
 
@@ -90,10 +89,109 @@ async def get_network_cytoscape_format(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing GraphML: {str(e)}")
 
+@router.get("/{network_id}/visdata", response_model=Dict[str, Any])
+async def get_network_visualization_data(
+    network_id: int,
+    current_user: models.User = Depends(auth.get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retrieves network data optimized for visualization.
+    
+    This endpoint dynamically generates rendering data by combining the network structure
+    with visual mapping rules and attribute values from the database.
+    
+    Args:
+        network_id: The ID of the network to retrieve.
+        current_user: The current authenticated user.
+        db: The database session.
+        
+    Returns:
+        A dictionary containing nodes and links data ready for visualization.
+    """
+    db_network = get_network_for_user(db, network_id, current_user.id)
+    
+    try:
+        # Parse GraphML content
+        G = nx.read_graphml(io.StringIO(db_network.graphml_content))
+        
+        # Default visual properties
+        default_node_size = 5
+        default_node_color = "#82b3ff"  # システムのテーマカラーに合わせた明るい青
+        default_edge_width = 1
+        default_edge_color = "#cccccc"  # 他の要素を邪魔しない薄いグレー
+        
+        # Prepare nodes data
+        nodes_data = []
+        for node_id, attrs in G.nodes(data=True):
+            # Extract position from attributes
+            x = float(attrs.get('x', 0))
+            y = float(attrs.get('y', 0))
+            
+            # Extract or set default visual properties
+            size = float(attrs.get('size', default_node_size))
+            color = attrs.get('color', default_node_color)
+            label = attrs.get('name', str(node_id))
+            
+            # Create node object
+            node = {
+                "id": str(node_id),
+                "label": label,
+                "x": x,
+                "y": y,
+                "size": size,
+                "color": color
+            }
+            
+            # Add any additional attributes that might be useful
+            for key, value in attrs.items():
+                if key not in ["id", "label", "x", "y", "size", "color", "name"]:
+                    node[key] = value
+            
+            nodes_data.append(node)
+        
+        # Prepare edges data
+        links_data = []
+        for source, target, attrs in G.edges(data=True):
+            # Extract or set default visual properties
+            width = float(attrs.get('width', default_edge_width))
+            color = attrs.get('color', default_edge_color)
+            
+            # Create edge object
+            edge = {
+                "source": str(source),
+                "target": str(target),
+                "width": width,
+                "color": color
+            }
+            
+            # Add any additional attributes
+            for key, value in attrs.items():
+                if key not in ["source", "target", "width", "color"]:
+                    edge[key] = value
+            
+            links_data.append(edge)
+        
+        # Return the visualization data
+        return {
+            "nodes": nodes_data,
+            "links": links_data
+        }
+    except Exception as e:
+        logger.error(f"Error generating visualization data: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail={
+                "error_code": "VISUALIZATION_ERROR",
+                "message": f"Error generating visualization data: {str(e)}",
+                "context": {"network_id": network_id}
+            }
+        )
+
 @router.get("/{network_id}/export")
 async def export_network_graphml(
     network_id: int,
-    current_user: models.User = Depends(auth.get_current_active_user),
+    current_user: models.User = Depends(auth.get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -139,29 +237,13 @@ async def upload_new_network(
         graphml_content_str = graphml_content_bytes.decode("utf-8")
 
         # Call NetworkXMCP to convert/normalize the GraphML
-        async with httpx.AsyncClient() as client:
-            url = f"{NETWORKX_MCP_URL}/tools/convert_graphml"
-            payload = {"graphml_content": graphml_content_str}
-            print(f"Sending GraphML to NetworkXMCP for conversion: {url}")
-            
-            response = await client.post(url, json=payload, timeout=60.0)
-            print(f"Response status: {response.status_code}")
-            
-            if response.status_code != 200:
-                error_msg = f"Error from NetworkXMCP: {response.text}"
-                print(f"Error: {error_msg}")
-                raise HTTPException(status_code=500, detail=error_msg)
-            
-            result = response.json()
-            print(f"Response from NetworkXMCP: {result}")
-            
-            if not result.get("success"):
-                error_msg = result.get("error", "Unknown error from NetworkXMCP")
-                print(f"Error: {error_msg}")
-                raise HTTPException(status_code=500, detail=error_msg)
-            
+        try:
+            result = await mcp_client.convert_graphml(graphml_content_str)
             normalized_graphml_str = result.get("graphml_content", "")
-            print(f"Normalized GraphML length: {len(normalized_graphml_str)}")
+            logger.info(f"Normalized GraphML length: {len(normalized_graphml_str)}")
+        except mcp_client.MCPError as e:
+            logger.error(f"Error from NetworkXMCP: {e.message}")
+            raise HTTPException(status_code=e.status_code, detail=e.message)
 
         # Create a new conversation
         db_conversation = models.Conversation(
@@ -182,12 +264,22 @@ async def upload_new_network(
         db.commit()
         db.refresh(db_network)
 
+        # Calculate default layout (spring) for the network
+        try:
+            await mcp_client.change_layout(db_network.id, "spring")
+            logger.info(f"Applied default spring layout to network {db_network.id}")
+        except mcp_client.MCPError as e:
+            # Log the error but don't fail the upload
+            logger.error(f"Error applying default layout: {e.message}")
+            # We continue without raising an exception since the network was created successfully
+
         return {"conversation_id": db_conversation.id, "network_id": db_network.id}
 
     except HTTPException as e:
         # Re-raise HTTPException to preserve status code and detail
         raise e
     except Exception as e:
+        logger.error(f"Unexpected error in upload_new_network: {str(e)}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 
@@ -218,27 +310,12 @@ async def calculate_network_layout(
     get_network_for_user(db, network_id, current_user.id)
     
     try:
-        async with httpx.AsyncClient() as client:
-            url = f"{NETWORKX_MCP_URL}/tools/change_layout"
-            # The new payload now only needs the network_id and layout parameters
-            payload = {
-                "network_id": network_id,
-                "layout_type": layout_type,
-                "layout_params": layout_params
-            }
-            print(f"Proxying layout request to NetworkXMCP: {url} with payload: {payload}")
-            
-            response = await client.post(url, json=payload, timeout=60.0)
-            
-            if response.status_code != 200:
-                raise HTTPException(status_code=response.status_code, detail=f"Error from NetworkXMCP: {response.text}")
-            
-            # Return the exact response from the MCP service
-            return response.json()
-
-    except HTTPException as e:
-        raise e
+        result = await mcp_client.change_layout(network_id, layout_type, layout_params)
+        return result
+    except mcp_client.MCPError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
+        logger.error(f"Unexpected error in calculate_network_layout: {str(e)}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
 
 
@@ -282,29 +359,13 @@ async def upload_and_overwrite_network(
         graphml_content_str = graphml_content_bytes.decode("utf-8")
 
         # Call NetworkXMCP to convert/normalize the GraphML
-        async with httpx.AsyncClient() as client:
-            url = f"{NETWORKX_MCP_URL}/tools/convert_graphml"
-            payload = {"graphml_content": graphml_content_str}
-            print(f"Sending GraphML to NetworkXMCP for conversion: {url}")
-            
-            response = await client.post(url, json=payload, timeout=60.0)
-            print(f"Response status: {response.status_code}")
-            
-            if response.status_code != 200:
-                error_msg = f"Error from NetworkXMCP: {response.text}"
-                print(f"Error: {error_msg}")
-                raise HTTPException(status_code=500, detail=error_msg)
-            
-            result = response.json()
-            print(f"Response from NetworkXMCP: {result}")
-            
-            if not result.get("success"):
-                error_msg = result.get("error", "Unknown error from NetworkXMCP")
-                print(f"Error: {error_msg}")
-                raise HTTPException(status_code=500, detail=error_msg)
-            
+        try:
+            result = await mcp_client.convert_graphml(graphml_content_str)
             normalized_graphml_str = result.get("graphml_content", "")
-            print(f"Normalized GraphML length: {len(normalized_graphml_str)}")
+            logger.info(f"Normalized GraphML length: {len(normalized_graphml_str)}")
+        except mcp_client.MCPError as e:
+            logger.error(f"Error from NetworkXMCP: {e.message}")
+            raise HTTPException(status_code=e.status_code, detail=e.message)
 
         # Update the network content
         db_network.graphml_content = normalized_graphml_str
@@ -312,8 +373,18 @@ async def upload_and_overwrite_network(
         db.commit()
         db.refresh(db_network)
         
+        # Calculate default layout (spring) for the network
+        try:
+            await mcp_client.change_layout(db_network.id, "spring")
+            logger.info(f"Applied default spring layout to network {db_network.id}")
+        except mcp_client.MCPError as e:
+            # Log the error but don't fail the upload
+            logger.error(f"Error applying default layout: {e.message}")
+            # We continue without raising an exception since the network was updated successfully
+        
         return db_network
     except HTTPException as e:
         raise e
     except Exception as e:
+        logger.error(f"Unexpected error in upload_and_overwrite_network: {str(e)}")
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")
