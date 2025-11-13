@@ -21,6 +21,3 @@ dependencies = [
 # - scikit-learn>=1.2.0 (約9MB) - 機械学習機能は現在未使用
 # - python-louvain>=0.16 (約1MB) - コミュニティ検出は現在未使用
 # - requests>=2.31.0 - httpxがあれば不要（現在未使用）
-
-[tool.setuptools]
-packages = ["layouts", "metrics", "tools"]

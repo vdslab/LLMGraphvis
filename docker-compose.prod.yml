@@ -1,7 +1,45 @@
-# 本番用のDocker Compose設定（オプション）
-# 使用方法: docker compose -f docker-compose.yml -f docker-compose.prod.yml up
+# 本番用のDocker Compose設定
+# 使用方法: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 
 services:
+  api:
+    # 本番環境では --reload フラグを外し、ボリュームマウントを無効化
+    command:
+      ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    volumes: []
+    restart: unless-stopped
+    # 本番環境向けのヘルスチェック
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  networkx-mcp:
+    # 本番環境では --reload フラグを外し、ボリュームマウントを無効化
+    command:
+      ["uv", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+    volumes: []
+    restart: unless-stopped
+    # 本番環境向けのヘルスチェック
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
   frontend:
     build:
       context: ./frontend
@@ -12,3 +50,34 @@ services:
       - NODE_ENV=production
     # 本番では volumes をマウントしない（ビルド済みの静的ファイルを使用）
     volumes: []
+    restart: unless-stopped
+    # 本番環境向けのヘルスチェック
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      api:
+        condition: service_healthy
+      networkx-mcp:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+
+  # 本番環境では db の設定も強化
+  db:
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  # 環境変数から読み込み
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+      - ./API/init.sql:/docker-entrypoint-initdb.d/init.sql
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
