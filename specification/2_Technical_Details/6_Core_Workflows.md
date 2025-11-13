@@ -1,4 +1,4 @@
-# 6. 主要な処理フローとデータ生成
+# 6. 主要な処理フローとデータ生成（最適化版）
 
 **前提知識レベル:**
 - シーケンス図の読解能力
@@ -64,11 +64,11 @@ sequenceDiagram
 
 ## 6.3. 対話によるネットワーク操作フロー
 
-**目的:** ユーザーの曖昧な自然言語指示（例:「重要なノードを大きくして」）から、LLMが具体的な「計算」と「可視化」のツール呼び出しを推論し、実行する、本システムの最も中心的なフローです。
+**目的:** ユーザーの曖昧な自然言語指示（例:「重要なノードを大きくして」）から、LLMが単一の強力なツール呼び出しを計画し、最終的な可視化を一度に実現する、新しいアーキテクチャの中心的なフローです。
 
-### 6.3.1. シーケンス図
+### 6.3.1. シーケンス図（新アーキテクチャ）
 
-このフローでは、計算結果をネットワークの属性として保存しておくことで、同じ計算を何度も繰り返す無駄を省く仕組みも示されています。
+このフローでは、LLMが視覚化の全体像を一度に計画し、`NetworkXMCP`がそれを実行します。状態（視覚ルール）は永続化されず、毎回動的に生成されます。
 
 ```mermaid
 sequenceDiagram
@@ -89,88 +89,77 @@ sequenceDiagram
 
     %% Step 1: Backend asks LLM for a plan
     B->>LLM: ユーザー指示、会話履歴、ツールリストを送信
-    note right of LLM: ユーザー指示を解釈し、ツール実行計画を立てる。
+    note right of LLM: ユーザー指示を解釈し、<br/>可視化の全体計画を立てる。
     LLM-->>B: ツール呼び出し要求 (1. list_attributes)
 
-    %% Step 2: Backend executes list_attributes
+    %% Step 2: Backend executes list_attributes to aid LLM's planning
     B->>N: GET /tools/list_attributes (network_id)
-    N->>DB: `attributes`テーブルから属性名一覧をクエリ
+    N->>DB: 属性テーブル群から属性名一覧をクエリ
     DB-->>N: 属性リスト
-    N-->>B: 属性リスト（例: ['weight', 'component_id']）
+    N-->>B: 属性リスト（例: ['weight', 'community_id']）
 
-    %% Step 3: Backend asks LLM for the next step
+    %% Step 3: Backend asks LLM for the final visualization plan
     B->>LLM: 属性リストをツール実行結果として送信
-    note right of LLM: 「次数中心性」が属性リストにないことを確認し、
-    note right of LLM: 次のステップとして属性計算を要求する。
-    LLM-->>B: ツール呼び出し要求 (2. calculate_centrality)
+    note right of LLM: 「次数中心性」が属性リストにないことを確認。<br/>したがって、計算も実行する必要があると判断。<br/>レイアウト、ノードサイズ、カラーの割り当てを<br/>すべて定義した単一のツールコールを計画する。
+    LLM-->>B: ツール呼び出し要求 (2. generate_visualization)
 
-    %% Step 4: Backend executes calculate_centrality
-    B->>N: POST /tools/calculate_centrality (centrality_type:"degree")
-    N->>N: NetworkXで次数中心性を計算
-    N->>DB: 計算結果を、`attributes`に定義を、`attribute_values`に値を保存
-    DB-->>N: 保存成功
-    N-->>B: 実行成功
+    %% Step 4: Backend executes the single visualization tool
+    B->>N: POST /tools/generate_visualization (詳細なJSONパラメータ)
+    note over N: リクエストに基づき、必要な属性計算（この場合は次数中心性）を実行し、<br/>レイアウト計算、属性と視覚スタイルのマッピングをすべて行い、<br/>最終的なレンダリングデータを生成する。
+    N->>DB: 属性値を取得
+    N-->>B: 最終レンダリングデータ { nodes: [...], links: [...] }
 
-
-
-
-    %% Step 6: Backend executes apply_metric_to_visual (calculate_centralityの結果を受けて自動実行)
-    B->>N: POST /tools/apply_metric_to_visual (metric:"degree_centrality", visual:"node_size")
-    N->>DB: `visual_mapping_rules`にマッピング設定を保存または更新
-    DB-->>N: 保存成功
-    N-->>B: 実行成功
-
-    %% Step 7: Backend sends notification and final response to Frontend
-    B-->>F: WebSocketイベント (event: graph_updated)
-    note right of F: サーバーからのWebSocketイベントを受け取り、<br/>データ再取得をトリガーする
-    B->>LLM: 全ツール実行完了を報告
+    %% Step 5: Backend sends final data and response to Frontend
+    B-->>F: WebSocketイベント (event: render_update, data: { nodes, links })
+    note right of F: サーバーからのWebSocketイベントを受け取り、<br/>ペイロード内のデータで直接画面を更新する。<br/>もはや再取得は不要。
+    B->>LLM: ツール実行完了を報告
     LLM-->>B: 最終応答メッセージ（「次数中心性を計算し...」）
     B->>DB: LLMの応答を保存
     B-->>F: 200 OK + { message: LLMからの応答 }
 
-    %% Step 8: Frontend fetches updated data
-    F->>B: GET /network/{network_id}/visdata
-    B->>DB: ネットワーク構造、全属性、視覚ルールをクエリ
-    DB-->>B: 各種データ
-    B->>B: レンダリングデータを動的に組み立て
-    B-->>F: 200 OK + { nodes, edges }
-    F->>F: render(nodes, edges)
+    %% Step 6: Frontend renders the updated network
+    F->>F: render(event.data.nodes, event.data.links)
 ```
 
 ### 6.3.2. データフローと責務詳細 (LLM Function Calling)
 
 ユーザーが「次数が多いノードを大きくして」のような曖昧な指示を出すと、システムは以下の手順でレンダリングデータを更新します。
 
-#### 1. LLMによる複数ステップのツールプランニング
+#### 1. LLMによるワンショットでのツールプランニング
 
-BackendとLLMは、以下のような複数回のやり取りを通じて、段階的にタスクを実行します。
+BackendとLLMは、より少ないやり取りで、より包括的なタスクを実行します。
 
 - **1回目のLLM呼び出し**:
     - **Backend → LLM**: ユーザー指示 `「友達が多い人を大きく表示して」` + ツールリスト
-    - **LLM → Backend**: `list_attributes()` の呼び出しを要求
+    - **LLM → Backend**: `list_attributes()` の呼び出しを要求（現状把握のため）
 
 - **2回目のLLM呼び出し**:
     - **Backend → LLM**: `list_attributes` の実行結果 `['weight']`
-    - **LLM → Backend**: `calculate_centrality(type: "degree")` の呼び出しを要求
-    - **Backend**: `calculate_centrality` の実行結果を受けて、自動的に `apply_metric_to_visual(metric: "degree_centrality", visual: "node_size", mapping: {scale: 'linear', ...})` を実行
+    - **LLM → Backend**: `generate_visualization` の呼び出しを要求。この際、リクエストボディには以下のような**完全な計画**が含まれる。
+      - `layout_config`: 使用するレイアウト（例: "spring"）
+      - `node_size_config`: `degree_centrality`（存在しないため計算が必要と判断）を`LINEAR`スケールでノードサイズに割り当てる設定
+      - `node_color_config`: デフォルトの単色設定
 
-#### 2. Backendによるツール実行と永続化
+#### 2. NetworkXMCPによるレンダリングデータ生成
 
-Backendは、LLMの要求に従ってNetworkXMCPのAPIを呼び出し、結果を正規化されたテーブルに永続化します。
+Backendは、LLMの計画に従ってNetworkXMCPの`POST /tools/generate_visualization`を一度だけ呼び出します。NetworkXMCPは、このリクエストを受け取ると、内部で以下の処理をすべて実行します。
 
-- `GET /tools/list_attributes`: `attributes`テーブルから属性名の一覧を取得します。
-- `POST /tools/calculate_centrality`: 計算結果の**値**を`attribute_values`系のテーブルに、その**定義**を`attributes`系のテーブルに書き込みます。
-- `POST /tools/apply_metric_to_visual`: マッピングルールを`visual_mapping_rules`テーブルに書き込みます。
+1.  **属性の確認と計算**:
+    - リクエストされた属性（例: `degree_centrality`）がデータベースに存在するか確認します。
+    - 存在しない場合は、`NetworkX`ライブラリを用いてその場で計算し、結果をデータベースに永続化します。
 
-#### 3. Backendによる動的なレンダリングデータ生成
+2.  **レイアウト計算**:
+    - リクエストされたレイアウト（例: `spring`）を計算します。
 
-Frontendが `/network/{network_id}/visdata` を呼び出すと、Backendはリクエストの都度、以下の情報をDBから読み込み、最終的なレンダリングデータを動的に組み立てて返します。
+3.  **マッピングとスタイル計算**:
+    - すべてのノードとエッジをループ処理し、リクエストされたルール（サイズ、色など）に基づいて各要素の最終的な視覚スタイル（具体的なピクセルサイズや色コード）を決定します。
 
-1.  `networks`テーブルから元のネットワーク構造
-2.  `attributes`と`attribute_values`テーブルから全ての属性データ（座標を含む）
-3.  `visual_mapping_rules`テーブルから適用すべき視覚ルール
+4.  **最終データ生成**:
+    - フロントエンドが直接描画できる形式（`{ "nodes": [...], "links": [...] }`）のJSONを組み立てて、Backendに返します。
 
-Backendは、これらの情報を統合し、各ノード・エッジのスタイルを決定して最終的なJSONを生成します。
+#### 3. Backendによる結果の中継
+
+Backendは、NetworkXMCPから受け取った最終レンダリングデータを、そのままWebSocketを通じてフロントエンドに送信します。フロントエンドは、このデータを使って即座に可視化を更新します。このフローでは、フロントエンドがデータを再取得するための追加のAPI呼び出しは不要です。
 
 ---
 
@@ -205,3 +194,144 @@ sequenceDiagram
     B->>F: 最終応答
     F->>U: ネットワークは変更せず、LLMからのメッセージを表示
 ```
+
+## 6.5. ファンクションコーリングの最適化に関する注意点
+
+### 6.5.1. 最適化のメリット
+
+1. **レイテンシの削減**:
+   - LLMとBackendの間のやり取りが減少するため、全体的な処理時間が短縮される
+   - ユーザーの待ち時間が減少し、体験が向上する
+
+2. **コスト削減**:
+   - LLMへのAPI呼び出し回数が減少するため、APIコストが削減される
+   - とくに大量のユーザーがいる場合、コスト削減効果は大きい
+
+3. **システムの効率化**:
+   - 関連する操作（計算と視覚マッピング）をまとめることで、処理の論理的なグループ化が可能になる
+
+### 6.5.2. 実装上の考慮点
+
+1. **複数ツール呼び出しのパース**:
+   - LLMからの応答で複数のツール呼び出しが含まれている場合、それらを適切にパースするロジックが必要
+
+2. **エラーハンドリング**:
+   - 複数のツール呼び出しの中で一部が失敗した場合の適切なエラーハンドリングが必要
+   - 部分的な成功と失敗の状態をLLMに正確に伝える仕組みが重要
+
+3. **依存関係の考慮**:
+   - ツール呼び出し間に依存関係がある場合（前のツールの出力が次のツールの入力になる場合など）、その順序を保証する必要がある
+
+## 6.6. その他の最適化可能な箇所
+
+ファンクションコーリングのまとめ以外にも、以下のような最適化ポイントが考えられます：
+
+### 6.6.1. WebSocketを活用したストリーミング最適化
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as ユーザー
+    participant F as Frontend
+    participant B as API Service
+    participant LLM as LLM Service
+    participant N as NetworkXMCP
+
+    U->>F: 「コミュニティを検出して色分けして」
+    F->>B: POST /chat/process (message, conversation_id)
+    
+    B->>LLM: ユーザー指示を送信
+    
+    %% LLMの思考プロセスをストリーミング
+    B-->>F: WebSocket (event: thinking_stream, content: "コミュニティ検出には...")
+    note right of F: LLMの思考プロセスをリアルタイムで表示
+    
+    LLM-->>B: ツール呼び出し要求 (detect_communities)
+    
+    %% ツール実行状況をストリーミング
+    B-->>F: WebSocket (event: tool_execution, tool: "detect_communities", status: "started")
+    B->>N: POST /tools/detect_communities
+    
+    %% 長時間実行の場合は進捗状況も通知
+    N-->>B: WebSocket (progress: 30%)
+    B-->>F: WebSocket (event: tool_execution, tool: "detect_communities", progress: 30%)
+    
+    N-->>B: 実行成功
+    B-->>F: WebSocket (event: tool_execution, tool: "detect_communities", status: "completed")
+    
+    B->>LLM: ツール実行結果を送信
+    LLM-->>B: 最終応答
+    
+    B-->>F: WebSocket (event: message, content: "コミュニティを検出し...")
+    B-->>F: WebSocket (event: graph_updated)
+    
+    F->>B: GET /network/{network_id}/visdata
+    B-->>F: 200 OK + { nodes, edges }
+    F->>F: render(nodes, edges)
+```
+
+### 6.6.2. バッチ処理による複数属性の一括計算
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as ユーザー
+    participant F as Frontend
+    participant B as API Service
+    participant LLM as LLM Service
+    participant N as NetworkXMCP
+    
+    U->>F: 「重要なノードを特定して」
+    F->>B: POST /chat/process (message, conversation_id)
+    
+    B->>LLM: ユーザー指示を送信
+    LLM-->>B: ツール呼び出し要求 (calculate_multiple_centralities)
+    
+    B->>N: POST /tools/calculate_multiple_centralities (types: ["degree", "betweenness", "closeness"])
+    note over N: 複数の中心性指標を<br/>一度のAPIコールで計算
+    N-->>B: 実行成功
+    
+    B->>LLM: ツール実行結果を送信
+    LLM-->>B: 最終応答
+    
+    B-->>F: 200 OK + { message: LLMからの応答 }
+    B-->>F: WebSocket (event: graph_updated)
+    
+    F->>B: GET /network/{network_id}/visdata
+    B-->>F: 200 OK + { nodes, edges }
+    F->>F: render(nodes, edges)
+```
+
+### 6.6.3. 条件付きファンクションコーリング
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as ユーザー
+    participant F as Frontend
+    participant B as API Service
+    participant LLM as LLM Service
+    participant N as NetworkXMCP
+    
+    U->>F: 「次数中心性でノードを大きくして」
+    F->>B: POST /chat/process (message, conversation_id)
+    
+    B->>LLM: ユーザー指示を送信
+    LLM-->>B: 条件付きツール呼び出し要求 (conditional_calculate_and_apply)
+    
+    B->>N: POST /tools/conditional_calculate_and_apply (metric: "degree_centrality", visual: "node_size")
+    note over N: 属性が存在しなければ計算し、<br/>存在すれば直接視覚化に適用
+    N-->>B: 実行成功
+    
+    B->>LLM: ツール実行結果を送信
+    LLM-->>B: 最終応答
+    
+    B-->>F: 200 OK + { message: LLMからの応答 }
+    B-->>F: WebSocket (event: graph_updated)
+    
+    F->>B: GET /network/{network_id}/visdata
+    B-->>F: 200 OK + { nodes, edges }
+    F->>F: render(nodes, edges)
+```
+
+これらの追加の最適化ポイントを実装することで、システム全体のパフォーマンスとユーザー体験をさらに向上させることができます。

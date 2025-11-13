@@ -97,7 +97,7 @@ graph TD
 | Method | Path                    | 説明                                                                                                                                                                                                                                                                                                                             |
 | :----- | :---------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `POST` | `/upload`               | GraphMLファイルをアップロードし、新しい会話とネットワークを作成する。 `multipart/form-data` を使用。この処理の中でNetworkXMCPを呼び出し、デフォルトのレイアウトを計算して属性として保存する。詳細は[新規会話開始（ネットワークアップロード）フロー](./6_Core_Workflows.md#62-新規会話開始ネットワークアップロードフロー)を参照。 |
-| `GET`  | `/{network_id}/visdata` | ネットワークの元データ、永続化された全属性、視覚マッピングルールをDBから読み出し、最終的なレンダリングデータ（`nodes_data`と`edges_data`）を動的に組み立てて返す。                                                                                                                                                               |
+| `GET`  | `/{network_id}/visdata` | **【注意: 非推奨】**ネットワークの基本的な構造（ノードとエッジ）を返す。動的なレンダリングデータ生成は`/chat/process`フローに移行されたため、このエンドポイントはスタイル情報を含まない。 |
 | `GET`  | `/{network_id}/export`  | ネットワークをGraphMLファイルとしてダウンロードする。                                                                                                                                                                                                                                                                            |
 
 #### `/network/upload` の詳細
@@ -111,66 +111,62 @@ graph TD
 }
 ```
 
-### 1.3. Backendによる動的なレンダリングデータ生成プロセス
+### 1.3. Backendの役割: LLMとツールのオーケストレーター
 
-`GET /network/{network_id}/visdata` が呼び出された際に、Backendが実行する動的なレンダリングデータ生成プロセスは、本システムの柔軟性を支えるコア機能です。このプロセスは、最終的な視覚スタイルを永続化せず、リクエストの都度、永続化された「データ」と「ルール」から組み立てることで、状態の不整合を防ぎます。
+新アーキテクチャにおいて、Backendの役割はレンダリングデータを自ら組み立てることではなく、LLMと専門ツール（NetworkXMCP）間の指示を調整する**オーケストレーター（指揮者）**に特化します。これにより、ビジネスロジックと専門的な計算処理が明確に分離されます。
 
 #### データ変換フロー図
 
 ```mermaid
 graph TD
-    subgraph DB [Database]
-        direction LR
-        D1["networks<br/>(GraphML構造)"]
-        D2["attributes<br/>(次数中心性など)"]
-        D3["visual_mapping_rules<br/>(中心性をサイズにマッピングするルールなど)"]
+    subgraph User Interaction
+        U[User] -- "「重要なノードを大きく」" --> F[Frontend]
     end
 
     subgraph Backend
-        direction LR
-        P1["1. DBから<br/>全データを取得"]
-        P2["2. ループ処理:<br/>ノード/エッジごとに<br/>ルールを適用し<br/>スタイルを計算"]
-        P3["3. 最終的な<br/>JSONを組み立て"]
+        B_API[API Service]
     end
 
-    F["Frontend<br/>(react-force-graph-2d)"]
+    subgraph Services
+        LLM[LLM Service]
+        NXMCP[NetworkXMCP]
+    end
 
-    DB -- "データ" --> P1
-    P1 --> P2
-    P2 --> P3
-    P3 -- "`{ nodes: [...], links: [...] }`" --> F
+    F -- "POST /chat/process" --> B_API
+    B_API -- "1. ユーザー指示とツールリストを送信" --> LLM
+    LLM -- "2. generate_visualizationツールの<br/>呼び出しプランを返す" --> B_API
+    B_API -- "3. プランに基づきツールを実行" --> NXMCP
+    NXMCP -- "4. 計算とマッピングを行い<br/>最終レンダリングデータを生成" --> NXMCP
+    NXMCP -- "5. 最終データを返す" --> B_API
+    B_API -- "6. WebSocketで<br/>最終データをFrontendに送信" --> F
 
-    style DB fill:#f9e2af,stroke:#333,stroke-width:2px
-    style F fill:#82b3ff,stroke:#333,stroke-width:2px
+    style B_API fill:#94e2d5,stroke:#333,stroke-width:2px
+    style NXMCP fill:#f5c2e7,stroke:#333,stroke-width:2px
 ```
 
 プロセスは以下のステップで実行されます。
 
-1.  **基礎データ（ネットワーク構造）の取得**
-    - `networks` テーブルから、リクエストされた `network_id` に紐づくGraphMLデータを読み込み、基本的なノードとエッジのリストを構築します。
+1.  **BackendがLLMに指示を送信**:
+    - Frontendから受け取ったユーザーの自然言語指示（例：「次数中心性でノードを色分けして」）と、利用可能なツールリスト（`list_attributes`, `calculate_centrality`, `generate_visualization`など）をLLMに送信します。
 
-2.  **全属性データの取得**
-    - `attributes` および `attribute_values` テーブルから、当該ネットワークに属するすべての属性（元データ由来、計算結果を含む）を読み込みます。
-    - 効率的にアクセスできるよう、データを `{ element_id: { attribute_name: value, ... } }` のようなMap形式に整理します。
+2.  **LLMが実行プランを計画**:
+    - LLMはユーザーの意図を解釈します。
+    - ネットワークの現状を把握するために`list_attributes`を呼び出し、必要な属性（例：`degree_centrality`）が存在するか確認します。
+    - 属性が存在しない場合は、`calculate_centrality`を呼び出して計算させます。
+    - 最終的に、レイアウト、ノードサイズ、ノードカラーなどの割り当てをすべて定義した、`generate_visualization`ツールのパラメータを組み立て、Backendに返します。
 
-3.  **視覚マッピングルールの取得**
-    - `visual_mapping_rules` テーブルから、現在適用されているすべての視覚ルール（例：「'次数中心性'を'NODE_SIZE'に線形スケールでマッピングする」）を取得します。
+3.  **BackendがNetworkXMCPを呼び出す**:
+    - Backendは、LLMから受け取った`generate_visualization`の呼び出しプラン（リクエストボディ）をそのままNetworkXMCPの`/tools/generate_visualization`エンドポイントに送信します。
 
-4.  **レンダリングデータの組み立て（ルール適用）**
-    - Step 1で取得したノードとエッジのリストをループ処理します。
-    - 個々のノード（またはエッジ）に対して、以下の処理を行います。
-      - Step 2で取得した属性Mapから、その要素の属性値を取得します。
-      - Step 3で取得した視覚ルールを一つずつ評価します。
-      - **ルール適用**:
-        - 例えば、「`NODE_SIZE`」に関するルールが存在し、それが「`degree_centrality`」属性に紐づいている場合、そのノードの `degree_centrality` の値をルールの定義（スケール種別、出力範囲など）に従って具体的なサイズ（例: `10.5`）に変換します。
-        - 「`NODE_COLOR`」に関するルールも同様に、属性値を具体的な色コード（例: `#ffcc00`）に変換します。
-      - **デフォルト値**: 適用されるルールがない視覚的特徴（例: ノードの形状）については、システムで定義されたデフォルト値を適用します。
-    - すべてのノードとエッジの視覚スタイルが決定されたら、Frontendのライブラリ（`react-force-graph-2d`）が要求する最終的なJSONフォーマット（`{ "nodes": [...], "links": [...] }`）に組み立てます。
+4.  **NetworkXMCPがレンダリングデータを生成**:
+    - NetworkXMCPは、リクエストされたすべての視覚的割り当て（レイアウト、サイズ、色など）に基づき、データベースから必要な属性値を取得し、マッピング計算を行い、フロントエンドが直接描画できる最終的なJSONデータを生成します。
 
-5.  **レスポンス返却**
-    - 組み立てられたJSONデータを、APIのレスポンスとしてFrontendに返却します。
+5.  **Backendが結果を中継**:
+    - NetworkXMCPから返された最終的なレンダリングデータを、BackendはWebSocketを通じてFrontendに送信します。Frontendはこれを受け取り、画面を更新します。
 
-#### 6. デフォルトの視覚スタイル
+この設計により、Backendは視覚化の具体的なロジックに関与せず、LLMの知能とNetworkXMCPの計算能力を最大限に引き出すことに集中できます。
+
+#### 5. デフォルトの視覚スタイル
 
 上記のプロセスにおいて、特定の視覚的特徴（例: `NODE_SIZE`）に適用されるマッピングルールが存在しない場合、システムは以下のデフォルト値を適用します。これにより、ユーザーがファイルをアップロードした直後でも、常に一定のスタイルでネットワークが描画されることを保証します。
 

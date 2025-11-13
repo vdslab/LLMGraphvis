@@ -64,11 +64,6 @@ const sidebars: SidebarsConfig = {
           id: "Technical_Details/Core_Workflows",
           label: "6. 主要な処理フローとデータ生成",
         },
-        {
-          type: "doc",
-          id: "Technical_Details/Core_Workflows_Optimized",
-          label: "6.1 主要な処理フロー（最適化版）",
-        },
       ],
     },
     {
