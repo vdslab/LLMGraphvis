@@ -87,6 +87,7 @@ POST /network/upload
 ```
 
 **リクエスト**:
+
 - Content-Type: multipart/form-data
 - ファイル: GraphMLファイル
 
@@ -106,6 +107,7 @@ POST /network/{conversation_id}/upload
 ```
 
 **リクエスト**:
+
 - Content-Type: multipart/form-data
 - ファイル: GraphMLファイル
 
@@ -128,8 +130,9 @@ GET /network/{network_id}/export
 ```
 
 **レスポンス**:
+
 - Content-Type: application/xml
-- Content-Disposition: attachment; filename=network_{network_id}.graphml
+- Content-Disposition: attachment; filename=`network_{network_id}.graphml`
 - GraphMLファイルの内容
 
 ### ネットワーク可視化
@@ -432,17 +435,17 @@ GET /chat/{conversation_id}/message
 
 ### 主なエラーコード
 
-| エラーコード | 説明 | HTTPステータスコード |
-|------------|------|-------------------|
-| `VALIDATION_ERROR` | リクエストの検証に失敗した | 400 |
-| `AUTHENTICATION_ERROR` | 認証に失敗した | 401 |
-| `PERMISSION_DENIED_ERROR` | 権限がない | 403 |
-| `RESOURCE_NOT_FOUND_ERROR` | リソースが見つからない | 404 |
-| `GRAPHML_VALIDATION_ERROR` | GraphMLの検証に失敗した | 400 |
-| `GRAPH_PROCESSING_ERROR` | グラフ処理に失敗した | 500 |
-| `MCP_COMMUNICATION_ERROR` | MCPサービスとの通信に失敗した | 502 |
-| `DATABASE_COMMUNICATION_ERROR` | データベースとの通信に失敗した | 503 |
-| `INTERNAL_SERVER_ERROR` | サーバー内部エラー | 500 |
+| エラーコード                   | 説明                           | HTTPステータスコード |
+| ------------------------------ | ------------------------------ | -------------------- |
+| `VALIDATION_ERROR`             | リクエストの検証に失敗した     | 400                  |
+| `AUTHENTICATION_ERROR`         | 認証に失敗した                 | 401                  |
+| `PERMISSION_DENIED_ERROR`      | 権限がない                     | 403                  |
+| `RESOURCE_NOT_FOUND_ERROR`     | リソースが見つからない         | 404                  |
+| `GRAPHML_VALIDATION_ERROR`     | GraphMLの検証に失敗した        | 400                  |
+| `GRAPH_PROCESSING_ERROR`       | グラフ処理に失敗した           | 500                  |
+| `MCP_COMMUNICATION_ERROR`      | MCPサービスとの通信に失敗した  | 502                  |
+| `DATABASE_COMMUNICATION_ERROR` | データベースとの通信に失敗した | 503                  |
+| `INTERNAL_SERVER_ERROR`        | サーバー内部エラー             | 500                  |
 
 ## データモデル
 
