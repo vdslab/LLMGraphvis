@@ -27,7 +27,7 @@ LLMGraphvis/
   │   ├── services/       # サービス
   │   └── core/           # コア機能
   │
-  ├── NetworkXMCP/        # ネットワーク分析サービス
+  ├── NetworkXAPI/        # ネットワーク分析サービス
   │   ├── api/            # APIエンドポイント
   │   ├── database/       # データベース関連
   │   ├── graphml/        # GraphML処理
@@ -61,7 +61,7 @@ LLMGraphvis/
 - **services/**: ビジネスロジックの実装
 - **core/**: コア機能（認証、エラーハンドリングなど）
 
-#### NetworkXMCP
+#### NetworkXAPI
 
 - **api/**: APIエンドポイントの定義
 - **database/**: データベース関連の処理
@@ -114,8 +114,8 @@ python -m venv venv
 source venv/bin/activate  # Windowsの場合: venv\Scripts\activate
 pip install -e .
 
-# NetworkXMCPのセットアップ
-cd ../NetworkXMCP
+# NetworkXAPIのセットアップ
+cd ../NetworkXAPI
 python -m venv venv
 source venv/bin/activate  # Windowsの場合: venv\Scripts\activate
 pip install -e .
@@ -142,8 +142,8 @@ cd ..
 cd API
 uvicorn main:app --reload --port 8000
 
-# NetworkXMCPの起動
-cd ../NetworkXMCP
+# NetworkXAPIの起動
+cd ../NetworkXAPI
 uvicorn main:app --reload --port 8001
 
 # フロントエンドの起動
@@ -252,8 +252,8 @@ function visualizeNetwork(data, options) {
 cd API
 pytest tests/unit
 
-# NetworkXMCPのユニットテスト
-cd ../NetworkXMCP
+# NetworkXAPIのユニットテスト
+cd ../NetworkXAPI
 pytest tests/unit
 ```
 
@@ -264,8 +264,8 @@ pytest tests/unit
 cd API
 pytest tests/integration
 
-# NetworkXMCPの統合テスト
-cd ../NetworkXMCP
+# NetworkXAPIの統合テスト
+cd ../NetworkXAPI
 pytest tests/integration
 ```
 
@@ -291,8 +291,8 @@ npm test
 cd API
 pytest --cov=.
 
-# NetworkXMCPのテストカバレッジ
-cd ../NetworkXMCP
+# NetworkXAPIのテストカバレッジ
+cd ../NetworkXAPI
 pytest --cov=.
 
 # フロントエンドのテストカバレッジ
@@ -355,16 +355,16 @@ sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) could not connect t
 2. `.env`ファイルのデータベース接続情報が正しいか確認する
 3. ネットワーク設定を確認する
 
-#### NetworkXMCP通信エラー
+#### NetworkXAPI通信エラー
 
 **エラー**:
 ```
-MCPCommunicationError: Error from NetworkXMCP: Connection refused
+APICommunicationError: Error from NetworkXAPI: Connection refused
 ```
 
 **解決策**:
-1. NetworkXMCPサービスが起動しているか確認する
-2. `.env`ファイルの`NETWORKX_MCP_URL`が正しいか確認する
+1. NetworkXAPIサービスが起動しているか確認する
+2. `.env`ファイルの`NETWORKX_API_URL`が正しいか確認する
 3. ネットワーク設定を確認する
 
 #### GraphML検証エラー
@@ -385,7 +385,7 @@ GraphMLValidationError: Invalid GraphML content: Missing <graph> element
 
 A: 以下の手順で新しいレイアウトアルゴリズムを追加できます。
 
-1. `NetworkXMCP/layouts/layout_functions.py`に新しいレイアウト関数を追加する
+1. `NetworkXAPI/layouts/layout_functions.py`に新しいレイアウト関数を追加する
 2. `get_layout_function`関数に新しいレイアウトを登録する
 3. 必要に応じて、テストを追加する
 
@@ -393,7 +393,7 @@ A: 以下の手順で新しいレイアウトアルゴリズムを追加でき�
 
 A: 以下の手順で新しい中心性指標を追加できます。
 
-1. `NetworkXMCP/metrics/centrality_functions.py`に新しい中心性関数を追加する
+1. `NetworkXAPI/metrics/centrality_functions.py`に新しい中心性関数を追加する
 2. `get_centrality_function`関数に新しい中心性を登録する
 3. 必要に応じて、テストを追加する
 
@@ -454,7 +454,7 @@ A: 以下の手順で新しい機能を追加できます。
 ```
 
 - **type**: コミットの種類（feat, fix, docs, style, refactor, test, chore）
-- **scope**: コミットの影響範囲（api, networkx_mcp, frontend, common）
+- **scope**: コミットの影響範囲（api, networkx_api, frontend, common）
 - **subject**: コミットの簡潔な説明
 - **body**: コミットの詳細な説明
 - **footer**: 関連するIssueやBreaking Changesの情報

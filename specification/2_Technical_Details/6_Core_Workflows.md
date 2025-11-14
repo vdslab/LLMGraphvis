@@ -25,22 +25,23 @@ sequenceDiagram
     participant U as ユーザー
     participant F as Frontend
     participant B as API Service (Backend)
-    participant N as NetworkXMCP (Tool Service)
+    participant N as NetworkXAPI (REST API)
     participant DB as Database
 
     %% Step 1: User uploads a file
     U->>F: GraphMLファイルをアップロード
     F->>B: POST /network/upload (GraphMLデータ)
-    note over B,F: 現在の設計は同期処理であり、大規模ネットワークでは<br/>タイムアウトの可能性があるため、将来的には<br/>非同期処理（ポーGリング or WebSocket通知）の検討も視野に入れる。
+    note over B,F: 現在の設計は同期処理であり、大規模ネットワークでは<br/>タイムアウトの可能性があるため、将来的には<br/>非同期処理（ポーリング or WebSocket通知）の検討も視野に入れる。
 
     %% Step 2: Backend saves initial data and requests default layout calculation
     B->>DB: ネットワーク、会話情報を保存
     DB-->>B: 保存成功 (network_id)
     B->>N: POST /tools/change_layout (network_id, name:"spring")
-    note over N: デフォルトのSpring Layoutを計算
 
-    %% Step 3: NetworkXMCP computes and saves layout as an attribute
-    N->>DB: 計算したノード座標を、`attributes`に定義を、`attribute_values`に値を保存
+    %% Step 3: NetworkXAPI computes and saves layout as an attribute
+    note over N,DB: 'x', 'y'の属性定義を作成後、<br/>各ノードの座標値を定義IDと紐付けて保存
+    N->>DB: 1. 'x', 'y'の属性定義を保存
+    N->>DB: 2. 各ノードの座標値を保存
     DB-->>N: 保存成功
     N-->>B: 実行成功応答
     B-->>F: アップロード成功 (network_id, conversation_id)
@@ -68,7 +69,7 @@ sequenceDiagram
 
 ### 6.3.1. シーケンス図（新アーキテクチャ）
 
-このフローでは、LLMが視覚化の全体像を一度に計画し、`NetworkXMCP`がそれを実行します。状態（視覚ルール）は永続化されず、毎回動的に生成されます。
+このフローでは、LLMが視覚化の全体像を一度に計画し、`NetworkXAPI`がそれを実行します。状態（視覚ルール）は永続化されず、毎回動的に生成されます。
 
 ```mermaid
 sequenceDiagram
@@ -78,7 +79,7 @@ sequenceDiagram
     participant F as Frontend
     participant B as API Service (Backend)
     participant LLM as LLM Service
-    participant N as NetworkXMCP (Tool Service)
+    participant N as NetworkXAPI (REST API)
     participant DB as Database
 
     note over F, B: このフローが開始される時点で、クライアントは<br/>既にWebSocket接続を確立済みであるとする。
@@ -105,8 +106,9 @@ sequenceDiagram
 
     %% Step 4: Backend executes the single visualization tool
     B->>N: POST /tools/generate_visualization (詳細なJSONパラメータ)
-    note over N: リクエストに基づき、必要な属性計算（この場合は次数中心性）を実行し、<br/>レイアウト計算、属性と視覚スタイルのマッピングをすべて行い、<br/>最終的なレンダリングデータを生成する。
-    N->>DB: 属性値を取得
+    note over N,DB: リクエストに基づき、属性計算、レイアウト計算、<br/>視覚マッピングをすべて実行し、最終レンダリングデータを生成する。<br>内部では、まず属性名をIDに解決し、そのIDで値を取得する。
+    N->>DB: 1. 属性名をIDに解決
+    N->>DB: 2. IDを使い属性値を取得
     N-->>B: 最終レンダリングデータ { nodes: [...], links: [...] }
 
     %% Step 5: Backend sends final data and response to Frontend
@@ -140,9 +142,9 @@ BackendとLLMは、より少ないやり取りで、より包括的なタスク�
       - `node_size_config`: `degree_centrality`（存在しないため計算が必要と判断）を`LINEAR`スケールでノードサイズに割り当てる設定
       - `node_color_config`: デフォルトの単色設定
 
-#### 2. NetworkXMCPによるレンダリングデータ生成
+#### 2. NetworkXAPIによるレンダリングデータ生成
 
-Backendは、LLMの計画に従ってNetworkXMCPの`POST /tools/generate_visualization`を一度だけ呼び出します。NetworkXMCPは、このリクエストを受け取ると、内部で以下の処理をすべて実行します。
+Backendは、LLMの計画に従ってNetworkXAPIの`POST /tools/generate_visualization`を一度だけ呼び出します。NetworkXAPIは、このリクエストを受け取ると、内部で以下の処理をすべて実行します。
 
 1.  **属性の確認と計算**:
     - リクエストされた属性（例: `degree_centrality`）がデータベースに存在するか確認します。
@@ -159,7 +161,7 @@ Backendは、LLMの計画に従ってNetworkXMCPの`POST /tools/generate_visuali
 
 #### 3. Backendによる結果の中継
 
-Backendは、NetworkXMCPから受け取った最終レンダリングデータを、そのままWebSocketを通じてフロントエンドに送信します。フロントエンドは、このデータを使って即座に可視化を更新します。このフローでは、フロントエンドがデータを再取得するための追加のAPI呼び出しは不要です。
+Backendは、NetworkXAPIから受け取った最終レンダリングデータを、そのままWebSocketを通じてフロントエンドに送信します。フロントエンドは、このデータを使って即座に可視化を更新します。このフローでは、フロントエンドがデータを再取得するための追加のAPI呼び出しは不要です。
 
 ---
 
@@ -174,7 +176,7 @@ sequenceDiagram
     participant F as Frontend
     participant B as API Service
     participant LLM as LLM Service
-    participant N as NetworkXMCP
+    participant N as NetworkXAPI
 
     U->>F: 「PageRankを計算して」
     F->>B: POST /chat/process (message, conversation_id)
@@ -235,7 +237,7 @@ sequenceDiagram
     participant F as Frontend
     participant B as API Service
     participant LLM as LLM Service
-    participant N as NetworkXMCP
+    participant N as NetworkXAPI
 
     U->>F: 「コミュニティを検出して色分けして」
     F->>B: POST /chat/process (message, conversation_id)
@@ -256,18 +258,16 @@ sequenceDiagram
     N-->>B: WebSocket (progress: 30%)
     B-->>F: WebSocket (event: tool_execution, tool: "detect_communities", progress: 30%)
     
-    N-->>B: 実行成功
+    N-->>B: 実行成功 (with final rendering data)
     B-->>F: WebSocket (event: tool_execution, tool: "detect_communities", status: "completed")
     
     B->>LLM: ツール実行結果を送信
     LLM-->>B: 最終応答
     
     B-->>F: WebSocket (event: message, content: "コミュニティを検出し...")
-    B-->>F: WebSocket (event: graph_updated)
+    B-->>F: WebSocket (event: render_update, data: { nodes, links })
     
-    F->>B: GET /network/{network_id}/visdata
-    B-->>F: 200 OK + { nodes, edges }
-    F->>F: render(nodes, edges)
+    F->>F: render(event.data.nodes, event.data.links)
 ```
 
 ### 6.6.2. バッチ処理による複数属性の一括計算
@@ -279,7 +279,7 @@ sequenceDiagram
     participant F as Frontend
     participant B as API Service
     participant LLM as LLM Service
-    participant N as NetworkXMCP
+    participant N as NetworkXAPI
     
     U->>F: 「重要なノードを特定して」
     F->>B: POST /chat/process (message, conversation_id)
@@ -289,17 +289,15 @@ sequenceDiagram
     
     B->>N: POST /tools/calculate_multiple_centralities (types: ["degree", "betweenness", "closeness"])
     note over N: 複数の中心性指標を<br/>一度のAPIコールで計算
-    N-->>B: 実行成功
+    N-->>B: 実行成功 (with final rendering data)
     
     B->>LLM: ツール実行結果を送信
     LLM-->>B: 最終応答
     
+    B-->>F: WebSocket (event: render_update, data: { nodes, links })
     B-->>F: 200 OK + { message: LLMからの応答 }
-    B-->>F: WebSocket (event: graph_updated)
     
-    F->>B: GET /network/{network_id}/visdata
-    B-->>F: 200 OK + { nodes, edges }
-    F->>F: render(nodes, edges)
+    F->>F: render(event.data.nodes, event.data.links)
 ```
 
 ### 6.6.3. 条件付きファンクションコーリング
@@ -311,7 +309,7 @@ sequenceDiagram
     participant F as Frontend
     participant B as API Service
     participant LLM as LLM Service
-    participant N as NetworkXMCP
+    participant N as NetworkXAPI
     
     U->>F: 「次数中心性でノードを大きくして」
     F->>B: POST /chat/process (message, conversation_id)
@@ -321,17 +319,15 @@ sequenceDiagram
     
     B->>N: POST /tools/conditional_calculate_and_apply (metric: "degree_centrality", visual: "node_size")
     note over N: 属性が存在しなければ計算し、<br/>存在すれば直接視覚化に適用
-    N-->>B: 実行成功
+    N-->>B: 実行成功 (with final rendering data)
     
     B->>LLM: ツール実行結果を送信
     LLM-->>B: 最終応答
     
+    B-->>F: WebSocket (event: render_update, data: { nodes, links })
     B-->>F: 200 OK + { message: LLMからの応答 }
-    B-->>F: WebSocket (event: graph_updated)
     
-    F->>B: GET /network/{network_id}/visdata
-    B-->>F: 200 OK + { nodes, edges }
-    F->>F: render(nodes, edges)
+    F->>F: render(event.data.nodes, event.data.links)
 ```
 
 これらの追加の最適化ポイントを実装することで、システム全体のパフォーマンスとユーザー体験をさらに向上させることができます。

@@ -60,9 +60,9 @@ graph TD
 
 - **状態:** `networkId`, `nodes`, `edges` (ノードの座標、スタイル、エッジのスタイルなど、すべてのレンダリングデータを含む)
 - **主要なアクションと連携API:**
-  - `fetchNetwork(networkId)`: `GET /network/{networkId}/visdata` を呼び出し、最終レンダリングデータを取得する。
+  - `fetchInitialNetwork(networkId)`: **【初期表示用】** `GET /network/{networkId}/visdata` を呼び出し、初期表示用のレンダリングデータを取得する。
   - `uploadNetwork(file)`: `POST /network/upload` を呼び出し、新規ネットワークをアップロードする。
-  - `setNetworkData(visData)`: `chatStore`のアクション経由で取得した、更新後の最終レンダリングデータで状態を上書きする。
+  - `setNetworkData(visData)`: WebSocket経由で受信した、更新後の最終レンダリングデータで状態を上書きする。
 
 ### `chatStore`
 
@@ -71,15 +71,14 @@ graph TD
 - **状態:** `conversationId`, `messages`, `isLoading`
 - **主要なアクションと連携API:**
   - `fetchHistory(conversationId)`: `GET /conversations/{id}/messages` を呼び出し、`messages` 状態を更新する。
-  - `sendMessage(messageContent)`: ユーザーの自然言語による指示（計算、可視化、レイアウト変更など）をバックエンドの `POST /chat/process` へ送信する。バックエンドでの処理の結果、ネットワークが更新された場合は、`networkStore` の状態も更新されます。
+  - `sendMessage(messageContent)`: ユーザーの自然言語による指示（計算、可視化、レイアウト変更など）をバックエンドの `POST /chat/process` へ送信する。バックエンドでの処理の結果、ネットワークが更新された場合は、WebSocketを通じて新しいレンダリングデータが送られてくるため、`networkStore` の状態も更新されます。
 
-#### コード例: `sendMessage` アクションの実装イメージ
+#### コード例: `sendMessage` とWebSocketリスナーの実装イメージ
 
 ```javascript
 // chatStore.js (Zustand)
 import { create } from "zustand";
 import { api } from "../services/api"; // axios instance
-import { useNetworkStore } from "./networkStore";
 
 export const useChatStore = create((set, get) => ({
   messages: [],
@@ -99,19 +98,42 @@ export const useChatStore = create((set, get) => ({
         message: userMessage,
       });
 
-      // アシスタントの返信をUIに反映
+      // アシスタントのテキスト返信をUIに反映
       const assistantMessage = response.data.message;
       set((state) => ({ messages: [...state.messages, assistantMessage] }));
 
-      // グラフの更新は、このAPIのレスポンスでは行わない。
-      // 代わりに、別途WebSocketのリスナーがサーバーからの `graph_updated` イベントを待ち受け、
-      // それをトリガーに networkStore の fetchNetwork() アクションを呼び出す。
+      // グラフの更新は、このAPIのレスポンスでは行われない。
+      // 更新されたグラフデータは、別途WebSocketを通じてサーバーからプッシュされる。
     } catch (error) {
       console.error("Failed to send message:", error);
-      // エラー処理: ユーザーへの通知、ログ記録、必要に応じたリトライなどを実装
+      // エラー処理
     } finally {
       set({ isLoading: false });
     }
   },
 }));
+
+// NetworkSocketManager.js
+import { useEffect } from "react";
+import { useNetworkStore } from "./stores/networkStore";
+import socket from "./services/socket"; // WebSocket instance
+
+export const NetworkSocketManager = () => {
+  const { setNetworkData } = useNetworkStore();
+
+  useEffect(() => {
+    // サーバーからの 'render_update' イベントを待ち受ける
+    socket.on("render_update", (visData) => {
+      console.log("Received updated network data via WebSocket:", visData);
+      // networkStoreの状態を、受信した最新のデータで直接更新する
+      setNetworkData(visData);
+    });
+
+    return () => {
+      socket.off("render_update");
+    };
+  }, [setNetworkData]);
+
+  return null; // このコンポーネントはUIを持たない
+};
 ```

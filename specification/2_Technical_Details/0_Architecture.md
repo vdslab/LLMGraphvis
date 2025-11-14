@@ -48,7 +48,7 @@ graph TD
     subgraph "Docker Environment"
         frontendService["<div style='font-weight:bold'>Frontend Service</div><div style='font-size: 80%;'>UIを提供</div>"]
         apiService["<div style='font-weight:bold'>API Service</div><div style='font-size: 80%;'>ビジネスロジック担当</div>"]
-        networkXMCP["<div style='font-weight:bold'>NetworkX MCP</div><div style='font-size: 80%;'>ネットワーク計算担当</div>"]
+        networkXAPI["<div style='font-weight:bold'>NetworkX API</div><div style='font-size: 80%;'>ネットワーク計算担当</div>"]
         database[("<div style='font-weight:bold'>Database</div><div style='font-size: 80%;'>データ永続化</div>")]
     end
 
@@ -57,19 +57,19 @@ graph TD
     webBrowser -- "Loads SPA (HTTPS)" --> frontendService
     note for frontendService "<b>Tech Stack:</b><br/>- React, Vite<br/>- Zustand<br/>- react-force-graph-2d<br/>- axios"
     note for apiService "<b>Tech Stack:</b><br/>- FastAPI (Python)<br/>- SQLAlchemy<br/>- Pydantic<br/>- LLM SDKs"
-    note for networkXMCP "<b>Tech Stack:</b><br/>- FastAPI (Python)<br/>- NetworkX<br/>- SQLAlchemy"
+    note for networkXAPI "<b>Tech Stack:</b><br/>- FastAPI (Python)<br/>- NetworkX<br/>- SQLAlchemy"
     note for database "<b>Tech Stack:</b><br/>- PostgreSQL"
     webBrowser -- "API Calls (HTTPS)" --> apiService
 
-    apiService -- "ネットワーク計算依頼 (HTTP)" --> networkXMCP
+    apiService -- "ネットワーク計算依頼 (HTTP)" --> networkXAPI
     apiService -- "データ永続化 (SQL)" --> database
-    networkXMCP -- "計算結果の属性を保存 (SQL)" --> database
+    networkXAPI -- "計算結果の属性を保存 (SQL)" --> database
     apiService -- "LLM呼び出し (HTTPS)" --> llmService
 
     style webBrowser fill:#d1e0ff,stroke:#333,stroke-width:2px
     style frontendService fill:#82b3ff,stroke:#333,stroke-width:2px
     style apiService fill:#94e2d5,stroke:#333,stroke-width:2px
-    style networkXMCP fill:#f5c2e7,stroke:#333,stroke-width:2px
+    style networkXAPI fill:#f5c2e7,stroke:#333,stroke-width:2px
     style database fill:#f9e2af,stroke:#333,stroke-width:2px
 ```
 
@@ -127,7 +127,7 @@ graph TD
 
 ### 0.4.3. 拡張性
 
-- **ステートレス設計**: APIサービスおよびNetworkX MCPはステートレスに設計し、コンテナーの水平スケールアウトを容易にする。
+- **ステートレス設計**: APIサービスおよびNetworkX APIはステートレスに設計し、コンテナーの水平スケールアウトを容易にする。
 - **非同期処理**: 時間のかかるネットワーク計算（大規模なレイアウト計算など）は、バックグラウンドで非同期に処理し、完了をWebSocketで通知するアーキテクチャを採用する。
 
 ### 0.4.4. セキュリティ

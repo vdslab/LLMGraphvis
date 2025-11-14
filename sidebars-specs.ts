@@ -46,7 +46,7 @@ const sidebars: SidebarsConfig = {
         },
         {
           type: "doc",
-          id: "Technical_Details/NetworkXMCP",
+          id: "Technical_Details/NetworkXAPI",
           label: "3. ネットワーク計算サービス仕様",
         },
         {
@@ -70,31 +70,6 @@ const sidebars: SidebarsConfig = {
       type: "category",
       label: "開発者ガイド",
       items: ["Developer_Guide/developer_guide"],
-    },
-    {
-      type: "category",
-      label: "リファクタリング計画",
-      items: [
-        "Refactoring_Plan/refactoring_plan",
-        "Refactoring_Plan/api_models_split",
-        "Refactoring_Plan/api_network_module_split",
-        "Refactoring_Plan/common_data_models",
-        "Refactoring_Plan/common_exceptions",
-        "Refactoring_Plan/common_graphml_utils",
-        "Refactoring_Plan/common_logging",
-        "Refactoring_Plan/error_handling_unification",
-        "Refactoring_Plan/networkx_mcp_structure",
-        "Refactoring_Plan/data_model_normalization",
-      ],
-    },
-    {
-      type: "category",
-      label: "付録",
-      items: [
-        "Appendix/api_specification",
-        "Appendix/networkx_mcp_specification",
-        "Appendix/architecture_diagrams",
-      ],
     },
   ],
 };
