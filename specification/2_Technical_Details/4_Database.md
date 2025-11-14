@@ -32,27 +32,87 @@
 
 ```mermaid
 erDiagram
+    %% Core Node-Side Entities
     users ||--o{ networks : "has"
     networks ||--o{ nodes : "contains"
+    
+    %% Node Attribute Definition
+    networks ||--o{ node_attributes : "defines"
+    node_attributes {
+        INTEGER network_id FK
+        VARCHAR attribute_name
+        VARCHAR display_name
+        TEXT description
+    }
+    node_attributes |o--|| node_text_attributes : "is"
+    node_text_attributes {
+        INTEGER node_attribute_id PK
+    }
+    node_attributes |o--|| node_float_attributes : "is"
+    node_float_attributes {
+        INTEGER node_attribute_id PK
+    }
+
+    %% Node Attribute Values
+    nodes ||--o{ node_attribute_values : "has"
+    node_attributes ||--o{ node_attribute_values : "value for"
+    node_attribute_values {
+        INTEGER node_id FK
+        INTEGER attribute_id FK
+    }
+    node_attribute_values |o--|| node_text_attribute_values : "is"
+    node_text_attribute_values {
+        INTEGER node_attribute_value_id PK
+        TEXT text_value
+    }
+    node_attribute_values |o--|| node_float_attribute_values : "is"
+    node_float_attribute_values {
+        INTEGER node_attribute_value_id PK
+        FLOAT float_value
+        VARCHAR unit
+    }
+
+    %% Core Edge-Side Entities
     networks ||--o{ edges : "contains"
     nodes }o--o{ edges : "connects"
 
-    %% Node Attributes & Values
-    nodes ||--o{ node_attributes : "has"
-    node_attributes |o--|| node_text_attributes : "extends"
-    node_attributes |o--|| node_float_attributes : "extends"
-    nodes ||--o{ node_attribute_values : "has"
-    node_attribute_values |o--|| node_text_attribute_values : "extends"
-    node_attribute_values |o--|| node_float_attribute_values : "extends"
+    %% Edge Attribute Definition
+    networks ||--o{ edge_attributes : "defines"
+    edge_attributes {
+        INTEGER network_id FK
+        VARCHAR attribute_name
+        VARCHAR display_name
+        TEXT description
+    }
+    edge_attributes |o--|| edge_text_attributes : "is"
+    edge_text_attributes {
+        INTEGER edge_attribute_id PK
+    }
+    edge_attributes |o--|| edge_float_attributes : "is"
+    edge_float_attributes {
+        INTEGER edge_attribute_id PK
+    }
 
-    %% Edge Attributes & Values
-    edges ||--o{ edge_attributes : "has"
-    edge_attributes |o--|| edge_text_attributes : "extends"
-    edge_attributes |o--|| edge_float_attributes : "extends"
+    %% Edge Attribute Values
     edges ||--o{ edge_attribute_values : "has"
-    edge_attribute_values |o--|| edge_text_attribute_values : "extends"
-    edge_attribute_values |o--|| edge_float_attribute_values : "extends"
+    edge_attributes ||--o{ edge_attribute_values : "value for"
+    edge_attribute_values {
+        INTEGER edge_id FK
+        INTEGER attribute_id FK
+    }
+    edge_attribute_values |o--|| edge_text_attribute_values : "is"
+    edge_text_attribute_values {
+        INTEGER edge_attribute_value_id PK
+        TEXT text_value
+    }
+    edge_attribute_values |o--|| edge_float_attribute_values : "is"
+    edge_float_attribute_values {
+        INTEGER edge_attribute_value_id PK
+        FLOAT float_value
+        VARCHAR unit
+    }
 
+    %% Core table definitions (already linked above)
     users {
         VARCHAR username UK
         VARCHAR hashed_password
@@ -67,37 +127,6 @@ erDiagram
         VARCHAR node_id UK
         VARCHAR label
         VARCHAR subtype
-        FLOAT x
-        FLOAT y
-    }
-    node_attributes {
-        INTEGER node_id FK
-        VARCHAR attribute_name
-        VARCHAR display_name
-        TEXT description
-        VARCHAR data_type
-    }
-    node_text_attributes {
-        INTEGER node_attribute_id FK
-        TEXT supplementary_description
-    }
-    node_float_attributes {
-        INTEGER node_attribute_id FK
-        TEXT supplementary_description
-    }
-    node_attribute_values {
-        INTEGER node_id FK
-        VARCHAR attribute_name
-        VARCHAR value_type
-    }
-    node_text_attribute_values {
-        INTEGER node_attribute_value_id FK
-        TEXT text_value
-    }
-    node_float_attribute_values {
-        INTEGER node_attribute_value_id FK
-        FLOAT float_value
-        VARCHAR unit
     }
     edges {
         INTEGER network_id FK
@@ -108,35 +137,6 @@ erDiagram
         VARCHAR subtype
         FLOAT weight
     }
-    edge_attributes {
-        INTEGER edge_id FK
-        VARCHAR attribute_name
-        VARCHAR display_name
-        TEXT description
-        VARCHAR data_type
-    }
-    edge_text_attributes {
-        INTEGER edge_attribute_id FK
-        TEXT supplementary_description
-    }
-    edge_float_attributes {
-        INTEGER edge_attribute_id FK
-        TEXT supplementary_description
-    }
-    edge_attribute_values {
-        INTEGER edge_id FK
-        VARCHAR attribute_name
-        VARCHAR value_type
-    }
-    edge_text_attribute_values {
-        INTEGER edge_attribute_value_id FK
-        TEXT text_value
-    }
-    edge_float_attribute_values {
-        INTEGER edge_attribute_value_id FK
-        FLOAT float_value
-        VARCHAR unit
-    }
 ```
 
 ### テーブル定義
@@ -144,8 +144,8 @@ erDiagram
 | テーブル名 | 説明 |
 |:---|:---|
 | `users` | アプリケーションのユーザー情報を格納します。 |
-| `networks` | ユーザーがアップロードしたGraphML形式の元データ、またはNetworkXMCPによって正規化されたGraphMLデータ。ネットワーク全体の情報を管理します。 |
-| `nodes` | ネットワーク内の各ノード（頂点）の基本情報を管理します。ノードID、ラベル、サブタイプ、座標情報などを格納します。 |
+| `networks` | ユーザーがアップロードしたGraphML形式の元データ、またはNetworkXAPIによって正規化されたGraphMLデータ。ネットワーク全体の情報を管理します。 |
+| `nodes` | ネットワーク内の各ノード（頂点）の基本情報を管理します。ノードID、ラベル、サブタイプなどを格納します。 |
 | `edges` | ネットワーク内の各エッジ（辺）の基本情報を管理します。エッジID、ソースノード、ターゲットノード、ラベル、サブタイプ、重みなどを格納します。 |
 | `node_attributes` | ノードの属性に関する基本情報を管理します。これは抽象的な基底テーブルで、具体的な属性に関するメタデータは子テーブル（サブタイプ）に格納されます。 |
 | `node_text_attributes` | `node_attributes`のサブタイプ。テキスト型の属性に関する追加の自然言語説明を格納します。 |
@@ -203,8 +203,6 @@ CREATE TABLE nodes (
     node_id VARCHAR(255) NOT NULL,
     label VARCHAR(255),
     subtype VARCHAR(100),
-    x FLOAT,
-    y FLOAT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     FOREIGN KEY (network_id) REFERENCES networks(id),
@@ -244,15 +242,14 @@ CREATE TABLE edges (
 ```sql
 CREATE TABLE node_attributes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    node_id INTEGER NOT NULL,
+    network_id INTEGER NOT NULL,
     attribute_name VARCHAR(255) NOT NULL,
     display_name VARCHAR(255),
     description TEXT,
-    data_type VARCHAR(50) NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    FOREIGN KEY (node_id) REFERENCES nodes(id),
-    UNIQUE(node_id, attribute_name)
+    FOREIGN KEY (network_id) REFERENCES networks(id),
+    UNIQUE(network_id, attribute_name)
 );
 ```
 
@@ -262,9 +259,7 @@ CREATE TABLE node_attributes (
 
 ```sql
 CREATE TABLE node_text_attributes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    node_attribute_id INTEGER NOT NULL,
-    supplementary_description TEXT,
+    node_attribute_id INTEGER PRIMARY KEY,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     FOREIGN KEY (node_attribute_id) REFERENCES node_attributes(id)
@@ -277,9 +272,7 @@ CREATE TABLE node_text_attributes (
 
 ```sql
 CREATE TABLE node_float_attributes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    node_attribute_id INTEGER NOT NULL,
-    supplementary_description TEXT,
+    node_attribute_id INTEGER PRIMARY KEY,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     FOREIGN KEY (node_attribute_id) REFERENCES node_attributes(id)
@@ -295,15 +288,14 @@ CREATE TABLE node_float_attributes (
 ```sql
 CREATE TABLE edge_attributes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    edge_id INTEGER NOT NULL,
+    network_id INTEGER NOT NULL,
     attribute_name VARCHAR(255) NOT NULL,
     display_name VARCHAR(255),
     description TEXT,
-    data_type VARCHAR(50) NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    FOREIGN KEY (edge_id) REFERENCES edges(id),
-    UNIQUE(edge_id, attribute_name)
+    FOREIGN KEY (network_id) REFERENCES networks(id),
+    UNIQUE(network_id, attribute_name)
 );
 ```
 
@@ -313,9 +305,7 @@ CREATE TABLE edge_attributes (
 
 ```sql
 CREATE TABLE edge_text_attributes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    edge_attribute_id INTEGER NOT NULL,
-    supplementary_description TEXT,
+    edge_attribute_id INTEGER PRIMARY KEY,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     FOREIGN KEY (edge_attribute_id) REFERENCES edge_attributes(id)
@@ -328,9 +318,7 @@ CREATE TABLE edge_text_attributes (
 
 ```sql
 CREATE TABLE edge_float_attributes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    edge_attribute_id INTEGER NOT NULL,
-    supplementary_description TEXT,
+    edge_attribute_id INTEGER PRIMARY KEY,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     FOREIGN KEY (edge_attribute_id) REFERENCES edge_attributes(id)
@@ -347,12 +335,12 @@ CREATE TABLE edge_float_attributes (
 CREATE TABLE node_attribute_values (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     node_id INTEGER NOT NULL,
-    attribute_name VARCHAR(255) NOT NULL,
-    value_type VARCHAR(50) NOT NULL,
+    attribute_id INTEGER NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     FOREIGN KEY (node_id) REFERENCES nodes(id),
-    UNIQUE(node_id, attribute_name)
+    FOREIGN KEY (attribute_id) REFERENCES node_attributes(id),
+    UNIQUE(node_id, attribute_id)
 );
 ```
 
@@ -362,8 +350,7 @@ CREATE TABLE node_attribute_values (
 
 ```sql
 CREATE TABLE node_text_attribute_values (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    node_attribute_value_id INTEGER NOT NULL,
+    node_attribute_value_id INTEGER PRIMARY KEY,
     text_value TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -377,8 +364,7 @@ CREATE TABLE node_text_attribute_values (
 
 ```sql
 CREATE TABLE node_float_attribute_values (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    node_attribute_value_id INTEGER NOT NULL,
+    node_attribute_value_id INTEGER PRIMARY KEY,
     float_value FLOAT,
     unit VARCHAR(50),
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -397,12 +383,12 @@ CREATE TABLE node_float_attribute_values (
 CREATE TABLE edge_attribute_values (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     edge_id INTEGER NOT NULL,
-    attribute_name VARCHAR(255) NOT NULL,
-    value_type VARCHAR(50) NOT NULL,
+    attribute_id INTEGER NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     FOREIGN KEY (edge_id) REFERENCES edges(id),
-    UNIQUE(edge_id, attribute_name)
+    FOREIGN KEY (attribute_id) REFERENCES edge_attributes(id),
+    UNIQUE(edge_id, attribute_id)
 );
 ```
 
@@ -412,8 +398,7 @@ CREATE TABLE edge_attribute_values (
 
 ```sql
 CREATE TABLE edge_text_attribute_values (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    edge_attribute_value_id INTEGER NOT NULL,
+    edge_attribute_value_id INTEGER PRIMARY KEY,
     text_value TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -427,8 +412,7 @@ CREATE TABLE edge_text_attribute_values (
 
 ```sql
 CREATE TABLE edge_float_attribute_values (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    edge_attribute_value_id INTEGER NOT NULL,
+    edge_attribute_value_id INTEGER PRIMARY KEY,
     float_value FLOAT,
     unit VARCHAR(50),
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -472,26 +456,35 @@ def determine_attribute_type(attribute_name, value):
 属性値を適切なサブタイプテーブルに保存するロジックを実装します。
 
 ```python
-def save_node_attribute(node_id, attribute_name, value):
+def save_node_attribute_value(network_id, node_id, attribute_name, value):
     """
     ノードの属性値を保存する
     
     Parameters:
+    - network_id: ネットワークID
     - node_id: ノードID
     - attribute_name: 属性名
     - value: 属性値
     """
+    # 属性定義テーブルからIDを取得
+    attribute_id = get_attribute_id_by_name(network_id, attribute_name)
+    if not attribute_id:
+        # 必要に応じて属性定義をここで作成するロジックも考えられる
+        raise ValueError(f"Attribute '{attribute_name}' not defined for this network.")
+
     # データ型を判定
     data_type, processed_value = determine_attribute_type(attribute_name, value)
     
-    # 基底テーブルに属性情報を保存
-    node_attribute_id = save_node_attribute_base(node_id, attribute_name, data_type)
+    # 基底テーブルに属性値の基本情報を保存
+    value_base_id = save_node_attribute_value_base(node_id, attribute_id)
     
     # データ型に応じて適切なサブタイプテーブルに値を保存
     if data_type == "TEXT":
-        save_node_text_attribute(node_attribute_id, processed_value)
+        save_node_text_attribute_value(value_base_id, processed_value)
     elif data_type == "FLOAT":
-        save_node_float_attribute(node_attribute_id, processed_value)
+        # 単位（unit）は別途取得または指定する必要がある
+        unit = get_unit_for_attribute(attribute_name) 
+        save_node_float_attribute_value(value_base_id, processed_value, unit)
 ```
 
 ## 4.10. サブタイプの利点
