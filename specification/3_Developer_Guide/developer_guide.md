@@ -16,6 +16,8 @@
 
 ## 3. プロジェクト構造
 
+### 3.1. 主要ディレクトリ
+
 プロジェクトは、明確な責務を持つ3つの主要なサービスで構成されます。
 
 ```
@@ -29,26 +31,102 @@ LLMGraphvis/
 - **frontend**: ユーザーインターフェースを提供します。
 - **networkx-api**: グラフ理論に基づいた計算（レイアウト、中心性など）を実行する専門サービスです。
 
+### 3.2. 各サービスのディレクトリ構造（推奨）
+
+開発の初期段階では、以下の構造を推奨します。これはあくまで出発点であり、プロジェクトの成長に合わせて最適化する責任はあなたにあります。
+
+<details>
+<summary><b>backend / networkx-api (FastAPI)</b></summary>
+
+```
+backend/
+├── app/
+│   ├── api/
+│   │   └── endpoints/
+│   │       ├── auth.py
+│   │       └── chat.py
+│   ├── core/
+│   │   └── config.py
+│   ├── db/
+│   │   ├── base.py
+│   │   └── session.py
+│   ├── models/
+│   │   ├── chat.py
+│   │   └── user.py
+│   ├── schemas/
+│   │   ├── chat.py
+│   │   └── token.py
+│   ├── services/
+│   │   ├── chat_service.py
+│   │   └── llm_service.py
+│   └── main.py
+├── tests/
+└── requirements.txt
+```
+</details>
+
+<details>
+<summary><b>frontend (React + Vite)</b></summary>
+
+```
+frontend/
+├── public/
+├── src/
+│   ├── assets/
+│   ├── components/
+│   │   ├── common/
+│   │   └── specific/
+│   ├── hooks/
+│   ├── pages/
+│   │   ├── ChatPage.tsx
+│   │   └── LoginPage.tsx
+│   ├── services/
+│   │   └── api.ts
+│   ├── stores/
+│   │   ├── authStore.ts
+│   │   └── chatStore.ts
+│   ├── styles/
+│   ├── types/
+│   └── main.tsx
+├── index.html
+├── package.json
+└── tsconfig.json
+```
+</details>
+
 ## 4. ローカル開発環境のセットアップ
 
-### Step 1: リポジトリのクローンと環境変数の設定
+### Step 1: プロジェクトの初期化と環境変数の設定
+
+プロジェクトはリモートリポジトリが存在しない状態で開始されるため、まずローカルに開発ディレクトリを構築します。
 
 ```bash
-git clone https://github.com/your-repo/LLMGraphvis.git
+# プロジェクト用のディレクトリを作成し、移動します
+mkdir LLMGraphvis
 cd LLMGraphvis
 
+# 各サービスのディレクトリを作成します
+mkdir backend frontend networkx-api
+
 # 環境変数のテンプレートをコピー
-cp .env.example .env
+# この.envファイルはプロジェクトのルートに配置してください
+cp path/to/your/.env.example .env
 ```
-`.env`ファイルを開き、必要に応じて内容を編集してください。（通常はデフォルトのままで動作します）
+`.env`ファイルを開き、`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`を含むすべての必須変数を設定してください。
 
 ### Step 2: データベースの起動
 
-Dockerを使用してPostgreSQLデータベースを起動します。
+Docker Composeのような抽象化ツールは使わず、Dockerコマンドを直接実行してPostgreSQLコンテナを起動します。これにより、依存関係が明確になります。
 
 ```bash
-docker-compose up -d postgres
+# .envファイルからデータベース設定を読み込んでコンテナを起動します
+docker run --name graphvis-db \
+  --env-file .env \
+  -p 5432:5432 \
+  -v pgdata:/var/lib/postgresql/data \
+  -d postgres
 ```
+**注意:** コンテナが正常に起動したか `docker ps` コマンドで確認してください。
 
 ### Step 3: 依存関係のインストール
 

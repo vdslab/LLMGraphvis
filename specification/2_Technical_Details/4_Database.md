@@ -22,11 +22,13 @@
 4.  **属性メタデータの充実化**:
     属性には詳細な説明を付与し、LLMの属性選択精度を向上させます。
 
+5.  **複数データベースのサポート**:
+    SQLAlchemy ORMを使用することで、PostgreSQLとMySQLの両方に対応可能なデータベース設計とします。具体的なDDLは、SQLAlchemyのマイグレーションツール（例: Alembic）によって各データベースに最適化された形で生成されます。
+
 ## 4.2. ER図
 
 ```mermaid
 erDiagram
-    users ||--o{ chats : "has"
     networks ||--|| chats : "is"
     chats ||--o{ chat_messages : "contains"
 
@@ -74,7 +76,6 @@ erDiagram
     networks {
         INTEGER id PK
         VARCHAR name
-        INTEGER user_id FK
     }
     nodes {
         INTEGER id PK
@@ -141,10 +142,12 @@ erDiagram
 
 ## 4.3. 基本テーブル
 
+**補足:** 以下のテーブル定義は概念的なものであり、SQLAlchemy ORMを通じて定義されます。`id`カラムの自動採番（`AUTOINCREMENT`相当）は、SQLAlchemyが各データベースの適切な機能（PostgreSQLの`SERIAL`や`IDENTITY`、MySQLの`AUTO_INCREMENT`など）を利用して管理します。
+
 ### 4.3.1. `users`
 ```sql
 CREATE TABLE users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     username VARCHAR(255) NOT NULL UNIQUE,
     hashed_password VARCHAR(255) NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -155,7 +158,7 @@ CREATE TABLE users (
 ### 4.3.2. `networks`
 ```sql
 CREATE TABLE networks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -164,8 +167,7 @@ CREATE TABLE networks (
 
 ### 4.3.3. `chats`
 ```sql
-CREATE TABLE chats (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     user_id INTEGER NOT NULL,
     network_id INTEGER NOT NULL UNIQUE,
@@ -179,7 +181,7 @@ CREATE TABLE chats (
 ### 4.3.4. `chat_messages`
 ```sql
 CREATE TABLE chat_messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     chat_id INTEGER NOT NULL,
     role VARCHAR(50) NOT NULL,
     content TEXT NOT NULL,
@@ -192,7 +194,7 @@ CREATE TABLE chat_messages (
 ### 4.3.5. `nodes`
 ```sql
 CREATE TABLE nodes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     network_id INTEGER NOT NULL,
     node_id VARCHAR(255) NOT NULL,
     label VARCHAR(255),
@@ -206,7 +208,7 @@ CREATE TABLE nodes (
 ### 4.3.6. `edges`
 ```sql
 CREATE TABLE edges (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     network_id INTEGER NOT NULL,
     edge_id VARCHAR(255) NOT NULL,
     source_node_id INTEGER NOT NULL,
@@ -226,7 +228,7 @@ CREATE TABLE edges (
 ### `node_attributes` (基底)
 ```sql
 CREATE TABLE node_attributes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     network_id INTEGER NOT NULL,
     attribute_name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -251,8 +253,7 @@ CREATE TABLE node_float_attributes (
 
 ### `edge_attributes` (基底)
 ```sql
-CREATE TABLE edge_attributes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     network_id INTEGER NOT NULL,
     attribute_name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -280,7 +281,7 @@ CREATE TABLE edge_float_attributes (
 ### `node_attribute_values` (基底)
 ```sql
 CREATE TABLE node_attribute_values (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     node_id INTEGER NOT NULL,
     attribute_id INTEGER NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -308,7 +309,7 @@ CREATE TABLE node_float_attribute_values (
 ### `edge_attribute_values` (基底)
 ```sql
 CREATE TABLE edge_attribute_values (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER PRIMARY KEY,
     edge_id INTEGER NOT NULL,
     attribute_id INTEGER NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),

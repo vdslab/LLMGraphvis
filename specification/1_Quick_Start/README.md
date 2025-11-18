@@ -14,28 +14,38 @@
 
 本システムは、ローカルで実行される各サービス（フロントエンド、バックエンド、計算サービス）と、Dockerで実行されるデータベース（PostgreSQL）で構成されます。
 
-**注意:** このドキュメントリポジトリ (`GraphVisAgent-docs`) は仕様書のみを管理しています。実際のソースコードは本体の `LLMGraphvis` リポジトリにあります。以下の手順は、本体リポジトリのルートディレクトリで実行することを想定しています。
+**注意:** このドキュメントリポジトリ (`GraphVisAgent-docs`) は仕様書のみを管理しています。実際のソースコードは本体の `LLMGraphvis` リポジトリにあります。以下の手順は、**これから作成する**本体リポジトリのルートディレクトリで実行することを想定しています。
 
 ## 2. 環境構築手順
 
-### ステップ1: リポジトリのクローンと環境変数の設定
+### ステップ1: プロジェクトの初期化と環境変数の設定
+
+プロジェクト作成時点ではリモートリポジトリは存在しないため、まずローカルに開発ディレクトリを作成します。
 
 ```bash
-git clone https://github.com/your-repo/LLMGraphvis.git
+# プロジェクト用のディレクトリを作成し、移動します
+mkdir LLMGraphvis
 cd LLMGraphvis
 
-# 環境変数のテンプレートをコピー
+# 環境変数のテンプレートをコピーします
+# .env.exampleは事前にプロジェクトルートに配置されている想定です
 cp .env.example .env
 ```
-`.env`ファイルを開き、必要に応じて内容を編集してください。（通常はデフォルトのままで動作します）
+`.env`ファイルを開き、`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` を含む必須変数を設定してください。
 
 ### ステップ2: データベースの起動
 
-Dockerを使用してPostgreSQLデータベースを起動します。
+Dockerを使用してPostgreSQLデータベースを起動します。`docker-compose` のような抽象化レイヤーは使わず、直接コマンドを実行します。
 
 ```bash
-docker-compose up -d postgres
+# .envファイルからデータベース設定を読み込んでコンテナを起動します
+docker run --name graphvis-db \
+  --env-file .env \
+  -p 5432:5432 \
+  -v pgdata:/var/lib/postgresql/data \
+  -d postgres
 ```
+**注意:** `docker ps` コマンドでコンテナが正常に起動していることを確認してください。
 
 ### ステップ3: 依存関係のインストール
 

@@ -42,17 +42,17 @@ graph TD
 
 ## 2.3. 状態管理とAPI連携 (Zustand & Axios)
 
-状態管理にはZustandを使用し、機能ごとにストアを分割します。API通信にはaxiosをベースとしたクライアント (`services/api.js`) を用い、各ストアのアクション内から呼び出します。APIクライアントは全てのリクエストに認証トークンを付与し、トークン失効時はログインページへリダイレクトします。
+状態管理にはZustandを使用し、機能ごとにストアを分割します。API通信にはaxiosをベースとしたクライアント (`services/api.js`) を用い、各ストアのアクション内から呼び出します。認証トークンは`HttpOnly`属性付きCookieとしてバックエンドから発行され、ブラウザが自動的にリクエストに含めるため、クライアントサイドのJavaScriptが直接トークンを操作することはありません。トークン失効時は、バックエンドからの`401 Unauthorized`応答を受けてログインページへリダイレクトします。
 
 ### `authStore`
 
 ユーザーの認証状態とアクセストークンを管理します。
 
-- **状態:** `isAuthenticated`, `user`, `token`
+- **状態:** `isAuthenticated`, `user`
 - **主要なアクションと連携API:**
-  - `login(username, password)`: `POST /auth/token` を呼び出し、成功時にトークンを状態と`localStorage`に保存する。
+  - `login(username, password)`: `POST /auth/token` を呼び出し、成功時に`HttpOnly` Cookieが設定される。
   - `register(username, password)`: `POST /auth/register` を呼び出す。
-  - `logout()`: トークンを削除し、状態をリセットする。
+  - `logout()`: `HttpOnly` Cookieを削除するAPIを呼び出し、状態をリセットする。
 
 ### `networkStore`
 
