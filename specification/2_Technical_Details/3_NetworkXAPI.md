@@ -5,7 +5,7 @@
 - NetworkXライブラリに関する知識
 - FastAPIに関する開発経験
 
-NetworkXAPIは、ネットワークに関する計算処理と、その結果の永続化に特化した**ステートフル**なREST APIサービスです。
+NetworkXAPIは、ネットワークに関する計算処理と、その結果の永続化に特化したREST APIサービスです。計算結果などの状態はすべて外部のデータベースに永続化するため、サービス自体は**ステートレス**に設計されており、水平スケールが可能です。
 
 ## 3.1. 役割
 
@@ -21,12 +21,10 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 | Method | Path | 説明 |
 |:---|:---|:---|
-| `GET` | `/health` | サービスのヘルスチェックを行う。 |
+| `POST` | `/tools/initialize_network` | GraphMLデータを受け取り、1.正規化、2.DBへのノード/エッジ保存、3.初期レイアウト(Spring)計算とDB保存、4.デフォルトスタイルを適用した初期レンダリングデータの生成、までを一貫して実行する。 |
 | `GET` | `/tools/list_attributes` | ネットワークに存在する属性（計算済みまたは元から存在）の一覧を返す。 |
 | `POST` | `/tools/calculate_centrality` | 中心性指標を計算して永続化する。具体的には、まず属性の**定義**（例: 'degree_centrality'）が`node_attributes`に存在するか確認し、なければ`network_id`に紐付けて作成する。次に、各ノードの計算**値**を、定義のIDを参照して`node_attribute_values`に保存する。 |
-| `POST` | `/tools/change_layout` | レイアウトを計算し、ノード座標（'x', 'y'）を永続化する。各座標の属性**定義**が`node_attributes`に存在しなければ作成し、各ノードの座標**値**を、定義IDを参照して`node_attribute_values`に保存する。初期レイアウト計算にも使用される。 |
-| `POST` | `/tools/generate_visualization` | **【新設】**レイアウト、ノードサイズ、ノードカラー等の視覚的割り当てに関するすべてのパラメータを受け取り、最終的なレンダリングデータを動的に生成して返す。 |
-| `POST` | `/tools/convert_graphml` | アップロードされたGraphMLファイルを解析・修正し、正規化されたGraphMLを返す。（ステートレス）<br/>正規化には、属性名の標準化、特定のデータ型への変換、欠損値の処理、およびシステムで一貫して扱えるGraphML形式への変換が含まれます。 |
+| `POST` | `/tools/generate_visualization` | レイアウト、ノードサイズ、ノードカラー等の視覚的割り当てに関するすべてのパラメータを受け取り、最終的なレンダリングデータを動的に生成して返す。 |
 
 ## 3.3. API詳細
 
@@ -52,15 +50,12 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 ### `/tools/generate_visualization`
 
-- **Request Body:**
+- **リクエストボディ例 1 (次数中心性でサイズ、コミュニティで色分け)**
 
 ```json
 {
   "network_id": "net_12345",
-  "layout_config": {
-    "name": "spring",
-    "params": { "k": 0.1 }
-  },
+  "layout_name": "spring",
   "node_size_config": {
     "attribute": "degree_centrality",
     "scale_type": "LINEAR",
@@ -75,6 +70,20 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
       "1": "#36a2eb",
       "2": "#ffce56"
     }
+  }
+}
+```
+
+- **リクエストボディ例 2 (媒介中心性で色分け)**
+
+```json
+{
+  "network_id": "net_12345",
+  "layout_name": "kamada_kawai",
+  "node_color_config": {
+    "attribute": "betweenness_centrality",
+    "scale_type": "LINEAR",
+    "gradient": ["#d1e0ff", "#003399"]
   }
 }
 ```
@@ -101,26 +110,6 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
       "color": "#cccccc"
     }
   ]
-}
-```
-
-### `/tools/change_layout`
-
-- **Request Body:**
-
-```json
-{
-  "network_id": "net_12345",
-  "layout_name": "spring"
-}
-```
-
-- **Response Body (Success):**
-
-```json
-{
-  "status": "success",
-  "message": "Layout calculated and node positions saved as attributes."
 }
 ```
 

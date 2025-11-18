@@ -38,7 +38,7 @@ graph TD
 | **HomePage**        | `/`         |   不要   | アプリケーションのトップページ。ログインや新規登録への導線。 |
 | **LoginPage**       | `/login`    |   不要   | ログインフォーム画面。                                       |
 | **RegisterPage**    | `/register` |   不要   | 新規ユーザー登録フォーム画面。                               |
-| **NetworkChatPage** | `/chat`     | **必要** | ネットワーク可視化とチャットUIを統合したメイン画面。         |
+| **NetworkChatPage** | `/chat/{id}`     | **必要** | ネットワーク可視化とチャットUIを統合したメイン画面。         |
 
 ## 2.3. 状態管理とAPI連携 (Zustand & Axios)
 
@@ -56,84 +56,60 @@ graph TD
 
 ### `networkStore`
 
-表示中のネットワークデータ（ノード、エッジ、レイアウト情報）の状態を管理します。このストアは、バックエンドから受け取った最新のネットワークデータを保持し、可視化コンポーネントに提供する責務を持ちます。
+表示中のネットワークデータ（ノード、エッジ）の状態を管理します。このストアは、バックエンドから受け取った最新のレンダリングデータを保持し、可視化コンポーネントに提供する責務を持ちます。
 
-- **状態:** `networkId`, `nodes`, `edges` (ノードの座標、スタイル、エッジのスタイルなど、すべてのレンダリングデータを含む)
-- **主要なアクションと連携API:**
-  - `fetchInitialNetwork(networkId)`: **【初期表示用】** `GET /network/{networkId}/visdata` を呼び出し、初期表示用のレンダリングデータを取得する。
-  - `uploadNetwork(file)`: `POST /network/upload` を呼び出し、新規ネットワークをアップロードする。
-  - `setNetworkData(visData)`: WebSocket経由で受信した、更新後の最終レンダリングデータで状態を上書きする。
+- **状態 (State):**
+  - `networkId`: 現在のネットワークID。
+  - `nodes`: ノードの配列。座標、サイズ、色など、描画に必要なすべての情報を含む。
+  - `edges`: エッジの配列。幅、色などのスタイル情報を含む。
+
+- **アクション (Actions) とデータの流れ:**
+  - `setNetworkData(visData)`:
+    - **トリガー:** SSEの `render_update` イベント経由で呼び出される。
+    - **データ:** `visData` は、NetworkXAPIが生成した最終的なレンダリングデータ (`{ nodes: [...], links: [...] }`)。
+    - **処理:** 受け取ったデータで `nodes` と `edges` の状態を完全に上書きする。これにより、画面のネットワークが再描画される。
 
 ### `chatStore`
 
-会話の履歴やメッセージ一覧を管理します。**ネットワークに対する操作は、すべてこのストアの`sendMessage`アクションが起点となります。**
+チャットセッション全体の状態（メッセージ履歴、サーバーの処理状況など）を管理します。ネットワークの初期化と対話的操作は、すべてこのストアのアクションが起点となります。
 
-- **状態:** `conversationId`, `messages`, `isLoading`
-- **主要なアクションと連携API:**
-  - `fetchHistory(conversationId)`: `GET /conversations/{id}/messages` を呼び出し、`messages` 状態を更新する。
-  - `sendMessage(messageContent)`: ユーザーの自然言語による指示（計算、可視化、レイアウト変更など）をバックエンドの `POST /chat/process` へ送信する。バックエンドでの処理の結果、ネットワークが更新された場合は、WebSocketを通じて新しいレンダリングデータが送られてくるため、`networkStore` の状態も更新されます。
+- **状態 (State):**
+  - `chatId`: 現在のチャットID。
+  - `messages`: チャットのメッセージ履歴の配列 (`{ role: 'user' | 'assistant', content: '...' }`)。
+  - `isLoading`: バックエンドでツールが実行中であるかを示す真偽値。
+  - `thinkingMessage`: LLMの思考プロセスなど、リアルタイムの状況を示すテキスト。
 
-#### コード例: `sendMessage` とWebSocketリスナーの実装イメージ
+- **アクション (Actions) とデータの流れ:**
+  - `createChat(name)`:
+    - **フロー:**
+      1. Backendの `POST /chat` へリクエストを送信する。
+      2. レスポンスで返された `chat_id` を `chatId` 状態に保存し、対応するチャットページへ遷移する。
+  - `uploadNetwork(chatId, file)`:
+    - **フロー:**
+      1. Backendの `POST /chat/{chatId}/upload` へGraphMLファイルを送信する。
+      2. Backendから即座に `202 Accepted` を受け取る。このアクションは状態を直接変更せず、UIをローディング状態に移行させ、後続のSSEイベントを待つ。
+  - `fetchHistory(chatId)`:
+    - **フロー:**
+      1. Backendの `GET /chat/{id}/messages` を呼び出す。
+      2. レスポンスで返されたメッセージ配列で `messages` 状態を更新する。
+  - `sendMessage(messageContent)`:
+    - **フロー:**
+      1. ユーザーのメッセージを `messages` 状態に即時追加し、UIに反映させる（楽観的更新）。
+      2. Backendの `POST /chat/{id}/process` へメッセージを送信し、即座に `202 Accepted` を受け取る。後続の更新はすべてSSE経由で行われる。
 
-```javascript
-// chatStore.js (Zustand)
-import { create } from "zustand";
-import { api } from "../services/api"; // axios instance
+### リアルタイム更新 (Server-Sent Events)
 
-export const useChatStore = create((set, get) => ({
-  messages: [],
-  isLoading: false,
-  sendMessage: async (messageContent) => {
-    const conversationId = get().conversationId;
-    set({ isLoading: true });
+`chatId` が確定すると、フロントエンドは `/api/chat/{chatId}/stream` へのSSE接続を確立します。サーバーからのすべての非同期通知は、この接続を通じてイベントとして受信され、対応するストアのアクションを呼び出します。
 
-    try {
-      // ユーザーのメッセージをUIに即時反映
-      const userMessage = { role: "user", content: messageContent };
-      set((state) => ({ messages: [...state.messages, userMessage] }));
-
-      // バックエンドに処理をリクエスト
-      const response = await api.post("/chat/process", {
-        conversation_id: conversationId,
-        message: userMessage,
-      });
-
-      // アシスタントのテキスト返信をUIに反映
-      const assistantMessage = response.data.message;
-      set((state) => ({ messages: [...state.messages, assistantMessage] }));
-
-      // グラフの更新は、このAPIのレスポンスでは行われない。
-      // 更新されたグラフデータは、別途WebSocketを通じてサーバーからプッシュされる。
-    } catch (error) {
-      console.error("Failed to send message:", error);
-      // エラー処理
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-}));
-
-// NetworkSocketManager.js
-import { useEffect } from "react";
-import { useNetworkStore } from "./stores/networkStore";
-import socket from "./services/socket"; // WebSocket instance
-
-export const NetworkSocketManager = () => {
-  const { setNetworkData } = useNetworkStore();
-
-  useEffect(() => {
-    // サーバーからの 'render_update' イベントを待ち受ける
-    socket.on("render_update", (visData) => {
-      console.log("Received updated network data via WebSocket:", visData);
-      // networkStoreの状態を、受信した最新のデータで直接更新する
-      setNetworkData(visData);
-    });
-
-    return () => {
-      socket.off("render_update");
-    };
-  }, [setNetworkData]);
-
-  return null; // このコンポーネントはUIを持たない
-};
-```
+- **`render_update` イベント:**
+  - **データ:** 最終的なレンダリングデータ (`{ nodes, links }`)。
+  - **処理:** `networkStore.setNetworkData` を呼び出し、ネットワークの可視化を更新する。
+- **`message` イベント:**
+  - **データ:** LLMからの最終応答メッセージ (`{ role, content }`)。
+  - **処理:** `chatStore.addMessage` を呼び出し、チャット履歴を更新する。
+- **`tool_execution` イベント:**
+  - **データ:** ツールの実行状態 (`{ tool, status }`)。
+  - **処理:** `chatStore.setIsLoading` を呼び出し、UIのローディングインジケーターを制御する。
+- **`thinking_stream` イベント:**
+  - **データ:** LLMの思考プロセスを示すテキスト。
+  - **処理:** `chatStore.setThinkingMessage` を呼び出し、リアルタイムの処理状況をUIに表示する。

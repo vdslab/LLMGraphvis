@@ -37,7 +37,7 @@ sequenceDiagram
     end
 ```
 
-### 5.1.2. ログインンフロー
+### 5.1.2. ログインフロー
 
 ```mermaid
 sequenceDiagram

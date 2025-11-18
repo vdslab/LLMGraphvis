@@ -15,13 +15,13 @@
 
 ```mermaid
 graph TD
-    user[<div style="font-weight:bold">ユーザー</div><div style="font-size: 80%;">研究者、開発者</div>]
+    user["ユーザー<br/>研究者、開発者"]
 
     subgraph "GraphVisAgent System"
-        webApplication["<div style="font-weight:bold">Web Application</div><div style="font-size: 80%;">ネットワークの可視化と<br/>対話分析プラットフォーム</div>"]
+        webApplication["Web Application<br/>ネットワークの可視化と<br/>対話分析プラットフォーム"]
     end
 
-    llmServices[<div style="font-weight:bold">LLM Services</div><div style="font-size: 80%;">OpenAI, Google Gemini等</div>]
+    llmServices["LLM Services<br/>OpenAI, Google Gemini等"]
 
     user -- "自然言語による操作・分析指示<br/>(HTTPS)" --> webApplication
     webApplication -- "可視化されたネットワーク<br/>チャット応答" --> user
@@ -43,22 +43,18 @@ graph TD
 
 ```mermaid
 graph TD
-    user[ユーザー] -- "HTTPS" --> webBrowser["<div style='font-weight:bold'>Web Browser</div><div style='font-size: 80%;'>SPAクライアント</div>"]
+    user[ユーザー] -- "HTTPS" --> webBrowser["Web Browser<br/>SPAクライアント"]
 
     subgraph "Docker Environment"
-        frontendService["<div style='font-weight:bold'>Frontend Service</div><div style='font-size: 80%;'>UIを提供</div>"]
-        apiService["<div style='font-weight:bold'>API Service</div><div style='font-size: 80%;'>ビジネスロジック担当</div>"]
-        networkXAPI["<div style='font-weight:bold'>NetworkX API</div><div style='font-size: 80%;'>ネットワーク計算担当</div>"]
-        database[("<div style='font-weight:bold'>Database</div><div style='font-size: 80%;'>データ永続化</div>")]
+        frontendService["Frontend Service<br/>UIを提供"]
+        apiService["API Service<br/>ビジネスロジック担当"]
+        networkXAPI["NetworkXAPI<br/>ネットワーク計算担当"]
+        database[("Database<br/>データ永続化")]
     end
 
-    llmService[<div style='font-weight:bold'>LLM Services</div><div style='font-size: 80%;'>外部API</div>]
+    llmService["LLM Services<br/>外部API"]
 
     webBrowser -- "Loads SPA (HTTPS)" --> frontendService
-    note for frontendService "<b>Tech Stack:</b><br/>- React, Vite<br/>- Zustand<br/>- react-force-graph-2d<br/>- axios"
-    note for apiService "<b>Tech Stack:</b><br/>- FastAPI (Python)<br/>- SQLAlchemy<br/>- Pydantic<br/>- LLM SDKs"
-    note for networkXAPI "<b>Tech Stack:</b><br/>- FastAPI (Python)<br/>- NetworkX<br/>- SQLAlchemy"
-    note for database "<b>Tech Stack:</b><br/>- PostgreSQL"
     webBrowser -- "API Calls (HTTPS)" --> apiService
 
     apiService -- "ネットワーク計算依頼 (HTTP)" --> networkXAPI
@@ -98,24 +94,24 @@ graph TD
 
 ## 0.3. リアルタイム通信方針
 
-本システムでは、サーバーからクライアントへの非同期な情報通知のために、**WebSocket** を利用します。
+サーバーからクライアントへの非同期な情報通知には、**HTTP Streaming (Server-Sent Events)** を利用する。
 
-- **採用理由**: 双方向通信が可能であり、リアルタイムなデータ更新やインタラクティブな機能（例: LLMの思考プロセスのストリーミング、グラフの動的な更新通知）に柔軟に対応できます。また、共同編集機能など、将来的な拡張性も考慮しています。
+- **採用理由**:
+  - **シンプルさ**: WebSocketのような双方向通信プロトコルは、今回の要件に対して過剰である。共同編集機能のようなクライアントからのリアルタイムな操作はスコープ外であり、サーバーからの一方向の通知で十分である。
+  - **軽量さと実装の容易さ**: SSEは標準的なHTTP上で動作するため、既存のインフラストラクチャとの親和性が高く、実装が容易である。クライアント側もブラウザ標準の`EventSource` APIで簡単に扱うことができる。
+  - **要件への適合**: LLMの思考プロセスのストリーミングや、計算完了通知といった現在の要件は、サーバーからクライアントへのプッシュ通知で完結する。SSEはこれらの要件を効率的に満たす。
 
 - **主な用途**:
-  - ネットワーク操作（計算・可視化適用）の完了通知
-  - 大規模ネットワークにおけるレイアウト計算などの進捗通知
-  - LLMの思考プロセスやツール実行状況のストリーミング
+  - ネットワーク操作（計算・可視化適用）の完了通知と、更新されたレンダリングデータの送信。
+  - 大規模ネットワークにおけるレイアウト計算などの進捗通知。
+  - LLMの思考プロセスやツール実行状況のストリーミング。
 
-- **将来的な展望**: WebSocketの採用により、共同編集機能など、クライアントからのリアルタイムな双方向通信が必須となる機能の実装が容易になります。
+この決定は、「実装を不必要に複雑にしない」という全体方針に合致する。
 
 ## 0.4. 非機能要件
 
 ### 0.4.1. パフォーマンス
 
-- **レンダリングデータ取得API (`/network/{network_id}/visdata`)**:
-  - **目標**: 95パーセンタイルのリクエストにおいて、2秒以内にレスポンスを完了する。
-  - **条件**: ノード数1,000、エッジ数5,000までのネットワークデータにおいて。
 - **LLM連携処理 (`/chat/process`)**:
   - **目標**: ユーザーのメッセージ受信からLLMの最終応答（ストリーミング終了）までの中央値を5秒とする。
   - **補足**: この時間は外部LLMサービスの応答時間に大きく依存するため、あくまで目標値とする。
@@ -127,8 +123,8 @@ graph TD
 
 ### 0.4.3. 拡張性
 
-- **ステートレス設計**: APIサービスおよびNetworkX APIはステートレスに設計し、コンテナーの水平スケールアウトを容易にする。
-- **非同期処理**: 時間のかかるネットワーク計算（大規模なレイアウト計算など）は、バックグラウンドで非同期に処理し、完了をWebSocketで通知するアーキテクチャを採用する。
+- **ステートレス設計**: APIサービスおよびNetworkXAPIは、セッション情報や計算結果といった状態をサービスインスタンス内に保持しません。すべての状態は外部のデータベースに集約・永続化されるため、各サービスはステートレスなコンポーネントとして動作します。これにより、コンテナーの水平スケールアウトを容易に実現します。
+- **非同期処理**: 時間のかかるネットワーク計算（大規模なレイアウト計算など）は、バックグラウンドで非同期に処理し、完了を**Server-Sent Events (SSE)**でクライアントに通知するアーキテクチャを採用します。
 
 ### 0.4.4. セキュリティ
 

@@ -4,78 +4,85 @@
 
 - 基本的なGit操作
 - Node.js/npm (またはyarn)
-- DockerおよびDocker Composeの基礎知識
+- Python 3.12+
+- Dockerの基礎知識
 - React, FastAPIに関する基本的な開発経験
 
 ## 1. 概要
 
 このガイドは、開発者がGraphVisAgentのローカル開発環境をセットアップし、アプリケーションを起動するまでの手順を説明します。
 
-本システムは、フロントエンド、バックエンド、計算サービス、データベースの複数のコンテナーで構成されています。これらはDocker Composeを用いて一括で管理されます。
+本システムは、ローカルで実行される各サービス（フロントエンド、バックエンド、計算サービス）と、Dockerで実行されるデータベース（PostgreSQL）で構成されます。
 
-**注意:** このドキュメントリポジトリ (`GraphVisAgent-docs`) は仕様書のみを管理しています。実際のソースコードは本体の `GraphVisAgent` リポジトリにあります。以下の手順は、本体リポジトリのルートディレクトリで実行することを想定しています。
+**注意:** このドキュメントリポジトリ (`GraphVisAgent-docs`) は仕様書のみを管理しています。実際のソースコードは本体の `LLMGraphvis` リポジトリにあります。以下の手順は、本体リポジトリのルートディレクトリで実行することを想定しています。
 
 ## 2. 環境構築手順
 
-### ステップ1: リポジトリのクローン
+### ステップ1: リポジトリのクローンと環境変数の設定
 
 ```bash
-git clone https://github.com/<your-org>/GraphVisAgent.git
-cd GraphVisAgent
-```
+git clone https://github.com/your-repo/LLMGraphvis.git
+cd LLMGraphvis
 
-### ステップ2: 環境変数の設定
-
-プロジェクトルートにある `.env.example` ファイルをコピーして `.env` ファイルを作成します。
-
-```bash
+# 環境変数のテンプレートをコピー
 cp .env.example .env
 ```
+`.env`ファイルを開き、必要に応じて内容を編集してください。（通常はデフォルトのままで動作します）
 
-その後、`.env` ファイルをエディターで開き、外部LLMサービスのAPIキーなど、必要な環境変数を設定してください。
+### ステップ2: データベースの起動
 
-```dotenv
-# .env
-OPENAI_API_KEY="sk-..."
-# GOOGLE_API_KEY="..." # 必要に応じて
+Dockerを使用してPostgreSQLデータベースを起動します。
+
+```bash
+docker-compose up -d postgres
 ```
 
 ### ステップ3: 依存関係のインストール
 
-本プロジェクトのフロントエンドは `npm` を使用します。
+各サービスのディレクトリに移動し、必要なパッケージをインストールします。
 
 ```bash
-# フロントエンドの依存関係をインストール
+# バックエンド
+cd backend
+pip install -r requirements.txt
+cd ..
+
+# ネットワーク計算サービス
+cd networkx-api
+pip install -r requirements.txt
+cd ..
+
+# フロントエンド
 cd frontend
 npm install
 cd ..
 ```
 
-_(バックエンドの依存関係はDockerビルド時にインストールされます)_
+### ステップ4: サービスの起動
 
-### ステップ4: アプリケーションの起動
-
-プロジェクトルートからDocker Composeを起動します。これにより、すべてのサービスがビルドされ、起動します。
+各サービスを個別のターミナルで起動します。
 
 ```bash
-docker compose up --build
-```
+# ターミナル1: バックエンドを起動
+cd backend
+uvicorn main:app --reload --port 8000
 
-初回起動時はビルドに時間がかかることがあります。
+# ターミナル2: ネットワーク計算サービスを起動
+cd networkx-api
+uvicorn main:app --reload --port 8001
+
+# ターミナル3: フロントエンドを起動
+cd frontend
+npm run dev
+```
 
 ### ステップ5: アプリケーションへのアクセス
 
-ビルドと起動が正常に完了したら、Webブラウザで以下のURLにアクセスします。
+各サービスが正常に起動したら、Webブラウザで以下のURLにアクセスします。
 
-- **フロントエンド (アプリケーション本体):** `http://localhost:3000`
+- **フロントエンド (アプリケーション本体):** `http://localhost:5173`
 - **バックエンドAPIドキュメント (Swagger UI):** `http://localhost:8000/docs`
-
-## 3. トラブルシューティング
-
-- **ポートが競合する場合:**
-  `docker compose.yml` や `.env` ファイルで、各サービスが使用するポート番号を適宜変更してください。
-- **ビルドに失敗する場合:**
-  Dockerデーモンのリソース割り当て（メモリ、CPU）が十分であるか確認してください。また、Dockerfile内の依存関係のバージョンに問題がないか確認します。
+- **NetworkXAPIドキュメント (Swagger UI):** `http://localhost:8001/docs`
 
 ---
 
