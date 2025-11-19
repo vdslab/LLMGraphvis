@@ -66,21 +66,31 @@ async def upload_network(chat_id: int, background_tasks: BackgroundTasks, file: 
     
     return {"status": "accepted"}
 
-@router.post("/{chat_id}/process", status_code=202)
-def process_message(chat_id: int, request: schemas.ChatProcessRequest, background_tasks: BackgroundTasks, db: Session = Depends(database.get_db)):
+@router.post("/{chat_id}/process", response_model=schemas.ChatMessage)
+async def process_message(chat_id: int, request: schemas.ChatProcessRequest, db: Session = Depends(database.get_db)):
     # Save user message
     db_message = models.ChatMessage(
         chat_id=chat_id,
-        role=request.message.role,
+        role="user",
         content=request.message.content
     )
     db.add(db_message)
     db.commit()
     
-    # Start background task
-    background_tasks.add_task(llm_service.process_chat, chat_id, request.message.content, db)
+    # Process chat and get response
+    response_content = await llm_service.process_chat(chat_id, request.message.content, db)
     
-    return {"status": "accepted"}
+    # Save assistant message
+    db_response = models.ChatMessage(
+        chat_id=chat_id,
+        role="assistant",
+        content=response_content
+    )
+    db.add(db_response)
+    db.commit()
+    db.refresh(db_response)
+    
+    return db_response
 
 @router.get("/{chat_id}/stream")
 async def stream(chat_id: int, request: Request):

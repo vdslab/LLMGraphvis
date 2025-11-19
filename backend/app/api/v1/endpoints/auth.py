@@ -111,3 +111,8 @@ async def get_current_user(access_token: str = Cookie(None), db: Session = Depen
 @router.get("/users/me", response_model=schemas.User)
 def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
+
+@router.post("/logout")
+def logout(response: Response):
+    response.delete_cookie("access_token")
+    return {"message": "Logged out successfully"}

@@ -30,8 +30,11 @@ export const useAuthStore = create((set) => ({
   },
 
   logout: async () => {
-    // Call logout endpoint if exists to clear cookie
-    // await api.post('/auth/logout'); 
+    try {
+      await api.post('/auth/logout'); 
+    } catch (e) {
+      console.error("Logout failed", e);
+    }
     set({ user: null, isAuthenticated: false });
   },
 

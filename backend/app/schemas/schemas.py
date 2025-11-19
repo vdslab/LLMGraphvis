@@ -53,5 +53,8 @@ class ChatMessage(ChatMessageBase):
     class Config:
         orm_mode = True
 
+class ChatProcessMessage(BaseModel):
+    content: str
+
 class ChatProcessRequest(BaseModel):
-    message: ChatMessageBase
+    message: ChatProcessMessage

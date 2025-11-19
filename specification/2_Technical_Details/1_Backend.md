@@ -70,13 +70,12 @@ graph TD
 ```json
 {
   "message": {
-    "role": "user",
     "content": "次数中心性を計算して、重要なノードを大きく表示してください。"
   }
 }
 ```
 
-- **Response (on SSE `message` event):**
+- **Response:**
 
 ```json
 {

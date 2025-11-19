@@ -22,6 +22,13 @@ const HomePage = () => {
             <Link to="/chat/new" className="btn btn-primary" style={{ textDecoration: 'none' }}>
               Go to Dashboard
             </Link>
+            <button 
+              onClick={() => useAuthStore.getState().logout()} 
+              className="btn" 
+              style={{ border: '1px solid var(--border-color)', cursor: 'pointer' }}
+            >
+              Logout
+            </button>
           </>
         ) : (
           <>

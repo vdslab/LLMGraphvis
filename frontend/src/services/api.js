@@ -27,4 +27,11 @@ api.interceptors.response.use(
   }
 );
 
+export const uploadGraphML = async (chatId, file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  return api.post(`/chat/${chatId}/upload`, formData);
+};
+
 export default api;

@@ -1,14 +1,17 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useChatStore } from '../stores/chatStore';
 import { useNetworkStore } from '../stores/networkStore';
 import NetworkGraph from '../components/NetworkGraph';
 import ChatInterface from '../components/ChatInterface';
+import { uploadGraphML } from '../services/api';
 
 const NetworkChatPage = () => {
   const { id } = useParams();
   const { setChatId, chatId } = useChatStore();
   const { nodes, links } = useNetworkStore();
+  const fileInputRef = useRef(null);
+  const [isUploading, setIsUploading] = useState(false);
   
   useEffect(() => {
     if (id) {
@@ -85,10 +88,64 @@ const NetworkChatPage = () => {
     }
   }, [id, setChatId]);
 
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      await uploadGraphML(id, file);
+      // Success handling if needed, but SSE will trigger updates
+      console.log("Upload successful");
+    } catch (error) {
+      console.error("Upload failed:", error);
+      alert("Failed to upload file.");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
     <div style={{ display: 'flex', height: '100vh' }}>
       <div style={{ flex: 1, borderRight: '1px solid var(--border-color)', position: 'relative' }}>
         <NetworkGraph nodes={nodes} links={links} />
+        {nodes.length === 0 && (
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            textAlign: 'center'
+          }}>
+            <h3>No network data</h3>
+            <p>Upload a GraphML file to get started</p>
+            <input
+              type="file"
+              accept=".graphml,.xml"
+              onChange={handleFileUpload}
+              style={{ display: 'none' }}
+              ref={fileInputRef}
+            />
+            <button 
+              onClick={() => fileInputRef.current.click()}
+              disabled={isUploading}
+              style={{
+                padding: '10px 20px',
+                fontSize: '16px',
+                cursor: 'pointer',
+                backgroundColor: '#4CAF50',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px'
+              }}
+            >
+              {isUploading ? 'Uploading...' : 'Upload GraphML'}
+            </button>
+          </div>
+        )}
       </div>
       <div style={{ width: '400px', display: 'flex', flexDirection: 'column' }}>
         <ChatInterface />

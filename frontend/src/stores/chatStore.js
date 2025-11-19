@@ -29,9 +29,7 @@ export const useChatStore = create((set, get) => ({
     // I need to add that to backend/routers/chat.py later.
     
     set({ isLoading: true, thinkingMessage: "Uploading and initializing network..." });
-    await api.post(`/chat/${chatId}/upload`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    });
+    await api.post(`/chat/${chatId}/upload`, formData);
     // Response is 202 Accepted.
     // SSE will handle the rest.
   },

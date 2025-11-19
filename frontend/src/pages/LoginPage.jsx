@@ -10,6 +10,14 @@ const LoginPage = () => {
   const navigate = useNavigate();
   
   console.log("LoginPage rendered");
+  
+  const { isAuthenticated } = useAuthStore();
+  
+  React.useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

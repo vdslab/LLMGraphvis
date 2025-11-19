@@ -28,8 +28,9 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
 
     vis_nodes = []
     
-    # Pre-fetch layout if possible, but for now we assume it's done or we default
-    # TODO: Fetch layout coordinates
+    # Pre-fetch layout attributes
+    layout_x_attr = f"{layout_name}_x"
+    layout_y_attr = f"{layout_name}_y"
     
     for n in nodes:
         # Default visual props
@@ -54,11 +55,19 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
             # Simplified color mapping
             pass
 
+        # Fetch Layout Coordinates
+        x = get_node_attr_value(n.id, layout_x_attr)
+        y = get_node_attr_value(n.id, layout_y_attr)
+        
+        # Default to center if not found (should not happen if initialized correctly)
+        if x is None: x = 0.5
+        if y is None: y = 0.5
+
         vis_nodes.append({
             "id": n.node_id,
             "label": n.label,
-            "x": 0.5, # TODO: Fetch from DB
-            "y": 0.5, # TODO: Fetch from DB
+            "x": x,
+            "y": y,
             "size": size, 
             "color": color 
         })

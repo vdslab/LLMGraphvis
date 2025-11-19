@@ -61,6 +61,26 @@ async def process_chat(chat_id: int, user_message: str, db: Session):
             await queue.put({"event": "render_update", "data": json.dumps(vis_data)})
             
             response_text = "I've updated the visualization. Nodes with more friends (higher degree centrality) are now shown larger."
+
+        elif ("bridge" in user_message.lower() or "betweenness" in user_message.lower() or "橋渡し" in user_message.lower()) and ("large" in user_message.lower() or "big" in user_message.lower() or "大きく" in user_message.lower()):
+            await queue.put({"event": "thinking_stream", "data": json.dumps({"content": "Calculating betweenness centrality..."})})
+            
+            # 1. Calculate Centrality
+            await network_service.calculate_centrality(network_id, "betweenness")
+            
+            await queue.put({"event": "thinking_stream", "data": json.dumps({"content": "Updating visualization..."})})
+            
+            # 2. Generate Visualization
+            # Map betweenness_centrality to size
+            vis_data = await network_service.generate_visualization(network_id, {
+                "node_size_config": {"attribute": "betweenness_centrality", "min": 5, "max": 20},
+                "node_color_config": None # Default
+            })
+            
+            # 3. Send Render Update
+            await queue.put({"event": "render_update", "data": json.dumps(vis_data)})
+            
+            response_text = "I've updated the visualization. Nodes acting as bridges (higher betweenness centrality) are now shown larger."
             
         else:
             # Fallback to simple LLM chat for other queries
@@ -76,11 +96,13 @@ async def process_chat(chat_id: int, user_message: str, db: Session):
                 response_text = "I'm sorry, I couldn't process that request right now. (LLM Error)"
 
         # 4. Send final response
-        await queue.put({"event": "message", "data": json.dumps({"role": "assistant", "content": response_text})})
+        # await queue.put({"event": "message", "data": json.dumps({"role": "assistant", "content": response_text})})
+        return response_text
         
     except Exception as e:
         print(f"Error in process_chat: {e}")
         await queue.put({"event": "error", "data": str(e)})
+        raise e
 
 async def event_generator(chat_id: int, request: Request) -> AsyncGenerator[dict, None]:
     queue = await get_event_queue(chat_id)
