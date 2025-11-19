@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from database import engine, Base
-from routers import tools
+from app.api.v1.endpoints import tools
+from app.core.database import engine, Base
 
 # Create database tables
 # Note: In a real microservices setup with shared DB, we need to be careful about who creates tables.

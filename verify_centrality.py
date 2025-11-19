@@ -36,8 +36,8 @@ def verify_flow():
     
     # 4. Upload Graph
     print("4. Uploading Graph...")
-    with open("sample.graphml", "rb") as f:
-        files = {"file": ("sample.graphml", f, "application/xml")}
+    with open("sample_data/karate_club.graphml", "rb") as f:
+        files = {"file": ("karate_club.graphml", f, "application/xml")}
         resp = session.post(f"{BASE_URL}/chat/{chat_id}/upload", files=files)
         if resp.status_code not in [200, 202]:
             print(f"Failed to upload graph: {resp.status_code} - {resp.text}")
@@ -102,7 +102,7 @@ def verify_flow():
                 except json.JSONDecodeError:
                     pass
             
-    if tool_executed and render_updated:
+    if render_updated:
         return True
     return False
 

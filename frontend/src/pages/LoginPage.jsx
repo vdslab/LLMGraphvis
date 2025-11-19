@@ -8,6 +8,8 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const login = useAuthStore((state) => state.login);
   const navigate = useNavigate();
+  
+  console.log("LoginPage rendered");
 
   const handleSubmit = async (e) => {
     e.preventDefault();

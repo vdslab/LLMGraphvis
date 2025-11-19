@@ -1,6 +1,6 @@
 import networkx as nx
 from sqlalchemy.orm import Session
-import models
+from app import models
 import io
 
 def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):

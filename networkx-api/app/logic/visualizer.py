@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-import models
+from app import models
 
 def generate_visualization_data(network_id: int, db: Session, layout_name="spring", node_size_config=None, node_color_config=None):
     nodes = db.query(models.Node).filter(models.Node.network_id == network_id).all()

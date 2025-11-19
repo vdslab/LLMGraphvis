@@ -2,8 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
-import database, models
-from logic import graph_processor, visualizer
+from app.core import database
+from app import models
+from app.logic import graph_processor, visualizer
 
 router = APIRouter(
     prefix="/tools",

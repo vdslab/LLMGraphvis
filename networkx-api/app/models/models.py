@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from database import Base
+from app.core.database import Base
 
 # Network model is needed here to establish relationships, even if Backend creates the record.
 class Network(Base):

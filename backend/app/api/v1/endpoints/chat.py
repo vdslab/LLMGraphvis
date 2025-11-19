@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request, UploadFile, File
+import json
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
-import models, schemas, database
-from services import llm_service, network_service
+from app import models, schemas
+from app.core import database
+from app.services import llm_service, network_service
 
 router = APIRouter(
     prefix="/chat",
@@ -28,6 +30,23 @@ def create_chat(chat: schemas.ChatCreate, db: Session = Depends(database.get_db)
     
     return db_chat
 
+async def handle_upload_background(chat_id: int, network_id: int, graphml_data: str):
+    try:
+        # Initialize network and get visualization data
+        vis_data = await network_service.initialize_network(network_id, graphml_data)
+        
+        # Broadcast render_update
+        queue = await llm_service.get_event_queue(chat_id)
+        await queue.put({"event": "render_update", "data": json.dumps(vis_data)})
+        
+        # Also notify system message
+        await queue.put({"event": "system_message", "data": json.dumps({"content": "Graph uploaded and initialized successfully."})})
+        
+    except Exception as e:
+        print(f"Error in upload background task: {e}")
+        queue = await llm_service.get_event_queue(chat_id)
+        await queue.put({"event": "error", "data": str(e)})
+
 @router.post("/{chat_id}/upload", status_code=202)
 async def upload_network(chat_id: int, background_tasks: BackgroundTasks, file: UploadFile = File(...), db: Session = Depends(database.get_db)):
     # Verify chat exists
@@ -43,8 +62,7 @@ async def upload_network(chat_id: int, background_tasks: BackgroundTasks, file: 
         raise HTTPException(status_code=400, detail="Invalid file encoding. Please upload a valid UTF-8 encoded GraphML file.")
     
     # Start background task
-    # We pass the network_id associated with the chat
-    background_tasks.add_task(network_service.initialize_network, chat.network_id, graphml_data)
+    background_tasks.add_task(handle_upload_background, chat_id, chat.network_id, graphml_data)
     
     return {"status": "accepted"}
 
