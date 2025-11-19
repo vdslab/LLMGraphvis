@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+networkx
+sqlalchemy
+psycopg2-binary
+pandas
+python-multipart
+python-dotenv
+lxml
