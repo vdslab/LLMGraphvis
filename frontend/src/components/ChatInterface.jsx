@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useChatStore } from '../stores/chatStore';
+import { useNetworkStore } from '../stores/networkStore';
 
 const ChatInterface = () => {
   const { messages, sendMessage, isLoading, thinkingMessage, uploadNetwork, chatId } = useChatStore();
+  const { nodes } = useNetworkStore();
   const [input, setInput] = useState('');
   const fileInputRef = React.useRef(null);
 
@@ -24,16 +26,20 @@ const ChatInterface = () => {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>
         <h3>Chat</h3>
-        <input 
-          type="file" 
-          ref={fileInputRef} 
-          style={{ display: 'none' }} 
-          onChange={handleFileUpload} 
-          accept=".graphml,.xml"
-        />
-        <button className="btn" onClick={() => fileInputRef.current.click()}>
-          Upload GraphML
-        </button>
+        {nodes.length > 0 && (
+          <>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              style={{ display: 'none' }} 
+              onChange={handleFileUpload} 
+              accept=".graphml,.xml"
+            />
+            <button className="btn" onClick={() => fileInputRef.current.click()}>
+              Upload GraphML
+            </button>
+          </>
+        )}
       </div>
       
       <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
