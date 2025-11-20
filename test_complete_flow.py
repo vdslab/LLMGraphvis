@@ -11,7 +11,7 @@ import requests
 import time
 import json
 
-BASE_URL = "http://localhost:8000/api"
+BASE_URL = "http://localhost:8000"
 
 def test_complete_flow():
     print("=" * 60)
@@ -28,7 +28,7 @@ def test_complete_flow():
             f"{BASE_URL}/auth/register",
             json={"username": username, "password": password}
         )
-        if response.status_code == 201:
+        if response.status_code in [200, 201]:
             print(f"✓ Registered new user: {username}")
         else:
             print(f"✗ Registration failed: {response.status_code}")

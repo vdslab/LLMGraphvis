@@ -7,11 +7,49 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: true, // Important for HttpOnly cookies
+  timeout: 60000, // 60 seconds timeout
 });
+
+// Retry configuration
+const RETRY_COUNT = 3;
+const RETRY_DELAY = 1000; // 1 second
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const config = error.config;
+
+    // If config does not exist or the retry option is not set, reject
+    if (!config || !config.retry) {
+        // Set default retry count if not present
+        if (config && !config.retryCount) {
+            config.retryCount = 0;
+        }
+    }
+
+    // Check if we should retry
+    // Retry on network errors or 5xx server errors
+    // Don't retry if we've reached max retries
+    if (
+      config &&
+      config.retryCount < RETRY_COUNT &&
+      (error.code === 'ECONNABORTED' || 
+       error.message === 'Network Error' || 
+       (error.response && error.response.status >= 500))
+    ) {
+      config.retryCount += 1;
+      
+      // Exponential backoff
+      const backoff = new Promise((resolve) => {
+        setTimeout(() => {
+          resolve();
+        }, RETRY_DELAY * Math.pow(2, config.retryCount - 1));
+      });
+
+      await backoff;
+      return api(config);
+    }
+
     if (error.response && error.response.status === 401) {
       // Ignore 401 from checkAuth to allow non-logged in users to visit /register
       if (error.config.url && error.config.url.includes('/auth/users/me')) {

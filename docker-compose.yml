@@ -15,6 +15,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: always
 
   backend:
     build: ./backend
@@ -35,6 +36,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    restart: always
     volumes:
       - ./backend:/app
 
@@ -52,6 +54,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    restart: always
     volumes:
       - ./networkx-api:/app
 
@@ -62,6 +65,7 @@ services:
       - "5173:5173"
     environment:
       - VITE_API_URL=http://backend:8000
+    restart: always
     volumes:
       - ./frontend:/app
       - /app/node_modules
