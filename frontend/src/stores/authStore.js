@@ -25,8 +25,11 @@ export const useAuthStore = create((set) => ({
 
   register: async (username, password) => {
     await api.post('/auth/register', { username, password });
-    // Auto login after register? Or redirect to login.
-    // Spec says: "Login after screen transition" (implied)
+    
+    // Auto login after register
+    // The backend sets the cookie on register, so we just need to fetch the user
+    const user = await api.get('/auth/users/me');
+    set({ user: user.data, isAuthenticated: true });
   },
 
   logout: async () => {

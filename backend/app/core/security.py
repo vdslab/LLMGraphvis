@@ -15,7 +15,8 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 
 # OAuth2 scheme for Swagger UI authentication with proper tokenUrl for the OpenAPI docs
 oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/auth/token"  # This must match the actual token endpoint
+    tokenUrl="/auth/token",  # This must match the actual token endpoint
+    auto_error=False
 )
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
@@ -52,7 +53,7 @@ def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
     except JWTError:
         return None
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)):
     """
     Dependency to get the current authenticated user from a token.
     
@@ -60,11 +61,14 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         token: JWT token from OAuth2PasswordBearer dependency
         
     Returns:
-        Username extracted from the token
+        Username extracted from the token, or None if no token/invalid
         
     Raises:
         HTTPException: If token is invalid or user not found
     """
+    if not token:
+        return None
+        
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",

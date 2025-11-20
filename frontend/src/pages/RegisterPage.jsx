@@ -14,7 +14,7 @@ const RegisterPage = () => {
     setError('');
     try {
       await register(username, password);
-      navigate('/login');
+      navigate('/');
     } catch (err) {
       setError('Registration failed. Username might be taken.');
     }

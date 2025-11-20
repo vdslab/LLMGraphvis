@@ -81,7 +81,7 @@ def login_for_access_token(
 
 async def get_current_user(
     db: Session = Depends(database.get_db),
-    username: str = Depends(auth.get_current_user),
+    username: Optional[str] = Depends(auth.get_current_user),
     access_token: Optional[str] = Cookie(None)
 ):
     """
@@ -91,7 +91,9 @@ async def get_current_user(
     but also supports cookie-based auth for browser clients.
     """
     # First, try to get user from standard Bearer token authentication
-    user = db.query(models.User).filter(models.User.username == username).first()
+    user = None
+    if username:
+        user = db.query(models.User).filter(models.User.username == username).first()
     
     # If not found but we have a cookie token, try that as fallback for browser clients
     if user is None and access_token:
