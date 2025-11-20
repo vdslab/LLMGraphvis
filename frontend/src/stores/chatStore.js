@@ -1,6 +1,14 @@
 import { create } from 'zustand';
-import api from '../services/api';
 import { useNetworkStore } from './networkStore';
+import {
+  getChats,
+  getChat,
+  getChatMessages,
+  exportNetwork,
+  createChat as createChatAPI,
+  processMessage as processMessageAPI,
+  uploadGraphML
+} from '../services/api';
 
 export const useChatStore = create((set, get) => ({
   chatId: null,
@@ -8,41 +16,77 @@ export const useChatStore = create((set, get) => ({
   isLoading: false,
   thinkingMessage: null,
 
+  // Get all chats for current user
+  fetchChats: async () => {
+    const res = await getChats();
+    return res.data;
+  },
+  
+  // Get chat details
+  fetchChat: async (chatId) => {
+    const res = await getChat(chatId);
+    return res.data;
+  },
+  
+  // Get message history
+  fetchMessages: async (chatId = null) => {
+    const id = chatId || get().chatId;
+    if (!id) return;
+    
+    const res = await getChatMessages(id);
+    set({ messages: res.data });
+    return res.data;
+  },
+
+  // Create a new chat
   createChat: async (name) => {
-    const res = await api.post('/chat', { name });
+    const res = await createChatAPI(name);
     set({ chatId: res.data.id, messages: [] });
     useNetworkStore.getState().setNetworkId(res.data.network_id);
     return res.data;
   },
 
+  // Upload network file to chat
   uploadNetwork: async (chatId, file) => {
-    const formData = new FormData();
-    formData.append('file', file); // Backend expects raw body or file? Spec says "GraphML data".
-    // Wait, spec says POST /chat/{id}/upload (GraphML data).
-    // Usually this means file upload.
-    // Let's assume backend handles file upload or raw body.
-    // My backend implementation for upload is not yet detailed in routers/chat.py, 
-    // but standard is multipart/form-data or raw bytes.
-    // I'll implement as multipart for file upload.
-    
-    // Note: I haven't implemented the upload endpoint in backend yet!
-    // I need to add that to backend/routers/chat.py later.
-    
     set({ isLoading: true, thinkingMessage: "Uploading and initializing network..." });
-    await api.post(`/chat/${chatId}/upload`, formData);
+    await uploadGraphML(chatId, file);
     // Response is 202 Accepted.
     // SSE will handle the rest.
   },
 
+  // Send message to process
   sendMessage: async (content) => {
     const { chatId, messages } = get();
-    // Optimistic update
-    const newMessage = { role: 'user', content, id: Date.now() };
-    set({ messages: [...messages, newMessage], isLoading: true, thinkingMessage: "Waiting for response..." });
+    // Optimistic update - add user message immediately
+    const newMessage = { role: 'user', content, id: Date.now(), created_at: new Date().toISOString() };
+    set({ messages: [...messages, newMessage], isLoading: true, thinkingMessage: "Processing..." });
 
-    await api.post(`/chat/${chatId}/process`, { message: { role: 'user', content } });
-    // Response is 202 Accepted.
-    // SSE will handle the rest.
+    try {
+      await processMessageAPI(chatId, content);
+      // Response is 202 Accepted.
+      // SSE will handle the rest.
+    } catch (error) {
+      console.error("Failed to send message:", error);
+      set({ isLoading: false, thinkingMessage: null });
+      throw error;
+    }
+  },
+  
+  // Export network as GraphML
+  exportNetworkAsGraphML: async (chatId = null) => {
+    const id = chatId || get().chatId;
+    if (!id) return;
+    
+    const response = await exportNetwork(id);
+    
+    // Create a download link
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `network_${id}.graphml`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   },
 
   addMessage: (message) => {

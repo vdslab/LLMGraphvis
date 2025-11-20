@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Dict, Any, List
 from fastapi import Request
 from sqlalchemy.orm import Session
 from google import genai
@@ -23,88 +23,261 @@ async def get_event_queue(chat_id: int) -> asyncio.Queue:
         event_queues[chat_id] = asyncio.Queue()
     return event_queues[chat_id]
 
-# Initialize Client
+# Initialize Gemini Client
 client = genai.Client(api_key=GOOGLE_API_KEY)
 
-async def process_chat(chat_id: int, user_message: str, db: Session):
+# Define tools for network operations
+def list_attributes(network_id: int) -> List[str]:
+    """
+    List all available node attributes for the network.
+    
+    Args:
+        network_id: The ID of the network to query
+        
+    Returns:
+        List of attribute names available in the network
+    """
+    # This is a placeholder - actual implementation will call network_service
+    return []
+
+def calculate_centrality(network_id: int, centrality_type: str) -> Dict[str, Any]:
+    """
+    Calculate centrality metrics for nodes in the network.
+    
+    Args:
+        network_id: The ID of the network
+        centrality_type: Type of centrality to calculate. Options: "degree", "betweenness", "closeness", "eigenvector"
+        
+    Returns:
+        Status message indicating success or failure
+    """
+    # This is a placeholder - actual implementation will call network_service
+    return {"status": "success"}
+
+def generate_visualization(
+    network_id: int,
+    layout_name: str = "spring",
+    node_size_attribute: str = None,
+    node_size_min: float = 5.0,
+    node_size_max: float = 20.0,
+    node_color_attribute: str = None
+) -> Dict[str, Any]:
+    """
+    Generate visualization data for the network with specified visual mappings.
+    
+    Args:
+        network_id: The ID of the network
+        layout_name: Layout algorithm to use (default: "spring")
+        node_size_attribute: Attribute to map to node size (e.g., "degree_centrality")
+        node_size_min: Minimum node size
+        node_size_max: Maximum node size
+        node_color_attribute: Attribute to map to node color
+        
+    Returns:
+        Visualization data with nodes and links
+    """
+    # This is a placeholder - actual implementation will call network_service
+    return {"nodes": [], "links": []}
+
+# System instruction for the LLM
+SYSTEM_INSTRUCTION = """You are a network visualization assistant. You help users analyze and visualize network graphs.
+
+When users ask to visualize networks based on certain properties:
+1. First, use list_attributes to see what attributes are available
+2. If needed, use calculate_centrality to compute centrality metrics
+3. Finally, use generate_visualization to create the visualization with appropriate mappings
+
+Common requests and how to handle them:
+- "Show people with many friends as larger" -> Calculate degree centrality, then map it to node size
+- "Highlight bridge nodes" or "Show important connectors" -> Calculate betweenness centrality, then map it to node size
+- "Show influential nodes" -> Calculate eigenvector centrality, then map it to node size
+
+Always explain what you're doing in a friendly, clear manner."""
+
+async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
+    """Process a chat message using Gemini API with function calling"""
     queue = await get_event_queue(chat_id)
     
     try:
-        # 1. Notify thinking start
-        await queue.put({"event": "thinking_stream", "data": json.dumps({"content": "Thinking..."})})
-        
         # Get Chat and Network ID
         chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
         if not chat:
             raise ValueError("Chat not found")
         network_id = chat.network_id
-
-        # MVP Logic: Simple Keyword Matching or LLM with Tools
-        # For this MVP, to ensure "Show people with many friends as larger" works 100%:
         
-        if "friend" in user_message.lower() and ("large" in user_message.lower() or "big" in user_message.lower()):
-            await queue.put({"event": "thinking_stream", "data": json.dumps({"content": "Calculating degree centrality..."})})
-            
-            # 1. Calculate Centrality
-            await network_service.calculate_centrality(network_id, "degree")
-            
-            await queue.put({"event": "thinking_stream", "data": json.dumps({"content": "Updating visualization..."})})
-            
-            # 2. Generate Visualization
-            # Map degree_centrality to size
-            vis_data = await network_service.generate_visualization(network_id, {
-                "node_size_config": {"attribute": "degree_centrality", "min": 5, "max": 20},
-                "node_color_config": None # Default
-            })
-            
-            # 3. Send Render Update
-            await queue.put({"event": "render_update", "data": json.dumps(vis_data)})
-            
-            response_text = "I've updated the visualization. Nodes with more friends (higher degree centrality) are now shown larger."
-
-        elif ("bridge" in user_message.lower() or "betweenness" in user_message.lower() or "橋渡し" in user_message.lower()) and ("large" in user_message.lower() or "big" in user_message.lower() or "大きく" in user_message.lower()):
-            await queue.put({"event": "thinking_stream", "data": json.dumps({"content": "Calculating betweenness centrality..."})})
-            
-            # 1. Calculate Centrality
-            await network_service.calculate_centrality(network_id, "betweenness")
-            
-            await queue.put({"event": "thinking_stream", "data": json.dumps({"content": "Updating visualization..."})})
-            
-            # 2. Generate Visualization
-            # Map betweenness_centrality to size
-            vis_data = await network_service.generate_visualization(network_id, {
-                "node_size_config": {"attribute": "betweenness_centrality", "min": 5, "max": 20},
-                "node_color_config": None # Default
-            })
-            
-            # 3. Send Render Update
-            await queue.put({"event": "render_update", "data": json.dumps(vis_data)})
-            
-            response_text = "I've updated the visualization. Nodes acting as bridges (higher betweenness centrality) are now shown larger."
-            
+        # Get chat history
+        messages = db.query(models.ChatMessage).filter(
+            models.ChatMessage.chat_id == chat_id
+        ).order_by(models.ChatMessage.created_at.asc()).all()
+        
+        # Build conversation history
+        history = []
+        for msg in messages:
+            history.append(types.Content(
+                role=msg.role,
+                parts=[types.Part.from_text(text=msg.content)]
+            ))
+        
+        # Add current user message
+        history.append(types.Content(
+            role="user",
+            parts=[types.Part.from_text(text=user_message)]
+        ))
+        
+        # Notify thinking start
+        await queue.put({
+            "event": "thinking_stream",
+            "data": json.dumps({"content": "Analyzing your request..."})
+        })
+        
+        # Create tools list - these will be actual Python functions
+        tools = [list_attributes, calculate_centrality, generate_visualization]
+        
+        # Call Gemini with function calling
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=history,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_INSTRUCTION,
+                tools=tools,
+                temperature=0.7,
+            )
+        )
+        
+        # Process function calls if any
+        if response.candidates[0].content.parts:
+            for part in response.candidates[0].content.parts:
+                # Check if this part is a function call
+                if hasattr(part, 'function_call') and part.function_call:
+                    function_call = part.function_call
+                    function_name = function_call.name
+                    function_args = dict(function_call.args)
+                    
+                    # Add network_id to args if not present
+                    if 'network_id' not in function_args:
+                        function_args['network_id'] = network_id
+                    
+                    # Notify tool execution start
+                    await queue.put({
+                        "event": "tool_execution",
+                        "data": json.dumps({
+                            "tool": function_name,
+                            "status": "started",
+                            "args": function_args
+                        })
+                    })
+                    
+                    # Execute the actual network service call
+                    try:
+                        if function_name == "list_attributes":
+                            result = await network_service.list_attributes(network_id)
+                            function_result = result
+                            
+                        elif function_name == "calculate_centrality":
+                            centrality_type = function_args.get("centrality_type", "degree")
+                            await queue.put({
+                                "event": "thinking_stream",
+                                "data": json.dumps({"content": f"Calculating {centrality_type} centrality..."})
+                            })
+                            result = await network_service.calculate_centrality(network_id, centrality_type)
+                            function_result = result
+                            
+                        elif function_name == "generate_visualization":
+                            await queue.put({
+                                "event": "thinking_stream",
+                                "data": json.dumps({"content": "Generating visualization..."})
+                            })
+                            
+                            # Build visualization config
+                            vis_config = {
+                                "layout_name": function_args.get("layout_name", "spring")
+                            }
+                            
+                            # Add node size config if specified
+                            if function_args.get("node_size_attribute"):
+                                vis_config["node_size_config"] = {
+                                    "attribute": function_args["node_size_attribute"],
+                                    "min": function_args.get("node_size_min", 5.0),
+                                    "max": function_args.get("node_size_max", 20.0)
+                                }
+                            
+                            # Add node color config if specified
+                            if function_args.get("node_color_attribute"):
+                                vis_config["node_color_config"] = {
+                                    "attribute": function_args["node_color_attribute"]
+                                }
+                            
+                            vis_data = await network_service.generate_visualization(network_id, vis_config)
+                            
+                            # Send render update
+                            await queue.put({
+                                "event": "render_update",
+                                "data": json.dumps(vis_data)
+                            })
+                            
+                            function_result = {"status": "success", "message": "Visualization updated"}
+                        else:
+                            function_result = {"error": f"Unknown function: {function_name}"}
+                        
+                        # Notify tool execution complete
+                        await queue.put({
+                            "event": "tool_execution",
+                            "data": json.dumps({
+                                "tool": function_name,
+                                "status": "completed"
+                            })
+                        })
+                        
+                    except Exception as e:
+                        error_msg = str(e)
+                        await queue.put({
+                            "event": "tool_execution",
+                            "data": json.dumps({
+                                "tool": function_name,
+                                "status": "failed",
+                                "error": error_msg
+                            })
+                        })
+                        function_result = {"error": error_msg}
+                    
+                    # Continue conversation with function result
+                    history.append(response.candidates[0].content)
+                    history.append(types.Content(
+                        role="user",
+                        parts=[types.Part.from_function_response(
+                            name=function_name,
+                            response=function_result
+                        )]
+                    ))
+                    
+                    # Get final response from LLM
+                    final_response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=history,
+                        config=types.GenerateContentConfig(
+                            system_instruction=SYSTEM_INSTRUCTION,
+                            temperature=0.7,
+                        )
+                    )
+                    
+                    response_text = final_response.text
+                else:
+                    # No function call, just text response
+                    response_text = response.text
         else:
-            # Fallback to simple LLM chat for other queries
-            # Note: Real tool calling would go here
-            try:
-                response = client.models.generate_content(
-                    model="gemini-2.0-flash-exp",
-                    contents=user_message
-                )
-                response_text = response.text
-            except Exception as e:
-                print(f"LLM Error: {e}")
-                response_text = "I'm sorry, I couldn't process that request right now. (LLM Error)"
-
-        # 4. Send final response
-        # await queue.put({"event": "message", "data": json.dumps({"role": "assistant", "content": response_text})})
+            response_text = response.text
+        
         return response_text
         
     except Exception as e:
         print(f"Error in process_chat: {e}")
+        import traceback
+        traceback.print_exc()
         await queue.put({"event": "error", "data": str(e)})
-        raise e
+        return f"I encountered an error: {str(e)}"
 
 async def event_generator(chat_id: int, request: Request) -> AsyncGenerator[dict, None]:
+    """Generate SSE events for a chat"""
     queue = await get_event_queue(chat_id)
     
     while True:

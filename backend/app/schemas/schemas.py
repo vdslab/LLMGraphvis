@@ -37,6 +37,13 @@ class Chat(ChatBase):
     class Config:
         orm_mode = True
 
+class ChatWithNetwork(Chat):
+    """Chat with network information"""
+    network: Optional[Dict[str, Any]] = None
+    
+    class Config:
+        orm_mode = True
+
 class ChatMessageBase(BaseModel):
     role: str
     content: str

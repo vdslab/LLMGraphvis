@@ -27,6 +27,28 @@ api.interceptors.response.use(
   }
 );
 
+// Get all chats
+export const getChats = () => api.get('/chat');
+
+// Get specific chat
+export const getChat = (chatId) => api.get(`/chat/${chatId}`);
+
+// Get chat messages
+export const getChatMessages = (chatId) => api.get(`/chat/${chatId}/messages`);
+
+// Export network
+export const exportNetwork = (chatId) =>
+  api.get(`/chat/${chatId}/export`, { responseType: 'blob' });
+
+// Create chat
+export const createChat = (name) => api.post('/chat', { name });
+
+// Process message
+export const processMessage = (chatId, content) =>
+  api.post(`/chat/${chatId}/process`, {
+    message: { content }
+  });
+
 export const uploadGraphML = async (chatId, file) => {
   const formData = new FormData();
   formData.append('file', file);

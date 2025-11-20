@@ -1,12 +1,80 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from app.api.v1.endpoints import auth, chat
 from app.core.database import engine, Base
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="GraphVisAgent Backend")
+# Create FastAPI app with Swagger UI configuration
+app = FastAPI(
+    title="GraphVisAgent Backend",
+    description="API with authentication support for both browser clients (cookies) and API clients (Bearer tokens).",
+    version="1.0.0",
+    swagger_ui_parameters={
+        "persistAuthorization": True,   # Remember authorization between refreshes
+        "tryItOutEnabled": True,        # Enable testing endpoints directly from Swagger
+        "displayRequestDuration": True, # Show request duration for debugging
+        "docExpansion": "none",         # Collapse all endpoints by default
+        "defaultModelsExpandDepth": 1   # Limit models display depth
+    }
+)
+
+# Public endpoints that don't require authentication
+PUBLIC_ENDPOINTS = [
+    {"path": "/health", "method": "GET"},
+    {"path": "/auth/register", "method": "POST"},
+    {"path": "/auth/token", "method": "POST"},
+    {"path": "/openapi.json", "method": "GET"},
+    {"path": "/docs", "method": "GET"},
+    {"path": "/redoc", "method": "GET"}
+]
+
+# Custom OpenAPI schema to include security scheme and exclude public endpoints
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    
+    # Add OAuth2 password flow security scheme
+    openapi_schema["components"]["securitySchemes"] = {
+        "OAuth2PasswordBearer": {
+            "type": "oauth2",
+            "flows": {
+                "password": {
+                    "tokenUrl": "/auth/token",
+                    "scopes": {}
+                }
+            }
+        }
+    }
+    
+    # Configure security for all paths
+    if "paths" in openapi_schema:
+        for path, path_item in openapi_schema["paths"].items():
+            for method, operation in path_item.items():
+                # Skip security for public endpoints
+                is_public = False
+                for endpoint in PUBLIC_ENDPOINTS:
+                    if path == endpoint["path"] and method.upper() == endpoint["method"]:
+                        is_public = True
+                        break
+                
+                # Add security requirement for protected endpoints only
+                if not is_public:
+                    operation["security"] = [{"OAuth2PasswordBearer": []}]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 # CORS configuration
 origins = [

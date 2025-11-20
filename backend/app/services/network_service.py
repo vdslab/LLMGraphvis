@@ -43,3 +43,13 @@ async def generate_visualization(network_id: int, params: dict):
         )
         response.raise_for_status()
         return response.json()
+
+async def export_network(network_id: int) -> str:
+    """Export network as GraphML from NetworkXAPI"""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"{NETWORKX_API_URL}/tools/export_network",
+            params={"network_id": network_id}
+        )
+        response.raise_for_status()
+        return response.text
