@@ -44,7 +44,7 @@ def list_chats(
     return chats
 
 @router.get("/{chat_id}", response_model=schemas.ChatWithNetwork)
-def get_chat(
+async def get_chat(
     chat_id: int,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db)
@@ -52,9 +52,38 @@ def get_chat(
     """Get specific chat with network information"""
     chat = verify_chat_ownership(chat_id, current_user.id, db)
     
-    # Here we would add network information to the response
-    # For now, just return the chat
-    return chat
+    # Fetch current visualization data
+    try:
+        # We use default parameters for now as we don't persist view state yet
+        vis_data = await network_service.generate_visualization(
+            chat.network_id, 
+            {"layout_name": "spring"} # Default layout
+        )
+        
+        # Create a dictionary from the chat object to allow adding extra fields
+        # Pydantic's orm_mode will handle the rest if we return a dict-like object
+        # But since ChatWithNetwork expects 'network' field which is not in DB model,
+        # we need to construct the response carefully.
+        
+        # The easiest way with Pydantic ORM mode is to attach the data to the object
+        # if the object allows it, or convert to dict.
+        # SQLAlchemy objects are not easily mutable for extra fields.
+        
+        # Let's return a dict that matches the schema
+        return {
+            "id": chat.id,
+            "name": chat.name,
+            "user_id": chat.user_id,
+            "network_id": chat.network_id,
+            "created_at": chat.created_at,
+            "updated_at": chat.updated_at,
+            "network": vis_data
+        }
+        
+    except Exception as e:
+        print(f"Failed to fetch visualization for chat {chat_id}: {e}")
+        # Fallback to returning chat without network data if fails (or empty network)
+        return chat
 
 @router.get("/{chat_id}/messages", response_model=List[schemas.ChatMessage])
 def get_messages(

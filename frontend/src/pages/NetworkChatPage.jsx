@@ -46,14 +46,17 @@ const NetworkChatPage = () => {
     }
   }, [id, isAuthenticated, createChat, navigate]);
 
-  // Load chat messages when component mounts
+  // Load chat messages and details when component mounts
   useEffect(() => {
     if (id && id !== 'new' && isAuthenticated) {
-      const loadMessages = async () => {
+      const loadData = async () => {
         try {
+          // Fetch chat details (includes network visualization)
+          await useChatStore.getState().fetchChat(parseInt(id));
+          // Fetch messages
           await fetchMessages(parseInt(id));
         } catch (error) {
-          console.error("Failed to load messages:", error);
+          console.error("Failed to load chat data:", error);
           if (error.response && error.response.status === 404) {
             // Chat not found or not owned by user
             navigate('/');
@@ -61,7 +64,7 @@ const NetworkChatPage = () => {
         }
       };
       
-      loadMessages();
+      loadData();
     }
   }, [id, fetchMessages, isAuthenticated, navigate]);
   
