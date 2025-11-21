@@ -124,13 +124,12 @@ graph TD
 プロセスは以下のステップで実行されます。
 
 1.  **BackendがLLMに指示を送信**:
-    - Frontendから受け取ったユーザーの自然言語指示（例：「次数中心性でノードを色分けして」）と、利用可能なツールリスト（`list_attributes`, `calculate_centrality`, `generate_visualization`など）をLLMに送信します。
+    - Frontendから受け取ったユーザーの自然言語指示（例：「次数中心性でノードを色分けして」）と、利用可能なツールリスト（`list_attributes`, `visualize_centrality`など）をLLMに送信します。
 
 2.  **LLMが実行プランを計画**:
     - LLMはユーザーの意図を解釈します。
     - ネットワークの現状を把握するために`list_attributes`を呼び出し、必要な属性（例：`degree_centrality`）が存在するか確認します。
-    - 属性が存在しない場合は、`calculate_centrality`を呼び出して計算させます。
-    - 最終的に、レイアウト、ノードサイズ、ノードカラーなどの割り当てをすべて定義した、`generate_visualization`ツールのパラメータを組み立て、Backendに返します。
+    - 属性の計算と可視化を一括で行うために、`visualize_centrality`ツールのパラメータを組み立て、Backendに返します。
 
 3.  **BackendがNetworkXAPIを呼び出す**:
     - Backendは、LLMから受け取った`generate_visualization`の呼び出しプラン（リクエストボディ）をそのままNetworkXAPIの`/tools/generate_visualization`エンドポイントに送信します。

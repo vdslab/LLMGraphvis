@@ -91,7 +91,11 @@ export const uploadGraphML = async (chatId, file) => {
   const formData = new FormData();
   formData.append('file', file);
 
-  return api.post(`/chat/${chatId}/upload`, formData);
+  return api.post(`/chat/${chatId}/upload`, formData, {
+    headers: {
+      'Content-Type': undefined
+    }
+  });
 };
 
 export default api;

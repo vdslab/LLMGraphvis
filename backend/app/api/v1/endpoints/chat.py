@@ -225,4 +225,4 @@ async def stream(
     verify_chat_ownership(chat_id, current_user.id, db)
     
     # Return SSE response with event generator
-    return EventSourceResponse(llm_service.event_generator(chat_id, request))
+    return EventSourceResponse(llm_service.event_generator(chat_id, request), ping=15)

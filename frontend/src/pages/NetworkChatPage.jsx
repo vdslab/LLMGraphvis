@@ -14,12 +14,14 @@ const NetworkChatPage = () => {
     setChatId,
     chatId,
     fetchMessages,
-    uploadNetwork
+    uploadNetwork,
+    createChat
   } = useChatStore();
   const { nodes, links } = useNetworkStore();
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
   const [sseError, setSseError] = useState(null);
+  const [retryTrigger, setRetryTrigger] = useState(0);
 
   // Check authentication
   useEffect(() => {
@@ -28,9 +30,25 @@ const NetworkChatPage = () => {
     }
   }, [isAuthenticated, navigate, id]);
 
+  // Handle "new" chat creation
+  useEffect(() => {
+    if (id === 'new' && isAuthenticated) {
+      const initNewChat = async () => {
+        try {
+          const newChat = await createChat("New Chat");
+          navigate(`/chat/${newChat.id}`, { replace: true });
+        } catch (error) {
+          console.error("Failed to create new chat:", error);
+          navigate('/');
+        }
+      };
+      initNewChat();
+    }
+  }, [id, isAuthenticated, createChat, navigate]);
+
   // Load chat messages when component mounts
   useEffect(() => {
-    if (id && isAuthenticated) {
+    if (id && id !== 'new' && isAuthenticated) {
       const loadMessages = async () => {
         try {
           await fetchMessages(parseInt(id));
@@ -49,12 +67,15 @@ const NetworkChatPage = () => {
   
   // Initialize SSE connection with error handling
   useEffect(() => {
-    if (id && isAuthenticated) {
-      setChatId(parseInt(id));
+    if (id && id !== 'new' && isAuthenticated) {
+      const numericId = parseInt(id);
+      if (isNaN(numericId)) return;
+
+      setChatId(numericId);
       setSseError(null);
       
       // Create SSE connection with error handling
-      const eventSource = new EventSource(`/api/chat/${id}/stream`);
+      const eventSource = new EventSource(`/api/chat/${numericId}/stream`, { withCredentials: true });
       
       // Set up event handlers
       eventSource.addEventListener('render_update', (event) => {
@@ -118,37 +139,56 @@ const NetworkChatPage = () => {
         }
       });
       
-      // Enhanced error handling for SSE
+      // Enhanced error handling for SSE with retry logic
       eventSource.onerror = (err) => {
         console.error("SSE Error:", err);
+        eventSource.close();
+
+        // Don't show error immediately, try to reconnect
+        const retryCount = window.sseRetryCount || 0;
+        const maxRetries = 3;
         
-        // Check if the connection was closed due to authentication error
-        if (eventSource.readyState === EventSource.CLOSED) {
-          setSseError("Connection lost. You may need to log in again.");
+        if (retryCount < maxRetries) {
+          console.log(`Attempting to reconnect... (${retryCount + 1}/${maxRetries})`);
+          window.sseRetryCount = retryCount + 1;
           
-          // Try to reconnect once after a short delay
+          // Exponential backoff
+          const timeout = Math.min(1000 * Math.pow(2, retryCount), 10000);
+          
           setTimeout(() => {
             if (isAuthenticated) {
-              // If still authenticated according to local state, try reconnecting
-              const newEventSource = new EventSource(`/api/chat/${id}/stream`);
+              // Trigger re-render to re-run effect and create new connection
+              // We can do this by briefly setting chatId to null then back
+              // But better to just let the user know we are reconnecting if it takes too long
+              setSseError(null); // Clear previous error if any
               
-              // If it immediately fails again, redirect to login
-              newEventSource.onerror = () => {
-                newEventSource.close();
-                // The axios interceptor will handle 401 redirect
-              };
+              // Force reconnection by unmounting/remounting or just creating new source
+              // Since this effect depends on [id], we can't easily force re-run without changing id
+              // Instead, we'll rely on the fact that we closed the old one, 
+              // and we can manually trigger a state update that causes re-connection?
+              // Actually, the cleanest way in this component structure is to let the user manually retry 
+              // OR we can use a state variable 'connectionKey' to force effect re-run.
+              // For now, let's just show a "Reconnecting..." message if it's not the first try
+              if (retryCount > 0) {
+                 setSseError("Reconnecting...");
+              }
+              
+              // To actually reconnect, we need to re-run the effect. 
+              // We can add a 'retryTrigger' state to the dependency array.
+              setRetryTrigger(prev => prev + 1);
             }
-          }, 2000);
+          }, timeout);
+        } else {
+          window.sseRetryCount = 0; // Reset for next time
+          setSseError("Connection lost. Please refresh the page or try logging in again.");
         }
-        
-        eventSource.close();
       };
       
       return () => {
         eventSource.close();
       };
     }
-  }, [id, setChatId, isAuthenticated]);
+  }, [id, setChatId, isAuthenticated, retryTrigger]);
 
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];

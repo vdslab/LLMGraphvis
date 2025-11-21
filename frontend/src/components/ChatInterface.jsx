@@ -18,7 +18,12 @@ const ChatInterface = () => {
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      await uploadNetwork(chatId, file);
+      try {
+        await uploadNetwork(chatId, file);
+      } catch (error) {
+        console.error("Upload failed:", error);
+        alert("Failed to upload file. Please try again.");
+      }
     }
   };
 

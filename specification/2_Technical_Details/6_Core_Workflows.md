@@ -113,14 +113,16 @@ sequenceDiagram
 
     %% Step 3: Backend continues planning with LLM
     B->>LLM: 属性リストをツール実行結果として送信
-    LLM-->>B: ツール呼び出し要求 (2. generate_visualization)
+    LLM-->>B: ツール呼び出し要求 (2. visualize_centrality)
 
-    %% Step 4: Backend executes the final visualization tool
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "generate_visualization", status: "started" })
-    B->>N: POST /tools/generate_visualization (詳細なJSONパラメータ)
-    note over N,DB: リクエストに基づき、属性計算、レイアウト計算、<br/>視覚マッピングをすべて実行し、最終レンダリングデータを生成する。
+    %% Step 4: Backend executes the combined visualization tool
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "visualize_centrality", status: "started" })
+    note right of B: 内部でcalculate_centralityと<br/>generate_visualizationを順次実行
+    B->>N: POST /tools/calculate_centrality
+    N-->>B: 計算完了
+    B->>N: POST /tools/generate_visualization
     N-->>B: 最終レンダリングデータ { nodes: [...], links: [...] }
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "generate_visualization", status: "completed" })
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "visualize_centrality", status: "completed" })
 
     %% Step 5: Backend sends final data and text response via SSE
     B-->>F: SSEイベント (event: render_update, data: { nodes, links })
@@ -145,10 +147,10 @@ sequenceDiagram
 
 2.  **LLMによるプランニングとツールの実行**:
     - BackendはバックグラウンドでLLMとの対話を開始する。
-    - LLMの思考プロセスや、`list_attributes`、`generate_visualization`といったツールの実行状況は、`thinking_stream`や`tool_execution`といった専用のSSEイベントを通じて逐一フロントエンドに通知される。
+    - LLMの思考プロセスや、`list_attributes`、`visualize_centrality`といったツールの実行状況は、`thinking_stream`や`tool_execution`といった専用のSSEイベントを通じて逐一フロントエンドに通知される。
 
 3.  **最終的な結果の通知**:
-    - `generate_visualization`が完了すると、Backendは2つの重要な情報をSSEで送信する。
+    - `visualize_centrality`が完了すると、Backendは2つの重要な情報をSSEで送信する。
         1.  `render_update`イベント: NetworkXAPIが生成した最終的なレンダリングデータ（`{nodes, links}`）を送信する。フロントエンドはこれを受けてグラフを再描画する。
         2.  `message`イベント: LLMが生成した最終的なテキスト応答（例：「次数中心性を計算し、ノードのサイズに反映しました。」）を送信する。フロントエンドはこれを受けてチャット履歴を更新する。
 
@@ -174,13 +176,13 @@ sequenceDiagram
     B-->>F: 202 Accepted
 
     B->>LLM: ユーザーの指示を送信
-    LLM-->>B: ツール呼び出しを要求 (calculate_centrality, centrality_type:"pagerank")
+    LLM-->>B: ツール呼び出しを要求 (visualize_centrality, centrality_type:"pagerank")
 
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "started" })
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "visualize_centrality", status: "started" })
     B->>N: /tools/calculate_centrality (network_id, centrality_type:"pagerank")
     note over N: "pagerank" は未実装のためエラーを返す
     N-->>B: 実行失敗の応答 (エラーメッセージ)
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "failed", error: "..." })
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "visualize_centrality", status: "failed", error: "..." })
 
     B->>LLM: ツールの実行結果（失敗）を送信
     note right of LLM: LLMは失敗を認識し、<br/>ユーザーへの説明と代替案を生成する。
