@@ -1,12 +1,16 @@
 import httpx
 import os
 from dotenv import load_dotenv
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 load_dotenv()
 
 NETWORKX_API_URL = os.getenv("NETWORKX_API_URL", "http://localhost:8001")
 
 async def initialize_network(network_id: int, graphml_data: str):
+    logger.info(f"Initializing network {network_id} via NetworkXAPI")
     async with httpx.AsyncClient() as client:
         response = await client.post(
             f"{NETWORKX_API_URL}/tools/initialize_network",
@@ -16,6 +20,7 @@ async def initialize_network(network_id: int, graphml_data: str):
         return response.json()
 
 async def list_attributes(network_id: int):
+    logger.info(f"Listing attributes for network {network_id}")
     async with httpx.AsyncClient() as client:
         response = await client.get(
             f"{NETWORKX_API_URL}/tools/list_attributes",
@@ -25,6 +30,7 @@ async def list_attributes(network_id: int):
         return response.json()
 
 async def calculate_centrality(network_id: int, centrality_type: str):
+    logger.info(f"Calculating {centrality_type} centrality for network {network_id}")
     async with httpx.AsyncClient() as client:
         response = await client.post(
             f"{NETWORKX_API_URL}/tools/calculate_centrality",
@@ -34,6 +40,7 @@ async def calculate_centrality(network_id: int, centrality_type: str):
         return response.json()
 
 async def generate_visualization(network_id: int, params: dict):
+    logger.info(f"Generating visualization for network {network_id} with params: {params}")
     async with httpx.AsyncClient() as client:
         # params should include layout_name, node_size_config, etc.
         payload = {"network_id": network_id, **params}
@@ -46,6 +53,7 @@ async def generate_visualization(network_id: int, params: dict):
 
 async def export_network(network_id: int) -> str:
     """Export network as GraphML from NetworkXAPI"""
+    logger.info(f"Exporting network {network_id}")
     async with httpx.AsyncClient() as client:
         response = await client.get(
             f"{NETWORKX_API_URL}/tools/export_network",

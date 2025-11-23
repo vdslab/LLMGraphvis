@@ -7,6 +7,9 @@ from app import models, schemas
 from app.core import database
 from app.services import llm_service, network_service
 from app.api.v1.endpoints.auth import get_current_user
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(
     prefix="/chat",
@@ -128,6 +131,7 @@ def create_chat(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db)
 ):
+    logger.info(f"Creating new chat: {chat.name} for user {current_user.id}")
     user_id = current_user.id
     
     # Create Network
@@ -145,11 +149,13 @@ def create_chat(
     return db_chat
 
 async def handle_upload_background(chat_id: int, network_id: int, graphml_data: str):
+    logger.info(f"Background upload started for chat_id={chat_id}, network_id={network_id}")
     try:
         # Initialize network and get visualization data
         vis_data = await network_service.initialize_network(network_id, graphml_data)
         
         # Broadcast render_update
+        logger.info(f"Broadcasting render_update for chat_id={chat_id}")
         queue = await llm_service.get_event_queue(chat_id)
         await queue.put({"event": "render_update", "data": json.dumps(vis_data)})
         
@@ -157,6 +163,7 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
         await queue.put({"event": "system_message", "data": json.dumps({"content": "Graph uploaded and initialized successfully."})})
         
     except Exception as e:
+        logger.error(f"Error in upload background task: {e}")
         print(f"Error in upload background task: {e}")
         queue = await llm_service.get_event_queue(chat_id)
         await queue.put({"event": "error", "data": str(e)})
@@ -186,6 +193,7 @@ async def upload_network(
 
 async def handle_process_background(chat_id: int, user_message: str, db: Session):
     """Background task to process chat message with LLM"""
+    logger.info(f"Background process started for chat_id={chat_id}, message='{user_message[:50]}...'")
     try:
         # Process chat and get response
         response_content = await llm_service.process_chat(chat_id, user_message, db)
@@ -212,6 +220,7 @@ async def handle_process_background(chat_id: int, user_message: str, db: Session
         })
         
     except Exception as e:
+        logger.error(f"Error in process background task: {e}")
         print(f"Error in process background task: {e}")
         import traceback
         traceback.print_exc()
@@ -226,6 +235,7 @@ async def process_message(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db)
 ):
+    logger.info(f"Process message request received for chat_id={chat_id}")
     # Verify chat exists and user owns it
     verify_chat_ownership(chat_id, current_user.id, db)
     

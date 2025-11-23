@@ -9,6 +9,9 @@ import os
 from dotenv import load_dotenv
 from app import models
 from app.services import network_service
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 load_dotenv()
 
@@ -73,6 +76,7 @@ Assistant: [Calls visualize_centrality(centrality_type="degree")] -> "I have cal
 
 async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
     """Process a chat message using Gemini API with function calling"""
+    logger.info(f"Processing chat_id={chat_id}, message='{user_message[:50]}...'")
     queue = await get_event_queue(chat_id)
     
     try:
@@ -111,6 +115,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
         tools = [list_attributes, visualize_centrality]
         
         # Call Gemini with function calling
+        logger.info("Calling Gemini API...")
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=history,
@@ -127,6 +132,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
         )
         
         # Process function calls if any
+        logger.info(f"Gemini Response: {response.candidates[0].content}")
         print(f"DEBUG: Gemini Response: {response.candidates[0].content}")
         if response.candidates[0].content.parts:
             for part in response.candidates[0].content.parts:
@@ -141,6 +147,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                         function_args['network_id'] = network_id
                     
                     # Notify tool execution start
+                    logger.info(f"Executing tool: {function_name} with args: {function_args}")
                     await queue.put({
                         "event": "tool_execution",
                         "data": json.dumps({
@@ -204,6 +211,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                         })
                         
                     except Exception as e:
+                        logger.error(f"Tool execution failed: {e}")
                         error_msg = str(e)
                         await queue.put({
                             "event": "tool_execution",
@@ -245,6 +253,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
         return response_text
         
     except Exception as e:
+        logger.error(f"Error in process_chat: {e}")
         print(f"Error in process_chat: {e}")
         import traceback
         traceback.print_exc()

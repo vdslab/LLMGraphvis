@@ -13,66 +13,82 @@ const NetworkGraph = ({ nodes, links }) => {
 
     svg.selectAll("*").remove(); // Clear previous
 
-    // Simulation
-    const simulation = d3.forceSimulation(nodes)
-      .force("link", d3.forceLink(links).id(d => d.id))
-      .force("charge", d3.forceManyBody().strength(-100))
-      .force("center", d3.forceCenter(width / 2, height / 2));
+    // 1. Create a map for quick node lookup
+    const nodeMap = new Map(nodes.map(n => [n.id, n]));
 
-    const link = svg.append("g")
+    // 2. Determine data extent for scaling
+    const xExtent = d3.extent(nodes, d => d.x);
+    const yExtent = d3.extent(nodes, d => d.y);
+    
+    // Handle case where all x or y are same or undefined (fallback)
+    const xMin = xExtent[0] !== undefined ? xExtent[0] : 0;
+    const xMax = xExtent[1] !== undefined ? xExtent[1] : 1;
+    const yMin = yExtent[0] !== undefined ? yExtent[0] : 0;
+    const yMax = yExtent[1] !== undefined ? yExtent[1] : 1;
+
+    const padding = 40;
+
+    const xScale = d3.scaleLinear()
+      .domain([xMin, xMax])
+      .range([padding, width - padding]);
+
+    const yScale = d3.scaleLinear()
+      .domain([yMin, yMax])
+      .range([padding, height - padding]);
+
+    // Group for zoomable content
+    const g = svg.append("g");
+
+    // 3. Draw Links
+    g.append("g")
       .selectAll("line")
       .data(links)
       .join("line")
+      .attr("x1", d => {
+        const sId = typeof d.source === 'object' ? d.source.id : d.source;
+        const n = nodeMap.get(sId);
+        return n ? xScale(n.x) : 0;
+      })
+      .attr("y1", d => {
+        const sId = typeof d.source === 'object' ? d.source.id : d.source;
+        const n = nodeMap.get(sId);
+        return n ? yScale(n.y) : 0;
+      })
+      .attr("x2", d => {
+        const tId = typeof d.target === 'object' ? d.target.id : d.target;
+        const n = nodeMap.get(tId);
+        return n ? xScale(n.x) : 0;
+      })
+      .attr("y2", d => {
+        const tId = typeof d.target === 'object' ? d.target.id : d.target;
+        const n = nodeMap.get(tId);
+        return n ? yScale(n.y) : 0;
+      })
       .attr("stroke", d => d.color || "#999")
       .attr("stroke-opacity", 0.6)
       .attr("stroke-width", d => d.width || 1);
 
-    const node = svg.append("g")
+    // 4. Draw Nodes
+    const node = g.append("g")
       .selectAll("circle")
       .data(nodes)
       .join("circle")
+      .attr("cx", d => xScale(d.x))
+      .attr("cy", d => yScale(d.y))
       .attr("r", d => d.size || 5)
-      .attr("fill", d => d.color || "#69b3a2")
-      .call(drag(simulation));
+      .attr("fill", d => d.color || "#69b3a2");
 
     node.append("title")
       .text(d => d.label);
 
-    simulation.on("tick", () => {
-      link
-        .attr("x1", d => d.source.x)
-        .attr("y1", d => d.source.y)
-        .attr("x2", d => d.target.x)
-        .attr("y2", d => d.target.y);
+    // 5. Add Zoom/Pan
+    const zoom = d3.zoom()
+      .scaleExtent([0.1, 10])
+      .on("zoom", (event) => {
+        g.attr("transform", event.transform);
+      });
 
-      node
-        .attr("cx", d => d.x)
-        .attr("cy", d => d.y);
-    });
-
-    function drag(simulation) {
-      function dragstarted(event) {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        event.subject.fx = event.subject.x;
-        event.subject.fy = event.subject.y;
-      }
-
-      function dragged(event) {
-        event.subject.fx = event.x;
-        event.subject.fy = event.y;
-      }
-
-      function dragended(event) {
-        if (!event.active) simulation.alphaTarget(0);
-        event.subject.fx = null;
-        event.subject.fy = null;
-      }
-
-      return d3.drag()
-        .on("start", dragstarted)
-        .on("drag", dragged)
-        .on("end", dragended);
-    }
+    svg.call(zoom);
 
   }, [nodes, links]);
 

@@ -35,7 +35,7 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
     for n in nodes:
         # Default visual props
         size = 5
-        color = "#999"
+        color = "#5384ED"
         
         # Apply Size Config
         if node_size_config:
