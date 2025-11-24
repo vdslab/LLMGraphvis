@@ -96,7 +96,7 @@ def verify_llm_flow():
                         
                         if tool_name == "calculate_centrality" and status == "completed":
                             calculate_called = True
-                        if tool_name == "update_visualization" and status == "completed": # Changed from generate_visualization
+                        if tool_name == "generate_visualization" and status == "completed":
                             visualize_called = True
                             
                     if "nodes" in data:
@@ -127,9 +127,9 @@ def verify_llm_flow():
         print("FAILED: calculate_centrality tool was not called.")
 
     if visualize_called:
-        print("SUCCESS: update_visualization tool was called.")
+        print("SUCCESS: generate_visualization tool was called.")
     else:
-        print("FAILED: update_visualization tool was not called.")
+        print("FAILED: generate_visualization tool was not called.")
         
     if render_updated:
         print("SUCCESS: render_update showed varying node sizes.")
