@@ -54,9 +54,10 @@ def calculate_centrality(centrality_type: str) -> Dict[str, Any]:
     # This is a placeholder - actual implementation will call network_service
     return {"status": "success"}
 
-def update_visualization(layout_name: str = "spring", node_size_config: Dict[str, Any] = None, node_color_config: Dict[str, Any] = None) -> Dict[str, Any]:
+def create_visualization(layout_name: str = "spring", node_size_config: Dict[str, Any] = None, node_color_config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Update the visual appearance (size, color, layout).
+    Create the visualization with specific layout, size, and color settings.
+    This function MUST be called to generate the final visualization.
     
     IMPORTANT: If you use `node_size_config` or `node_color_config` with a specific attribute (e.g., "degree_centrality"), 
     you MUST ensure that `calculate_centrality` has been called FIRST to compute that attribute. 
@@ -73,9 +74,9 @@ def update_visualization(layout_name: str = "spring", node_size_config: Dict[str
     # This is a placeholder - actual implementation will call network_service
     return {"nodes": [], "links": []}
 
-def apply_layout(layout_name: str) -> Dict[str, Any]:
+def calculate_layout(layout_name: str) -> Dict[str, Any]:
     """
-    Apply a specific layout algorithm to arrange the nodes in the visualization.
+    Calculate and save a specific layout algorithm to arrange the nodes.
     
     Args:
         layout_name: Name of the layout algorithm. Options: "spring", "circular", "kamada_kawai", "shell", "spectral"
@@ -90,18 +91,24 @@ def apply_layout(layout_name: str) -> Dict[str, Any]:
 SYSTEM_INSTRUCTION = """You are a network visualization assistant.
 
 User Request: "Show popular nodes" (or friends, connections)
-Step 1: Call `calculate_centrality(centrality_type='degree')`
-Step 2: Call `update_visualization(node_size_config={'attribute': 'degree_centrality', ...})`
+Step 1: Call `list_attributes()` to see what's available.
+Step 2: Call `calculate_centrality(centrality_type='degree')`
+Step 3: Call `list_attributes()` AGAIN to confirm the new attribute is available.
+Step 4: Call `create_visualization(layout_name='spring', node_size_config={'attribute': 'degree_centrality', ...})`
 
 User Request: "Show bridges"
-Step 1: Call `calculate_centrality(centrality_type='betweenness')`
-Step 2: Call `update_visualization(node_size_config={'attribute': 'betweenness_centrality', ...})`
+Step 1: Call `list_attributes()`
+Step 2: Call `calculate_centrality(centrality_type='betweenness')`
+Step 3: Call `list_attributes()`
+Step 4: Call `create_visualization(layout_name='spring', node_size_config={'attribute': 'betweenness_centrality', ...})`
 
-User Request: "Show influential nodes"
-Step 1: Call `calculate_centrality(centrality_type='eigenvector')`
-Step 2: Call `update_visualization(node_size_config={'attribute': 'eigenvector_centrality', ...})`
+User Request: "Apply circular layout"
+Step 1: Call `list_attributes()`
+Step 2: Call `calculate_layout(layout_name='circular')`
+Step 3: Call `list_attributes()`
+Step 4: Call `create_visualization(layout_name='circular')`
 
-ALWAYS perform Step 1 before Step 2.
+ALWAYS follow this pattern: List -> Calculate (if needed) -> List -> Create Visualization.
 """
 
 async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
@@ -134,19 +141,27 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
         # Example 1: Popular nodes (Degree)
         example_1 = [
             types.Content(role="user", parts=[types.Part(text="Show popular nodes")]),
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="list_attributes", args={}))]),
+            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="list_attributes", response={"attributes": ["weight"]}))]),
             types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="calculate_centrality", args={"centrality_type": "degree"}))]),
             types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="calculate_centrality", response={"status": "success", "message": "Calculated degree centrality."}))]),
-            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="update_visualization", args={"node_size_config": {"attribute": "degree_centrality", "min": 5, "max": 20}}))]),
-            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="update_visualization", response={"status": "success", "message": "Visualization updated."}))])
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="list_attributes", args={}))]),
+            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="list_attributes", response={"attributes": ["weight", "degree_centrality"]}))]),
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="create_visualization", args={"layout_name": "spring", "node_size_config": {"attribute": "degree_centrality", "min": 5, "max": 20}}))]),
+            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="create_visualization", response={"status": "success", "message": "Visualization created."}))])
         ]
         
         # Example 2: Bridges (Betweenness)
         example_2 = [
             types.Content(role="user", parts=[types.Part(text="Show bridges")]),
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="list_attributes", args={}))]),
+            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="list_attributes", response={"attributes": ["weight"]}))]),
             types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="calculate_centrality", args={"centrality_type": "betweenness"}))]),
             types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="calculate_centrality", response={"status": "success", "message": "Calculated betweenness centrality."}))]),
-            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="update_visualization", args={"node_size_config": {"attribute": "betweenness_centrality", "min": 5, "max": 20}}))]),
-            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="update_visualization", response={"status": "success", "message": "Visualization updated."}))])
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="list_attributes", args={}))]),
+            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="list_attributes", response={"attributes": ["weight", "betweenness_centrality"]}))]),
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="create_visualization", args={"layout_name": "spring", "node_size_config": {"attribute": "betweenness_centrality", "min": 5, "max": 20}}))]),
+            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="create_visualization", response={"status": "success", "message": "Visualization created."}))])
         ]
         
         # Insert examples at the beginning of history
@@ -159,6 +174,81 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
             "data": json.dumps({"content": "Analyzing your request..."})
         })
         
+        # Define tools using explicit FunctionDeclaration
+        list_attributes_tool = types.FunctionDeclaration(
+            name="list_attributes",
+            description="List all available node attributes for the network.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={},
+            )
+        )
+
+        calculate_centrality_tool = types.FunctionDeclaration(
+            name="calculate_centrality",
+            description="Calculate centrality metrics to identify important nodes.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "centrality_type": types.Schema(
+                        type="STRING",
+                        description="Type of centrality. Options: degree, betweenness, closeness, eigenvector",
+                        enum=["degree", "betweenness", "closeness", "eigenvector"]
+                    )
+                },
+                required=["centrality_type"]
+            )
+        )
+
+        create_visualization_tool = types.FunctionDeclaration(
+            name="create_visualization",
+            description="Create the visualization with specific layout, size, and color settings.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "layout_name": types.Schema(
+                        type="STRING",
+                        description="Name of the layout algorithm.",
+                        enum=["spring", "circular", "kamada_kawai", "shell", "spectral"]
+                    ),
+                    "node_size_config": types.Schema(
+                        type="OBJECT",
+                        description="Configuration for node sizes.",
+                        properties={
+                            "attribute": types.Schema(type="STRING"),
+                            "min": types.Schema(type="NUMBER"),
+                            "max": types.Schema(type="NUMBER")
+                        }
+                    ),
+                    "node_color_config": types.Schema(
+                        type="OBJECT",
+                        description="Configuration for node colors.",
+                        properties={
+                            "attribute": types.Schema(type="STRING"),
+                            "scale_type": types.Schema(type="STRING")
+                        }
+                    )
+                },
+                required=["layout_name"]
+            )
+        )
+
+        calculate_layout_tool = types.FunctionDeclaration(
+            name="calculate_layout",
+            description="Calculate and save a specific layout algorithm to arrange the nodes.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "layout_name": types.Schema(
+                        type="STRING",
+                        description="Name of the layout algorithm.",
+                        enum=["spring", "circular", "kamada_kawai", "shell", "spectral"]
+                    )
+                },
+                required=["layout_name"]
+            )
+        )
+
         # Call Gemini with function calling
         logger.info("Calling Gemini API...")
         response = client.models.generate_content(
@@ -166,170 +256,179 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
             contents=history,
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_INSTRUCTION,
+                tools=[types.Tool(
+                    function_declarations=[
+                        list_attributes_tool,
+                        calculate_centrality_tool,
+                        create_visualization_tool,
+                        calculate_layout_tool
+                    ]
+                )],
+                tool_config=types.ToolConfig(
+                    function_calling_config=types.FunctionCallingConfig(
+                        mode="AUTO"
+                    )
+                ),
                 temperature=0.7,
-            ),
-            tools=[
-                list_attributes,
-                calculate_centrality,
-                update_visualization,
-                apply_layout
-            ],
-            tool_config=types.ToolConfig(
-                function_calling_config=types.FunctionCallingConfig(
-                    mode="AUTO"
-                )
             )
         )
         
         # Process function calls if any
         logger.info(f"Gemini Response: {response.candidates[0].content}")
         print(f"DEBUG: Gemini Response: {response.candidates[0].content}")
-        if response.candidates[0].content.parts:
-            for part in response.candidates[0].content.parts:
-                # Check if this part is a function call
-                if hasattr(part, 'function_call') and part.function_call:
-                    function_call = part.function_call
-                    function_name = function_call.name
-                    function_args = dict(function_call.args)
-                    
-                    # Add network_id to args if not present
-                    if 'network_id' not in function_args:
-                        function_args['network_id'] = network_id
-                    
-                    # Notify tool execution start
-                    logger.info(f"Executing tool: {function_name} with args: {function_args}")
-                    await queue.put({
-                        "event": "tool_execution",
-                        "data": json.dumps({
-                            "tool": function_name,
-                            "status": "started",
-                            "args": function_args
-                        })
-                    })
-                    
-                    # Execute the actual network service call
-                    try:
-                        if function_name == "list_attributes":
-                            result = await network_service.list_attributes(network_id)
-                            function_result = result
-                            
-                        elif function_name == "calculate_centrality":
-                            centrality_type = function_args.get("centrality_type", "degree")
-                            
-                            await queue.put({
-                                "event": "thinking_stream",
-                                "data": json.dumps({"content": f"Calculating {centrality_type} centrality..."})
+        
+        # Loop to handle multiple sequential tool calls
+        current_response = response
+        max_iterations = 10  # Prevent infinite loops
+        iteration = 0
+        
+        while iteration < max_iterations:
+            iteration += 1
+            has_function_call = False
+            
+            if current_response.candidates[0].content.parts:
+                for part in current_response.candidates[0].content.parts:
+                    # Check if this part is a function call
+                    if hasattr(part, 'function_call') and part.function_call:
+                        has_function_call = True
+                        function_call = part.function_call
+                        function_name = function_call.name
+                        function_args = dict(function_call.args)
+                        
+                        # Add network_id to args if not present
+                        if 'network_id' not in function_args:
+                            function_args['network_id'] = network_id
+                        
+                        # Notify tool execution start
+                        logger.info(f"Executing tool: {function_name} with args: {function_args}")
+                        await queue.put({
+                            "event": "tool_execution",
+                            "data": json.dumps({
+                                "tool": function_name,
+                                "status": "started",
+                                "args": function_args
                             })
-                            await network_service.calculate_centrality(network_id, centrality_type)
-                            
-                            function_result = {"status": "success", "message": f"Calculated {centrality_type} centrality."}
+                        })
+                        
+                        # Execute the actual network service call
+                        try:
+                            if function_name == "list_attributes":
+                                result = await network_service.list_attributes(network_id)
+                                function_result = {"attributes": result}
+                                
+                            elif function_name == "calculate_centrality":
+                                centrality_type = function_args.get("centrality_type", "degree")
+                                
+                                await queue.put({
+                                    "event": "thinking_stream",
+                                    "data": json.dumps({"content": f"Calculating {centrality_type} centrality..."})
+                                })
+                                await network_service.calculate_centrality(network_id, centrality_type)
+                                
+                                function_result = {"status": "success", "message": f"Calculated {centrality_type} centrality."}
 
-                        elif function_name == "update_visualization":
-                            vis_config = {
-                                "layout_name": function_args.get("layout_name", "spring"),
-                                "node_size_config": function_args.get("node_size_config"),
-                                "node_color_config": function_args.get("node_color_config")
-                            }
+                            elif function_name == "create_visualization":
+                                vis_config = {
+                                    "layout_name": function_args.get("layout_name", "spring"),
+                                    "node_size_config": function_args.get("node_size_config"),
+                                    "node_color_config": function_args.get("node_color_config")
+                                }
+                                
+                                await queue.put({
+                                    "event": "thinking_stream",
+                                    "data": json.dumps({"content": "Creating visualization..."})
+                                })
+                                
+                                vis_data = await network_service.generate_visualization(network_id, vis_config)
+                                
+                                # Send render update
+                                await queue.put({
+                                    "event": "render_update",
+                                    "data": json.dumps(vis_data)
+                                })
+                                
+                                function_result = {"status": "success", "message": "Visualization created."}
                             
+                            elif function_name == "calculate_layout":
+                                layout_name = function_args.get("layout_name", "spring")
+                                
+                                # 1. Calculate Layout
+                                await queue.put({
+                                    "event": "thinking_stream",
+                                    "data": json.dumps({"content": f"Calculating {layout_name} layout..."})
+                                })
+                                await network_service.calculate_layout(network_id, layout_name)
+                                
+                                function_result = {"status": "success", "message": f"Calculated {layout_name} layout."}
+                                
+                            else:
+                                function_result = {"error": f"Unknown function: {function_name}"}
+                            
+                            # Notify tool execution complete
                             await queue.put({
-                                "event": "thinking_stream",
-                                "data": json.dumps({"content": "Updating visualization..."})
+                                "event": "tool_execution",
+                                "data": json.dumps({
+                                    "tool": function_name,
+                                    "status": "completed"
+                                })
                             })
                             
-                            vis_data = await network_service.generate_visualization(network_id, vis_config)
-                            
-                            # Send render update
+                        except Exception as e:
+                            logger.error(f"Tool execution failed: {e}")
+                            error_msg = str(e)
                             await queue.put({
-                                "event": "render_update",
-                                "data": json.dumps(vis_data)
+                                "event": "tool_execution",
+                                "data": json.dumps({
+                                    "tool": function_name,
+                                    "status": "failed",
+                                    "error": error_msg
+                                })
                             })
-                            
-                            function_result = {"status": "success", "message": "Visualization updated."}
+                            function_result = {"error": error_msg}
                         
-                        elif function_name == "apply_layout":
-                            layout_name = function_args.get("layout_name", "spring")
-                            
-                            # 1. Calculate Layout
-                            await queue.put({
-                                "event": "thinking_stream",
-                                "data": json.dumps({"content": f"Calculating {layout_name} layout..."})
-                            })
-                            await network_service.calculate_layout(network_id, layout_name)
-                            
-                            # 2. Generate Visualization
-                            await queue.put({
-                                "event": "thinking_stream",
-                                "data": json.dumps({"content": "Updating visualization..."})
-                            })
-                            
-                            vis_config = {
-                                "layout_name": layout_name,
-                                # Keep existing size config? We don't know it here.
-                                # For now, reset size or keep default?
-                                # Let's just pass layout_name. Visualizer will use default size/color if not provided.
-                            }
-                            
-                            vis_data = await network_service.generate_visualization(network_id, vis_config)
-                            
-                            # Send render update
-                            await queue.put({
-                                "event": "render_update",
-                                "data": json.dumps(vis_data)
-                            })
-                            
-                            function_result = {"status": "success", "message": f"Applied {layout_name} layout."}
-                            
-                        else:
-                            function_result = {"error": f"Unknown function: {function_name}"}
+                        # Continue conversation with function result
+                        history.append(current_response.candidates[0].content)
+                        history.append(types.Content(
+                            role="user",
+                            parts=[types.Part.from_function_response(
+                                name=function_name,
+                                response=function_result
+                            )]
+                        ))
                         
-                        # Notify tool execution complete
-                        await queue.put({
-                            "event": "tool_execution",
-                            "data": json.dumps({
-                                "tool": function_name,
-                                "status": "completed"
-                            })
-                        })
-                        
-                    except Exception as e:
-                        logger.error(f"Tool execution failed: {e}")
-                        error_msg = str(e)
-                        await queue.put({
-                            "event": "tool_execution",
-                            "data": json.dumps({
-                                "tool": function_name,
-                                "status": "failed",
-                                "error": error_msg
-                            })
-                        })
-                        function_result = {"error": error_msg}
-                    
-                    # Continue conversation with function result
-                    history.append(response.candidates[0].content)
-                    history.append(types.Content(
-                        role="user",
-                        parts=[types.Part.from_function_response(
-                            name=function_name,
-                            response=function_result
-                        )]
-                    ))
-                    
-                    # Get final response from LLM
-                    final_response = client.models.generate_content(
-                        model="gemini-2.5-flash",
-                        contents=history,
-                        config=types.GenerateContentConfig(
-                            system_instruction=SYSTEM_INSTRUCTION,
-                            temperature=0.7,
+                        # Get next response from LLM
+                        current_response = client.models.generate_content(
+                            model="gemini-2.5-flash",
+                            contents=history,
+                            config=types.GenerateContentConfig(
+                                system_instruction=SYSTEM_INSTRUCTION,
+                                temperature=0.7,
+                                tools=[types.Tool(
+                                    function_declarations=[
+                                        list_attributes_tool,
+                                        calculate_centrality_tool,
+                                        create_visualization_tool,
+                                        calculate_layout_tool
+                                    ]
+                                )],
+                                tool_config=types.ToolConfig(
+                                    function_calling_config=types.FunctionCallingConfig(
+                                        mode="AUTO"
+                                    )
+                                )
+                            )
                         )
-                    )
-                    
-                    response_text = final_response.text
-                else:
-                    # No function call, just text response
-                    response_text = response.text
-        else:
-            response_text = response.text
+                        logger.info(f"Gemini Response (iteration {iteration}): {current_response.candidates[0].content}")
+                        print(f"DEBUG: Gemini Response (iteration {iteration}): {current_response.candidates[0].content}")
+                        break  # Process one function call per iteration
+            
+            if not has_function_call:
+                # No more function calls, extract text response
+                response_text = current_response.text if current_response.text else "I have processed your request."
+                break
+        
+        if iteration >= max_iterations:
+            response_text = "I've completed the requested operations."
         
         if not response_text:
             response_text = "I have processed your request."

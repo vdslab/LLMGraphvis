@@ -111,7 +111,7 @@ graph TD
 
     F -- "POST /chat/{id}/process" --> B_API
     B_API -- "1. ユーザー指示とツールリストを送信" --> LLM
-    LLM -- "2. calculate_centralityと<br/>update_visualizationの<br/>呼び出しプランを返す" --> B_API
+    LLM -- "2. calculate_centralityと<br/>create_visualizationの<br/>呼び出しプランを返す" --> B_API
     B_API -- "3. プランに基づきツールを順次実行" --> NXAPI
     NXAPI -- "4. 計算とマッピングを行い<br/>最終レンダリングデータを生成" --> NXAPI
     NXAPI -- "5. 最終データを返す" --> B_API
@@ -124,12 +124,12 @@ graph TD
 プロセスは以下のステップで実行されます。
 
 1.  **BackendがLLMに指示を送信**:
-    - Frontendから受け取ったユーザーの自然言語指示（例：「次数中心性でノードを色分けして」）と、利用可能なツールリスト（`list_attributes`, `calculate_centrality`, `update_visualization`など）をLLMに送信します。
+    - Frontendから受け取ったユーザーの自然言語指示（例：「次数中心性でノードを色分けして」）と、利用可能なツールリスト（`list_attributes`, `calculate_centrality`, `calculate_layout`, `create_visualization`など）をLLMに送信します。
 
 2.  **LLMが実行プランを計画**:
     - LLMはユーザーの意図を解釈します。
     - ネットワークの現状を把握するために`list_attributes`を呼び出し、必要な属性（例：`degree_centrality`）が存在するか確認します。
-    - 属性の計算が必要な場合は`calculate_centrality`を呼び出し、その後`update_visualization`を呼び出して可視化を更新するプランをBackendに返します。
+    - 属性の計算が必要な場合は`calculate_centrality`を呼び出し、その後`create_visualization`を呼び出して可視化を更新するプランをBackendに返します。
 
 3.  **BackendがNetworkXAPIを呼び出す**:
     - Backendは、LLMから受け取ったツール呼び出しプランに基づき、NetworkXAPIのエンドポイントを呼び出します。

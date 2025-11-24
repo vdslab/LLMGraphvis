@@ -122,15 +122,24 @@ sequenceDiagram
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "completed" })
     
     B->>LLM: ツール実行結果（成功）を送信
-    LLM-->>B: ツール呼び出し要求 (3. generate_visualization)
+    LLM-->>B: ツール呼び出し要求 (3. list_attributes)
 
-    %% Step 5: Backend executes generate_visualization
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "generate_visualization", status: "started" })
-    B->>N: POST /tools/generate_visualization
+    %% Step 5: Backend executes list_attributes (Verification)
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_attributes", status: "started" })
+    B->>N: GET /tools/list_attributes
+    N-->>B: 更新された属性リスト
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_attributes", status: "completed" })
+
+    B->>LLM: ツール実行結果（成功）を送信
+    LLM-->>B: ツール呼び出し要求 (4. create_visualization)
+
+    %% Step 6: Backend executes create_visualization
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "create_visualization", status: "started" })
+    B->>N: POST /tools/create_visualization
     N-->>B: 最終レンダリングデータ { nodes: [...], links: [...] }
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "generate_visualization", status: "completed" })
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "create_visualization", status: "completed" })
 
-    %% Step 6: Backend sends final data and text response via SSE
+    %% Step 7: Backend sends final data and text response via SSE
     B-->>F: SSEイベント (event: render_update, data: { nodes, links })
     note right of F: グラフの更新データを受け取り、<br/>即座に画面を再描画する。
 
@@ -140,7 +149,7 @@ sequenceDiagram
     B-->>F: SSEイベント (event: message, data: { role: "assistant", content: "次数中心性を計算し..." })
     note right of F: テキスト応答を受け取り、<br/>チャット履歴に追加する。
 
-    %% Step 7: Frontend renders the updated network
+    %% Step 8: Frontend renders the updated network
     F->>F: render(event.data.nodes, event.data.links)
 ```
 
@@ -153,7 +162,8 @@ sequenceDiagram
 
 2.  **LLMによるプランニングとツールの実行**:
     - BackendはバックグラウンドでLLMとの対話を開始する。
-    - LLMの思考プロセスや、`list_attributes`、`calculate_centrality`、`generate_visualization`といったツールの実行状況は、`thinking_stream`や`tool_execution`といった専用のSSEイベントを通じて逐一フロントエンドに通知される。
+    - LLMの思考プロセスや、`list_attributes`、`calculate_centrality`、`calculate_layout`、`generate_visualization`といったツールの実行状況は、`thinking_stream`や`tool_execution`といった専用のSSEイベントを通じて逐一フロントエンドに通知される。
+    - **重要**: LLMは計算を実行した後、必ず再度`list_attributes`を呼び出して、新しい属性が利用可能になったことを確認してから`generate_visualization`を呼び出す。
 
 3.  **最終的な結果の通知**:
     - `generate_visualization`が完了すると、Backendは2つの重要な情報をSSEで送信する。
