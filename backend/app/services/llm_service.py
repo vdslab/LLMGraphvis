@@ -109,6 +109,14 @@ Step 3: Call `list_attributes()`
 Step 4: Call `create_visualization(layout_name='circular')`
 
 ALWAYS follow this pattern: List -> Calculate (if needed) -> List -> Create Visualization.
+
+IMPORTANT: Maintain Context
+When calling `create_visualization`, you MUST maintain the previous visualization state unless the user explicitly asks to change it.
+- If the user previously asked for "circular layout", KEEP `layout_name='circular'` in subsequent calls.
+- If the user previously asked to size nodes by "degree", KEEP `node_size_config={'attribute': 'degree_centrality', ...}`.
+- If the user previously asked to color nodes by "community", KEEP `node_color_config={'attribute': 'community_id', ...}`.
+- DO NOT revert to defaults ("spring" layout, etc.) unless the user's new request specifically conflicts with the previous state or requires a reset.
+- Infer the current state from the conversation history.
 """
 
 async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
