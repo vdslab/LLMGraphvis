@@ -26,7 +26,6 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 | `POST` | `/tools/calculate_centrality` | 中心性指標を計算して永続化する。具体的には、まず属性の**定義**（例: 'degree_centrality'）が`node_attributes`に存在するか確認し、なければ`network_id`に紐付けて作成する。次に、各ノードの計算**値**を、定義のIDを参照して`node_attribute_values`に保存する。 |
 | `POST` | `/tools/calculate_layout` | レイアウト座標を計算して永続化する。`layout_name`（例: 'circular'）を受け取り、`{layout_name}_x`, `{layout_name}_y` という属性として保存する。 |
 | `POST` | `/tools/generate_visualization` | レイアウト、ノードサイズ、ノードカラー等の視覚的割り当てに関するすべてのパラメータを受け取り、最終的なレンダリングデータを動的に生成して返す。**レイアウト計算は行わず、計算済みの座標データを使用する。** |
-| `POST` | `/tools/visualize_centrality` | 中心性指標の計算と可視化を一括で行う。`centrality_type`を受け取り、計算を実行して永続化した後、その中心性をノードサイズに反映したレンダリングデータを返す。 |
 
 ## 3.3. API詳細
 
@@ -122,42 +121,6 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
       "y": 0.456,
       "size": 15.2,
       "color": "#ff6384"
-    }
-  ],
-  "links": [
-    {
-      "source": "node1",
-      "target": "node2",
-      "width": 1,
-      "color": "#cccccc"
-    }
-  ]
-}
-```
-
-### `/tools/visualize_centrality`
-
-- **Request Body:**
-
-```json
-{
-  "network_id": 12345,
-  "centrality_type": "degree"
-}
-```
-
-- **Response Body (Success):**
-
-```json
-{
-  "nodes": [
-    {
-      "id": "node1",
-      "label": "Node 1",
-      "x": 0.123,
-      "y": 0.456,
-      "size": 15.2,
-      "color": "#cccccc"
     }
   ],
   "links": [

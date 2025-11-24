@@ -85,7 +85,7 @@ sequenceDiagram
     participant U as ユーザー
     participant F as Frontend
     participant B as API Service (Backend)
-    participant LLM as LLM Service
+    participant LLM as LLM Service (Gemini 2.5 Flash)
     participant N as NetworkXAPI (REST API)
     participant DB as Database
 
@@ -113,18 +113,24 @@ sequenceDiagram
 
     %% Step 3: Backend continues planning with LLM
     B->>LLM: 属性リストをツール実行結果として送信
-    LLM-->>B: ツール呼び出し要求 (2. visualize_centrality)
+    LLM-->>B: ツール呼び出し要求 (2. calculate_centrality)
 
-    %% Step 4: Backend executes the combined visualization tool
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "visualize_centrality", status: "started" })
-    note right of B: 内部でcalculate_centralityと<br/>generate_visualizationを順次実行
+    %% Step 4: Backend executes calculate_centrality
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "started" })
     B->>N: POST /tools/calculate_centrality
     N-->>B: 計算完了
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "completed" })
+    
+    B->>LLM: ツール実行結果（成功）を送信
+    LLM-->>B: ツール呼び出し要求 (3. generate_visualization)
+
+    %% Step 5: Backend executes generate_visualization
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "generate_visualization", status: "started" })
     B->>N: POST /tools/generate_visualization
     N-->>B: 最終レンダリングデータ { nodes: [...], links: [...] }
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "visualize_centrality", status: "completed" })
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "generate_visualization", status: "completed" })
 
-    %% Step 5: Backend sends final data and text response via SSE
+    %% Step 6: Backend sends final data and text response via SSE
     B-->>F: SSEイベント (event: render_update, data: { nodes, links })
     note right of F: グラフの更新データを受け取り、<br/>即座に画面を再描画する。
 
@@ -134,7 +140,7 @@ sequenceDiagram
     B-->>F: SSEイベント (event: message, data: { role: "assistant", content: "次数中心性を計算し..." })
     note right of F: テキスト応答を受け取り、<br/>チャット履歴に追加する。
 
-    %% Step 6: Frontend renders the updated network
+    %% Step 7: Frontend renders the updated network
     F->>F: render(event.data.nodes, event.data.links)
 ```
 
@@ -147,10 +153,10 @@ sequenceDiagram
 
 2.  **LLMによるプランニングとツールの実行**:
     - BackendはバックグラウンドでLLMとの対話を開始する。
-    - LLMの思考プロセスや、`list_attributes`、`visualize_centrality`といったツールの実行状況は、`thinking_stream`や`tool_execution`といった専用のSSEイベントを通じて逐一フロントエンドに通知される。
+    - LLMの思考プロセスや、`list_attributes`、`calculate_centrality`、`generate_visualization`といったツールの実行状況は、`thinking_stream`や`tool_execution`といった専用のSSEイベントを通じて逐一フロントエンドに通知される。
 
 3.  **最終的な結果の通知**:
-    - `visualize_centrality`が完了すると、Backendは2つの重要な情報をSSEで送信する。
+    - `generate_visualization`が完了すると、Backendは2つの重要な情報をSSEで送信する。
         1.  `render_update`イベント: NetworkXAPIが生成した最終的なレンダリングデータ（`{nodes, links}`）を送信する。フロントエンドはこれを受けてグラフを再描画する。
         2.  `message`イベント: LLMが生成した最終的なテキスト応答（例：「次数中心性を計算し、ノードのサイズに反映しました。」）を送信する。フロントエンドはこれを受けてチャット履歴を更新する。
 

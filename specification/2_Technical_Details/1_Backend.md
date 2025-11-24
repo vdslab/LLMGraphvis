@@ -111,8 +111,8 @@ graph TD
 
     F -- "POST /chat/{id}/process" --> B_API
     B_API -- "1. ユーザー指示とツールリストを送信" --> LLM
-    LLM -- "2. generate_visualizationツールの<br/>呼び出しプランを返す" --> B_API
-    B_API -- "3. プランに基づきツールを実行" --> NXAPI
+    LLM -- "2. calculate_centralityと<br/>update_visualizationの<br/>呼び出しプランを返す" --> B_API
+    B_API -- "3. プランに基づきツールを順次実行" --> NXAPI
     NXAPI -- "4. 計算とマッピングを行い<br/>最終レンダリングデータを生成" --> NXAPI
     NXAPI -- "5. 最終データを返す" --> B_API
     B_API -- "6. HTTP Streaming (SSE)で<br/>最終データをFrontendに送信" --> F
@@ -124,15 +124,16 @@ graph TD
 プロセスは以下のステップで実行されます。
 
 1.  **BackendがLLMに指示を送信**:
-    - Frontendから受け取ったユーザーの自然言語指示（例：「次数中心性でノードを色分けして」）と、利用可能なツールリスト（`list_attributes`, `visualize_centrality`など）をLLMに送信します。
+    - Frontendから受け取ったユーザーの自然言語指示（例：「次数中心性でノードを色分けして」）と、利用可能なツールリスト（`list_attributes`, `calculate_centrality`, `update_visualization`など）をLLMに送信します。
 
 2.  **LLMが実行プランを計画**:
     - LLMはユーザーの意図を解釈します。
     - ネットワークの現状を把握するために`list_attributes`を呼び出し、必要な属性（例：`degree_centrality`）が存在するか確認します。
-    - 属性の計算と可視化を一括で行うために、`visualize_centrality`ツールのパラメータを組み立て、Backendに返します。
+    - 属性の計算が必要な場合は`calculate_centrality`を呼び出し、その後`update_visualization`を呼び出して可視化を更新するプランをBackendに返します。
 
 3.  **BackendがNetworkXAPIを呼び出す**:
-    - Backendは、LLMから受け取ったツール呼び出しプランに基づき、NetworkXAPIの適切なエンドポイント（`/tools/generate_visualization` または `/tools/visualize_centrality`）を呼び出します。
+    - Backendは、LLMから受け取ったツール呼び出しプランに基づき、NetworkXAPIのエンドポイントを呼び出します。
+    - 複合的なアクションの場合、Backendはまず`/tools/calculate_centrality`を呼び出して指標を計算し、次に`/tools/generate_visualization`を呼び出してその指標を用いた可視化データを生成するという、**複数のAPIコールを順次実行**します。
 
 4.  **NetworkXAPIがレンダリングデータを生成**:
     - NetworkXAPIは、計算（必要な場合）とマッピングを行い、フロントエンドが直接描画できる最終的なJSONデータを生成します。
@@ -192,7 +193,7 @@ APIで送受信される主要なデータ構造です。
 ## 1.5. 外部サービス連携
 
 - **NetworkXAPI**: グラフ計算が必要なリクエストを `http://networkx-api:8001` に転送（プロキシ）します。（このURLは、環境変数 `NETWORKX_API_URL` によって設定されます。デフォルト値は `http://networkx-api:8001` です。）
-- **LLMサービス**: ユーザーの指示解釈、ツールコール変換、結果の要約のために外部LLM（OpenAI, Gemini等）のAPIを呼び出します。
+- **LLMサービス**: ユーザーの指示解釈、ツールコール変換、結果の要約のために外部LLM（Google Gemini 2.5 Flash）のAPIを呼び出します。
 
 ## 1.6. エラーハンドリング
 

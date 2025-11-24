@@ -19,10 +19,6 @@ class CalculateCentralityRequest(BaseModel):
     network_id: int
     centrality_type: str
 
-class VisualizeCentralityRequest(BaseModel):
-    network_id: int
-    centrality_type: str
-
 class GenerateVisualizationRequest(BaseModel):
     network_id: int
     layout_name: Optional[str] = "spring"
@@ -59,34 +55,6 @@ def calculate_centrality(request: CalculateCentralityRequest, db: Session = Depe
     try:
         graph_processor.calculate_centrality(request.network_id, request.centrality_type, db)
         return {"status": "success", "message": f"{request.centrality_type} centrality calculated."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@router.post("/visualize_centrality")
-def visualize_centrality(request: VisualizeCentralityRequest, db: Session = Depends(database.get_db)):
-    try:
-        # 1. Calculate Centrality
-        graph_processor.calculate_centrality(request.network_id, request.centrality_type, db)
-        
-        # 2. Generate Visualization
-        # Use default layout (spring) and map centrality to node size
-        vis_config = {
-            "layout_name": "spring", # Default to spring
-            "node_size_config": {
-                "attribute": f"{request.centrality_type}_centrality",
-                "min": 5.0,
-                "max": 20.0
-            }
-        }
-        
-        vis_data = visualizer.generate_visualization_data(
-            request.network_id, 
-            db, 
-            layout_name=vis_config["layout_name"],
-            node_size_config=vis_config["node_size_config"]
-        )
-        
-        return vis_data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -40,6 +40,39 @@ def list_attributes() -> List[str]:
     # This is a placeholder - actual implementation will call network_service
     return []
 
+def calculate_centrality(centrality_type: str) -> Dict[str, Any]:
+    """
+    Calculate centrality metrics to identify important nodes.
+    Use this for requests about: "popular", "friends", "connections" (degree), "bridges", "connectors" (betweenness), "influential" (eigenvector).
+    
+    Args:
+        centrality_type: Type of centrality. Options: "degree", "betweenness", "closeness", "eigenvector"
+        
+    Returns:
+        Status message indicating success or failure
+    """
+    # This is a placeholder - actual implementation will call network_service
+    return {"status": "success"}
+
+def update_visualization(layout_name: str = "spring", node_size_config: Dict[str, Any] = None, node_color_config: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Update the visual appearance (size, color, layout).
+    
+    IMPORTANT: If you use `node_size_config` or `node_color_config` with a specific attribute (e.g., "degree_centrality"), 
+    you MUST ensure that `calculate_centrality` has been called FIRST to compute that attribute. 
+    Otherwise, the visualization will not reflect the metric.
+    
+    Args:
+        layout_name: Name of the layout algorithm. Options: "spring", "circular", "kamada_kawai", "shell", "spectral"
+        node_size_config: Configuration for node sizes. Example: {"attribute": "degree_centrality", "min": 5.0, "max": 20.0}
+        node_color_config: Configuration for node colors. Example: {"attribute": "community_id", "scale_type": "CATEGORICAL"}
+        
+    Returns:
+        Visualization data including nodes and links
+    """
+    # This is a placeholder - actual implementation will call network_service
+    return {"nodes": [], "links": []}
+
 def apply_layout(layout_name: str) -> Dict[str, Any]:
     """
     Apply a specific layout algorithm to arrange the nodes in the visualization.
@@ -54,27 +87,21 @@ def apply_layout(layout_name: str) -> Dict[str, Any]:
     return {"status": "success"}
 
 # System instruction for the LLM
-SYSTEM_INSTRUCTION = """You are a network visualization assistant. You help users analyze and visualize network graphs.
+SYSTEM_INSTRUCTION = """You are a network visualization assistant.
 
-You have access to tools that can manipulate and visualize the network.
-IMPORTANT: You do NOT need to ask for the network ID. The system automatically applies your actions to the current network.
+User Request: "Show popular nodes" (or friends, connections)
+Step 1: Call `calculate_centrality(centrality_type='degree')`
+Step 2: Call `update_visualization(node_size_config={'attribute': 'degree_centrality', ...})`
 
-CRITICAL RULES:
-1. When a user requests to see "friends", "connections", "popular nodes", or "bridges", you MUST use the `visualize_centrality` tool.
-2. When a user requests to change the layout (e.g., "circular", "spring"), you MUST use the `apply_layout` tool.
-3. Do NOT describe what you are going to do before calling the tool. Call the tool first.
-4. Only after the tool has executed should you explain what you did.
+User Request: "Show bridges"
+Step 1: Call `calculate_centrality(centrality_type='betweenness')`
+Step 2: Call `update_visualization(node_size_config={'attribute': 'betweenness_centrality', ...})`
 
-Specific Mappings:
-- "friends", "connections", "popular" -> Use `visualize_centrality(centrality_type="degree")`
-- "bridge", "connector", "between" -> Use `visualize_centrality(centrality_type="betweenness")`
-- "influential", "pagerank" -> Use `visualize_centrality(centrality_type="eigenvector")`
-- "circular layout", "circle" -> Use `apply_layout(layout_name="circular")`
-- "spring layout", "force directed" -> Use `apply_layout(layout_name="spring")`
+User Request: "Show influential nodes"
+Step 1: Call `calculate_centrality(centrality_type='eigenvector')`
+Step 2: Call `update_visualization(node_size_config={'attribute': 'eigenvector_centrality', ...})`
 
-Example:
-User: "Show people with many friends as larger"
-Assistant: [Calls visualize_centrality(centrality_type="degree")] -> "I have calculated degree centrality and updated the node sizes to reflect the number of connections."
+ALWAYS perform Step 1 before Step 2.
 """
 
 async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
@@ -97,25 +124,40 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
         # Build conversation history
         history = []
         for msg in messages:
-            history.append(types.Content(
-                role=msg.role,
-                parts=[types.Part.from_text(text=msg.content)]
-            ))
+            role = "user" if msg.role == "user" else "model"
+            history.append(types.Content(role=role, parts=[types.Part(text=msg.content)]))
         
         # Add current user message
-        history.append(types.Content(
-            role="user",
-            parts=[types.Part.from_text(text=user_message)]
-        ))
+        history.append(types.Content(role="user", parts=[types.Part(text=user_message)]))
         
+        # Inject few-shot examples to guide the model
+        # Example 1: Popular nodes (Degree)
+        example_1 = [
+            types.Content(role="user", parts=[types.Part(text="Show popular nodes")]),
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="calculate_centrality", args={"centrality_type": "degree"}))]),
+            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="calculate_centrality", response={"status": "success", "message": "Calculated degree centrality."}))]),
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="update_visualization", args={"node_size_config": {"attribute": "degree_centrality", "min": 5, "max": 20}}))]),
+            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="update_visualization", response={"status": "success", "message": "Visualization updated."}))])
+        ]
+        
+        # Example 2: Bridges (Betweenness)
+        example_2 = [
+            types.Content(role="user", parts=[types.Part(text="Show bridges")]),
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="calculate_centrality", args={"centrality_type": "betweenness"}))]),
+            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="calculate_centrality", response={"status": "success", "message": "Calculated betweenness centrality."}))]),
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="update_visualization", args={"node_size_config": {"attribute": "betweenness_centrality", "min": 5, "max": 20}}))]),
+            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="update_visualization", response={"status": "success", "message": "Visualization updated."}))])
+        ]
+        
+        # Insert examples at the beginning of history
+        # Note: We insert them before the actual user conversation to set the pattern
+        history = example_1 + example_2 + history
+
         # Notify thinking start
         await queue.put({
             "event": "thinking_stream",
             "data": json.dumps({"content": "Analyzing your request..."})
         })
-        
-        # Create tools list - these will be actual Python functions
-        tools = [list_attributes, visualize_centrality, apply_layout]
         
         # Call Gemini with function calling
         logger.info("Calling Gemini API...")
@@ -124,13 +166,18 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
             contents=history,
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_INSTRUCTION,
-                tools=tools,
-                tool_config=types.ToolConfig(
-                    function_calling_config=types.FunctionCallingConfig(
-                        mode="ANY"
-                    )
-                ),
                 temperature=0.7,
+            ),
+            tools=[
+                list_attributes,
+                calculate_centrality,
+                update_visualization,
+                apply_layout
+            ],
+            tool_config=types.ToolConfig(
+                function_calling_config=types.FunctionCallingConfig(
+                    mode="AUTO"
+                )
             )
         )
         
@@ -166,16 +213,30 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                             result = await network_service.list_attributes(network_id)
                             function_result = result
                             
-                        elif function_name == "visualize_centrality":
+                        elif function_name == "calculate_centrality":
                             centrality_type = function_args.get("centrality_type", "degree")
                             
-                            # Calculate and Visualize in one go
                             await queue.put({
                                 "event": "thinking_stream",
-                                "data": json.dumps({"content": f"Calculating {centrality_type} centrality and updating visualization..."})
+                                "data": json.dumps({"content": f"Calculating {centrality_type} centrality..."})
+                            })
+                            await network_service.calculate_centrality(network_id, centrality_type)
+                            
+                            function_result = {"status": "success", "message": f"Calculated {centrality_type} centrality."}
+
+                        elif function_name == "update_visualization":
+                            vis_config = {
+                                "layout_name": function_args.get("layout_name", "spring"),
+                                "node_size_config": function_args.get("node_size_config"),
+                                "node_color_config": function_args.get("node_color_config")
+                            }
+                            
+                            await queue.put({
+                                "event": "thinking_stream",
+                                "data": json.dumps({"content": "Updating visualization..."})
                             })
                             
-                            vis_data = await network_service.visualize_centrality(network_id, centrality_type)
+                            vis_data = await network_service.generate_visualization(network_id, vis_config)
                             
                             # Send render update
                             await queue.put({
@@ -183,7 +244,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                                 "data": json.dumps(vis_data)
                             })
                             
-                            function_result = {"status": "success", "message": f"Calculated {centrality_type} centrality and updated visualization."}
+                            function_result = {"status": "success", "message": "Visualization updated."}
                         
                         elif function_name == "apply_layout":
                             layout_name = function_args.get("layout_name", "spring")
@@ -270,6 +331,9 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
         else:
             response_text = response.text
         
+        if not response_text:
+            response_text = "I have processed your request."
+            
         return response_text
         
     except Exception as e:
