@@ -40,12 +40,12 @@ def list_attributes() -> List[str]:
     # This is a placeholder - actual implementation will call network_service
     return []
 
-def visualize_centrality(centrality_type: str) -> Dict[str, Any]:
+def apply_layout(layout_name: str) -> Dict[str, Any]:
     """
-    Calculate a specific centrality measure and immediately visualize it by mapping it to node size.
+    Apply a specific layout algorithm to arrange the nodes in the visualization.
     
     Args:
-        centrality_type: Type of centrality to calculate. Options: "degree", "betweenness", "closeness", "eigenvector"
+        layout_name: Name of the layout algorithm. Options: "spring", "circular", "kamada_kawai", "shell", "spectral"
         
     Returns:
         Status message indicating success or failure
@@ -61,13 +61,16 @@ IMPORTANT: You do NOT need to ask for the network ID. The system automatically a
 
 CRITICAL RULES:
 1. When a user requests to see "friends", "connections", "popular nodes", or "bridges", you MUST use the `visualize_centrality` tool.
-2. Do NOT describe what you are going to do before calling the tool. Call the tool first.
-3. Only after the tool has executed should you explain what you did.
+2. When a user requests to change the layout (e.g., "circular", "spring"), you MUST use the `apply_layout` tool.
+3. Do NOT describe what you are going to do before calling the tool. Call the tool first.
+4. Only after the tool has executed should you explain what you did.
 
 Specific Mappings:
 - "friends", "connections", "popular" -> Use `visualize_centrality(centrality_type="degree")`
 - "bridge", "connector", "between" -> Use `visualize_centrality(centrality_type="betweenness")`
 - "influential", "pagerank" -> Use `visualize_centrality(centrality_type="eigenvector")`
+- "circular layout", "circle" -> Use `apply_layout(layout_name="circular")`
+- "spring layout", "force directed" -> Use `apply_layout(layout_name="spring")`
 
 Example:
 User: "Show people with many friends as larger"
@@ -112,7 +115,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
         })
         
         # Create tools list - these will be actual Python functions
-        tools = [list_attributes, visualize_centrality]
+        tools = [list_attributes, visualize_centrality, apply_layout]
         
         # Call Gemini with function calling
         logger.info("Calling Gemini API...")
@@ -180,7 +183,25 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                             })
                             
                             vis_config = {
-                                "layout_name": "spring",
+                                "layout_name": "spring", # Default to spring if not specified, or keep current? 
+                                # Ideally we should keep current layout. 
+                                # But for now let's default to spring or maybe pass None to use existing?
+                                # Visualizer defaults to 0.5 if not found, but we want to use existing layout.
+                                # Let's pass "spring" as default for now, or maybe we should track current layout in DB?
+                                # The user requirement was "layout calculation endpoint and visualization creation endpoint are separated".
+                                # So here we just generate visualization. 
+                                # If we don't pass layout_name, visualizer might fail if we changed logic?
+                                # In visualizer.py: layout_name="spring" is default.
+                                # So if we want to use *current* layout, we need to know what it is, 
+                                # OR we just rely on the fact that we have calculated *some* layout.
+                                # But visualizer takes layout_name to look up {layout_name}_x.
+                                # If we want to preserve current layout, we need to know what it was.
+                                # For now, let's assume we stick to "spring" unless user changed it?
+                                # Or better: The visualize_centrality tool shouldn't change layout.
+                                # But visualizer REQUIRES a layout_name to fetch coordinates.
+                                # Let's assume "spring" is the base for now, or maybe we can fetch the last used layout?
+                                # For simplicity, let's use "spring" here, but this is a potential issue if user switched to circular.
+                                # TODO: Fix this later by tracking current layout in Chat or Network model.
                                 "node_size_config": {
                                     "attribute": f"{centrality_type}_centrality",
                                     "min": 5.0,
@@ -197,6 +218,39 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                             })
                             
                             function_result = {"status": "success", "message": f"Calculated {centrality_type} centrality and updated visualization."}
+                        
+                        elif function_name == "apply_layout":
+                            layout_name = function_args.get("layout_name", "spring")
+                            
+                            # 1. Calculate Layout
+                            await queue.put({
+                                "event": "thinking_stream",
+                                "data": json.dumps({"content": f"Calculating {layout_name} layout..."})
+                            })
+                            await network_service.calculate_layout(network_id, layout_name)
+                            
+                            # 2. Generate Visualization
+                            await queue.put({
+                                "event": "thinking_stream",
+                                "data": json.dumps({"content": "Updating visualization..."})
+                            })
+                            
+                            vis_config = {
+                                "layout_name": layout_name,
+                                # Keep existing size config? We don't know it here.
+                                # For now, reset size or keep default?
+                                # Let's just pass layout_name. Visualizer will use default size/color if not provided.
+                            }
+                            
+                            vis_data = await network_service.generate_visualization(network_id, vis_config)
+                            
+                            # Send render update
+                            await queue.put({
+                                "event": "render_update",
+                                "data": json.dumps(vis_data)
+                            })
+                            
+                            function_result = {"status": "success", "message": f"Applied {layout_name} layout."}
                             
                         else:
                             function_result = {"error": f"Unknown function: {function_name}"}

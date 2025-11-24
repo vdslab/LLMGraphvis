@@ -25,6 +25,10 @@ class GenerateVisualizationRequest(BaseModel):
     node_size_config: Optional[Dict[str, Any]] = None
     node_color_config: Optional[Dict[str, Any]] = None
 
+class CalculateLayoutRequest(BaseModel):
+    network_id: int
+    layout_name: str
+
 @router.post("/initialize_network")
 def initialize_network(request: InitializeNetworkRequest, db: Session = Depends(database.get_db)):
     try:
@@ -54,16 +58,19 @@ def calculate_centrality(request: CalculateCentralityRequest, db: Session = Depe
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/calculate_layout")
+def calculate_layout(request: CalculateLayoutRequest, db: Session = Depends(database.get_db)):
+    try:
+        graph_processor.calculate_layout(request.network_id, request.layout_name, db)
+        return {"status": "success", "message": f"Layout '{request.layout_name}' calculated and saved."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/generate_visualization")
 def generate_visualization(request: GenerateVisualizationRequest, db: Session = Depends(database.get_db)):
     try:
-        # If layout is requested and not computed, compute it
-        # For simplicity, we assume layout is computed or we compute it on demand
-        if request.layout_name:
-            # Check if layout exists (simplified check)
-            # In real app, check specific attributes like {layout}_x
-            pass # TODO: Implement check and compute
-            
+        # Note: We do NOT calculate layout here anymore. 
+        # We assume it's already calculated or we use default/fallback in visualizer.
         vis_data = visualizer.generate_visualization_data(
             request.network_id, 
             db, 

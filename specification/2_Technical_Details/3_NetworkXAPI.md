@@ -24,7 +24,8 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 | `POST` | `/tools/initialize_network` | GraphMLデータを受け取り、1.正規化、2.DBへのノード/エッジ保存、3.初期レイアウト(Spring)計算とDB保存、4.デフォルトスタイルを適用した初期レンダリングデータの生成、までを一貫して実行する。 |
 | `GET` | `/tools/list_attributes` | ネットワークに存在する属性（計算済みまたは元から存在）の一覧を返す。 |
 | `POST` | `/tools/calculate_centrality` | 中心性指標を計算して永続化する。具体的には、まず属性の**定義**（例: 'degree_centrality'）が`node_attributes`に存在するか確認し、なければ`network_id`に紐付けて作成する。次に、各ノードの計算**値**を、定義のIDを参照して`node_attribute_values`に保存する。 |
-| `POST` | `/tools/generate_visualization` | レイアウト、ノードサイズ、ノードカラー等の視覚的割り当てに関するすべてのパラメータを受け取り、最終的なレンダリングデータを動的に生成して返す。 |
+| `POST` | `/tools/calculate_layout` | レイアウト座標を計算して永続化する。`layout_name`（例: 'circular'）を受け取り、`{layout_name}_x`, `{layout_name}_y` という属性として保存する。 |
+| `POST` | `/tools/generate_visualization` | レイアウト、ノードサイズ、ノードカラー等の視覚的割り当てに関するすべてのパラメータを受け取り、最終的なレンダリングデータを動的に生成して返す。**レイアウト計算は行わず、計算済みの座標データを使用する。** |
 
 ## 3.3. API詳細
 
@@ -34,7 +35,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 ```json
 {
-  "network_id": "net_12345",
+  "network_id": 12345,
   "centrality_type": "degree"
 }
 ```
@@ -48,13 +49,33 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 }
 ```
 
+### `/tools/calculate_layout`
+
+- **Request Body:**
+
+```json
+{
+  "network_id": 12345,
+  "layout_name": "circular"
+}
+```
+
+- **Response Body (Success):**
+
+```json
+{
+  "status": "success",
+  "message": "Layout 'circular' calculated and saved."
+}
+```
+
 ### `/tools/generate_visualization`
 
 - **リクエストボディ例 1 (次数中心性でサイズ、コミュニティで色分け)**
 
 ```json
 {
-  "network_id": "net_12345",
+  "network_id": 12345,
   "layout_name": "spring",
   "node_size_config": {
     "attribute": "degree_centrality",
@@ -78,7 +99,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 ```json
 {
-  "network_id": "net_12345",
+  "network_id": 12345,
   "layout_name": "kamada_kawai",
   "node_color_config": {
     "attribute": "betweenness_centrality",
@@ -127,7 +148,7 @@ LLMは、ユーザーの「次数が多いノードを大きく、コミュニ�
 
 1.  **属性名の解決**: `network_id`とリクエストされた属性名（`"degree_centrality"`）を使い、`node_attributes`テーブルを検索して、対応する`attribute_id`を特定します。
 2.  **値の取得**: 解決した`attribute_id`をキーとして`node_attribute_values`テーブルを検索し、ネットワーク内の全ノードに対応する値を取得します。
-3.  **レイアウトの再利用または計算**: `layout_name`が指定された場合、対応するレイアウト属性（例: `spring_layout_x`, `spring_layout_y`）がDBに存在すればそれを再利用します。存在しない場合は、NetworkXライブラリを用いてレイアウト計算を実行し、その結果を属性としてDBに保存します。
+3.  **レイアウトの適用**: `layout_name`が指定された場合、対応するレイアウト属性（例: `spring_layout_x`, `spring_layout_y`）をDBから取得して適用します。**計算は行いません。**
 
 この「属性名をIDに解決する」というステップを挟むことで、データの整合性を保ち、文字列ベースの曖昧な検索を排除しています。その後、取得した値を用いてマッピング処理やスタイル計算を実行します。
 

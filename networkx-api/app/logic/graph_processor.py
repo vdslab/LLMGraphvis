@@ -14,6 +14,14 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
     except Exception as e:
         raise ValueError(f"Failed to parse GraphML: {e}")
 
+    # Ensure Network exists in DB
+    network = db.query(models.Network).filter(models.Network.id == network_id).first()
+    if not network:
+        network = models.Network(id=network_id, name=f"Network {network_id}")
+        db.add(network)
+        db.commit()
+
+
     # Save Nodes
     for node_id, data in G.nodes(data=True):
         db_node = models.Node(
@@ -65,6 +73,14 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
     # Calculate Layout
     if layout_name == "spring":
         pos = nx.spring_layout(G, seed=42) # Seed for reproducibility
+    elif layout_name == "circular":
+        pos = nx.circular_layout(G)
+    elif layout_name == "kamada_kawai":
+        pos = nx.kamada_kawai_layout(G)
+    elif layout_name == "shell":
+        pos = nx.shell_layout(G)
+    elif layout_name == "spectral":
+        pos = nx.spectral_layout(G)
     else:
         # Fallback to spring
         pos = nx.spring_layout(G, seed=42)
