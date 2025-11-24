@@ -169,47 +169,13 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                         elif function_name == "visualize_centrality":
                             centrality_type = function_args.get("centrality_type", "degree")
                             
-                            # 1. Calculate Centrality
+                            # Calculate and Visualize in one go
                             await queue.put({
                                 "event": "thinking_stream",
-                                "data": json.dumps({"content": f"Calculating {centrality_type} centrality..."})
-                            })
-                            await network_service.calculate_centrality(network_id, centrality_type)
-                            
-                            # 2. Generate Visualization
-                            await queue.put({
-                                "event": "thinking_stream",
-                                "data": json.dumps({"content": "Updating visualization..."})
+                                "data": json.dumps({"content": f"Calculating {centrality_type} centrality and updating visualization..."})
                             })
                             
-                            vis_config = {
-                                "layout_name": "spring", # Default to spring if not specified, or keep current? 
-                                # Ideally we should keep current layout. 
-                                # But for now let's default to spring or maybe pass None to use existing?
-                                # Visualizer defaults to 0.5 if not found, but we want to use existing layout.
-                                # Let's pass "spring" as default for now, or maybe we should track current layout in DB?
-                                # The user requirement was "layout calculation endpoint and visualization creation endpoint are separated".
-                                # So here we just generate visualization. 
-                                # If we don't pass layout_name, visualizer might fail if we changed logic?
-                                # In visualizer.py: layout_name="spring" is default.
-                                # So if we want to use *current* layout, we need to know what it is, 
-                                # OR we just rely on the fact that we have calculated *some* layout.
-                                # But visualizer takes layout_name to look up {layout_name}_x.
-                                # If we want to preserve current layout, we need to know what it was.
-                                # For now, let's assume we stick to "spring" unless user changed it?
-                                # Or better: The visualize_centrality tool shouldn't change layout.
-                                # But visualizer REQUIRES a layout_name to fetch coordinates.
-                                # Let's assume "spring" is the base for now, or maybe we can fetch the last used layout?
-                                # For simplicity, let's use "spring" here, but this is a potential issue if user switched to circular.
-                                # TODO: Fix this later by tracking current layout in Chat or Network model.
-                                "node_size_config": {
-                                    "attribute": f"{centrality_type}_centrality",
-                                    "min": 5.0,
-                                    "max": 20.0
-                                }
-                            }
-                            
-                            vis_data = await network_service.generate_visualization(network_id, vis_config)
+                            vis_data = await network_service.visualize_centrality(network_id, centrality_type)
                             
                             # Send render update
                             await queue.put({

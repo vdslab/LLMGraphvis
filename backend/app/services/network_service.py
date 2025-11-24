@@ -39,6 +39,16 @@ async def calculate_centrality(network_id: int, centrality_type: str):
         response.raise_for_status()
         return response.json()
 
+async def visualize_centrality(network_id: int, centrality_type: str):
+    logger.info(f"Visualizing {centrality_type} centrality for network {network_id}")
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            f"{NETWORKX_API_URL}/tools/visualize_centrality",
+            json={"network_id": network_id, "centrality_type": centrality_type}
+        )
+        response.raise_for_status()
+        return response.json()
+
 async def calculate_layout(network_id: int, layout_name: str):
     logger.info(f"Calculating {layout_name} layout for network {network_id}")
     async with httpx.AsyncClient() as client:

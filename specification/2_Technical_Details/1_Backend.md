@@ -132,10 +132,10 @@ graph TD
     - 属性の計算と可視化を一括で行うために、`visualize_centrality`ツールのパラメータを組み立て、Backendに返します。
 
 3.  **BackendがNetworkXAPIを呼び出す**:
-    - Backendは、LLMから受け取った`generate_visualization`の呼び出しプラン（リクエストボディ）をそのままNetworkXAPIの`/tools/generate_visualization`エンドポイントに送信します。
+    - Backendは、LLMから受け取ったツール呼び出しプランに基づき、NetworkXAPIの適切なエンドポイント（`/tools/generate_visualization` または `/tools/visualize_centrality`）を呼び出します。
 
 4.  **NetworkXAPIがレンダリングデータを生成**:
-    - NetworkXAPIは、リクエストされたすべての視覚的割り当て（レイアウト、サイズ、色など）に基づき、データベースから必要な属性値を取得し、マッピング計算を行い、フロントエンドが直接描画できる最終的なJSONデータを生成します。
+    - NetworkXAPIは、計算（必要な場合）とマッピングを行い、フロントエンドが直接描画できる最終的なJSONデータを生成します。
 
 5.  **Backendが結果を中継**:
     - NetworkXAPIから返された最終的なレンダリングデータを、BackendはHTTP Streaming (SSE)を通じてFrontendに送信します。Frontendはこれを受け取り、画面を更新します。
