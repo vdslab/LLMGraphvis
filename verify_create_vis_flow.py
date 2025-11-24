@@ -54,7 +54,7 @@ def verify_create_vis_flow():
     # 2. calculate_centrality (degree)
     # 3. calculate_layout (circular)
     # 4. list_attributes (check both)
-    # 5. create_visualization (layout='circular', size='degree_centrality')
+    # 5. generate_visualization (layout='circular', size='degree_centrality')
     
     msg_res = requests.post(
         f"{BASE_URL}{API_V1_STR}/chat/{chat_id}/process",
@@ -104,11 +104,11 @@ def verify_create_vis_flow():
     else:
         print("SUCCESS: calculate_layout was called.")
         
-    if "create_visualization" not in tools_called:
-        print("FAILURE: create_visualization was NOT called.")
+    if "generate_visualization" not in tools_called:
+        print("FAILURE: generate_visualization was NOT called.")
         success = False
     else:
-        print("SUCCESS: create_visualization was called.")
+        print("SUCCESS: generate_visualization was called.")
 
     if success:
         print("\nVerification SUCCESS")

@@ -142,7 +142,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 **新設計では、NetworkXAPIが「最終的なレンダリングデータを動的に生成する」という責務を一手に担います。**
 
-LLMは、ユーザーの「次数が多いノードを大きく、コミュニティごとに色分けして」といった指示を解釈し、必要に応じて`calculate_layout`でレイアウトを計算した後、一度のツール呼び出し（`create_visualization`経由の`generate_visualization`）で、使用するレイアウト、ノードサイズ、ノードカラーの割り当て方法をすべて指定します。NetworkXAPIの`/tools/generate_visualization`エンドポイントは、この指示書（リクエストボディ）に基づき、最終的なJSONを返します。
+LLMは、ユーザーの「次数が多いノードを大きく、コミュニティごとに色分けして」といった指示を解釈し、必要に応じて`calculate_layout`でレイアウトを計算した後、一度のツール呼び出し（`generate_visualization`）で、使用するレイアウト、ノードサイズ、ノードカラーの割り当て方法をすべて指定します。NetworkXAPIの`/tools/generate_visualization`エンドポイントは、この指示書（リクエストボディ）に基づき、最終的なJSONを返します。
 
 このプロセスにおいて、`generate_visualization`はリクエストで指定された属性名（例: `"attribute": "degree_centrality"`）をそのまま使うわけではありません。正規化されたスキーマに基づき、以下の手順でデータを取得します。
 

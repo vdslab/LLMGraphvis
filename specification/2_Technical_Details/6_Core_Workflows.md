@@ -131,13 +131,13 @@ sequenceDiagram
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_attributes", status: "completed" })
 
     B->>LLM: ツール実行結果（成功）を送信
-    LLM-->>B: ツール呼び出し要求 (4. create_visualization)
+    LLM-->>B: ツール呼び出し要求 (4. generate_visualization)
 
-    %% Step 6: Backend executes create_visualization
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "create_visualization", status: "started" })
-    B->>N: POST /tools/create_visualization
+    %% Step 6: Backend executes generate_visualization
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "generate_visualization", status: "started" })
+    B->>N: POST /tools/generate_visualization
     N-->>B: 最終レンダリングデータ { nodes: [...], links: [...] }
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "create_visualization", status: "completed" })
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "generate_visualization", status: "completed" })
 
     %% Step 7: Backend sends final data and text response via SSE
     B-->>F: SSEイベント (event: render_update, data: { nodes, links })

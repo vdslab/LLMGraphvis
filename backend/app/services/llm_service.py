@@ -54,7 +54,7 @@ def calculate_centrality(centrality_type: str) -> Dict[str, Any]:
     # This is a placeholder - actual implementation will call network_service
     return {"status": "success"}
 
-def create_visualization(layout_name: str = "spring", node_size_config: Dict[str, Any] = None, node_color_config: Dict[str, Any] = None) -> Dict[str, Any]:
+def generate_visualization(layout_name: str = "spring", node_size_config: Dict[str, Any] = None, node_color_config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Create the visualization with specific layout, size, and color settings.
     This function MUST be called to generate the final visualization.
@@ -94,24 +94,24 @@ User Request: "Show popular nodes" (or friends, connections)
 Step 1: Call `list_attributes()` to see what's available.
 Step 2: Call `calculate_centrality(centrality_type='degree')`
 Step 3: Call `list_attributes()` AGAIN to confirm the new attribute is available.
-Step 4: Call `create_visualization(layout_name='spring', node_size_config={'attribute': 'degree_centrality', ...})`
+Step 4: Call `generate_visualization(layout_name='spring', node_size_config={'attribute': 'degree_centrality', ...})`
 
 User Request: "Show bridges"
 Step 1: Call `list_attributes()`
 Step 2: Call `calculate_centrality(centrality_type='betweenness')`
 Step 3: Call `list_attributes()`
-Step 4: Call `create_visualization(layout_name='spring', node_size_config={'attribute': 'betweenness_centrality', ...})`
+Step 4: Call `generate_visualization(layout_name='spring', node_size_config={'attribute': 'betweenness_centrality', ...})`
 
 User Request: "Apply circular layout"
 Step 1: Call `list_attributes()`
 Step 2: Call `calculate_layout(layout_name='circular')`
 Step 3: Call `list_attributes()`
-Step 4: Call `create_visualization(layout_name='circular')`
+Step 4: Call `generate_visualization(layout_name='circular')`
 
 ALWAYS follow this pattern: List -> Calculate (if needed) -> List -> Create Visualization.
 
 IMPORTANT: Maintain Context
-When calling `create_visualization`, you MUST maintain the previous visualization state unless the user explicitly asks to change it.
+When calling `generate_visualization`, you MUST maintain the previous visualization state unless the user explicitly asks to change it.
 - If the user previously asked for "circular layout", KEEP `layout_name='circular'` in subsequent calls.
 - If the user previously asked to size nodes by "degree", KEEP `node_size_config={'attribute': 'degree_centrality', ...}`.
 - If the user previously asked to color nodes by "community", KEEP `node_color_config={'attribute': 'community_id', ...}`.
@@ -155,8 +155,8 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
             types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="calculate_centrality", response={"status": "success", "message": "Calculated degree centrality."}))]),
             types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="list_attributes", args={}))]),
             types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="list_attributes", response={"attributes": ["weight", "degree_centrality"]}))]),
-            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="create_visualization", args={"layout_name": "spring", "node_size_config": {"attribute": "degree_centrality", "min": 5, "max": 20}}))]),
-            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="create_visualization", response={"status": "success", "message": "Visualization created."}))])
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="generate_visualization", args={"layout_name": "spring", "node_size_config": {"attribute": "degree_centrality", "min": 5, "max": 20}}))]),
+            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="generate_visualization", response={"status": "success", "message": "Visualization created."}))])
         ]
         
         # Example 2: Bridges (Betweenness)
@@ -168,8 +168,8 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
             types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="calculate_centrality", response={"status": "success", "message": "Calculated betweenness centrality."}))]),
             types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="list_attributes", args={}))]),
             types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="list_attributes", response={"attributes": ["weight", "betweenness_centrality"]}))]),
-            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="create_visualization", args={"layout_name": "spring", "node_size_config": {"attribute": "betweenness_centrality", "min": 5, "max": 20}}))]),
-            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="create_visualization", response={"status": "success", "message": "Visualization created."}))])
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="generate_visualization", args={"layout_name": "spring", "node_size_config": {"attribute": "betweenness_centrality", "min": 5, "max": 20}}))]),
+            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="generate_visualization", response={"status": "success", "message": "Visualization created."}))])
         ]
         
         # Insert examples at the beginning of history
@@ -208,8 +208,8 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
             )
         )
 
-        create_visualization_tool = types.FunctionDeclaration(
-            name="create_visualization",
+        generate_visualization_tool = types.FunctionDeclaration(
+            name="generate_visualization",
             description="Create the visualization with specific layout, size, and color settings.",
             parameters=types.Schema(
                 type="OBJECT",
@@ -268,7 +268,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                     function_declarations=[
                         list_attributes_tool,
                         calculate_centrality_tool,
-                        create_visualization_tool,
+                        generate_visualization_tool,
                         calculate_layout_tool
                     ]
                 )],
@@ -335,7 +335,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                                 
                                 function_result = {"status": "success", "message": f"Calculated {centrality_type} centrality."}
 
-                            elif function_name == "create_visualization":
+                            elif function_name == "generate_visualization":
                                 vis_config = {
                                     "layout_name": function_args.get("layout_name", "spring"),
                                     "node_size_config": function_args.get("node_size_config"),
@@ -415,7 +415,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                                     function_declarations=[
                                         list_attributes_tool,
                                         calculate_centrality_tool,
-                                        create_visualization_tool,
+                                        generate_visualization_tool,
                                         calculate_layout_tool
                                     ]
                                 )],
