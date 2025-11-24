@@ -33,6 +33,8 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - ALGORITHM=${ALGORITHM}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
+      - KEEP_ALIVE_TIMEOUT=${KEEP_ALIVE_TIMEOUT}
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--timeout-keep-alive", "${KEEP_ALIVE_TIMEOUT}"]
     depends_on:
       db:
         condition: service_healthy

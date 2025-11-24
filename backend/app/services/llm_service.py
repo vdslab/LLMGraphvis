@@ -259,7 +259,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
 
         # Call Gemini with function calling
         logger.info("Calling Gemini API...")
-        response = client.models.generate_content(
+        response = await client.aio.models.generate_content(
             model="gemini-2.5-flash",
             contents=history,
             config=types.GenerateContentConfig(
@@ -405,7 +405,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                         ))
                         
                         # Get next response from LLM
-                        current_response = client.models.generate_content(
+                        current_response = await client.aio.models.generate_content(
                             model="gemini-2.5-flash",
                             contents=history,
                             config=types.GenerateContentConfig(

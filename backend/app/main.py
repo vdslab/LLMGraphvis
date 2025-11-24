@@ -21,6 +21,13 @@ app = FastAPI(
     }
 )
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    print(f"Global exception handler caught: {exc}")
+    import traceback
+    traceback.print_exc()
+    return {"detail": "Internal Server Error"}
+
 # Public endpoints that don't require authentication
 PUBLIC_ENDPOINTS = [
     {"path": "/health", "method": "GET"},
