@@ -51,23 +51,53 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
     layout_x_attr = f"{layout_name}_x"
     layout_y_attr = f"{layout_name}_y"
     
+    # Pre-calculate Node Size Min/Max if config exists
+    node_size_map = {}
+    node_size_min_val = 0
+    node_size_max_val = 0
+    has_node_size_data = False
+    
+    if node_size_config:
+        attr_name = node_size_config.get("attribute")
+        attr_record = db.query(models.NodeAttribute).filter(
+            models.NodeAttribute.network_id == network_id,
+            models.NodeAttribute.attribute_name == attr_name
+        ).first()
+        
+        if attr_record:
+            values = db.query(models.NodeAttributeValue).filter(
+                models.NodeAttributeValue.attribute_id == attr_record.id
+            ).all()
+            
+            valid_values = []
+            for v in values:
+                if v.float_value is not None:
+                    val = v.float_value.float_value
+                    valid_values.append(val)
+                    node_size_map[v.node_id] = val
+            
+            if valid_values:
+                node_size_min_val = min(valid_values)
+                node_size_max_val = max(valid_values)
+                has_node_size_data = True
+
     for n in nodes:
         # Default visual props
         size = 20
         color = "#5384ED"
         
         # Apply Size Config
-        if node_size_config:
-            attr_name = node_size_config.get("attribute")
-            val = get_node_attr_value(n.id, attr_name)
+        if has_node_size_data:
+            val = node_size_map.get(n.id)
             if val is not None:
-                # Linear scale mapping
-                min_size = node_size_config.get("min", 20)
-                max_size = node_size_config.get("max", 60)
-                # We need min/max of the attribute to scale properly
-                # Simplified: assume 0-1 for centrality or just multiply
-                # Better: Fetch min/max of attribute from DB
-                size = min_size + (val * (max_size - min_size)) # Assuming val is 0-1
+                target_min_size = node_size_config.get("min", 20)
+                target_max_size = node_size_config.get("max", 60)
+                
+                if node_size_max_val == node_size_min_val:
+                    size = target_min_size
+                else:
+                    norm_val = (val - node_size_min_val) / (node_size_max_val - node_size_min_val)
+                    size = target_min_size + (norm_val * (target_max_size - target_min_size))
                 
         # Apply Color Config
         if node_color_config:
