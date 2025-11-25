@@ -46,7 +46,7 @@ sequenceDiagram
     %% Step 3: Backend accepts the request and starts background task
     B-->>F: 202 Accepted
     note right of B: FastAPIのBackgroundTasksを使い、<br/>後続の重い処理をバックグラウンドで実行
-    B-XN: POST /tools/initialize_network (network_id, graphml_data)
+    B->>N: POST /tools/initialize_network (network_id, graphml_data)
     note right of B: ネットワークの初期化と<br/>初期レンダリングデータ生成を要求
 
     %% Step 4: Frontend waits for SSE event
