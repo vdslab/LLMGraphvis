@@ -97,13 +97,17 @@ erDiagram
         VARCHAR attribute_name UK
         TEXT description
     }
-    node_text_attributes { INTEGER node_attribute_id PK, FK }
-    node_float_attributes { INTEGER node_attribute_id PK, FK }
+    node_text_attributes {
+        INTEGER node_attribute_id PK, FK
+    }
+    node_float_attributes {
+        INTEGER node_attribute_id PK, FK
+    }
     node_attribute_values {
         INTEGER id PK
         INTEGER node_id FK
         INTEGER attribute_id FK
-        UNIQUE(node_id, attribute_id)
+        %% UNIQUE on (node_id, attribute_id)
     }
     node_text_attribute_values {
         INTEGER node_attribute_value_id PK, FK
@@ -119,13 +123,17 @@ erDiagram
         VARCHAR attribute_name UK
         TEXT description
     }
-    edge_text_attributes { INTEGER edge_attribute_id PK, FK }
-    edge_float_attributes { INTEGER edge_attribute_id PK, FK }
+    edge_text_attributes {
+        INTEGER edge_attribute_id PK, FK
+    }
+    edge_float_attributes {
+        INTEGER edge_attribute_id PK, FK
+    }
     edge_attribute_values {
         INTEGER id PK
         INTEGER edge_id FK
         INTEGER attribute_id FK
-        UNIQUE(edge_id, attribute_id)
+        %% UNIQUE on (edge_id, attribute_id)
     }
     edge_text_attribute_values {
         INTEGER edge_attribute_value_id PK, FK
