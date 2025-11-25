@@ -75,7 +75,7 @@ def generate_visualization(layout_name: str = "spring", node_size_config: Dict[s
     
     Args:
         layout_name: Name of the layout algorithm. Options: "spring", "circular", "kamada_kawai", "shell", "spectral"
-        node_size_config: Configuration for node sizes. Example: {"attribute": "degree_centrality", "min": 5.0, "max": 20.0}
+        node_size_config: Configuration for node sizes. Example: {"attribute": "degree_centrality", "min": 5.0, "max": 50.0}
         node_color_config: Configuration for node colors. Example: {"attribute": "community_id", "scale_type": "CATEGORICAL"}
         edge_width_config: Configuration for edge widths. Example: {"attribute": "weight", "min": 1.0, "max": 10.0}
         edge_color_config: Configuration for edge colors. Example: {"attribute": "type", "scale_type": "CATEGORICAL"}
@@ -171,7 +171,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
             types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="calculate_centrality", response={"status": "success", "message": "Calculated degree centrality."}))]),
             types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="list_node_attributes", args={}))]),
             types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="list_node_attributes", response={"attributes": ["weight", "degree_centrality"]}))]),
-            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="generate_visualization", args={"layout_name": "spring", "node_size_config": {"attribute": "degree_centrality", "min": 5, "max": 20}}))]),
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="generate_visualization", args={"layout_name": "spring", "node_size_config": {"attribute": "degree_centrality", "min": 5, "max": 50}}))]),
             types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="generate_visualization", response={"status": "success", "message": "Visualization created."}))])
         ]
         
@@ -184,7 +184,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
             types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="calculate_centrality", response={"status": "success", "message": "Calculated betweenness centrality."}))]),
             types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="list_node_attributes", args={}))]),
             types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="list_node_attributes", response={"attributes": ["weight", "betweenness_centrality"]}))]),
-            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="generate_visualization", args={"layout_name": "spring", "node_size_config": {"attribute": "betweenness_centrality", "min": 5, "max": 20}}))]),
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="generate_visualization", args={"layout_name": "spring", "node_size_config": {"attribute": "betweenness_centrality", "min": 5, "max": 50}}))]),
             types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="generate_visualization", response={"status": "success", "message": "Visualization created."}))])
         ]
         

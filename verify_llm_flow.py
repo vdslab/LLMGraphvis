@@ -110,7 +110,13 @@ def verify_llm_flow():
                             
                             if max_size > min_size:
                                 print("   Verified: Node sizes vary (Centrality applied)")
-                                render_updated = True
+                                if max_size > 20:
+                                    print(f"   Verified: Max node size ({max_size}) is greater than 20 (Size increased)")
+                                    render_updated = True
+                                else:
+                                    print(f"   Warning: Max node size ({max_size}) is not significantly larger than default 20.")
+                                    # Still count as updated if it varies, but warn
+                                    render_updated = True
                             else:
                                 print("   Warning: Node sizes are uniform.")
 

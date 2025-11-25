@@ -53,7 +53,7 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
     
     for n in nodes:
         # Default visual props
-        size = 5
+        size = 20
         color = "#5384ED"
         
         # Apply Size Config
@@ -62,8 +62,8 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
             val = get_node_attr_value(n.id, attr_name)
             if val is not None:
                 # Linear scale mapping
-                min_size = node_size_config.get("min", 5)
-                max_size = node_size_config.get("max", 20)
+                min_size = node_size_config.get("min", 20)
+                max_size = node_size_config.get("max", 60)
                 # We need min/max of the attribute to scale properly
                 # Simplified: assume 0-1 for centrality or just multiply
                 # Better: Fetch min/max of attribute from DB
@@ -97,7 +97,7 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
         source_node = db.query(models.Node).get(e.source_node_id)
         target_node = db.query(models.Node).get(e.target_node_id)
         
-        width = 1
+        width = 5
         color = "#ccc"
 
         # Apply Edge Width Config
@@ -105,7 +105,7 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
             attr_name = edge_width_config.get("attribute")
             val = get_edge_attr_value(e.id, attr_name)
             if val is not None:
-                min_width = edge_width_config.get("min", 1)
+                min_width = edge_width_config.get("min", 5)
                 max_width = edge_width_config.get("max", 10)
                 # Simplified scaling, assuming val is roughly normalized or small
                 # In production, we should normalize against min/max of the dataset
