@@ -22,12 +22,47 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 | Method | Path | 説明 |
 |:---|:---|:---|
 | `POST` | `/tools/initialize_network` | GraphMLデータを受け取り、1.正規化、2.DBへのノード/エッジ保存、3.初期レイアウト(Spring)計算とDB保存、4.デフォルトスタイルを適用した初期レンダリングデータの生成、までを一貫して実行する。 |
-| `GET` | `/tools/list_attributes` | ネットワークに存在する属性（計算済みまたは元から存在）の一覧を返す。 |
+| `GET` | `/tools/list_node_attributes` | ネットワークに存在するノード属性（計算済みまたは元から存在）の一覧を返す。 |
+| `GET` | `/tools/list_edge_attributes` | ネットワークに存在するエッジ属性（計算済みまたは元から存在）の一覧を返す。 |
 | `POST` | `/tools/calculate_centrality` | 中心性指標を計算して永続化する。具体的には、まず属性の**定義**（例: 'degree_centrality'）が`node_attributes`に存在するか確認し、なければ`network_id`に紐付けて作成する。次に、各ノードの計算**値**を、定義のIDを参照して`node_attribute_values`に保存する。 |
 | `POST` | `/tools/calculate_layout` | レイアウト座標を計算して永続化する。`layout_name`（例: 'circular'）を受け取り、`{layout_name}_x`, `{layout_name}_y` という属性として保存する。 |
 | `POST` | `/tools/generate_visualization` | レイアウト、ノードサイズ、ノードカラー等の視覚的割り当てに関するすべてのパラメータを受け取り、最終的なレンダリングデータを動的に生成して返す。**レイアウト計算は行わず、計算済みの座標データを使用する。新しいレイアウトを適用する場合は、事前に`/tools/calculate_layout`を呼び出す必要がある。** |
 
 ## 3.3. API詳細
+
+### 1. 属性一覧取得 (Node)
+- **Endpoint**: `GET /tools/list_node_attributes`
+- **Description**: ネットワーク内の利用可能なノード属性一覧を取得する。
+- **Parameters**:
+  - `network_id` (query): ネットワークID
+- **Response**:
+  - `attributes`: List[str] - 属性名のリスト
+
+### 2. 属性一覧取得 (Edge)
+- **Endpoint**: `GET /tools/list_edge_attributes`
+- **Description**: ネットワーク内の利用可能なエッジ属性一覧を取得する。
+- **Parameters**:
+  - `network_id` (query): ネットワークID
+- **Response**:
+  - `attributes`: List[str] - 属性名のリスト
+
+### 3. 中心性計算
+- **Endpoint**: `POST /tools/calculate_centrality`
+- **Description**: 指定された中心性指標を計算し、ノード属性として保存する。
+- **Request Body**:
+  - `network_id`: int
+  - `centrality_type`: str ("degree", "betweenness", "closeness", "eigenvector")
+- **Response**:
+  - `centrality`: Dict[str, float] - ノードIDと中心性スコアのマッピング
+
+### 4. レイアウト計算
+- **Endpoint**: `POST /tools/calculate_layout`
+- **Description**: 指定されたレイアウトアルゴリズムで座標を計算し、ノード属性として保存する。
+- **Request Body**:
+  - `network_id`: int
+  - `layout_name`: str ("spring", "circular", "kamada_kawai", "shell", "spectral")
+- **Response**:
+  - `pos`: Dict[str, List[float]] - ノードIDと座標(x, y)のマッピング
 
 ### `/tools/calculate_centrality`
 
@@ -44,8 +79,11 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 ```json
 {
-  "status": "success",
-  "message": "Degree centrality calculated and saved as 'degree_centrality' attribute."
+  "centrality": {
+    "node1": 0.5,
+    "node2": 0.3,
+    "node3": 0.8
+  }
 }
 ```
 
@@ -64,8 +102,10 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 ```json
 {
-  "status": "success",
-  "message": "Layout 'circular' calculated and saved."
+  "pos": {
+    "node1": [0.123, 0.456],
+    "node2": [0.789, 0.987]
+  }
 }
 ```
 

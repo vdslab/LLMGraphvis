@@ -19,11 +19,21 @@ async def initialize_network(network_id: int, graphml_data: str):
         response.raise_for_status()
         return response.json()
 
-async def list_attributes(network_id: int):
-    logger.info(f"Listing attributes for network {network_id}")
+async def list_node_attributes(network_id: int):
+    logger.info(f"Listing node attributes for network {network_id}")
     async with httpx.AsyncClient() as client:
         response = await client.get(
-            f"{NETWORKX_API_URL}/tools/list_attributes",
+            f"{NETWORKX_API_URL}/tools/list_node_attributes",
+            params={"network_id": network_id}
+        )
+        response.raise_for_status()
+        return response.json()
+
+async def list_edge_attributes(network_id: int):
+    logger.info(f"Listing edge attributes for network {network_id}")
+    async with httpx.AsyncClient() as client:
+        response = await client.get(
+            f"{NETWORKX_API_URL}/tools/list_edge_attributes",
             params={"network_id": network_id}
         )
         response.raise_for_status()

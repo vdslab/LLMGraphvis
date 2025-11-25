@@ -30,9 +30,19 @@ async def get_event_queue(chat_id: int) -> asyncio.Queue:
 client = genai.Client(api_key=GOOGLE_API_KEY)
 
 # Define tools for network operations
-def list_attributes() -> List[str]:
+def list_node_attributes() -> List[str]:
     """
     List all available node attributes for the network.
+    
+    Returns:
+        List of attribute names available in the network
+    """
+    # This is a placeholder - actual implementation will call network_service
+    return []
+
+def list_edge_attributes() -> List[str]:
+    """
+    List all available edge attributes for the network.
     
     Returns:
         List of attribute names available in the network
@@ -54,7 +64,7 @@ def calculate_centrality(centrality_type: str) -> Dict[str, Any]:
     # This is a placeholder - actual implementation will call network_service
     return {"status": "success"}
 
-def generate_visualization(layout_name: str = "spring", node_size_config: Dict[str, Any] = None, node_color_config: Dict[str, Any] = None) -> Dict[str, Any]:
+def generate_visualization(layout_name: str = "spring", node_size_config: Dict[str, Any] = None, node_color_config: Dict[str, Any] = None, edge_width_config: Dict[str, Any] = None, edge_color_config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Create the visualization with specific layout, size, and color settings.
     This function MUST be called to generate the final visualization.
@@ -67,6 +77,8 @@ def generate_visualization(layout_name: str = "spring", node_size_config: Dict[s
         layout_name: Name of the layout algorithm. Options: "spring", "circular", "kamada_kawai", "shell", "spectral"
         node_size_config: Configuration for node sizes. Example: {"attribute": "degree_centrality", "min": 5.0, "max": 20.0}
         node_color_config: Configuration for node colors. Example: {"attribute": "community_id", "scale_type": "CATEGORICAL"}
+        edge_width_config: Configuration for edge widths. Example: {"attribute": "weight", "min": 1.0, "max": 10.0}
+        edge_color_config: Configuration for edge colors. Example: {"attribute": "type", "scale_type": "CATEGORICAL"}
         
     Returns:
         Visualization data including nodes and links
@@ -91,22 +103,26 @@ def calculate_layout(layout_name: str) -> Dict[str, Any]:
 SYSTEM_INSTRUCTION = """You are a network visualization assistant.
 
 User Request: "Show popular nodes" (or friends, connections)
-Step 1: Call `list_attributes()` to see what's available.
+Step 1: Call `list_node_attributes()` to see what's available.
 Step 2: Call `calculate_centrality(centrality_type='degree')`
-Step 3: Call `list_attributes()` AGAIN to confirm the new attribute is available.
+Step 3: Call `list_node_attributes()` AGAIN to confirm the new attribute is available.
 Step 4: Call `generate_visualization(layout_name='spring', node_size_config={'attribute': 'degree_centrality', ...})`
 
 User Request: "Show bridges"
-Step 1: Call `list_attributes()`
+Step 1: Call `list_node_attributes()`
 Step 2: Call `calculate_centrality(centrality_type='betweenness')`
-Step 3: Call `list_attributes()`
+Step 3: Call `list_node_attributes()`
 Step 4: Call `generate_visualization(layout_name='spring', node_size_config={'attribute': 'betweenness_centrality', ...})`
 
 User Request: "Apply circular layout"
-Step 1: Call `list_attributes()`
+Step 1: Call `list_node_attributes()`
 Step 2: Call `calculate_layout(layout_name='circular')`
-Step 3: Call `list_attributes()`
+Step 3: Call `list_node_attributes()`
 Step 4: Call `generate_visualization(layout_name='circular')`
+
+User Request: "Show edge weights"
+Step 1: Call `list_edge_attributes()`
+Step 2: Call `generate_visualization(edge_width_config={'attribute': 'weight', 'min': 1, 'max': 5})`
 
 ALWAYS follow this pattern: List -> Calculate (if needed) -> List -> Create Visualization.
 
@@ -149,12 +165,12 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
         # Example 1: Popular nodes (Degree)
         example_1 = [
             types.Content(role="user", parts=[types.Part(text="Show popular nodes")]),
-            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="list_attributes", args={}))]),
-            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="list_attributes", response={"attributes": ["weight"]}))]),
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="list_node_attributes", args={}))]),
+            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="list_node_attributes", response={"attributes": ["weight"]}))]),
             types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="calculate_centrality", args={"centrality_type": "degree"}))]),
             types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="calculate_centrality", response={"status": "success", "message": "Calculated degree centrality."}))]),
-            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="list_attributes", args={}))]),
-            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="list_attributes", response={"attributes": ["weight", "degree_centrality"]}))]),
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="list_node_attributes", args={}))]),
+            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="list_node_attributes", response={"attributes": ["weight", "degree_centrality"]}))]),
             types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="generate_visualization", args={"layout_name": "spring", "node_size_config": {"attribute": "degree_centrality", "min": 5, "max": 20}}))]),
             types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="generate_visualization", response={"status": "success", "message": "Visualization created."}))])
         ]
@@ -162,12 +178,12 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
         # Example 2: Bridges (Betweenness)
         example_2 = [
             types.Content(role="user", parts=[types.Part(text="Show bridges")]),
-            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="list_attributes", args={}))]),
-            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="list_attributes", response={"attributes": ["weight"]}))]),
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="list_node_attributes", args={}))]),
+            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="list_node_attributes", response={"attributes": ["weight"]}))]),
             types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="calculate_centrality", args={"centrality_type": "betweenness"}))]),
             types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="calculate_centrality", response={"status": "success", "message": "Calculated betweenness centrality."}))]),
-            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="list_attributes", args={}))]),
-            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="list_attributes", response={"attributes": ["weight", "betweenness_centrality"]}))]),
+            types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="list_node_attributes", args={}))]),
+            types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="list_node_attributes", response={"attributes": ["weight", "betweenness_centrality"]}))]),
             types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(name="generate_visualization", args={"layout_name": "spring", "node_size_config": {"attribute": "betweenness_centrality", "min": 5, "max": 20}}))]),
             types.Content(role="function", parts=[types.Part(function_response=types.FunctionResponse(name="generate_visualization", response={"status": "success", "message": "Visualization created."}))])
         ]
@@ -183,9 +199,18 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
         })
         
         # Define tools using explicit FunctionDeclaration
-        list_attributes_tool = types.FunctionDeclaration(
-            name="list_attributes",
+        list_node_attributes_tool = types.FunctionDeclaration(
+            name="list_node_attributes",
             description="List all available node attributes for the network.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={},
+            )
+        )
+
+        list_edge_attributes_tool = types.FunctionDeclaration(
+            name="list_edge_attributes",
+            description="List all available edge attributes for the network.",
             parameters=types.Schema(
                 type="OBJECT",
                 properties={},
@@ -235,6 +260,23 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                             "attribute": types.Schema(type="STRING"),
                             "scale_type": types.Schema(type="STRING")
                         }
+                    ),
+                    "edge_width_config": types.Schema(
+                        type="OBJECT",
+                        description="Configuration for edge widths.",
+                        properties={
+                            "attribute": types.Schema(type="STRING"),
+                            "min": types.Schema(type="NUMBER"),
+                            "max": types.Schema(type="NUMBER")
+                        }
+                    ),
+                    "edge_color_config": types.Schema(
+                        type="OBJECT",
+                        description="Configuration for edge colors.",
+                        properties={
+                            "attribute": types.Schema(type="STRING"),
+                            "scale_type": types.Schema(type="STRING")
+                        }
                     )
                 },
                 required=["layout_name"]
@@ -266,7 +308,8 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                 system_instruction=SYSTEM_INSTRUCTION,
                 tools=[types.Tool(
                     function_declarations=[
-                        list_attributes_tool,
+                        list_node_attributes_tool,
+                        list_edge_attributes_tool,
                         calculate_centrality_tool,
                         generate_visualization_tool,
                         calculate_layout_tool
@@ -320,8 +363,12 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                         
                         # Execute the actual network service call
                         try:
-                            if function_name == "list_attributes":
-                                result = await network_service.list_attributes(network_id)
+                            if function_name == "list_node_attributes":
+                                result = await network_service.list_node_attributes(network_id)
+                                function_result = {"attributes": result}
+
+                            elif function_name == "list_edge_attributes":
+                                result = await network_service.list_edge_attributes(network_id)
                                 function_result = {"attributes": result}
                                 
                             elif function_name == "calculate_centrality":
@@ -339,7 +386,9 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                                 vis_config = {
                                     "layout_name": function_args.get("layout_name", "spring"),
                                     "node_size_config": function_args.get("node_size_config"),
-                                    "node_color_config": function_args.get("node_color_config")
+                                    "node_color_config": function_args.get("node_color_config"),
+                                    "edge_width_config": function_args.get("edge_width_config"),
+                                    "edge_color_config": function_args.get("edge_color_config")
                                 }
                                 
                                 await queue.put({
@@ -413,7 +462,8 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                                 temperature=0.7,
                                 tools=[types.Tool(
                                     function_declarations=[
-                                        list_attributes_tool,
+                                        list_node_attributes_tool,
+                                        list_edge_attributes_tool,
                                         calculate_centrality_tool,
                                         generate_visualization_tool,
                                         calculate_layout_tool

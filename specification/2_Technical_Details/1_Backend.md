@@ -124,10 +124,16 @@ graph TD
 プロセスは以下のステップで実行されます。
 
 1.  **BackendがLLMに指示を送信**:
-    - Frontendから受け取ったユーザーの自然言語指示（例：「次数中心性でノードを色分けして」）と、利用可能なツールリスト（`list_attributes`, `calculate_centrality`, `calculate_layout`, `generate_visualization`など）をLLMに送信します。
+    - Frontendから受け取ったユーザーの自然言語指示（例：「次数中心性でノードを色分けして」）と、利用可能なツールリスト（`list_node_attributes`, `list_edge_attributes`, `calculate_centrality`, `calculate_layout`, `generate_visualization`など）をLLMに送信します。
 
 2.  **LLMが実行プランを計画**:
     - LLMはユーザーの意図を解釈します。
+    - **Tool Execution**:
+     - `list_node_attributes()`: `network_service.list_node_attributes` を呼び出し、NetworkXAPIからノード属性一覧を取得。
+     - `list_edge_attributes()`: `network_service.list_edge_attributes` を呼び出し、NetworkXAPIからエッジ属性一覧を取得。
+     - `calculate_centrality(type)`: `network_service.calculate_centrality` を呼び出し、NetworkXAPIで計算を実行。
+     - `calculate_layout(name)`: `network_service.calculate_layout` を呼び出し、NetworkXAPIで計算を実行。
+     - `generate_visualization(config)`: `network_service.generate_visualization` を呼び出し、NetworkXAPIから可視化データを取得。
     - ネットワークの現状を把握するために`list_attributes`を呼び出し、必要な属性（例：`degree_centrality`）が存在するか確認します。
     - 属性の計算が必要な場合は`calculate_centrality`を呼び出し、その後`generate_visualization`を呼び出して可視化を更新するプランをBackendに返します。
 

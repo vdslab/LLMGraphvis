@@ -122,13 +122,13 @@ sequenceDiagram
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "completed" })
     
     B->>LLM: ツール実行結果（成功）を送信
-    LLM-->>B: ツール呼び出し要求 (3. list_attributes)
+    LLM-->>B: ツール呼び出し要求 (3. list_node_attributes)
 
-    %% Step 5: Backend executes list_attributes (Verification)
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_attributes", status: "started" })
-    B->>N: GET /tools/list_attributes
+    %% Step 5: Backend executes list_node_attributes (Verification)
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_node_attributes", status: "started" })
+    B->>N: GET /tools/list_node_attributes
     N-->>B: 更新された属性リスト
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_attributes", status: "completed" })
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_node_attributes", status: "completed" })
 
     B->>LLM: ツール実行結果（成功）を送信
     LLM-->>B: ツール呼び出し要求 (4. generate_visualization)

@@ -24,6 +24,8 @@ class GenerateVisualizationRequest(BaseModel):
     layout_name: Optional[str] = "spring"
     node_size_config: Optional[Dict[str, Any]] = None
     node_color_config: Optional[Dict[str, Any]] = None
+    edge_width_config: Optional[Dict[str, Any]] = None
+    edge_color_config: Optional[Dict[str, Any]] = None
 
 class CalculateLayoutRequest(BaseModel):
     network_id: int
@@ -45,9 +47,14 @@ def initialize_network(request: InitializeNetworkRequest, db: Session = Depends(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/list_attributes")
-def list_attributes(network_id: int, db: Session = Depends(database.get_db)):
+@router.get("/list_node_attributes")
+def list_node_attributes(network_id: int, db: Session = Depends(database.get_db)):
     attributes = db.query(models.NodeAttribute).filter(models.NodeAttribute.network_id == network_id).all()
+    return [attr.attribute_name for attr in attributes]
+
+@router.get("/list_edge_attributes")
+def list_edge_attributes(network_id: int, db: Session = Depends(database.get_db)):
+    attributes = db.query(models.EdgeAttribute).filter(models.EdgeAttribute.network_id == network_id).all()
     return [attr.attribute_name for attr in attributes]
 
 @router.post("/calculate_centrality")
@@ -76,7 +83,9 @@ def generate_visualization(request: GenerateVisualizationRequest, db: Session = 
             db, 
             layout_name=request.layout_name,
             node_size_config=request.node_size_config,
-            node_color_config=request.node_color_config
+            node_color_config=request.node_color_config,
+            edge_width_config=request.edge_width_config,
+            edge_color_config=request.edge_color_config
         )
         return vis_data
     except Exception as e:
