@@ -1,0 +1,192 @@
+<?xml version='1.0' encoding='utf-8'?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd"><key id="d2" for="node" attr.name="bipartite" attr.type="long"/>
+<key id="d1" for="graph" attr.name="bottom" attr.type="string"/>
+<key id="d0" for="graph" attr.name="top" attr.type="string"/>
+<graph edgedefault="undirected"><data key="d0">['Evelyn Jefferson', 'Laura Mandeville', 'Theresa Anderson', 'Brenda Rogers', 'Charlotte McDowd', 'Frances Anderson', 'Eleanor Nye', 'Pearl Oglethorpe', 'Ruth DeSand', 'Verne Sanderson', 'Myra Liddel', 'Katherina Rogers', 'Sylvia Avondale', 'Nora Fayette', 'Helen Lloyd', 'Dorothy Murchison', 'Olivia Carleton', 'Flora Price']</data>
+<data key="d1">['E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9', 'E10', 'E11', 'E12', 'E13', 'E14']</data>
+<node id="Evelyn Jefferson">
+  <data key="d2">0</data>
+</node>
+<node id="Laura Mandeville">
+  <data key="d2">0</data>
+</node>
+<node id="Theresa Anderson">
+  <data key="d2">0</data>
+</node>
+<node id="Brenda Rogers">
+  <data key="d2">0</data>
+</node>
+<node id="Charlotte McDowd">
+  <data key="d2">0</data>
+</node>
+<node id="Frances Anderson">
+  <data key="d2">0</data>
+</node>
+<node id="Eleanor Nye">
+  <data key="d2">0</data>
+</node>
+<node id="Pearl Oglethorpe">
+  <data key="d2">0</data>
+</node>
+<node id="Ruth DeSand">
+  <data key="d2">0</data>
+</node>
+<node id="Verne Sanderson">
+  <data key="d2">0</data>
+</node>
+<node id="Myra Liddel">
+  <data key="d2">0</data>
+</node>
+<node id="Katherina Rogers">
+  <data key="d2">0</data>
+</node>
+<node id="Sylvia Avondale">
+  <data key="d2">0</data>
+</node>
+<node id="Nora Fayette">
+  <data key="d2">0</data>
+</node>
+<node id="Helen Lloyd">
+  <data key="d2">0</data>
+</node>
+<node id="Dorothy Murchison">
+  <data key="d2">0</data>
+</node>
+<node id="Olivia Carleton">
+  <data key="d2">0</data>
+</node>
+<node id="Flora Price">
+  <data key="d2">0</data>
+</node>
+<node id="E1">
+  <data key="d2">1</data>
+</node>
+<node id="E2">
+  <data key="d2">1</data>
+</node>
+<node id="E3">
+  <data key="d2">1</data>
+</node>
+<node id="E4">
+  <data key="d2">1</data>
+</node>
+<node id="E5">
+  <data key="d2">1</data>
+</node>
+<node id="E6">
+  <data key="d2">1</data>
+</node>
+<node id="E7">
+  <data key="d2">1</data>
+</node>
+<node id="E8">
+  <data key="d2">1</data>
+</node>
+<node id="E9">
+  <data key="d2">1</data>
+</node>
+<node id="E10">
+  <data key="d2">1</data>
+</node>
+<node id="E11">
+  <data key="d2">1</data>
+</node>
+<node id="E12">
+  <data key="d2">1</data>
+</node>
+<node id="E13">
+  <data key="d2">1</data>
+</node>
+<node id="E14">
+  <data key="d2">1</data>
+</node>
+<edge source="Evelyn Jefferson" target="E1"/>
+<edge source="Evelyn Jefferson" target="E2"/>
+<edge source="Evelyn Jefferson" target="E3"/>
+<edge source="Evelyn Jefferson" target="E4"/>
+<edge source="Evelyn Jefferson" target="E5"/>
+<edge source="Evelyn Jefferson" target="E6"/>
+<edge source="Evelyn Jefferson" target="E8"/>
+<edge source="Evelyn Jefferson" target="E9"/>
+<edge source="Laura Mandeville" target="E1"/>
+<edge source="Laura Mandeville" target="E2"/>
+<edge source="Laura Mandeville" target="E3"/>
+<edge source="Laura Mandeville" target="E5"/>
+<edge source="Laura Mandeville" target="E6"/>
+<edge source="Laura Mandeville" target="E7"/>
+<edge source="Laura Mandeville" target="E8"/>
+<edge source="Theresa Anderson" target="E2"/>
+<edge source="Theresa Anderson" target="E3"/>
+<edge source="Theresa Anderson" target="E4"/>
+<edge source="Theresa Anderson" target="E5"/>
+<edge source="Theresa Anderson" target="E6"/>
+<edge source="Theresa Anderson" target="E7"/>
+<edge source="Theresa Anderson" target="E8"/>
+<edge source="Theresa Anderson" target="E9"/>
+<edge source="Brenda Rogers" target="E1"/>
+<edge source="Brenda Rogers" target="E3"/>
+<edge source="Brenda Rogers" target="E4"/>
+<edge source="Brenda Rogers" target="E5"/>
+<edge source="Brenda Rogers" target="E6"/>
+<edge source="Brenda Rogers" target="E7"/>
+<edge source="Brenda Rogers" target="E8"/>
+<edge source="Charlotte McDowd" target="E3"/>
+<edge source="Charlotte McDowd" target="E4"/>
+<edge source="Charlotte McDowd" target="E5"/>
+<edge source="Charlotte McDowd" target="E7"/>
+<edge source="Frances Anderson" target="E3"/>
+<edge source="Frances Anderson" target="E5"/>
+<edge source="Frances Anderson" target="E6"/>
+<edge source="Frances Anderson" target="E8"/>
+<edge source="Eleanor Nye" target="E5"/>
+<edge source="Eleanor Nye" target="E6"/>
+<edge source="Eleanor Nye" target="E7"/>
+<edge source="Eleanor Nye" target="E8"/>
+<edge source="Pearl Oglethorpe" target="E6"/>
+<edge source="Pearl Oglethorpe" target="E8"/>
+<edge source="Pearl Oglethorpe" target="E9"/>
+<edge source="Ruth DeSand" target="E5"/>
+<edge source="Ruth DeSand" target="E7"/>
+<edge source="Ruth DeSand" target="E8"/>
+<edge source="Ruth DeSand" target="E9"/>
+<edge source="Verne Sanderson" target="E7"/>
+<edge source="Verne Sanderson" target="E8"/>
+<edge source="Verne Sanderson" target="E9"/>
+<edge source="Verne Sanderson" target="E12"/>
+<edge source="Myra Liddel" target="E8"/>
+<edge source="Myra Liddel" target="E9"/>
+<edge source="Myra Liddel" target="E10"/>
+<edge source="Myra Liddel" target="E12"/>
+<edge source="Katherina Rogers" target="E8"/>
+<edge source="Katherina Rogers" target="E9"/>
+<edge source="Katherina Rogers" target="E10"/>
+<edge source="Katherina Rogers" target="E12"/>
+<edge source="Katherina Rogers" target="E13"/>
+<edge source="Katherina Rogers" target="E14"/>
+<edge source="Sylvia Avondale" target="E7"/>
+<edge source="Sylvia Avondale" target="E8"/>
+<edge source="Sylvia Avondale" target="E9"/>
+<edge source="Sylvia Avondale" target="E10"/>
+<edge source="Sylvia Avondale" target="E12"/>
+<edge source="Sylvia Avondale" target="E13"/>
+<edge source="Sylvia Avondale" target="E14"/>
+<edge source="Nora Fayette" target="E6"/>
+<edge source="Nora Fayette" target="E7"/>
+<edge source="Nora Fayette" target="E9"/>
+<edge source="Nora Fayette" target="E10"/>
+<edge source="Nora Fayette" target="E11"/>
+<edge source="Nora Fayette" target="E12"/>
+<edge source="Nora Fayette" target="E13"/>
+<edge source="Nora Fayette" target="E14"/>
+<edge source="Helen Lloyd" target="E7"/>
+<edge source="Helen Lloyd" target="E8"/>
+<edge source="Helen Lloyd" target="E10"/>
+<edge source="Helen Lloyd" target="E11"/>
+<edge source="Helen Lloyd" target="E12"/>
+<edge source="Dorothy Murchison" target="E8"/>
+<edge source="Dorothy Murchison" target="E9"/>
+<edge source="Olivia Carleton" target="E9"/>
+<edge source="Olivia Carleton" target="E11"/>
+<edge source="Flora Price" target="E9"/>
+<edge source="Flora Price" target="E11"/>
+</graph></graphml>
