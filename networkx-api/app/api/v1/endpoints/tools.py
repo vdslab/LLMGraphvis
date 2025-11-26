@@ -45,6 +45,8 @@ def initialize_network(request: InitializeNetworkRequest, db: Session = Depends(
         
         return vis_data
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/list_node_attributes")

@@ -13,4 +13,4 @@ dist/
 
 .gemini/
 
-sample_data/concert_network.graphml
+sample_data/concert_networks/*

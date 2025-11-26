@@ -165,6 +165,8 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
     except Exception as e:
         logger.error(f"Error in upload background task: {e}")
         print(f"Error in upload background task: {e}")
+        import traceback
+        traceback.print_exc()
         queue = await llm_service.get_event_queue(chat_id)
         await queue.put({"event": "error", "data": str(e)})
 

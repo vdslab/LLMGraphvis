@@ -1,166 +1,110 @@
 from sqlalchemy.orm import Session
 from app import models
+from app.logic import utils
+from typing import Dict, Any, List, Set
 
 def generate_visualization_data(network_id: int, db: Session, layout_name="spring", node_size_config=None, node_color_config=None, edge_width_config=None, edge_color_config=None):
+    # 1. Identify required attributes
+    required_node_attrs = {f"{layout_name}_x", f"{layout_name}_y"}
+    if node_size_config and node_size_config.get("attribute"):
+        required_node_attrs.add(node_size_config["attribute"])
+    if node_color_config and node_color_config.get("attribute"):
+        required_node_attrs.add(node_color_config["attribute"])
+        
+    required_edge_attrs = set()
+    if edge_width_config and edge_width_config.get("attribute"):
+        required_edge_attrs.add(edge_width_config["attribute"])
+    if edge_color_config and edge_color_config.get("attribute"):
+        required_edge_attrs.add(edge_color_config["attribute"])
+
+    # 2. Fetch Attribute Definitions (Name -> ID)
+    node_attr_defs = db.query(models.NodeAttribute).filter(
+        models.NodeAttribute.network_id == network_id,
+        models.NodeAttribute.attribute_name.in_(required_node_attrs)
+    ).all()
+    node_attr_map = {attr.attribute_name: attr.id for attr in node_attr_defs}
+    
+    edge_attr_defs = db.query(models.EdgeAttribute).filter(
+        models.EdgeAttribute.network_id == network_id,
+        models.EdgeAttribute.attribute_name.in_(required_edge_attrs)
+    ).all()
+    edge_attr_map = {attr.attribute_name: attr.id for attr in edge_attr_defs}
+
+    # 3. Fetch Attribute Values (Bulk)
+    # We want a map: values[entity_id][attr_name] = value
+    
+    node_values = _fetch_attribute_values(db, models.NodeAttributeValue, models.NodeFloatAttributeValue, models.NodeTextAttributeValue, list(node_attr_map.values()))
+    edge_values = _fetch_attribute_values(db, models.EdgeAttributeValue, models.EdgeFloatAttributeValue, models.EdgeTextAttributeValue, list(edge_attr_map.values()))
+
+    # Helper to get value from our map
+    def get_val(entity_id, attr_name, attr_map, values_map):
+        if attr_name not in attr_map: return None
+        attr_id = attr_map[attr_name]
+        if entity_id in values_map and attr_id in values_map[entity_id]:
+            return values_map[entity_id][attr_id]
+        return None
+
+    # 4. Calculate Stats for Normalization (Min/Max)
+    # We can do this from the fetched values in memory
+    def get_stats(config, attr_map, values_map):
+        if not config or not config.get("attribute"): return None, 0, 0
+        attr_name = config["attribute"]
+        if attr_name not in attr_map: return None, 0, 0
+        
+        attr_id = attr_map[attr_name]
+        vals = []
+        for entity_vals in values_map.values():
+            if attr_id in entity_vals:
+                v = entity_vals[attr_id]
+                if isinstance(v, (int, float)):
+                    vals.append(v)
+        
+        if not vals: return None, 0, 0
+        return True, min(vals), max(vals)
+
+    node_size_stats = get_stats(node_size_config, node_attr_map, node_values)
+    node_color_stats = get_stats(node_color_config, node_attr_map, node_values)
+    edge_width_stats = get_stats(edge_width_config, edge_attr_map, edge_values)
+    edge_color_stats = get_stats(edge_color_config, edge_attr_map, edge_values)
+
+    # 5. Build Visualization Data
     nodes = db.query(models.Node).filter(models.Node.network_id == network_id).all()
-    edges = db.query(models.Edge).filter(models.Edge.network_id == network_id).all()
-    
-    # --- Helper Functions ---
-    
-    def get_node_attr_value(node_id, attr_name):
-        attr = db.query(models.NodeAttribute).filter(
-            models.NodeAttribute.network_id == network_id,
-            models.NodeAttribute.attribute_name == attr_name
-        ).first()
-        if not attr: return None
-        
-        val = db.query(models.NodeAttributeValue).filter(
-            models.NodeAttributeValue.node_id == node_id,
-            models.NodeAttributeValue.attribute_id == attr.id
-        ).first()
-        
-        if val:
-            if val.float_value: return val.float_value.float_value
-            if val.text_value: return val.text_value.text_value
-        return None
-
-    def get_edge_attr_value(edge_id, attr_name):
-        attr = db.query(models.EdgeAttribute).filter(
-            models.EdgeAttribute.network_id == network_id,
-            models.EdgeAttribute.attribute_name == attr_name
-        ).first()
-        if not attr: return None
-        
-        val = db.query(models.EdgeAttributeValue).filter(
-            models.EdgeAttributeValue.edge_id == edge_id,
-            models.EdgeAttributeValue.attribute_id == attr.id
-        ).first()
-        
-        if val:
-            if val.float_value:
-                return val.float_value.float_value
-            if val.text_value:
-                return val.text_value.text_value
-        return None
-
-    def normalize(value, min_val, max_val, target_min, target_max):
-        if max_val == min_val: return target_min
-        return target_min + ((value - min_val) / (max_val - min_val)) * (target_max - target_min)
-
-    def interpolate_color(val, min_val, max_val, start_color, end_color):
-        # Simple linear interpolation for hex colors
-        def hex_to_rgb(hex_color):
-            hex_color = hex_color.lstrip('#')
-            return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-        
-        def rgb_to_hex(rgb):
-            return '#{:02x}{:02x}{:02x}'.format(int(rgb[0]), int(rgb[1]), int(rgb[2]))
-
-        if max_val == min_val: return start_color
-        
-        ratio = (val - min_val) / (max_val - min_val)
-        ratio = max(0, min(1, ratio)) # Clamp
-        
-        s_rgb = hex_to_rgb(start_color)
-        e_rgb = hex_to_rgb(end_color)
-        
-        new_rgb = (
-            s_rgb[0] + (e_rgb[0] - s_rgb[0]) * ratio,
-            s_rgb[1] + (e_rgb[1] - s_rgb[1]) * ratio,
-            s_rgb[2] + (e_rgb[2] - s_rgb[2]) * ratio
-        )
-        return rgb_to_hex(new_rgb)
-
-    # --- Pre-calculation for Normalization ---
-
-    def get_attr_stats(config, model_attr, model_val, model_float_val):
-        if not config: return None, 0, 0
-        attr_name = config.get("attribute")
-        attr_record = db.query(model_attr).filter(
-            model_attr.network_id == network_id,
-            model_attr.attribute_name == attr_name
-        ).first()
-        
-        if not attr_record: return None, 0, 0
-        
-        values_map = {}
-        min_val = float('inf')
-        max_val = float('-inf')
-        
-        # Fetch all values for this attribute
-        all_vals = db.query(model_val).filter(model_val.attribute_id == attr_record.id).all()
-        
-        for v in all_vals:
-            val = None
-            if v.float_value: val = v.float_value.float_value
-            elif v.text_value: val = v.text_value.text_value # For categorical
-            
-            if val is not None:
-                # Store ID mapping
-                entity_id = v.node_id if model_val == models.NodeAttributeValue else v.edge_id
-                values_map[entity_id] = val
-                
-                if isinstance(val, (int, float)):
-                    if val < min_val: min_val = val
-                    if val > max_val: max_val = val
-                    
-        return values_map, min_val, max_val
-
-    # Node Stats
-    node_size_map, node_size_min, node_size_max = get_attr_stats(
-        node_size_config, models.NodeAttribute, models.NodeAttributeValue, models.NodeFloatAttributeValue
-    )
-    node_color_map, node_color_min, node_color_max = get_attr_stats(
-        node_color_config, models.NodeAttribute, models.NodeAttributeValue, models.NodeFloatAttributeValue
-    )
-    
-    # Edge Stats
-    edge_width_map, edge_width_min, edge_width_max = get_attr_stats(
-        edge_width_config, models.EdgeAttribute, models.EdgeAttributeValue, models.EdgeFloatAttributeValue
-    )
-    edge_color_map, edge_color_min, edge_color_max = get_attr_stats(
-        edge_color_config, models.EdgeAttribute, models.EdgeAttributeValue, models.EdgeFloatAttributeValue
-    )
-
-    # --- Node Processing ---
+    smart_defaults = utils.calculate_smart_node_size(len(nodes))
     
     vis_nodes = []
+    
     layout_x_attr = f"{layout_name}_x"
     layout_y_attr = f"{layout_name}_y"
 
     for n in nodes:
         # Defaults
-        size = 20
+        size = smart_defaults["default"]
         color = "#5384ED"
         
-        # 1. Size
-        if node_size_map and n.id in node_size_map:
-            val = node_size_map[n.id]
+        # Size
+        if node_size_stats[0]:
+            val = get_val(n.id, node_size_config["attribute"], node_attr_map, node_values)
             if isinstance(val, (int, float)):
-                target_min = node_size_config.get("min", 20)
-                target_max = node_size_config.get("max", 60)
-                size = normalize(val, node_size_min, node_size_max, target_min, target_max)
+                target_min = node_size_config.get("min", smart_defaults["min"])
+                target_max = node_size_config.get("max", smart_defaults["max"])
+                size = utils.normalize(val, node_size_stats[1], node_size_stats[2], target_min, target_max)
 
-        # 2. Color
-        if node_color_map and n.id in node_color_map:
-            val = node_color_map[n.id]
+        # Color
+        if node_color_stats[0]:
+            val = get_val(n.id, node_color_config["attribute"], node_attr_map, node_values)
             scale_type = node_color_config.get("scale_type", "LINEAR")
             
             if scale_type == "LINEAR" and isinstance(val, (int, float)):
                 gradient = node_color_config.get("gradient", ["#d1e0ff", "#003399"])
-                color = interpolate_color(val, node_color_min, node_color_max, gradient[0], gradient[1])
+                color = utils.interpolate_color(val, node_color_stats[1], node_color_stats[2], gradient[0], gradient[1])
             elif scale_type == "CATEGORICAL":
                 color_map = node_color_config.get("color_map", {})
-                # Try exact match first, then string match
                 if str(val) in color_map:
                     color = color_map[str(val)]
-                else:
-                    # Fallback or cycle colors if needed (omitted for simplicity)
-                    pass
 
-        # 3. Layout
-        x = get_node_attr_value(n.id, layout_x_attr)
-        y = get_node_attr_value(n.id, layout_y_attr)
+        # Layout
+        x = get_val(n.id, layout_x_attr, node_attr_map, node_values)
+        y = get_val(n.id, layout_y_attr, node_attr_map, node_values)
         if x is None: x = 0.5
         if y is None: y = 0.5
 
@@ -172,34 +116,38 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
             "size": size, 
             "color": color 
         })
-        
-    # --- Edge Processing ---
-    
+
+    edges = db.query(models.Edge).filter(models.Edge.network_id == network_id).all()
     vis_edges = []
+    
     for e in edges:
-        source_node = db.query(models.Node).get(e.source_node_id)
+        source_node = db.query(models.Node).get(e.source_node_id) # This is still N+1 if not careful, but usually cached by identity map if nodes loaded
         target_node = db.query(models.Node).get(e.target_node_id)
+        
+        # Optimization: We loaded all nodes above. SQLAlchemy Identity Map should handle this.
+        # But to be safe, we can build a map of id->node_id_str
+        # Let's trust Identity Map for now as we just queried them.
         
         # Defaults
         width = 1
         color = "#ccc"
 
-        # 1. Width
-        if edge_width_map and e.id in edge_width_map:
-            val = edge_width_map[e.id]
+        # Width
+        if edge_width_stats[0]:
+            val = get_val(e.id, edge_width_config["attribute"], edge_attr_map, edge_values)
             if isinstance(val, (int, float)):
                 target_min = edge_width_config.get("min", 1)
                 target_max = edge_width_config.get("max", 10)
-                width = normalize(val, edge_width_min, edge_width_max, target_min, target_max)
+                width = utils.normalize(val, edge_width_stats[1], edge_width_stats[2], target_min, target_max)
 
-        # 2. Color
-        if edge_color_map and e.id in edge_color_map:
-            val = edge_color_map[e.id]
+        # Color
+        if edge_color_stats[0]:
+            val = get_val(e.id, edge_color_config["attribute"], edge_attr_map, edge_values)
             scale_type = edge_color_config.get("scale_type", "LINEAR")
             
             if scale_type == "LINEAR" and isinstance(val, (int, float)):
                 gradient = edge_color_config.get("gradient", ["#eeeeee", "#000000"])
-                color = interpolate_color(val, edge_color_min, edge_color_max, gradient[0], gradient[1])
+                color = utils.interpolate_color(val, edge_color_stats[1], edge_color_stats[2], gradient[0], gradient[1])
             elif scale_type == "CATEGORICAL":
                 color_map = edge_color_config.get("color_map", {})
                 if str(val) in color_map:
@@ -211,5 +159,37 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
             "width": width,
             "color": color
         })
-        
+
     return {"nodes": vis_nodes, "links": vis_edges}
+
+def _fetch_attribute_values(db: Session, model_val, model_float, model_text, attr_ids: List[int]) -> Dict[int, Dict[int, Any]]:
+    """
+    Fetch all values for given attribute IDs and return a map: entity_id -> {attr_id: value}
+    """
+    if not attr_ids: return {}
+    
+    # Fetch base values
+    # We need to join to get the actual values
+    # This query fetches everything in one go
+    
+    # Construct query for Float values
+    q_float = db.query(model_val.node_id if model_val == models.NodeAttributeValue else model_val.edge_id, model_val.attribute_id, model_float.float_value)\
+        .join(model_float, model_val.id == model_float.node_attribute_value_id if model_val == models.NodeAttributeValue else model_val.id == model_float.edge_attribute_value_id)\
+        .filter(model_val.attribute_id.in_(attr_ids)).all()
+
+    # Construct query for Text values
+    q_text = db.query(model_val.node_id if model_val == models.NodeAttributeValue else model_val.edge_id, model_val.attribute_id, model_text.text_value)\
+        .join(model_text, model_val.id == model_text.node_attribute_value_id if model_val == models.NodeAttributeValue else model_val.id == model_text.edge_attribute_value_id)\
+        .filter(model_val.attribute_id.in_(attr_ids)).all()
+
+    result = {}
+    
+    for entity_id, attr_id, val in q_float:
+        if entity_id not in result: result[entity_id] = {}
+        result[entity_id][attr_id] = val
+        
+    for entity_id, attr_id, val in q_text:
+        if entity_id not in result: result[entity_id] = {}
+        result[entity_id][attr_id] = val
+        
+    return result

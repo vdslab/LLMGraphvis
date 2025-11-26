@@ -101,15 +101,15 @@ sequenceDiagram
     B->>LLM: ユーザー指示、チャット履歴、ツールリストを送信
     B-->>F: SSEイベント (event: thinking_stream, data: "ユーザーの意図を解釈中...")
     note right of LLM: ユーザー指示を解釈し、<br/>可視化の全体計画を立てる。
-    LLM-->>B: ツール呼び出し要求 (1. list_attributes)
+    LLM-->>B: ツール呼び出し要求 (1. list_node_attributes)
 
     %% Step 2: Backend executes tools and streams status
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_attributes", status: "started" })
-    B->>N: GET /tools/list_attributes (network_id)
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_node_attributes", status: "started" })
+    B->>N: GET /tools/list_node_attributes (network_id)
     N->>DB: 属性テーブル群から属性名一覧をクエリ
     DB-->>N: 属性リスト
     N-->>B: 属性リスト（例: ['weight', 'community_id']）
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_attributes", status: "completed" })
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_node_attributes", status: "completed" })
 
     %% Step 3: Backend continues planning with LLM
     B->>LLM: 属性リストをツール実行結果として送信
@@ -162,8 +162,8 @@ sequenceDiagram
 
 2.  **LLMによるプランニングとツールの実行**:
     - BackendはバックグラウンドでLLMとの対話を開始する。
-    - LLMの思考プロセスや、`list_attributes`、`calculate_centrality`、`calculate_layout`、`generate_visualization`といったツールの実行状況は、`thinking_stream`や`tool_execution`といった専用のSSEイベントを通じて逐一フロントエンドに通知される。
-    - **重要**: LLMは計算を実行した後、必ず再度`list_attributes`を呼び出して、新しい属性が利用可能になったことを確認してから`generate_visualization`を呼び出す。
+    - LLMの思考プロセスや、`list_node_attributes`、`calculate_centrality`、`calculate_layout`、`generate_visualization`といったツールの実行状況は、`thinking_stream`や`tool_execution`といった専用のSSEイベントを通じて逐一フロントエンドに通知される。
+    - **重要**: LLMは計算を実行した後、必ず再度`list_node_attributes`を呼び出して、新しい属性が利用可能になったことを確認してから`generate_visualization`を呼び出す。
 
 3.  **最終的な結果の通知**:
     - `generate_visualization`が完了すると、Backendは2つの重要な情報をSSEで送信する。
