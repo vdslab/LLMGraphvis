@@ -38,7 +38,7 @@ graph TD
 | **HomePage**        | `/`         |   不要   | アプリケーションのトップページ。ログインや新規登録への導線。 |
 | **LoginPage**       | `/login`    |   不要   | ログインフォーム画面。                                       |
 | **RegisterPage**    | `/register` |   不要   | 新規ユーザー登録フォーム画面。                               |
-| **NetworkChatPage** | `/chat/{id}`     | **必要** | ネットワーク可視化とチャットUIを統合したメイン画面。         |
+| **NetworkChatPage** | `/chat/{id}`     | **必要** | ネットワーク可視化とチャットUIを統合したメイン画面。LLMからのメッセージはMarkdown形式でレンダリングされる。         |
 
 ## 2.3. 状態管理とAPI連携 (Zustand & Axios)
 

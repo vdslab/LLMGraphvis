@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { useChatStore } from '../stores/chatStore';
 import { useNetworkStore } from '../stores/networkStore';
 
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
 const ChatInterface = () => {
   const { messages, sendMessage, isLoading, thinkingMessage, uploadNetwork, chatId } = useChatStore();
   const { nodes } = useNetworkStore();
@@ -57,7 +60,9 @@ const ChatInterface = () => {
             borderRadius: '1rem',
             maxWidth: '80%'
           }}>
-            {msg.content}
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {msg.content}
+            </ReactMarkdown>
           </div>
         ))}
         {isLoading && (
