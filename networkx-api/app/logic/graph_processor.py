@@ -195,7 +195,12 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
     
     # Calculate Layout
     if layout_name == "spring":
-        pos = nx.spring_layout(G, seed=42)
+        # Heuristic for k: 1/sqrt(N) is default. 
+        # Increasing it slightly (e.g. 1.5/sqrt(N)) helps spread nodes out.
+        import math
+        num_nodes = len(G.nodes)
+        k = 1.5 / math.sqrt(num_nodes) if num_nodes > 0 else None
+        pos = nx.spring_layout(G, k=k, iterations=100, seed=42)
     elif layout_name == "circular":
         pos = nx.circular_layout(G)
     elif layout_name == "kamada_kawai":
