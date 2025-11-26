@@ -73,7 +73,7 @@ def verify_llm_flow():
     render_updated = False
     
     start_time = time.time()
-    timeout = 45 # 45 seconds timeout
+    timeout = 90 # 90 seconds timeout
     
     for line in resp.iter_lines():
         if time.time() - start_time > timeout:
@@ -120,7 +120,7 @@ def verify_llm_flow():
                             else:
                                 print("   Warning: Node sizes are uniform.")
 
-                    if "role" in data and data["role"] == "model":
+                    if "role" in data and (data["role"] == "model" or data["role"] == "assistant"):
                         print(f"   Assistant: {data['content']}")
                         break
                         

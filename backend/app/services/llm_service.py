@@ -72,9 +72,9 @@ def _get_tool_definitions() -> List[types.FunctionDeclaration]:
                     ),
                     "node_size_config": types.Schema(
                         type="OBJECT",
-                        description="Configuration for node sizes.",
+                        description="Configuration for node sizes. WARNING: The attribute MUST exist. Call calculate_centrality first if needed.",
                         properties={
-                            "attribute": types.Schema(type="STRING"),
+                            "attribute": types.Schema(type="STRING", description="Name of the attribute (e.g., 'degree_centrality'). MUST be calculated first."),
                             "min": types.Schema(type="NUMBER"),
                             "max": types.Schema(type="NUMBER")
                         }
@@ -153,6 +153,11 @@ Step 2: Call `generate_visualization(edge_width_config={'attribute': 'weight', '
 
 ALWAYS follow this pattern: List -> Calculate (if needed) -> List -> Create Visualization.
 
+CRITICAL RULES:
+1. You MUST call `calculate_centrality` BEFORE trying to visualize centrality (degree, betweenness, etc.). The attributes 'degree_centrality', 'betweenness_centrality', etc. DO NOT EXIST until you calculate them.
+2. You CANNOT skip the calculation step if the user asks for a metric that hasn't been calculated yet.
+3. Always verify available attributes with `list_node_attributes` before generating visualization.
+
 IMPORTANT: Maintain Context
 When calling `generate_visualization`, you MUST maintain the previous visualization state unless the user explicitly asks to change it.
 - If the user previously asked for "circular layout", KEEP `layout_name='circular'` in subsequent calls.
@@ -160,6 +165,17 @@ When calling `generate_visualization`, you MUST maintain the previous visualizat
 - If the user previously asked to color nodes by "community", KEEP `node_color_config={'attribute': 'community_id', ...}`.
 - DO NOT revert to defaults ("spring" layout, etc.) unless the user's new request specifically conflicts with the previous state or requires a reset.
 - Infer the current state from the conversation history.
+
+IMPORTANT: Final Response
+After completing the tool execution loop, provide a final response to the user. This response MUST include:
+1. A summary of the actions you took (e.g., "I calculated degree centrality...").
+2. The reasoning behind your decisions (e.g., "...to identify the most connected nodes in the network.").
+3. Explain WHY you chose specific parameters or tools.
+
+CRITICAL: Language Matching
+You MUST respond in the same language as the user's input.
+- If the user asks in Japanese, respond in Japanese.
+- If the user asks in English, respond in English.
 """
 
 # --- Main Logic ---
@@ -195,7 +211,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                 system_instruction=SYSTEM_INSTRUCTION,
                 tools=[types.Tool(function_declarations=tools)],
                 tool_config=tool_config,
-                temperature=0.7,
+                temperature=0.1,
             )
         )
         
@@ -298,12 +314,14 @@ async def _execute_tool_loop(initial_response, network_id, history, queue, tools
                             system_instruction=SYSTEM_INSTRUCTION,
                             tools=[types.Tool(function_declarations=tools)],
                             tool_config=tool_config,
-                            temperature=0.7,
+                            temperature=0.1,
                         )
                     )
                     break # Process one at a time
         
         if not has_function_call:
+            # If no function call, check if we should have called one.
+            # For now, just return the text.
             return current_response.text if current_response.text else "I have processed your request."
             
     return "I've completed the requested operations."
