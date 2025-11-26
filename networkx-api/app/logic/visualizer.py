@@ -118,6 +118,7 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
         })
 
     edges = db.query(models.Edge).filter(models.Edge.network_id == network_id).all()
+    smart_edge_defaults = utils.calculate_smart_edge_width(len(edges))
     vis_edges = []
     
     for e in edges:
@@ -129,15 +130,15 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
         # Let's trust Identity Map for now as we just queried them.
         
         # Defaults
-        width = 1
-        color = "#ccc"
+        width = smart_edge_defaults["default"]
+        color = "#999"
 
         # Width
         if edge_width_stats[0]:
             val = get_val(e.id, edge_width_config["attribute"], edge_attr_map, edge_values)
             if isinstance(val, (int, float)):
-                target_min = edge_width_config.get("min", 1)
-                target_max = edge_width_config.get("max", 10)
+                target_min = edge_width_config.get("min", smart_edge_defaults["min"])
+                target_max = edge_width_config.get("max", smart_edge_defaults["max"])
                 width = utils.normalize(val, edge_width_stats[1], edge_width_stats[2], target_min, target_max)
 
         # Color

@@ -49,3 +49,23 @@ def calculate_smart_node_size(num_nodes: int) -> dict:
         "min": round(base_size * 0.5, 1),
         "max": round(base_size * 2.5, 1)
     }
+
+def calculate_smart_edge_width(num_edges: int) -> dict:
+    """
+    Calculate smart default edge widths based on graph size (number of edges).
+    Returns a dict with 'default', 'min', 'max'.
+    """
+    if num_edges <= 0:
+        return {"default": 1.0, "min": 0.5, "max": 5.0}
+        
+    # Heuristic: Dense graphs need thinner edges
+    # Formula: base = 50 / sqrt(E), clamped between 0.2 and 5
+    import math
+    base_width = 50 / math.sqrt(num_edges)
+    base_width = max(0.2, min(5.0, base_width))
+    
+    return {
+        "default": round(base_width, 1),
+        "min": round(base_width * 0.5, 1),
+        "max": round(base_width * 3.0, 1)
+    }

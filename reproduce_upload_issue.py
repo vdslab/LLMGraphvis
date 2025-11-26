@@ -84,6 +84,13 @@ def reproduce_issue():
                         print(f"   Received Render Update: {len(nodes)} nodes")
                         if nodes:
                             print(f"   First Node Size: {nodes[0].get('size')}")
+                        
+                        if "links" in data:
+                            links = data['links']
+                            print(f"   Received Render Update: {len(links)} links")
+                            if links:
+                                print(f"   First Link Width: {links[0].get('width')}")
+
                         print("   SUCCESS: Graph processed and rendered.")
                         return True
                     if "error" in data:
