@@ -5,7 +5,7 @@ from app.api.v1.endpoints import auth, chat
 from app.core.database import engine, Base
 
 # Create database tables
-# Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)
 
 # Create FastAPI app with Swagger UI configuration
 app = FastAPI(
