@@ -76,13 +76,15 @@ graph TD
 ```
 
 - **Response:**
+  - Status Code: `202 Accepted`
 
 ```json
 {
-  "role": "assistant",
-  "content": "次数中心性を計算し、ノードのサイズに反映しました。"
+  "status": "accepted"
 }
 ```
+
+※ 実際のLLMからの応答メッセージは、SSE (`/chat/{id}/stream`) の `message` イベントを通じて非同期に送信されます。
 
 このエンドポイントが呼び出された際の、Backend、LLM、NetworkXAPI間のより詳細な連携フローについては、以下のドキュメントを参照してください。
 
