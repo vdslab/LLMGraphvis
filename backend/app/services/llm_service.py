@@ -204,6 +204,14 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
         tool_config = types.ToolConfig(function_calling_config=types.FunctionCallingConfig(mode="AUTO"))
         
         logger.info("Calling Gemini API...")
+        
+        # Log Request Details
+        logger.info(f"--- Gemini API Request ---")
+        logger.info(f"Model: gemini-2.5-flash")
+        logger.info(f"System Instruction: {SYSTEM_INSTRUCTION[:100]}...")
+        logger.info(f"Tools: {[t.name for t in tools]}")
+        logger.info(f"History (Last 2): {history[-2:] if len(history) > 1 else history}")
+        
         response = await client.aio.models.generate_content(
             model="gemini-2.5-flash",
             contents=history,
@@ -214,6 +222,19 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
                 temperature=0.1,
             )
         )
+        
+        # Log Response Details
+        logger.info(f"--- Gemini API Response ---")
+        if response.candidates:
+            for i, candidate in enumerate(response.candidates):
+                logger.info(f"Candidate {i}:")
+                for part in candidate.content.parts:
+                    if part.text:
+                        logger.info(f"  Text: {part.text[:200]}..." if len(part.text) > 200 else f"  Text: {part.text}")
+                    if part.function_call:
+                        logger.info(f"  Function Call: {part.function_call.name}({part.function_call.args})")
+        else:
+            logger.info("No candidates in response.")
         
         # 3. Tool Execution Loop
         final_response_text = await _execute_tool_loop(response, network_id, history, queue, tools, tool_config)
@@ -237,7 +258,10 @@ def _build_history(chat_id: int, user_message: str, db: Session) -> List[types.C
         role = "user" if msg.role == "user" else "model"
         history.append(types.Content(role=role, parts=[types.Part(text=msg.content)]))
     
-    history.append(types.Content(role="user", parts=[types.Part(text=user_message)]))
+    # Check if the last message in history is the same as the user_message
+    # This prevents duplication if the message was already saved to DB and fetched
+    if not history or history[-1].parts[0].text != user_message:
+        history.append(types.Content(role="user", parts=[types.Part(text=user_message)]))
     
     # Few-shot examples (Condensed for brevity in this refactor, but kept same logic)
     example_1 = [
@@ -307,6 +331,10 @@ async def _execute_tool_loop(initial_response, network_id, history, queue, tools
                         parts=[types.Part.from_function_response(name=function_name, response=function_result)]
                     ))
                     
+                    # Log Request Details (Tool Loop)
+                    logger.info(f"--- Gemini API Request (Tool Loop) ---")
+                    logger.info(f"Tool Output: {function_result}")
+                    
                     current_response = await client.aio.models.generate_content(
                         model="gemini-2.5-flash",
                         contents=history,
@@ -317,6 +345,19 @@ async def _execute_tool_loop(initial_response, network_id, history, queue, tools
                             temperature=0.1,
                         )
                     )
+
+                    # Log Response Details (Tool Loop)
+                    logger.info(f"--- Gemini API Response (Tool Loop) ---")
+                    if current_response.candidates:
+                        for i, candidate in enumerate(current_response.candidates):
+                            logger.info(f"Candidate {i}:")
+                            for part in candidate.content.parts:
+                                if part.text:
+                                    logger.info(f"  Text: {part.text[:200]}..." if len(part.text) > 200 else f"  Text: {part.text}")
+                                if part.function_call:
+                                    logger.info(f"  Function Call: {part.function_call.name}({part.function_call.args})")
+                    else:
+                        logger.info("No candidates in response.")
                     break # Process one at a time
         
         if not has_function_call:
