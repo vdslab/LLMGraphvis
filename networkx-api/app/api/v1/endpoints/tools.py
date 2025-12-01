@@ -53,6 +53,11 @@ class CreateKCoreSubgraphRequest(BaseModel):
 class CreateLargestComponentSubgraphRequest(BaseModel):
     source_network_id: int
 
+class GetTopNodesRequest(BaseModel):
+    network_id: int
+    metric: str
+    k: int = 10
+
 @router.post("/initialize_network")
 def initialize_network(request: InitializeNetworkRequest, db: Session = Depends(database.get_db)):
     try:
@@ -174,4 +179,14 @@ def get_subgraphs(network_id: int, db: Session = Depends(database.get_db)):
         subgraphs = db.query(models.Network).filter(models.Network.parent_network_id == network_id).all()
         return [{"id": s.id, "name": s.name, "created_at": s.created_at} for s in subgraphs]
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/get_top_nodes")
+def get_top_nodes(request: GetTopNodesRequest, db: Session = Depends(database.get_db)):
+    try:
+        result = graph_processor.get_top_nodes(request.network_id, request.metric, request.k, db)
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

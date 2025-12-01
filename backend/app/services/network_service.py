@@ -2,6 +2,7 @@ import httpx
 import os
 from dotenv import load_dotenv
 from app.core.logging import get_logger
+from typing import List, Dict, Any
 
 logger = get_logger(__name__)
 
@@ -138,6 +139,16 @@ async def get_subgraphs(network_id: int):
         response = await client.get(
             f"{NETWORKX_API_URL}/tools/get_subgraphs",
             params={"network_id": network_id}
+        )
+        response.raise_for_status()
+        return response.json()
+
+async def get_top_nodes(network_id: int, metric: str, k: int = 10) -> List[Dict[str, Any]]:
+    logger.info(f"Getting top {k} nodes for network {network_id} by metric {metric}")
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            f"{NETWORKX_API_URL}/tools/get_top_nodes",
+            json={"network_id": network_id, "metric": metric, "k": k}
         )
         response.raise_for_status()
         return response.json()

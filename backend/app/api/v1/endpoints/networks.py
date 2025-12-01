@@ -105,3 +105,17 @@ async def create_largest_component_subgraph(
         
     result = await network_service.create_largest_component_subgraph(network_id)
     return result
+
+@router.get("/{network_id}/nodes/top")
+async def get_top_nodes(
+    network_id: int,
+    metric: str,
+    k: int = 10,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    if not verify_network_access(network_id, current_user.id, db):
+        raise HTTPException(status_code=403, detail="Access denied")
+        
+    result = await network_service.get_top_nodes(network_id, metric, k)
+    return result

@@ -186,6 +186,22 @@ def _get_tool_definitions() -> List[types.FunctionDeclaration]:
             name="get_subgraphs",
             description="List all available subgraphs for the current network.",
             parameters=types.Schema(type="OBJECT", properties={})
+        ),
+        types.FunctionDeclaration(
+            name="get_top_nodes",
+            description="Get the top k nodes based on a centrality metric. Useful for identifying key nodes to focus on.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "metric": types.Schema(
+                        type="STRING",
+                        description="Centrality metric to use. Options: degree, betweenness, closeness, eigenvector",
+                        enum=["degree", "betweenness", "closeness", "eigenvector"]
+                    ),
+                    "k": types.Schema(type="INTEGER", description="Number of top nodes to return (default 10).")
+                },
+                required=["metric"]
+            )
         )
     ]
 
@@ -213,9 +229,14 @@ Step 4: Call `generate_visualization(layout_name='circular')`
 
 User Request: "Show edge weights"
 Step 1: Call `list_edge_attributes()`
-Step 2: Call `generate_visualization(edge_width_config={'attribute': 'weight', 'min': 1, 'max': 5})`
-
-ALWAYS follow this pattern: List -> Calculate (if needed) -> List -> Create Visualization.
+    Step 2: Call `generate_visualization(edge_width_config={'attribute': 'weight', 'min': 1, 'max': 5})`
+    
+    User Request: "Create an ego network for the most central node"
+    Step 1: Call `get_top_nodes(metric='degree', k=1)` to find the node ID (e.g., 'n1').
+    Step 2: Call `create_ego_network(center_node_id='n1', radius=1)`
+    Step 3: Call `generate_visualization(overlay_network_id=subgraph_id)`
+    
+    ALWAYS follow this pattern: List -> Calculate (if needed) -> List -> Create Visualization.
 
 CRITICAL RULES:
 1. You MUST call `calculate_centrality` BEFORE trying to visualize centrality (degree, betweenness, etc.). The attributes 'degree_centrality', 'betweenness_centrality', etc. DO NOT EXIST until you calculate them.
@@ -501,6 +522,13 @@ async def _execute_single_tool(function_name, function_args, network_id, queue):
     elif function_name == "get_subgraphs":
         result = await network_service.get_subgraphs(network_id)
         return {"subgraphs": result}
+
+    elif function_name == "get_top_nodes":
+        metric = function_args.get("metric")
+        k = function_args.get("k", 10)
+        await queue.put({"event": "thinking_stream", "data": json.dumps({"content": f"Finding top {k} nodes by {metric} centrality..."})})
+        result = await network_service.get_top_nodes(network_id, metric, k)
+        return {"top_nodes": result}
         
     else:
         raise ValueError(f"Unknown function: {function_name}")

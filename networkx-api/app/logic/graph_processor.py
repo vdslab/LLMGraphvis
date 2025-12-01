@@ -657,6 +657,9 @@ def create_ego_network(source_network_id: int, center_node_id: str, radius: int,
     
     id_map = {n.id: n.node_id for n in nodes}
     
+    for n in nodes:
+        G.add_node(n.node_id)
+    
     for e in edges:
         u = id_map.get(e.source_node_id)
         v = id_map.get(e.target_node_id)
@@ -676,6 +679,8 @@ def create_path_subgraph(source_network_id: int, source_node_id: str, target_nod
     edges = db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
     nodes = db.query(models.Node).filter(models.Node.network_id == source_network_id).all()
     id_map = {n.id: n.node_id for n in nodes}
+    for n in nodes:
+        G.add_node(n.node_id)
     for e in edges:
         u = id_map.get(e.source_node_id)
         v = id_map.get(e.target_node_id)
@@ -694,6 +699,8 @@ def create_k_core_subgraph(source_network_id: int, k: int, db: Session) -> Dict[
     edges = db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
     nodes = db.query(models.Node).filter(models.Node.network_id == source_network_id).all()
     id_map = {n.id: n.node_id for n in nodes}
+    for n in nodes:
+        G.add_node(n.node_id)
     for e in edges:
         u = id_map.get(e.source_node_id)
         v = id_map.get(e.target_node_id)
@@ -716,6 +723,8 @@ def create_largest_component_subgraph(source_network_id: int, db: Session) -> Di
     edges = db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
     nodes = db.query(models.Node).filter(models.Node.network_id == source_network_id).all()
     id_map = {n.id: n.node_id for n in nodes}
+    for n in nodes:
+        G.add_node(n.node_id)
     for e in edges:
         u = id_map.get(e.source_node_id)
         v = id_map.get(e.target_node_id)
@@ -730,3 +739,19 @@ def create_largest_component_subgraph(source_network_id: int, db: Session) -> Di
     node_ids = list(largest_component)
     
     return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix="Largest Component")
+
+def get_top_nodes(network_id: int, metric: str, k: int, db: Session) -> List[Dict[str, Any]]:
+    """
+    Returns the top k nodes based on the specified centrality metric.
+    """
+    # Calculate centrality (this also saves to DB, which is fine)
+    # We reuse the existing logic.
+    centrality = calculate_centrality(network_id, metric, db)
+    
+    # Sort by score descending
+    sorted_nodes = sorted(centrality.items(), key=lambda item: item[1], reverse=True)
+    
+    # Take top k
+    top_nodes = sorted_nodes[:k]
+    
+    return [{"node_id": node_id, "score": score} for node_id, score in top_nodes]
