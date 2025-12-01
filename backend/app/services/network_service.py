@@ -81,3 +81,63 @@ async def export_network(network_id: int) -> str:
         )
         response.raise_for_status()
         return response.text
+
+async def create_ego_network(source_network_id: int, center_node_id: str, radius: int):
+    logger.info(f"Creating ego network for {source_network_id} center={center_node_id} radius={radius}")
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            f"{NETWORKX_API_URL}/tools/create_ego_network",
+            json={"source_network_id": source_network_id, "center_node_id": center_node_id, "radius": radius}
+        )
+        response.raise_for_status()
+        return response.json()
+
+async def create_subgraph_from_nodes(source_network_id: int, node_ids: list):
+    logger.info(f"Creating subgraph from nodes for {source_network_id} count={len(node_ids)}")
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            f"{NETWORKX_API_URL}/tools/create_subgraph_from_nodes",
+            json={"source_network_id": source_network_id, "node_ids": node_ids}
+        )
+        response.raise_for_status()
+        return response.json()
+
+async def create_path_subgraph(source_network_id: int, source_node_id: str, target_node_id: str):
+    logger.info(f"Creating path subgraph for {source_network_id} {source_node_id}->{target_node_id}")
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            f"{NETWORKX_API_URL}/tools/create_path_subgraph",
+            json={"source_network_id": source_network_id, "source_node_id": source_node_id, "target_node_id": target_node_id}
+        )
+        response.raise_for_status()
+        return response.json()
+
+async def create_k_core_subgraph(source_network_id: int, k: int):
+    logger.info(f"Creating k-core subgraph for {source_network_id} k={k}")
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            f"{NETWORKX_API_URL}/tools/create_k_core_subgraph",
+            json={"source_network_id": source_network_id, "k": k}
+        )
+        response.raise_for_status()
+        return response.json()
+
+async def create_largest_component_subgraph(source_network_id: int):
+    logger.info(f"Creating largest component subgraph for {source_network_id}")
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.post(
+            f"{NETWORKX_API_URL}/tools/create_largest_component_subgraph",
+            json={"source_network_id": source_network_id}
+        )
+        response.raise_for_status()
+        return response.json()
+
+async def get_subgraphs(network_id: int):
+    logger.info(f"Getting subgraphs for {network_id}")
+    async with httpx.AsyncClient(timeout=120.0) as client:
+        response = await client.get(
+            f"{NETWORKX_API_URL}/tools/get_subgraphs",
+            params={"network_id": network_id}
+        )
+        response.raise_for_status()
+        return response.json()

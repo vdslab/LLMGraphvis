@@ -26,10 +26,32 @@ class GenerateVisualizationRequest(BaseModel):
     node_color_config: Optional[Dict[str, Any]] = None
     edge_width_config: Optional[Dict[str, Any]] = None
     edge_color_config: Optional[Dict[str, Any]] = None
+    overlay_network_id: Optional[int] = None
 
 class CalculateLayoutRequest(BaseModel):
     network_id: int
     layout_name: str
+
+class CreateEgoNetworkRequest(BaseModel):
+    source_network_id: int
+    center_node_id: str
+    radius: int
+
+class CreateSubgraphFromNodesRequest(BaseModel):
+    source_network_id: int
+    node_ids: List[str]
+
+class CreatePathSubgraphRequest(BaseModel):
+    source_network_id: int
+    source_node_id: str
+    target_node_id: str
+
+class CreateKCoreSubgraphRequest(BaseModel):
+    source_network_id: int
+    k: int
+
+class CreateLargestComponentSubgraphRequest(BaseModel):
+    source_network_id: int
 
 @router.post("/initialize_network")
 def initialize_network(request: InitializeNetworkRequest, db: Session = Depends(database.get_db)):
@@ -87,8 +109,69 @@ def generate_visualization(request: GenerateVisualizationRequest, db: Session = 
             node_size_config=request.node_size_config,
             node_color_config=request.node_color_config,
             edge_width_config=request.edge_width_config,
-            edge_color_config=request.edge_color_config
+            edge_color_config=request.edge_color_config,
+            overlay_network_id=request.overlay_network_id
         )
         return vis_data
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/create_ego_network")
+def create_ego_network(request: CreateEgoNetworkRequest, db: Session = Depends(database.get_db)):
+    try:
+        result = graph_processor.create_ego_network(request.source_network_id, request.center_node_id, request.radius, db)
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/create_subgraph_from_nodes")
+def create_subgraph_from_nodes(request: CreateSubgraphFromNodesRequest, db: Session = Depends(database.get_db)):
+    try:
+        result = graph_processor.create_subgraph_from_nodes(request.source_network_id, request.node_ids, db)
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/create_path_subgraph")
+def create_path_subgraph(request: CreatePathSubgraphRequest, db: Session = Depends(database.get_db)):
+    try:
+        result = graph_processor.create_path_subgraph(request.source_network_id, request.source_node_id, request.target_node_id, db)
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/create_k_core_subgraph")
+def create_k_core_subgraph(request: CreateKCoreSubgraphRequest, db: Session = Depends(database.get_db)):
+    try:
+        result = graph_processor.create_k_core_subgraph(request.source_network_id, request.k, db)
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/create_largest_component_subgraph")
+def create_largest_component_subgraph(request: CreateLargestComponentSubgraphRequest, db: Session = Depends(database.get_db)):
+    try:
+        result = graph_processor.create_largest_component_subgraph(request.source_network_id, db)
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/get_subgraphs")
+def get_subgraphs(network_id: int, db: Session = Depends(database.get_db)):
+    try:
+        subgraphs = db.query(models.Network).filter(models.Network.parent_network_id == network_id).all()
+        return [{"id": s.id, "name": s.name, "created_at": s.created_at} for s in subgraphs]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

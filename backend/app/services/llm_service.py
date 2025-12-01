@@ -103,6 +103,10 @@ def _get_tool_definitions() -> List[types.FunctionDeclaration]:
                             "attribute": types.Schema(type="STRING"),
                             "scale_type": types.Schema(type="STRING")
                         }
+                    ),
+                    "overlay_network_id": types.Schema(
+                        type="INTEGER",
+                        description="ID of a subgraph to overlay/highlight on the main visualization."
                     )
                 },
                 required=["layout_name"]
@@ -122,6 +126,66 @@ def _get_tool_definitions() -> List[types.FunctionDeclaration]:
                 },
                 required=["layout_name"]
             )
+        ),
+        types.FunctionDeclaration(
+            name="create_ego_network",
+            description="Create an ego network subgraph centered on a specific node.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "center_node_id": types.Schema(type="STRING", description="ID of the center node."),
+                    "radius": types.Schema(type="INTEGER", description="Radius of the ego network (default 1).")
+                },
+                required=["center_node_id"]
+            )
+        ),
+        types.FunctionDeclaration(
+            name="create_subgraph_from_nodes",
+            description="Create a subgraph containing only the specified nodes.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "node_ids": types.Schema(
+                        type="ARRAY",
+                        items=types.Schema(type="STRING"),
+                        description="List of node IDs to include."
+                    )
+                },
+                required=["node_ids"]
+            )
+        ),
+        types.FunctionDeclaration(
+            name="create_path_subgraph",
+            description="Create a subgraph containing the shortest path between two nodes.",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "source_node_id": types.Schema(type="STRING", description="Start node ID."),
+                    "target_node_id": types.Schema(type="STRING", description="End node ID.")
+                },
+                required=["source_node_id", "target_node_id"]
+            )
+        ),
+        types.FunctionDeclaration(
+            name="create_k_core_subgraph",
+            description="Create a k-core subgraph (maximal subgraph where every node has degree >= k).",
+            parameters=types.Schema(
+                type="OBJECT",
+                properties={
+                    "k": types.Schema(type="INTEGER", description="The core number k.")
+                },
+                required=["k"]
+            )
+        ),
+        types.FunctionDeclaration(
+            name="create_largest_component_subgraph",
+            description="Create a subgraph from the largest connected component.",
+            parameters=types.Schema(type="OBJECT", properties={})
+        ),
+        types.FunctionDeclaration(
+            name="get_subgraphs",
+            description="List all available subgraphs for the current network.",
+            parameters=types.Schema(type="OBJECT", properties={})
         )
     ]
 
@@ -389,7 +453,8 @@ async def _execute_single_tool(function_name, function_args, network_id, queue):
             "node_size_config": function_args.get("node_size_config"),
             "node_color_config": function_args.get("node_color_config"),
             "edge_width_config": function_args.get("edge_width_config"),
-            "edge_color_config": function_args.get("edge_color_config")
+            "edge_color_config": function_args.get("edge_color_config"),
+            "overlay_network_id": function_args.get("overlay_network_id")
         }
         await queue.put({"event": "thinking_stream", "data": json.dumps({"content": "Creating visualization..."})})
         vis_data = await network_service.generate_visualization(network_id, vis_config)
@@ -401,6 +466,41 @@ async def _execute_single_tool(function_name, function_args, network_id, queue):
         await queue.put({"event": "thinking_stream", "data": json.dumps({"content": f"Calculating {layout_name} layout..."})})
         await network_service.calculate_layout(network_id, layout_name)
         return {"status": "success", "message": f"Calculated {layout_name} layout."}
+
+    elif function_name == "create_ego_network":
+        center_node_id = function_args.get("center_node_id")
+        radius = function_args.get("radius", 1)
+        await queue.put({"event": "thinking_stream", "data": json.dumps({"content": f"Creating ego network for {center_node_id}..."})})
+        result = await network_service.create_ego_network(network_id, center_node_id, radius)
+        return {"status": "success", "message": f"Created ego network: {result['name']}", "subgraph_id": result['new_network_id']}
+
+    elif function_name == "create_subgraph_from_nodes":
+        node_ids = function_args.get("node_ids")
+        await queue.put({"event": "thinking_stream", "data": json.dumps({"content": f"Creating subgraph from {len(node_ids)} nodes..."})})
+        result = await network_service.create_subgraph_from_nodes(network_id, node_ids)
+        return {"status": "success", "message": f"Created subgraph: {result['name']}", "subgraph_id": result['new_network_id']}
+
+    elif function_name == "create_path_subgraph":
+        source_node_id = function_args.get("source_node_id")
+        target_node_id = function_args.get("target_node_id")
+        await queue.put({"event": "thinking_stream", "data": json.dumps({"content": f"Creating path subgraph from {source_node_id} to {target_node_id}..."})})
+        result = await network_service.create_path_subgraph(network_id, source_node_id, target_node_id)
+        return {"status": "success", "message": f"Created path subgraph: {result['name']}", "subgraph_id": result['new_network_id']}
+
+    elif function_name == "create_k_core_subgraph":
+        k = function_args.get("k")
+        await queue.put({"event": "thinking_stream", "data": json.dumps({"content": f"Creating {k}-core subgraph..."})})
+        result = await network_service.create_k_core_subgraph(network_id, k)
+        return {"status": "success", "message": f"Created k-core subgraph: {result['name']}", "subgraph_id": result['new_network_id']}
+
+    elif function_name == "create_largest_component_subgraph":
+        await queue.put({"event": "thinking_stream", "data": json.dumps({"content": "Creating largest component subgraph..."})})
+        result = await network_service.create_largest_component_subgraph(network_id)
+        return {"status": "success", "message": f"Created largest component subgraph: {result['name']}", "subgraph_id": result['new_network_id']}
+
+    elif function_name == "get_subgraphs":
+        result = await network_service.get_subgraphs(network_id)
+        return {"subgraphs": result}
         
     else:
         raise ValueError(f"Unknown function: {function_name}")

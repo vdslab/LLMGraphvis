@@ -26,7 +26,13 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 | `GET` | `/tools/list_edge_attributes` | ネットワークに存在するエッジ属性（計算済みまたは元から存在）の一覧を返す。 |
 | `POST` | `/tools/calculate_centrality` | 中心性指標を計算して永続化する。具体的には、まず属性の**定義**（例: 'degree_centrality'）が`node_attributes`に存在するか確認し、なければ`network_id`に紐付けて作成する。次に、各ノードの計算**値**を、定義のIDを参照して`node_attribute_values`に保存する。レスポンスは計算完了のステータスのみを返す。 |
 | `POST` | `/tools/calculate_layout` | レイアウト座標を計算して永続化する。`layout_name`（例: 'circular'）を受け取り、`{layout_name}_x`, `{layout_name}_y` という属性として保存する。レスポンスは計算完了のステータスのみを返す。 |
-| `POST` | `/tools/generate_visualization` | レイアウト、ノードサイズ、ノードカラー等の視覚的割り当てに関するすべてのパラメータを受け取り、最終的なレンダリングデータを動的に生成して返す。**レイアウト計算は行わず、計算済みの座標データを使用する。新しいレイアウトを適用する場合は、事前に`/tools/calculate_layout`を呼び出す必要がある。** |
+| `POST` | `/tools/generate_visualization` | レイアウト、ノードサイズ、ノードカラー等の視覚的割り当てに関するすべてのパラメータを受け取り、最終的なレンダリングデータを動的に生成して返す。**レイアウト計算は行わず、計算済みの座標データを使用する。新しいレイアウトを適用する場合は、事前に`/tools/calculate_layout`を呼び出す必要がある。** サブグラフのオーバーレイ表示もサポートする。 |
+| `POST` | `/tools/create_ego_network` | 指定されたノードを中心としたEgo Graph（指定ホップ数以内のノード群）を新しいネットワークとして作成する。 |
+| `POST` | `/tools/create_subgraph_from_nodes` | 指定されたノードIDのリストからサブグラフを新しいネットワークとして作成する。 |
+| `POST` | `/tools/create_path_subgraph` | 指定された2ノード間の最短経路をサブグラフとして新しいネットワークとして作成する。 |
+| `POST` | `/tools/create_k_core_subgraph` | K-Core（次数k以上のノード群）を抽出し、新しいネットワークとして作成する。 |
+| `POST` | `/tools/create_largest_component_subgraph` | 最大連結成分を抽出し、新しいネットワークとして作成する。 |
+| `GET` | `/tools/get_subgraphs` | 指定されたネットワークの子ネットワーク（サブグラフ）の一覧を取得する。 |
 
 ## 3.3. API詳細
 
@@ -65,6 +71,65 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 - **Response**:
   - `status`: str ("success")
   - `message`: str
+
+### 5. サブグラフ作成 (Ego Network)
+- **Endpoint**: `POST /tools/create_ego_network`
+- **Description**: 指定ノードを中心としたEgo Graphを作成する。
+- **Request Body**:
+  - `source_network_id`: int
+  - `center_node_id`: str
+  - `radius`: int
+- **Response**:
+  - `new_network_id`: int
+  - `name`: str
+
+### 6. サブグラフ作成 (From Nodes)
+- **Endpoint**: `POST /tools/create_subgraph_from_nodes`
+- **Description**: ノードIDリストからサブグラフを作成する。
+- **Request Body**:
+  - `source_network_id`: int
+  - `node_ids`: List[str]
+- **Response**:
+  - `new_network_id`: int
+  - `name`: str
+
+### 7. サブグラフ作成 (Path)
+- **Endpoint**: `POST /tools/create_path_subgraph`
+- **Description**: 最短経路のサブグラフを作成する。
+- **Request Body**:
+  - `source_network_id`: int
+  - `source_node_id`: str
+  - `target_node_id`: str
+- **Response**:
+  - `new_network_id`: int
+  - `name`: str
+
+### 8. サブグラフ作成 (K-Core)
+- **Endpoint**: `POST /tools/create_k_core_subgraph`
+- **Description**: K-Coreサブグラフを作成する。
+- **Request Body**:
+  - `source_network_id`: int
+  - `k`: int
+- **Response**:
+  - `new_network_id`: int
+  - `name`: str
+
+### 9. サブグラフ作成 (Largest Component)
+- **Endpoint**: `POST /tools/create_largest_component_subgraph`
+- **Description**: 最大連結成分のサブグラフを作成する。
+- **Request Body**:
+  - `source_network_id`: int
+- **Response**:
+  - `new_network_id`: int
+  - `name`: str
+
+### 10. サブグラフ一覧取得
+- **Endpoint**: `GET /tools/get_subgraphs`
+- **Description**: サブグラフの一覧を取得する。
+- **Parameters**:
+  - `network_id` (query): 親ネットワークID
+- **Response**:
+  - `subgraphs`: List[{ "id": int, "name": str, "created_at": str }]
 
 ### `/tools/calculate_centrality`
 
@@ -143,6 +208,15 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
     "scale_type": "LINEAR",
     "gradient": ["#d1e0ff", "#003399"]
   }
+}
+```
+
+- **リクエストボディ例 3 (サブグラフのオーバーレイ表示)**
+
+```json
+{
+  "network_id": 12345,
+  "overlay_network_id": 67890 // サブグラフID
 }
 ```
 

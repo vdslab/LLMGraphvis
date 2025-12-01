@@ -65,3 +65,23 @@ class ChatProcessMessage(BaseModel):
 
 class ChatProcessRequest(BaseModel):
     message: ChatProcessMessage
+
+class CreateEgoNetworkRequest(BaseModel):
+    center_node_id: str
+    radius: int
+
+class CreateSubgraphFromNodesRequest(BaseModel):
+    node_ids: List[str]
+
+class CreatePathSubgraphRequest(BaseModel):
+    source_node_id: str
+    target_node_id: str
+
+class CreateKCoreSubgraphRequest(BaseModel):
+    k: int
+
+class Subgraph(BaseModel):
+    id: int
+    name: str
+    created_at: datetime
+

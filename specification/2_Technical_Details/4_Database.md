@@ -36,6 +36,7 @@
 ```mermaid
 erDiagram
     networks ||--|| chats : "is"
+    networks |o--o{ networks : "parent of"
     chats ||--o{ chat_messages : "contains"
 
     networks ||--o{ nodes : "contains"
@@ -78,6 +79,7 @@ erDiagram
     networks {
         INTEGER id PK
         VARCHAR name
+        INTEGER parent_network_id FK
     }
     nodes {
         INTEGER id PK
@@ -160,13 +162,30 @@ CREATE TABLE users (
 CREATE TABLE networks (
     id INTEGER PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    parent_network_id INTEGER,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    FOREIGN KEY (parent_network_id) REFERENCES networks(id)
 );
 ```
 
-### 4.3.3. `chats`
+### 4.3.3. networks (ネットワーク)
+
+| カラム名 | データ型 | 制約 | 説明 |
+| :--- | :--- | :--- | :--- |
+| `id` | `INTEGER` | `PRIMARY KEY` | ネットワークの一意識別子 |
+| `name` | `VARCHAR` | `NOT NULL` | ネットワーク名 |
+| `parent_network_id` | `INTEGER` | `FOREIGN KEY` | 親ネットワークのID（サブグラフの場合） |
+
+- **説明**: グラフデータ全体を管理するテーブルです。
+- **リレーション**:
+    - `chats` テーブルと1対1の関係を持ちます。
+    - `nodes`, `edges`, `node_attributes`, `edge_attributes` と1対多の関係を持ちます。
+    - 自分自身 (`networks`) と1対多の関係を持ちます（サブグラフの階層構造）。
+
+### 4.3.4. `chats`
 ```sql
+CREATE TABLE chats (
     id INTEGER PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     user_id INTEGER NOT NULL,

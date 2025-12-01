@@ -17,6 +17,10 @@ class Network(Base):
     node_attributes = relationship("NodeAttribute", back_populates="network")
     edge_attributes = relationship("EdgeAttribute", back_populates="network")
 
+    parent_network_id = Column(Integer, ForeignKey("networks.id"), nullable=True)
+    subgraphs = relationship("Network", back_populates="parent_network")
+    parent_network = relationship("Network", remote_side=[id], back_populates="subgraphs")
+
 class Node(Base):
     __tablename__ = "nodes"
 

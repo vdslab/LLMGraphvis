@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
-from app.api.v1.endpoints import auth, chat
+from app.api.v1.endpoints import auth, chat, networks
 from app.core.database import engine, Base
 
 # Create database tables
@@ -98,8 +98,10 @@ app.add_middleware(
 )
 
 # Include routers
+# Include routers
 app.include_router(auth.router)
 app.include_router(chat.router)
+app.include_router(networks.router)
 
 @app.get("/health")
 def health_check():

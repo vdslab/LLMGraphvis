@@ -21,6 +21,10 @@ class Network(Base):
     name = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    parent_network_id = Column(Integer, ForeignKey("networks.id"), nullable=True)
+
+    subgraphs = relationship("Network", back_populates="parent_network")
+    parent_network = relationship("Network", remote_side=[id], back_populates="subgraphs")
 
     chat = relationship("Chat", back_populates="network", uselist=False)
     # Nodes and Edges are managed by NetworkXAPI

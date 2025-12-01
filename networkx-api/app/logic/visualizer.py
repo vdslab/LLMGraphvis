@@ -3,7 +3,7 @@ from app import models
 from app.logic import utils
 from typing import Dict, Any, List, Set
 
-def generate_visualization_data(network_id: int, db: Session, layout_name="spring", node_size_config=None, node_color_config=None, edge_width_config=None, edge_color_config=None):
+def generate_visualization_data(network_id: int, db: Session, layout_name="spring", node_size_config=None, node_color_config=None, edge_width_config=None, edge_color_config=None, overlay_network_id=None):
     # 1. Identify required attributes
     required_node_attrs = {f"{layout_name}_x", f"{layout_name}_y"}
     if node_size_config and node_size_config.get("attribute"):
@@ -71,6 +71,12 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
     nodes = db.query(models.Node).filter(models.Node.network_id == network_id).all()
     smart_defaults = utils.calculate_smart_node_size(len(nodes))
     
+    # Overlay Logic: Fetch subgraph nodes if overlay_network_id is provided
+    overlay_node_ids = set()
+    if overlay_network_id:
+        overlay_nodes = db.query(models.Node.node_id).filter(models.Node.network_id == overlay_network_id).all()
+        overlay_node_ids = {n.node_id for n in overlay_nodes}
+    
     vis_nodes = []
     
     layout_x_attr = f"{layout_name}_x"
@@ -101,6 +107,18 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
                 color_map = node_color_config.get("color_map", {})
                 if str(val) in color_map:
                     color = color_map[str(val)]
+        
+        # Overlay Override
+        if overlay_network_id:
+            if n.node_id in overlay_node_ids:
+                # Highlight color (e.g., Orange/Red)
+                # If color config was present, maybe we mix? But for now, simple override.
+                color = "#FF4500" 
+            else:
+                # Dimmed color
+                color = "#E0E0E0"
+                # Also maybe reduce size?
+                # size = size * 0.5
 
         # Layout
         x = get_val(n.id, layout_x_attr, node_attr_map, node_values)
@@ -153,6 +171,15 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
                 color_map = edge_color_config.get("color_map", {})
                 if str(val) in color_map:
                     color = color_map[str(val)]
+        
+        # Overlay Override
+        if overlay_network_id:
+            if source_node.node_id in overlay_node_ids and target_node.node_id in overlay_node_ids:
+                color = "#FF4500"
+                width = width * 1.5 # Thicker
+            else:
+                color = "#E0E0E0"
+                width = 0.5 # Thinner
 
         vis_edges.append({
             "source": source_node.node_id,
