@@ -5,7 +5,13 @@ from app.core.database import engine, Base
 # Create database tables
 # Note: In a real microservices setup with shared DB, we need to be careful about who creates tables.
 # Here, NetworkXAPI owns the Network/Node/Edge tables.
-Base.metadata.create_all(bind=engine)
+print("DEBUG: Starting table creation...", flush=True)
+try:
+    print(f"DEBUG: Registered tables: {list(Base.metadata.tables.keys())}", flush=True)
+    Base.metadata.create_all(bind=engine)
+    print("DEBUG: Table creation completed.", flush=True)
+except Exception as e:
+    print(f"DEBUG: Table creation FAILED: {e}", flush=True)
 
 app = FastAPI(title="GraphVisAgent NetworkXAPI")
 

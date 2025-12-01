@@ -62,20 +62,32 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
 
     # --- 3. Process Attributes ---
     
-    # Collect all unique attribute names
-    node_attr_keys = set()
+    # Infer Attribute Types
+    node_attr_types = {}
     for _, data in G.nodes(data=True):
-        for key in data.keys():
-            if key != 'label': node_attr_keys.add(key)
+        for key, val in data.items():
+            if key == 'label': continue
+            if key not in node_attr_types:
+                node_attr_types[key] = "float" # Assume float initially
+            
+            if node_attr_types[key] == "float":
+                if not isinstance(val, (int, float)) or isinstance(val, bool):
+                     node_attr_types[key] = "string"
 
-    edge_attr_keys = set()
+    edge_attr_types = {}
     for _, _, data in G.edges(data=True):
-        for key in data.keys():
-            if key != 'weight': edge_attr_keys.add(key)
+        for key, val in data.items():
+            if key == 'weight': continue
+            if key not in edge_attr_types:
+                edge_attr_types[key] = "float"
+            
+            if edge_attr_types[key] == "float":
+                if not isinstance(val, (int, float)) or isinstance(val, bool):
+                     edge_attr_types[key] = "string"
 
     # Ensure Attributes Exist
-    node_attr_map = _ensure_attributes(network_id, node_attr_keys, models.NodeAttribute, db)
-    edge_attr_map = _ensure_attributes(network_id, edge_attr_keys, models.EdgeAttribute, db)
+    node_attr_map = _ensure_attributes(network_id, node_attr_types, models.NodeAttribute, db)
+    edge_attr_map = _ensure_attributes(network_id, edge_attr_types, models.EdgeAttribute, db)
 
     # --- 4. Bulk Insert Attribute Values ---
     
@@ -214,8 +226,9 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
     
     # Save to DB - Bulk Update Strategy
     # 1. Ensure attributes exist
-    attr_x = _get_or_create_attribute(network_id, f"{layout_name}_x", models.NodeAttribute, db)
-    attr_y = _get_or_create_attribute(network_id, f"{layout_name}_y", models.NodeAttribute, db)
+    # 1. Ensure attributes exist
+    attr_x = _get_or_create_attribute(network_id, f"{layout_name}_x", models.NodeAttribute, db, data_type="float")
+    attr_y = _get_or_create_attribute(network_id, f"{layout_name}_y", models.NodeAttribute, db, data_type="float")
     
     # 2. Delete existing values for these attributes (Clean slate)
     # This avoids complex upsert logic and is safe for re-calculation
@@ -290,7 +303,7 @@ def calculate_centrality(network_id: int, centrality_type: str, db: Session):
         
     # Save to DB - Bulk Update Strategy
     attr_name = f"{centrality_type}_centrality"
-    attr = _get_or_create_attribute(network_id, attr_name, models.NodeAttribute, db)
+    attr = _get_or_create_attribute(network_id, attr_name, models.NodeAttribute, db, data_type="float")
     
     # Delete existing
     _delete_attribute_values(network_id, attr.id, models.NodeAttributeValue, db)
@@ -326,10 +339,12 @@ def calculate_centrality(network_id: int, centrality_type: str, db: Session):
 
 # --- Helpers ---
 
-def _ensure_attributes(network_id: int, keys: set, model_class, db: Session) -> Dict[str, int]:
+def _ensure_attributes(network_id: int, attr_types: Dict[str, str], model_class, db: Session) -> Dict[str, int]:
     """
     Ensure attributes exist for the given keys and return a map of {name: id}.
+    attr_types: Dict mapping attribute name to data_type ("float", "string", etc.)
     """
+    keys = set(attr_types.keys())
     if not keys: return {}
     
     # Find existing
@@ -344,7 +359,11 @@ def _ensure_attributes(network_id: int, keys: set, model_class, db: Session) -> 
     missing = keys - set(attr_map.keys())
     new_attrs = []
     for key in missing:
-        new_attrs.append({"network_id": network_id, "attribute_name": key})
+        new_attrs.append({
+            "network_id": network_id, 
+            "attribute_name": key,
+            "data_type": attr_types.get(key, "string")
+        })
     
     if new_attrs:
         db.bulk_insert_mappings(model_class, new_attrs)
@@ -359,13 +378,13 @@ def _ensure_attributes(network_id: int, keys: set, model_class, db: Session) -> 
         
     return attr_map
 
-def _get_or_create_attribute(network_id: int, name: str, model_class, db: Session):
+def _get_or_create_attribute(network_id: int, name: str, model_class, db: Session, data_type: str = "string"):
     attr = db.query(model_class).filter(
         model_class.network_id == network_id,
         model_class.attribute_name == name
     ).first()
     if not attr:
-        attr = model_class(network_id=network_id, attribute_name=name)
+        attr = model_class(network_id=network_id, attribute_name=name, data_type=data_type)
         db.add(attr)
         db.commit()
         db.refresh(attr)

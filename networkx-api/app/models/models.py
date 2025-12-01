@@ -55,6 +55,7 @@ class NodeAttribute(Base):
     id = Column(Integer, primary_key=True, index=True)
     network_id = Column(Integer, ForeignKey("networks.id"), nullable=False)
     attribute_name = Column(String, nullable=False)
+    data_type = Column(String) # Expected type: "boolean", "int", "long", "float", "double", "string"
     description = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -103,6 +104,7 @@ class EdgeAttribute(Base):
     id = Column(Integer, primary_key=True, index=True)
     network_id = Column(Integer, ForeignKey("networks.id"), nullable=False)
     attribute_name = Column(String, nullable=False)
+    data_type = Column(String) # Expected type: "boolean", "int", "long", "float", "double", "string"
     description = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

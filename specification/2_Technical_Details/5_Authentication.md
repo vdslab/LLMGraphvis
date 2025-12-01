@@ -61,3 +61,18 @@ sequenceDiagram
         Frontend-->>User: エラーメッセージを表示
     end
 ```
+
+### 5.1.3. ログアウトフロー
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Backend
+
+    User->>Frontend: ログアウトボタンをクリック
+    Frontend->>Backend: POST /auth/logout
+    Backend->>Backend: Cookie削除 (Set-Cookie: access_token=; Max-Age=0)
+    Backend-->>Frontend: 200 OK
+    Frontend->>User: ログイン画面に遷移
+```

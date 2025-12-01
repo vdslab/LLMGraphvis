@@ -25,6 +25,12 @@
 5.  **複数データベースのサポート**:
     SQLAlchemy ORMを使用することで、PostgreSQLとMySQLの両方に対応可能なデータベース設計とします。具体的なDDLは、SQLAlchemyのマイグレーションツール（例: Alembic）によって各データベースに最適化された形で生成されます。
 
+6.  **柔軟なデータ検証と型安全性**:
+    属性定義（`NodeAttribute` / `EdgeAttribute`）に「期待されるデータ型（`data_type`）」を保持します。一方で、実際の値は型別のテーブル（`NodeFloatAttributeValue` / `NodeTextAttributeValue`）に格納します。
+    これにより、以下のメリットを享受します：
+    - **柔軟性**: インポート時に型不一致があってもエラーとせず、テキストとして保存することでデータの消失を防ぎます（例: 数値属性に "N/A" が混入した場合）。
+    - **検証可能性**: `data_type` と実際の格納テーブルを比較することで、後から型不一致データを特定・検証できます。
+
 ## 4.2. ER図
 
 ```mermaid
@@ -35,8 +41,8 @@ erDiagram
     networks ||--o{ nodes : "contains"
     
     networks ||--o{ node_attributes : "defines"
-    node_attributes |o--|| node_text_attributes : "is"
-    node_attributes |o--|| node_float_attributes : "is"
+    %% node_attributes |o--|| node_text_attributes : "is" (Removed)
+    %% node_attributes |o--|| node_float_attributes : "is" (Removed)
 
     nodes ||--o{ node_attribute_values : "has"
     node_attributes ||--o{ node_attribute_values : "value for"
@@ -47,8 +53,8 @@ erDiagram
     nodes }o--o{ edges : "connects"
 
     networks ||--o{ edge_attributes : "defines"
-    edge_attributes |o--|| edge_text_attributes : "is"
-    edge_attributes |o--|| edge_float_attributes : "is"
+    %% edge_attributes |o--|| edge_text_attributes : "is" (Removed)
+    %% edge_attributes |o--|| edge_float_attributes : "is" (Removed)
 
     edges ||--o{ edge_attribute_values : "has"
     edge_attributes ||--o{ edge_attribute_values : "value for"
@@ -95,14 +101,11 @@ erDiagram
         INTEGER id PK
         INTEGER network_id FK
         VARCHAR attribute_name UK
+        VARCHAR data_type
         TEXT description
     }
-    node_text_attributes {
-        INTEGER node_attribute_id PK, FK
-    }
-    node_float_attributes {
-        INTEGER node_attribute_id PK, FK
-    }
+    %% node_text_attributes (Removed)
+    %% node_float_attributes (Removed)
     node_attribute_values {
         INTEGER id PK
         INTEGER node_id FK
@@ -121,14 +124,11 @@ erDiagram
         INTEGER id PK
         INTEGER network_id FK
         VARCHAR attribute_name UK
+        VARCHAR data_type
         TEXT description
     }
-    edge_text_attributes {
-        INTEGER edge_attribute_id PK, FK
-    }
-    edge_float_attributes {
-        INTEGER edge_attribute_id PK, FK
-    }
+    %% edge_text_attributes (Removed)
+    %% edge_float_attributes (Removed)
     edge_attribute_values {
         INTEGER id PK
         INTEGER edge_id FK
@@ -239,6 +239,7 @@ CREATE TABLE node_attributes (
     id INTEGER PRIMARY KEY,
     network_id INTEGER NOT NULL,
     attribute_name VARCHAR(255) NOT NULL,
+    data_type VARCHAR(50), -- Expected type: "float", "string", etc.
     description TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -246,24 +247,17 @@ CREATE TABLE node_attributes (
     UNIQUE(network_id, attribute_name)
 );
 ```
+(Note: `node_text_attributes` and `node_float_attributes` definition tables are removed. Values are stored in `node_attribute_values` subtypes.)
 ```sql
-CREATE TABLE node_text_attributes (
-    node_attribute_id INTEGER PRIMARY KEY,
-    FOREIGN KEY (node_attribute_id) REFERENCES node_attributes(id)
-);
-```
-```sql
-CREATE TABLE node_float_attributes (
-    node_attribute_id INTEGER PRIMARY KEY,
-    FOREIGN KEY (node_attribute_id) REFERENCES node_attributes(id)
-);
-```
+
 
 ### `edge_attributes` (基底)
 ```sql
+CREATE TABLE edge_attributes (
     id INTEGER PRIMARY KEY,
     network_id INTEGER NOT NULL,
     attribute_name VARCHAR(255) NOT NULL,
+    data_type VARCHAR(50), -- Expected type: "float", "string", etc.
     description TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -271,18 +265,9 @@ CREATE TABLE node_float_attributes (
     UNIQUE(network_id, attribute_name)
 );
 ```
+(Note: `edge_text_attributes` and `edge_float_attributes` definition tables are removed.)
 ```sql
-CREATE TABLE edge_text_attributes (
-    edge_attribute_id INTEGER PRIMARY KEY,
-    FOREIGN KEY (edge_attribute_id) REFERENCES edge_attributes(id)
-);
-```
-```sql
-CREATE TABLE edge_float_attributes (
-    edge_attribute_id INTEGER PRIMARY KEY,
-    FOREIGN KEY (edge_attribute_id) REFERENCES edge_attributes(id)
-);
-```
+
 
 ## 4.5. 属性値テーブル（サブタイプ階層）
 
