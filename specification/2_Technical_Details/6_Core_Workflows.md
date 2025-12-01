@@ -54,8 +54,8 @@ sequenceDiagram
     note right of F: SSE接続を確立し、<br/>ネットワークの初期化完了を待つ。<br/>この間、ローディング画面などを表示。
 
     %% Step 5: Background processing in NetworkXAPI
-    N->>N: 1. GraphMLを正規化
-    N->>DB: 2. ノードとエッジをDBに保存
+    N->>N: 1. GraphMLを正規化<br/>(属性型の推論とdata_typeの決定)
+    N->>DB: 2. ノードとエッジをDBに保存<br/>(値は型別のテーブルへ)
     DB-->>N: 保存成功
     N->>N: 3. 初期レイアウト(Spring)を計算
     N->>DB: 4. 計算したx, y座標を属性として保存

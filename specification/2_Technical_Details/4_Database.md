@@ -41,9 +41,7 @@ erDiagram
     networks ||--o{ nodes : "contains"
     
     networks ||--o{ node_attributes : "defines"
-    %% node_attributes |o--|| node_text_attributes : "is" (Removed)
-    %% node_attributes |o--|| node_float_attributes : "is" (Removed)
-
+    
     nodes ||--o{ node_attribute_values : "has"
     node_attributes ||--o{ node_attribute_values : "value for"
     node_attribute_values |o--|| node_text_attribute_values : "is"
@@ -53,8 +51,6 @@ erDiagram
     nodes }o--o{ edges : "connects"
 
     networks ||--o{ edge_attributes : "defines"
-    %% edge_attributes |o--|| edge_text_attributes : "is" (Removed)
-    %% edge_attributes |o--|| edge_float_attributes : "is" (Removed)
 
     edges ||--o{ edge_attribute_values : "has"
     edge_attributes ||--o{ edge_attribute_values : "value for"
@@ -104,8 +100,6 @@ erDiagram
         VARCHAR data_type
         TEXT description
     }
-    %% node_text_attributes (Removed)
-    %% node_float_attributes (Removed)
     node_attribute_values {
         INTEGER id PK
         INTEGER node_id FK
@@ -127,8 +121,6 @@ erDiagram
         VARCHAR data_type
         TEXT description
     }
-    %% edge_text_attributes (Removed)
-    %% edge_float_attributes (Removed)
     edge_attribute_values {
         INTEGER id PK
         INTEGER edge_id FK
