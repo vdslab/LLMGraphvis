@@ -30,9 +30,12 @@ const NetworkChatPage = () => {
     }
   }, [isAuthenticated, navigate, id]);
 
+  const creationAttempted = useRef(false);
+
   // Handle "new" chat creation
   useEffect(() => {
-    if (id === 'new' && isAuthenticated) {
+    if (id === 'new' && isAuthenticated && !creationAttempted.current) {
+      creationAttempted.current = true;
       const initNewChat = async () => {
         try {
           const newChat = await createChat("New Chat");
@@ -40,6 +43,7 @@ const NetworkChatPage = () => {
         } catch (error) {
           console.error("Failed to create new chat:", error);
           navigate('/');
+          creationAttempted.current = false; // Reset on failure to allow retry if needed
         }
       };
       initNewChat();
