@@ -207,3 +207,47 @@ sequenceDiagram
     B-->>F: SSEイベント (event: message, data: { role: "assistant", content: "申し訳ありません..." })
     note right of F: グラフは変更せず、LLMからのエラーメッセージをチャット履歴に表示する。
 ```
+
+---
+
+## 6.5. ノード認識に基づくサブグラフ作成フロー
+
+**目的:** ユーザーの「最も重要なノードのEgo Networkを作って」といった抽象的な指示に対し、LLMが自律的に重要ノードを特定し、その結果を用いてサブグラフを作成するフローを定義します。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as ユーザー
+    participant F as Frontend
+    participant B as API Service
+    participant LLM as LLM Service
+    participant N as NetworkXAPI
+
+    U->>F: 「次数が一番高いノードのEgo Networkを作って」
+    F->>B: POST /chat/{id}/process
+    B-->>F: 202 Accepted
+
+    B->>LLM: ユーザー指示を送信
+    note right of LLM: 「次数が一番高いノード」を特定する必要があると判断
+
+    LLM-->>B: ツール呼び出し要求 (get_top_nodes, metric:"degree", k:1)
+    B->>N: /tools/get_top_nodes (metric:"degree", k:1)
+    N-->>B: [{"node_id": "n0", "score": 15}]
+    
+    B->>LLM: ツール実行結果（n0）を送信
+    note right of LLM: 特定したノードID "n0" を用いて<br/>次のアクションを決定
+
+    LLM-->>B: ツール呼び出し要求 (create_ego_network, center_node_id:"n0", radius:1)
+    B->>N: /tools/create_ego_network (center_node_id:"n0", radius:1)
+    N-->>B: 作成成功 (new_network_id)
+
+    B->>LLM: ツール実行結果（成功）を送信
+    LLM-->>B: ツール呼び出し要求 (generate_visualization, overlay_network_id: new_network_id)
+    
+    B->>N: /tools/generate_visualization
+    N-->>B: レンダリングデータ
+    B-->>F: SSEイベント (render_update)
+    
+    LLM-->>B: 最終応答メッセージ
+    B-->>F: SSEイベント (message)
+```

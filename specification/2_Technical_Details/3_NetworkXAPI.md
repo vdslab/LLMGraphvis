@@ -33,6 +33,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 | `POST` | `/tools/create_k_core_subgraph` | K-Core（次数k以上のノード群）を抽出し、新しいネットワークとして作成する。 |
 | `POST` | `/tools/create_largest_component_subgraph` | 最大連結成分を抽出し、新しいネットワークとして作成する。 |
 | `GET` | `/tools/get_subgraphs` | 指定されたネットワークの子ネットワーク（サブグラフ）の一覧を取得する。 |
+| `POST` | `/tools/get_top_nodes` | 指定された中心性指標に基づいて、上位k個のノードを取得する。 |
 
 ## 3.3. API詳細
 
@@ -130,6 +131,16 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
   - `network_id` (query): 親ネットワークID
 - **Response**:
   - `subgraphs`: List[{ "id": int, "name": str, "created_at": str }]
+
+### 11. 重要ノード取得
+- **Endpoint**: `POST /tools/get_top_nodes`
+- **Description**: 指定された中心性指標に基づいて、上位k個のノードを取得する。
+- **Request Body**:
+  - `network_id`: int
+  - `metric`: str ("degree", "betweenness", "closeness", "eigenvector")
+  - `k`: int (default: 10)
+- **Response**:
+  - `top_nodes`: List[{ "node_id": str, "score": float }]
 
 ### `/tools/calculate_centrality`
 
