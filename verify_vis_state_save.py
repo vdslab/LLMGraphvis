@@ -73,7 +73,12 @@ async def verify_vis_state_save():
         db.refresh(chat)
         if chat.visualization_state:
             print("SUCCESS: visualization_state was saved to the database.")
-            print(f"Saved state: {chat.visualization_state}")
+            state = chat.visualization_state
+            if isinstance(state, dict) and "config" in state and "data" in state:
+                print("SUCCESS: visualization_state has correct structure (config and data).")
+                print(f"Config: {state['config']}")
+            else:
+                print(f"FAILURE: visualization_state has incorrect structure: {state.keys() if isinstance(state, dict) else state}")
         else:
             print("FAILURE: visualization_state was NOT saved to the database.")
 

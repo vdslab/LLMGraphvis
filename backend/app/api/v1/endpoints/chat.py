@@ -57,11 +57,19 @@ async def get_chat(
     
     # Fetch current visualization data
     try:
-        # We use default parameters for now as we don't persist view state yet
-        vis_data = await network_service.generate_visualization(
-            chat.network_id, 
-            {"layout_name": "spring"} # Default layout
-        )
+        vis_data = None
+        # Check if we have a saved state
+        if chat.visualization_state and isinstance(chat.visualization_state, dict):
+            # The state structure is {"config": ..., "data": ...}
+            if "data" in chat.visualization_state:
+                vis_data = chat.visualization_state["data"]
+        
+        # If no saved state, generate default
+        if not vis_data:
+            vis_data = await network_service.generate_visualization(
+                chat.network_id, 
+                {"layout_name": "spring"} # Default layout
+            )
         
         # Create a dictionary from the chat object to allow adding extra fields
         # Pydantic's orm_mode will handle the rest if we return a dict-like object
@@ -162,6 +170,24 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
         # Also notify system message
         await queue.put({"event": "system_message", "data": json.dumps({"content": "Graph uploaded and initialized successfully."})})
         
+        # Save initial state to DB
+        db = database.SessionLocal()
+        try:
+            chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
+            if chat:
+                # Initial state has data but maybe no config yet (default spring)
+                state_to_save = {
+                    "config": {"layout_name": "spring"},
+                    "data": vis_data
+                }
+                chat.visualization_state = state_to_save
+                db.commit()
+                logger.info(f"Saved initial visualization state for chat_id={chat_id}")
+        except Exception as e:
+            logger.error(f"Failed to save initial visualization state: {e}")
+        finally:
+            db.close()
+        
     except Exception as e:
         logger.error(f"Error in upload background task: {e}")
         print(f"Error in upload background task: {e}")
@@ -193,9 +219,10 @@ async def upload_network(
     
     return {"status": "accepted"}
 
-async def handle_process_background(chat_id: int, user_message: str, db: Session):
+async def handle_process_background(chat_id: int, user_message: str):
     """Background task to process chat message with LLM"""
     logger.info(f"Background process started for chat_id={chat_id}, message='{user_message[:50]}...'")
+    db = database.SessionLocal()
     try:
         # Process chat and get response
         response_content = await llm_service.process_chat(chat_id, user_message, db)
@@ -228,6 +255,8 @@ async def handle_process_background(chat_id: int, user_message: str, db: Session
         traceback.print_exc()
         queue = await llm_service.get_event_queue(chat_id)
         await queue.put({"event": "error", "data": str(e)})
+    finally:
+        db.close()
 
 @router.post("/{chat_id}/process", status_code=202)
 async def process_message(
@@ -251,7 +280,7 @@ async def process_message(
     db.commit()
     
     # Start background task for LLM processing
-    background_tasks.add_task(handle_process_background, chat_id, request.message.content, db)
+    background_tasks.add_task(handle_process_background, chat_id, request.message.content)
     
     return {"status": "accepted"}
 
