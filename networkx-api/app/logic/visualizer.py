@@ -118,11 +118,9 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
     # Pre-calculate Custom Color Map
     custom_color_map = {}
     if custom_node_colors:
-        print(f"DEBUG: custom_node_colors received: {custom_node_colors}")
         for item in custom_node_colors:
             if "node_id" in item and "color" in item:
-                custom_color_map[item["node_id"]] = item["color"]
-        print(f"DEBUG: custom_color_map built: {custom_color_map}")
+                custom_color_map[str(item["node_id"])] = item["color"]
 
     layout_x_attr = f"{layout_name}_x"
     layout_y_attr = f"{layout_name}_y"
@@ -146,8 +144,8 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
         
         # Priority 1: Custom Node Colors (Direct Override)
         # custom_color_map keys are Original IDs (node_id), not DB IDs (id)
-        if n.node_id in custom_color_map:
-            specific_color = custom_color_map[n.node_id]
+        if str(n.node_id) in custom_color_map:
+            specific_color = custom_color_map[str(n.node_id)]
         
         # Priority 2: Config-based (Ranking, Categorical, Linear)
         if not specific_color and node_color_config and node_color_stats[0]: # Check if config exists and has valid stats
@@ -181,7 +179,11 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
                     color = overlay_config.get("highlight_color", "#FF4500") if overlay_config else "#FF4500"
             else:
                 # Outside Overlay
-                color = overlay_config.get("dimmed_color", "#B0B0B0") if overlay_config else "#B0B0B0"
+                # Priority: Custom Color > Dimmed Color
+                if str(n.node_id) in custom_color_map:
+                    color = custom_color_map[str(n.node_id)]
+                else:
+                    color = overlay_config.get("dimmed_color", "#B0B0B0") if overlay_config else "#B0B0B0"
         else:
             # No Overlay
             if specific_color:
