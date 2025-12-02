@@ -235,6 +235,40 @@ const NetworkChatPage = () => {
     }
   };
 
+  // Resizing logic
+  const [sidebarWidth, setSidebarWidth] = useState(window.innerWidth / 4);
+  const [isResizing, setIsResizing] = useState(false);
+  const sidebarRef = useRef(null);
+
+  const startResizing = React.useCallback((mouseDownEvent) => {
+    setIsResizing(true);
+  }, []);
+
+  const stopResizing = React.useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  const resize = React.useCallback(
+    (mouseMoveEvent) => {
+      if (isResizing) {
+        const newWidth = window.innerWidth - mouseMoveEvent.clientX;
+        if (newWidth > 200 && newWidth < window.innerWidth * 0.8) {
+          setSidebarWidth(newWidth);
+        }
+      }
+    },
+    [isResizing]
+  );
+
+  useEffect(() => {
+    window.addEventListener("mousemove", resize);
+    window.addEventListener("mouseup", stopResizing);
+    return () => {
+      window.removeEventListener("mousemove", resize);
+      window.removeEventListener("mouseup", stopResizing);
+    };
+  }, [resize, stopResizing]);
+
   // Don't render anything if not authenticated
   if (!isAuthenticated) {
     return null;  // Redirecting to login via useEffect
@@ -270,8 +304,8 @@ const NetworkChatPage = () => {
       )}
       
       {/* Main content */}
-      <div style={{ display: 'flex', flex: 1 }}>
-        <div style={{ flex: 1, borderRight: '1px solid var(--border-color)', position: 'relative' }}>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
           <NetworkGraph nodes={nodes} links={links} onNodeFocus={handleNodeFocus} />
           {nodes.length === 0 && (
             <div style={{
@@ -308,7 +342,20 @@ const NetworkChatPage = () => {
             </div>
           )}
         </div>
-        <div style={{ width: '400px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        
+        {/* Resize Handle */}
+        <div
+          onMouseDown={startResizing}
+          style={{
+            width: '5px',
+            cursor: 'col-resize',
+            backgroundColor: isResizing ? 'var(--primary-color)' : 'var(--border-color)',
+            transition: 'background-color 0.2s',
+            zIndex: 10
+          }}
+        />
+
+        <div style={{ width: sidebarWidth, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderLeft: '1px solid var(--border-color)' }}>
           <ChatInterface />
         </div>
       </div>
