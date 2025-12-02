@@ -266,6 +266,28 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 }
 ```
 
+- **リクエストボディ例 6 (複合的な可視化: サイズ + オーバーレイ + 個別色指定)**
+
+```json
+{
+  "network_id": 12345,
+  "overlay_network_id": 67890, // サブグラフID
+  "node_size_config": {
+    "attribute": "degree_centrality",
+    "scale_type": "LINEAR",
+    "min": 5,
+    "max": 20
+  },
+  "overlay_config": {
+    "highlight_color": "#87CEEB", // サブグラフ内は水色
+    "dimmed_color": "#D3D3D3"     // サブグラフ外はグレー
+  },
+  "custom_node_colors": [
+    { "node_id": "n1", "color": "blue" } // 特定の重要ノードだけ青 (オーバーレイ設定より優先)
+  ]
+}
+```
+
 - **Response Body (Success):**
 
 ```json

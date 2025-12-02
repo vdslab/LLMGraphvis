@@ -290,4 +290,42 @@ sequenceDiagram
     NetworkXAPI-->>Backend: Render Data
     Backend-->>User: Render Update
 ```
+
+## 6.8. 複合的な可視化フロー (サイズ + オーバーレイ + 個別色指定)
+
+**目的:** 「次数中心性でサイズを決め、上位1人を青、その周辺（サブグラフ）を水色、それ以外をグレーにして」といった複雑な指示を実現するフローです。
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant LLM
+    participant Backend
+    participant NetworkXAPI
+    participant DB
+
+    User->>LLM: "次数中心性でサイズを決め、上位1人を青..."
+    
+    note right of LLM: 1. 次数中心性を計算
+    LLM->>Backend: calculate_centrality(type="degree")
+    Backend->>NetworkXAPI: POST /tools/calculate_centrality
+    NetworkXAPI-->>Backend: Success
+    
+    note right of LLM: 2. 上位ノードを特定
+    LLM->>Backend: get_top_nodes(metric="degree", k=1)
+    Backend->>NetworkXAPI: POST /tools/get_top_nodes
+    NetworkXAPI-->>Backend: [{"node_id": "n1", ...}]
+    
+    note right of LLM: 3. Ego Networkを作成
+    LLM->>Backend: create_ego_network(center="n1", radius=1)
+    Backend->>NetworkXAPI: POST /tools/create_ego_network
+    NetworkXAPI-->>Backend: subgraph_id (e.g., 999)
+
+    note right of LLM: 4. 複合ルールで可視化生成
+    LLM->>Backend: generate_visualization({<br/>  node_size_config: {attribute: "degree_centrality"},<br/>  overlay_network_id: 999,<br/>  overlay_config: {highlight: "lightblue", dimmed: "gray"},<br/>  custom_node_colors: [{node_id: "n1", color: "blue"}]<br/>})
+    Backend->>NetworkXAPI: POST /tools/generate_visualization
+    
+    note right of NetworkXAPI: 優先順位に従い色を決定:<br/>1. Custom (Blue)<br/>2. Overlay (Lightblue)<br/>3. Dimmed (Gray)
+    NetworkXAPI-->>Backend: Render Data
+    Backend-->>User: Render Update
+```
 ```
