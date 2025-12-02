@@ -143,8 +143,9 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
         specific_color = None
         
         # Priority 1: Custom Node Colors (Direct Override)
-        if n.id in custom_color_map:
-            specific_color = custom_color_map[n.id]
+        # custom_color_map keys are Original IDs (node_id), not DB IDs (id)
+        if n.node_id in custom_color_map:
+            specific_color = custom_color_map[n.node_id]
         
         # Priority 2: Config-based (Ranking, Categorical, Linear)
         if not specific_color and node_color_config and node_color_stats[0]: # Check if config exists and has valid stats
