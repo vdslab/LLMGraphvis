@@ -192,7 +192,6 @@ CREATE TABLE chats (
     network_id INTEGER NOT NULL UNIQUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    visualization_state JSON,
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (network_id) REFERENCES networks(id)
 );

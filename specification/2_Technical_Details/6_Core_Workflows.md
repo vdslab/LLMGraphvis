@@ -192,13 +192,13 @@ sequenceDiagram
     B-->>F: 202 Accepted
 
     B->>LLM: ユーザーの指示を送信
-    LLM-->>B: ツール呼び出しを要求 (visualize_centrality, centrality_type:"pagerank")
+    LLM-->>B: ツール呼び出しを要求 (calculate_centrality, centrality_type:"pagerank")
 
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "visualize_centrality", status: "started" })
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "started" })
     B->>N: /tools/calculate_centrality (network_id, centrality_type:"pagerank")
     note over N: "pagerank" は未実装のためエラーを返す
     N-->>B: 実行失敗の応答 (エラーメッセージ)
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "visualize_centrality", status: "failed", error: "..." })
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "failed", error: "..." })
 
     B->>LLM: ツールの実行結果（失敗）を送信
     note right of LLM: LLMは失敗を認識し、<br/>ユーザーへの説明と代替案を生成する。
@@ -214,10 +214,6 @@ sequenceDiagram
 
 **目的:** ユーザーの「最も重要なノードのEgo Networkを作って」といった抽象的な指示に対し、LLMが自律的に重要ノードを特定し、その結果を用いてサブグラフを作成するフローを定義します。
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant U as ユーザー
 ```mermaid
 sequenceDiagram
     participant User
@@ -261,8 +257,8 @@ sequenceDiagram
     NetworkXAPI->>DB: Create Subgraph
     NetworkXAPI-->>Backend: Subgraph Info
     Backend-->>LLM: Success Message
-```    
     LLM-->>B: 最終応答メッセージ
+```
     
 ## 6.7. ランキングに基づく可視化フロー
 
@@ -327,5 +323,4 @@ sequenceDiagram
     note right of NetworkXAPI: 優先順位に従い色を決定:<br/>1. Custom (Blue)<br/>2. Overlay (Lightblue)<br/>3. Dimmed (Gray)
     NetworkXAPI-->>Backend: Render Data
     Backend-->>User: Render Update
-```
 ```
