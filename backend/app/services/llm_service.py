@@ -372,7 +372,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
             logger.info("No candidates in response.")
         
         # 3. Tool Execution Loop
-        final_response_text = await _execute_tool_loop(response, network_id, history, queue, tools, tool_config)
+        final_response_text = await _execute_tool_loop(response, network_id, history, queue, tools, tool_config, chat_id, db)
         return final_response_text
         
     except Exception as e:
@@ -414,7 +414,7 @@ def _build_history(chat_id: int, user_message: str, db: Session) -> List[types.C
     # We can add more examples if needed, but keeping it clean.
     return example_1 + history
 
-async def _execute_tool_loop(initial_response, network_id, history, queue, tools, tool_config):
+async def _execute_tool_loop(initial_response, network_id, history, queue, tools, tool_config, chat_id, db):
     """Handle the loop of tool executions."""
     current_response = initial_response
     max_iterations = 10
@@ -444,7 +444,7 @@ async def _execute_tool_loop(initial_response, network_id, history, queue, tools
                     
                     # Execute
                     try:
-                        function_result = await _execute_single_tool(function_name, function_args, network_id, queue)
+                        function_result = await _execute_single_tool(function_name, function_args, network_id, queue, chat_id, db)
                         status = "completed"
                         error_msg = None
                     except Exception as e:
@@ -502,7 +502,7 @@ async def _execute_tool_loop(initial_response, network_id, history, queue, tools
             
     return "I've completed the requested operations."
 
-async def _execute_single_tool(function_name, function_args, network_id, queue):
+async def _execute_single_tool(function_name, function_args, network_id, queue, chat_id, db):
     """Execute a single tool and return the result."""
     if function_name == "list_node_attributes":
         result = await network_service.list_node_attributes(network_id)
@@ -531,6 +531,19 @@ async def _execute_single_tool(function_name, function_args, network_id, queue):
         }
         await queue.put({"event": "thinking_stream", "data": json.dumps({"content": "Creating visualization..."})})
         vis_data = await network_service.generate_visualization(network_id, vis_config)
+        
+        # Save visualization state to DB
+        try:
+            chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
+            if chat:
+                chat.visualization_state = vis_data
+                db.commit()
+                logger.info(f"Saved visualization state for chat_id={chat_id}")
+            else:
+                logger.warning(f"Chat not found for chat_id={chat_id}, could not save visualization state")
+        except Exception as e:
+            logger.error(f"Failed to save visualization state: {e}")
+            
         await queue.put({"event": "render_update", "data": json.dumps(vis_data)})
         return {"status": "success", "message": "Visualization created."}
     

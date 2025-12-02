@@ -42,6 +42,7 @@ class Chat(Base):
     network_id = Column(Integer, ForeignKey("networks.id"), nullable=False, unique=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    visualization_state = Column(JSON, nullable=True)
 
     user = relationship("User", back_populates="chats")
     network = relationship("Network", back_populates="chat")
