@@ -118,9 +118,11 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
     # Pre-calculate Custom Color Map
     custom_color_map = {}
     if custom_node_colors:
+        print(f"DEBUG: custom_node_colors received: {custom_node_colors}")
         for item in custom_node_colors:
             if "node_id" in item and "color" in item:
                 custom_color_map[item["node_id"]] = item["color"]
+        print(f"DEBUG: custom_color_map built: {custom_color_map}")
 
     layout_x_attr = f"{layout_name}_x"
     layout_y_attr = f"{layout_name}_y"

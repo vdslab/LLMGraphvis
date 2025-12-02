@@ -7,6 +7,16 @@ from app.core.database import engine, Base
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
+# Manual Migration for visualization_state
+from sqlalchemy import text
+try:
+    with engine.connect() as connection:
+        connection.execute(text("ALTER TABLE chats ADD COLUMN IF NOT EXISTS visualization_state JSON;"))
+        connection.commit()
+        print("Migration: visualization_state column added (or already exists).")
+except Exception as e:
+    print(f"Migration failed: {e}")
+
 # Create FastAPI app with Swagger UI configuration
 app = FastAPI(
     title="GraphVisAgent Backend",
