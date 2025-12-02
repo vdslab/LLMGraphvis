@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 from app import models, schemas
 from app.core import database
-from app.services import llm_service, network_service
+from app.services import llm as llm_service, network_service
 from app.api.v1.endpoints.auth import get_current_user
 from app.core.logging import get_logger
 
