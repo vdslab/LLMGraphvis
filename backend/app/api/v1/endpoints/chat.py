@@ -55,32 +55,14 @@ async def get_chat(
     """Get specific chat with network information"""
     chat = verify_chat_ownership(chat_id, current_user.id, db)
     
-    # Fetch current visualization data
     try:
-        vis_data = None
-        # Check if we have a saved state
-        if chat.visualization_state and isinstance(chat.visualization_state, dict):
-            # The state structure is {"config": ..., "data": ...}
-            if "data" in chat.visualization_state:
-                vis_data = chat.visualization_state["data"]
+
+        # Generate default visualization data
+        vis_data = await network_service.generate_visualization(
+            chat.network_id, 
+            {"layout_name": "spring"} # Default layout
+        )
         
-        # If no saved state, generate default
-        if not vis_data:
-            vis_data = await network_service.generate_visualization(
-                chat.network_id, 
-                {"layout_name": "spring"} # Default layout
-            )
-        
-        # Create a dictionary from the chat object to allow adding extra fields
-        # Pydantic's orm_mode will handle the rest if we return a dict-like object
-        # But since ChatWithNetwork expects 'network' field which is not in DB model,
-        # we need to construct the response carefully.
-        
-        # The easiest way with Pydantic ORM mode is to attach the data to the object
-        # if the object allows it, or convert to dict.
-        # SQLAlchemy objects are not easily mutable for extra fields.
-        
-        # Let's return a dict that matches the schema
         return {
             "id": chat.id,
             "name": chat.name,
@@ -169,24 +151,6 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
         
         # Also notify system message
         await queue.put({"event": "system_message", "data": json.dumps({"content": "Graph uploaded and initialized successfully."})})
-        
-        # Save initial state to DB
-        db = database.SessionLocal()
-        try:
-            chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
-            if chat:
-                # Initial state has data but maybe no config yet (default spring)
-                state_to_save = {
-                    "config": {"layout_name": "spring"},
-                    "data": vis_data
-                }
-                chat.visualization_state = state_to_save
-                db.commit()
-                logger.info(f"Saved initial visualization state for chat_id={chat_id}")
-        except Exception as e:
-            logger.error(f"Failed to save initial visualization state: {e}")
-        finally:
-            db.close()
         
     except Exception as e:
         logger.error(f"Error in upload background task: {e}")

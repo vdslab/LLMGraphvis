@@ -328,17 +328,6 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
         
         history = _build_history(chat_id, user_message, db)
         
-        # Inject current visualization state if available
-        if chat.visualization_state and isinstance(chat.visualization_state, dict):
-            vis_state = chat.visualization_state
-            if "config" in vis_state:
-                config_str = json.dumps(vis_state["config"], indent=2)
-                system_message = f"Current Visualization State: {config_str}"
-                # Insert before the last user message
-                if history and history[-1].role == "user":
-                    history.insert(-1, types.Content(role="model", parts=[types.Part(text=system_message)]))
-                else:
-                    history.append(types.Content(role="model", parts=[types.Part(text=system_message)]))
         
         # Notify thinking start
         await queue.put({
@@ -544,23 +533,6 @@ async def _execute_single_tool(function_name, function_args, network_id, queue, 
         await queue.put({"event": "thinking_stream", "data": json.dumps({"content": "Creating visualization..."})})
         vis_data = await network_service.generate_visualization(network_id, vis_config)
         
-        # Save visualization state to DB
-        try:
-            chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
-            if chat:
-                # Save both config and data
-                state_to_save = {
-                    "config": vis_config,
-                    "data": vis_data
-                }
-                chat.visualization_state = state_to_save
-                db.commit()
-                logger.info(f"Saved visualization state for chat_id={chat_id}")
-            else:
-                logger.warning(f"Chat not found for chat_id={chat_id}, could not save visualization state")
-        except Exception as e:
-            logger.error(f"Failed to save visualization state: {e}")
-            
         await queue.put({"event": "render_update", "data": json.dumps(vis_data)})
         return {"status": "success", "message": "Visualization created."}
     

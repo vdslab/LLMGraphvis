@@ -7,15 +7,7 @@ from app.core.database import engine, Base
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
-# Manual Migration for visualization_state
-from sqlalchemy import text
-try:
-    with engine.connect() as connection:
-        connection.execute(text("ALTER TABLE chats ADD COLUMN IF NOT EXISTS visualization_state JSON;"))
-        connection.commit()
-        print("Migration: visualization_state column added (or already exists).")
-except Exception as e:
-    print(f"Migration failed: {e}")
+
 
 # Create FastAPI app with Swagger UI configuration
 app = FastAPI(
@@ -25,7 +17,6 @@ app = FastAPI(
     swagger_ui_parameters={
         "persistAuthorization": True,   # Remember authorization between refreshes
         "tryItOutEnabled": True,        # Enable testing endpoints directly from Swagger
-        "displayRequestDuration": True, # Show request duration for debugging
         "docExpansion": "none",         # Collapse all endpoints by default
         "defaultModelsExpandDepth": 1   # Limit models display depth
     }
