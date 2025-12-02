@@ -645,6 +645,31 @@ def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str], db: 
 
     return {"new_network_id": new_network_id, "name": new_network.name}
 
+    return [{"node_id": node_id, "score": score} for node_id, score in top_nodes]
+
+def _resolve_node_id(G, node_id_input: str) -> str:
+    """
+    Tries to resolve the node_id_input to a node in G.
+    Handles cases where LLM adds 'Node ' prefix or similar.
+    """
+    if node_id_input in G:
+        return node_id_input
+    
+    # Try stripping "node " or "Node " (case insensitive)
+    lower_input = node_id_input.lower()
+    if lower_input.startswith("node"):
+        # Remove "node" and any following whitespace
+        cleaned = lower_input.replace("node", "").strip()
+        if cleaned in G:
+            return cleaned
+            
+    # Try stripping whitespace
+    stripped = node_id_input.strip()
+    if stripped in G:
+        return stripped
+        
+    return node_id_input
+
 def create_ego_network(source_network_id: int, center_node_id: str, radius: int, db: Session) -> Dict[str, Any]:
     # Reconstruct graph structure to run ego_graph
     G = nx.Graph()
@@ -666,6 +691,9 @@ def create_ego_network(source_network_id: int, center_node_id: str, radius: int,
         if u and v:
             G.add_edge(u, v)
             
+    # Resolve node ID
+    center_node_id = _resolve_node_id(G, center_node_id)
+            
     if center_node_id not in G:
         raise ValueError(f"Node {center_node_id} not found in network")
         
@@ -686,6 +714,10 @@ def create_path_subgraph(source_network_id: int, source_node_id: str, target_nod
         v = id_map.get(e.target_node_id)
         if u and v:
             G.add_edge(u, v)
+            
+    # Resolve node IDs
+    source_node_id = _resolve_node_id(G, source_node_id)
+    target_node_id = _resolve_node_id(G, target_node_id)
             
     try:
         path_nodes = nx.shortest_path(G, source=source_node_id, target=target_node_id)
