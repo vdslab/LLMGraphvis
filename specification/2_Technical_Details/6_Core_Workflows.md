@@ -263,4 +263,31 @@ sequenceDiagram
     Backend-->>LLM: Success Message
 ```    
     LLM-->>B: 最終応答メッセージ
+    
+## 6.7. ランキングに基づく可視化フロー
+
+**目的:** 「次数が高い上位3ノードを赤くして」といった指示に対し、LLMがランキングルールを構築し、NetworkXAPIがそれを解釈して動的に色を割り当てるフローです。
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant LLM
+    participant Backend
+    participant NetworkXAPI
+    participant DB
+
+    User->>LLM: "次数が高い上位3ノードを赤くして"
+    LLM->>Backend: calculate_centrality(type="degree")
+    Backend->>NetworkXAPI: POST /tools/calculate_centrality
+    NetworkXAPI->>DB: Save Centrality Values
+    NetworkXAPI-->>Backend: Success
+    Backend-->>LLM: Success
+
+    LLM->>Backend: generate_visualization(node_color_config={scale_type="RANKING", ranking_rules=[{top:3, color:"red"}]})
+    Backend->>NetworkXAPI: POST /tools/generate_visualization
+    NetworkXAPI->>DB: Fetch Node Values
+    NetworkXAPI->>NetworkXAPI: Sort & Apply Colors
+    NetworkXAPI-->>Backend: Render Data
+    Backend-->>User: Render Update
+```
 ```

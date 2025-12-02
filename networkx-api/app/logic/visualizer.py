@@ -3,7 +3,7 @@ from app import models
 from app.logic import utils
 from typing import Dict, Any, List, Set
 
-def generate_visualization_data(network_id: int, db: Session, layout_name="spring", node_size_config=None, node_color_config=None, edge_width_config=None, edge_color_config=None, overlay_network_id=None):
+def generate_visualization_data(network_id: int, db: Session, layout_name="spring", node_size_config=None, node_color_config=None, edge_width_config=None, edge_color_config=None, overlay_network_id=None, overlay_config=None, custom_node_colors=None):
     # 1. Identify required attributes
     required_node_attrs = {f"{layout_name}_x", f"{layout_name}_y"}
     if node_size_config and node_size_config.get("attribute"):
@@ -79,6 +79,49 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
     
     vis_nodes = []
     
+    # Pre-calculate Ranking Color Map if needed
+    ranking_color_map = {}
+    if node_color_config and node_color_config.get("scale_type") == "RANKING":
+        attr_name = node_color_config.get("attribute")
+        if attr_name in node_attr_map:
+            attr_id = node_attr_map[attr_name]
+            # Collect all values: (node_id, value)
+            # node_values is {node_id: {attr_id: val}}
+            values_list = []
+            for nid, attrs in node_values.items():
+                if attr_id in attrs:
+                    val = attrs[attr_id]
+                    if isinstance(val, (int, float)):
+                        values_list.append((nid, val))
+            
+            # Sort descending
+            values_list.sort(key=lambda x: x[1], reverse=True)
+            
+            # Apply rules
+            rules = node_color_config.get("ranking_rules", [])
+            current_idx = 0
+            for rule in rules:
+                count = rule.get("top", 0)
+                color = rule.get("color", "#999999")
+                
+                # Assign color to the next 'count' nodes
+                end_idx = min(current_idx + count, len(values_list))
+                for i in range(current_idx, end_idx):
+                    nid = values_list[i][0]
+                    ranking_color_map[nid] = color
+                
+                current_idx = end_idx
+                if current_idx >= len(values_list):
+                    break
+
+    
+    # Pre-calculate Custom Color Map
+    custom_color_map = {}
+    if custom_node_colors:
+        for item in custom_node_colors:
+            if "node_id" in item and "color" in item:
+                custom_color_map[item["node_id"]] = item["color"]
+
     layout_x_attr = f"{layout_name}_x"
     layout_y_attr = f"{layout_name}_y"
 
@@ -96,29 +139,56 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
                 size = utils.normalize(val, node_size_stats[1], node_size_stats[2], target_min, target_max)
 
         # Color
-        if node_color_stats[0]:
-            val = get_val(n.id, node_color_config["attribute"], node_attr_map, node_values)
-            scale_type = node_color_config.get("scale_type", "LINEAR")
+        # 4. Determine Color
+        specific_color = None
+        
+        # Priority 1: Custom Node Colors (Direct Override)
+        if n.id in custom_color_map:
+            specific_color = custom_color_map[n.id]
+        
+        # Priority 2: Config-based (Ranking, Categorical, Linear)
+        if not specific_color and node_color_config and node_color_stats[0]: # Check if config exists and has valid stats
+            attr_name = node_color_config.get("attribute")
+            scale_type = node_color_config.get("scale_type", "LINEAR") # Default was LINEAR
+            
+            val = None
+            if attr_name in node_attr_map:
+                attr_id = node_attr_map[attr_name]
+                if attr_id in node_values.get(n.id, {}):
+                    val = node_values[n.id][attr_id]
             
             if scale_type == "LINEAR" and isinstance(val, (int, float)):
                 gradient = node_color_config.get("gradient", ["#d1e0ff", "#003399"])
-                color = utils.interpolate_color(val, node_color_stats[1], node_color_stats[2], gradient[0], gradient[1])
+                specific_color = utils.interpolate_color(val, node_color_stats[1], node_color_stats[2], gradient[0], gradient[1])
             elif scale_type == "CATEGORICAL":
                 color_map = node_color_config.get("color_map", {})
                 if str(val) in color_map:
-                    color = color_map[str(val)]
-        
-        # Overlay Override
+                    specific_color = color_map[str(val)]
+            elif scale_type == "RANKING":
+                if n.id in ranking_color_map:
+                    specific_color = ranking_color_map[n.id]
+
+        # Apply Logic
         if overlay_network_id:
             if n.node_id in overlay_node_ids:
-                # Highlight color (e.g., Orange/Red)
-                # If color config was present, maybe we mix? But for now, simple override.
-                color = "#FF4500" 
+                # Inside Overlay
+                if specific_color:
+                    color = specific_color
+                else:
+                    color = overlay_config.get("highlight_color", "#FF4500") if overlay_config else "#FF4500"
             else:
-                # Dimmed color
-                color = "#B0B0B0"
-                # Also maybe reduce size?
-                # size = size * 0.5
+                # Outside Overlay
+                color = overlay_config.get("dimmed_color", "#B0B0B0") if overlay_config else "#B0B0B0"
+        else:
+            # No Overlay
+            if specific_color:
+                color = specific_color
+            else:
+                # If no specific color was determined, use a default.
+                # The original code used "#5384ED" as a general default,
+                # and node_color_config.get("default_color", "#B0B0B0") for RANKING if not found.
+                # Let's use the general default if no config, or config's default if present.
+                color = node_color_config.get("default_color", "#5384ED") if node_color_config else "#5384ED"
 
         # Layout
         x = get_val(n.id, layout_x_attr, node_attr_map, node_values)
@@ -175,10 +245,10 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
         # Overlay Override
         if overlay_network_id:
             if source_node.node_id in overlay_node_ids and target_node.node_id in overlay_node_ids:
-                color = "#FF4500"
+                color = overlay_config.get("highlight_color", "#FF4500") if overlay_config else "#FF4500"
                 width = width * 1.5 # Thicker
             else:
-                color = "#B0B0B0"
+                color = overlay_config.get("dimmed_color", "#B0B0B0") if overlay_config else "#B0B0B0"
                 width = 0.5 # Thinner
 
         vis_edges.append({

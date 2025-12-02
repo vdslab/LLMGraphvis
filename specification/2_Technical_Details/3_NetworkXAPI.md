@@ -222,12 +222,47 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 }
 ```
 
-- **リクエストボディ例 3 (サブグラフのオーバーレイ表示)**
+- **リクエストボディ例 3 (ランキングによる色分け)**
 
 ```json
 {
   "network_id": 12345,
-  "overlay_network_id": 67890 // サブグラフID
+  "layout_name": "spring",
+  "node_color_config": {
+    "attribute": "degree_centrality",
+    "scale_type": "RANKING",
+    "ranking_rules": [
+      { "top": 2, "color": "blue" },
+      { "top": 5, "color": "green" }
+    ],
+    "default_color": "gray"
+  }
+}
+```
+
+- **リクエストボディ例 4 (サブグラフのオーバーレイ表示と色設定)**
+
+```json
+{
+  "network_id": 12345,
+  "overlay_network_id": 67890, // サブグラフID
+  "overlay_config": {
+    "highlight_color": "#FF0000", // サブグラフに含まれるノード・エッジの色
+    "dimmed_color": "#EEEEEE"      // それ以外のノード・エッジの色
+  }
+}
+```
+
+- **リクエストボディ例 5 (個別のノード色指定)**
+
+```json
+{
+  "network_id": 12345,
+  "custom_node_colors": [
+    { "node_id": "n1", "color": "red" },
+    { "node_id": "n2", "color": "blue" }
+  ],
+  "node_size_config": { ... } // サイズは属性で指定可能
 }
 ```
 

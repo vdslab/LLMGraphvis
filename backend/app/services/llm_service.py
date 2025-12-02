@@ -84,7 +84,19 @@ def _get_tool_definitions() -> List[types.FunctionDeclaration]:
                         description="Configuration for node colors.",
                         properties={
                             "attribute": types.Schema(type="STRING"),
-                            "scale_type": types.Schema(type="STRING")
+                            "scale_type": types.Schema(type="STRING", description="LINEAR, CATEGORICAL, or RANKING"),
+                            "ranking_rules": types.Schema(
+                                type="ARRAY",
+                                description="Rules for RANKING scale_type. Processed in order. e.g. [{'top': 1, 'color': 'red'}, {'top': 5, 'color': 'blue'}] means top 1 is red, next 5 are blue.",
+                                items=types.Schema(
+                                    type="OBJECT",
+                                    properties={
+                                        "top": types.Schema(type="INTEGER", description="Number of nodes to apply this color to (taking from the top of the remaining list)."),
+                                        "color": types.Schema(type="STRING", description="Color for these nodes.")
+                                    }
+                                )
+                            ),
+                            "default_color": types.Schema(type="STRING", description="Color for nodes not matching any rule.")
                         }
                     ),
                     "edge_width_config": types.Schema(
@@ -107,6 +119,26 @@ def _get_tool_definitions() -> List[types.FunctionDeclaration]:
                     "overlay_network_id": types.Schema(
                         type="INTEGER",
                         description="ID of a subgraph to overlay/highlight on the main visualization."
+                    ),
+                    "overlay_config": types.Schema(
+                        type="OBJECT",
+                        description="Configuration for overlay colors.",
+                        properties={
+                            "highlight_color": types.Schema(type="STRING", description="Color for the highlighted subgraph nodes/edges (default: #FF4500)."),
+                            "dimmed_color": types.Schema(type="STRING", description="Color for the non-highlighted nodes/edges (default: #B0B0B0).")
+                        }
+                    ),
+                    "custom_node_colors": types.Schema(
+                        type="ARRAY",
+                        description="List of specific node-color pairs. Overrides all other color settings for these nodes. Useful for highlighting specific nodes identified by the LLM.",
+                        items=types.Schema(
+                            type="OBJECT",
+                            properties={
+                                "node_id": types.Schema(type="STRING"),
+                                "color": types.Schema(type="STRING")
+                            },
+                            required=["node_id", "color"]
+                        )
                     )
                 },
                 required=["layout_name"]
@@ -229,19 +261,32 @@ Step 4: Call `generate_visualization(layout_name='circular')`
 
 User Request: "Show edge weights"
 Step 1: Call `list_edge_attributes()`
-    Step 2: Call `generate_visualization(edge_width_config={'attribute': 'weight', 'min': 1, 'max': 5})`
-    
-    User Request: "Create an ego network for the most central node"
-    Step 1: Call `get_top_nodes(metric='degree', k=1)` to find the node ID (e.g., 'n1').
-    Step 2: Call `create_ego_network(center_node_id='n1', radius=1)`
-    Step 3: Call `generate_visualization(overlay_network_id=subgraph_id)`
+Step 2: Call `generate_visualization(edge_width_config={'attribute': 'weight', 'min': 1, 'max': 5})`
 
-    User Request: "Create a subgraph for the top 3 nodes by betweenness"
-    Step 1: Call `get_top_nodes(metric='betweenness', k=3)` to get node IDs (e.g., ['n1', 'n2', 'n3']).
-    Step 2: Call `create_subgraph_from_nodes(node_ids=['n1', 'n2', 'n3'])`
-    Step 3: Call `generate_visualization(overlay_network_id=subgraph_id)`
-    
-    ALWAYS follow this pattern: List -> Calculate (if needed) -> List -> Create Visualization.
+User Request: "Color the top 2 nodes by degree blue, and the rest gray"
+Step 1: Call `calculate_centrality(centrality_type='degree')` (if not already done)
+Step 2: Call `generate_visualization(layout_name='spring', node_color_config={'attribute': 'degree_centrality', 'scale_type': 'RANKING', 'ranking_rules': [{'top': 2, 'color': 'blue'}], 'default_color': 'gray'})`
+
+User Request: "Create an ego network for the most central node"
+Step 1: Call `get_top_nodes(metric='degree', k=1)` to find the node ID (e.g., 'n1').
+Step 2: Call `create_ego_network(center_node_id='n1', radius=1)`
+Step 3: Call `generate_visualization(overlay_network_id=subgraph_id)`
+
+User Request: "Create a subgraph for the top 3 nodes by betweenness"
+Step 1: Call `get_top_nodes(metric='betweenness', k=3)` to get node IDs (e.g., ['n1', 'n2', 'n3']).
+Step 2: Call `create_subgraph_from_nodes(node_ids=['n1', 'n2', 'n3'])`
+Step 3: Call `generate_visualization(overlay_network_id=subgraph_id)`
+
+User Request: "Color the most central node Red, its neighbors Blue, and the rest Gray"
+Step 1: Call `get_top_nodes(metric='degree', k=1)` -> 'n1'
+Step 2: Call `create_ego_network(center_node_id='n1', radius=1)` -> subgraph_id
+Step 3: Call `generate_visualization(
+    overlay_network_id=subgraph_id,
+    custom_node_colors=[{'node_id': 'n1', 'color': 'red'}],
+    overlay_config={'highlight_color': 'blue', 'dimmed_color': 'gray'}
+)`
+
+ALWAYS follow this pattern: List -> Calculate (if needed) -> List -> Create Visualization.
 
 CRITICAL RULES:
 1. You MUST call `calculate_centrality` BEFORE trying to visualize centrality (degree, betweenness, etc.). The attributes 'degree_centrality', 'betweenness_centrality', etc. DO NOT EXIST until you calculate them.
@@ -480,7 +525,9 @@ async def _execute_single_tool(function_name, function_args, network_id, queue):
             "node_color_config": function_args.get("node_color_config"),
             "edge_width_config": function_args.get("edge_width_config"),
             "edge_color_config": function_args.get("edge_color_config"),
-            "overlay_network_id": function_args.get("overlay_network_id")
+            "overlay_network_id": function_args.get("overlay_network_id"),
+            "overlay_config": function_args.get("overlay_config"),
+            "custom_node_colors": function_args.get("custom_node_colors")
         }
         await queue.put({"event": "thinking_stream", "data": json.dumps({"content": "Creating visualization..."})})
         vis_data = await network_service.generate_visualization(network_id, vis_config)
