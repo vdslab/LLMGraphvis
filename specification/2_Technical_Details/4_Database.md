@@ -259,9 +259,6 @@ CREATE TABLE node_attributes (
 );
 ```
 (Note: `node_text_attributes` and `node_float_attributes` definition tables are removed. Values are stored in `node_attribute_values` subtypes.)
-```sql
-
-
 ### `edge_attributes` (基底)
 ```sql
 CREATE TABLE edge_attributes (
@@ -277,9 +274,6 @@ CREATE TABLE edge_attributes (
 );
 ```
 (Note: `edge_text_attributes` and `edge_float_attributes` definition tables are removed.)
-```sql
-
-
 ## 4.5. 属性値テーブル（サブタイプ階層）
 
 ### `node_attribute_values` (基底)
