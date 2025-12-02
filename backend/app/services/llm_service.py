@@ -235,6 +235,11 @@ Step 1: Call `list_edge_attributes()`
     Step 1: Call `get_top_nodes(metric='degree', k=1)` to find the node ID (e.g., 'n1').
     Step 2: Call `create_ego_network(center_node_id='n1', radius=1)`
     Step 3: Call `generate_visualization(overlay_network_id=subgraph_id)`
+
+    User Request: "Create a subgraph for the top 3 nodes by betweenness"
+    Step 1: Call `get_top_nodes(metric='betweenness', k=3)` to get node IDs (e.g., ['n1', 'n2', 'n3']).
+    Step 2: Call `create_subgraph_from_nodes(node_ids=['n1', 'n2', 'n3'])`
+    Step 3: Call `generate_visualization(overlay_network_id=subgraph_id)`
     
     ALWAYS follow this pattern: List -> Calculate (if needed) -> List -> Create Visualization.
 

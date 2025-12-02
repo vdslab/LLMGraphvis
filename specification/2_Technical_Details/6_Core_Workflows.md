@@ -218,36 +218,49 @@ sequenceDiagram
 sequenceDiagram
     autonumber
     participant U as ユーザー
-    participant F as Frontend
-    participant B as API Service
-    participant LLM as LLM Service
-    participant N as NetworkXAPI
+```mermaid
+sequenceDiagram
+    participant User
+    participant LLM
+    participant Backend
+    participant NetworkXAPI
+    participant DB
 
-    U->>F: 「次数が一番高いノードのEgo Networkを作って」
-    F->>B: POST /chat/{id}/process
-    B-->>F: 202 Accepted
+    User->>LLM: "次数中心性が高い上位2ノードのサブグラフを作って"
+    LLM->>Backend: get_top_nodes(metric="degree", k=2)
+    Backend->>NetworkXAPI: POST /tools/get_top_nodes
+    NetworkXAPI->>DB: Calculate & Query
+    DB-->>NetworkXAPI: Top Nodes List
+    NetworkXAPI-->>Backend: [{"node_id": "n1", ...}, {"node_id": "n2", ...}]
+    Backend-->>LLM: Top Nodes Data
 
-    B->>LLM: ユーザー指示を送信
-    note right of LLM: 「次数が一番高いノード」を特定する必要があると判断
+    LLM->>Backend: create_subgraph_from_nodes(node_ids=["n1", "n2"])
+    Backend->>NetworkXAPI: POST /tools/create_subgraph_from_nodes
+    NetworkXAPI->>DB: Create Subgraph Network
+    DB-->>NetworkXAPI: New Network ID
+    NetworkXAPI-->>Backend: Subgraph Info
+    Backend-->>LLM: Success Message
 
-    LLM-->>B: ツール呼び出し要求 (get_top_nodes, metric:"degree", k:1)
-    B->>N: /tools/get_top_nodes (metric:"degree", k:1)
-    N-->>B: [{"node_id": "n0", "score": 15}]
-    
-    B->>LLM: ツール実行結果（n0）を送信
-    note right of LLM: 特定したノードID "n0" を用いて<br/>次のアクションを決定
+    LLM->>Backend: generate_visualization(overlay_network_id=...)
+    Backend-->>User: Render Update
+```
 
-    LLM-->>B: ツール呼び出し要求 (create_ego_network, center_node_id:"n0", radius:1)
-    B->>N: /tools/create_ego_network (center_node_id:"n0", radius:1)
-    N-->>B: 作成成功 (new_network_id)
+## 6.6. パスサブグラフ作成フロー
 
-    B->>LLM: ツール実行結果（成功）を送信
-    LLM-->>B: ツール呼び出し要求 (generate_visualization, overlay_network_id: new_network_id)
-    
-    B->>N: /tools/generate_visualization
-    N-->>B: レンダリングデータ
-    B-->>F: SSEイベント (render_update)
-    
+```mermaid
+sequenceDiagram
+    participant User
+    participant LLM
+    participant Backend
+    participant NetworkXAPI
+
+    User->>LLM: "Node AとNode Bの最短経路のサブグラフを作って"
+    LLM->>Backend: create_path_subgraph(source="A", target="B")
+    Backend->>NetworkXAPI: POST /tools/create_path_subgraph
+    NetworkXAPI->>NetworkXAPI: Calculate Shortest Path
+    NetworkXAPI->>DB: Create Subgraph
+    NetworkXAPI-->>Backend: Subgraph Info
+    Backend-->>LLM: Success Message
+```    
     LLM-->>B: 最終応答メッセージ
-    B-->>F: SSEイベント (message)
 ```
