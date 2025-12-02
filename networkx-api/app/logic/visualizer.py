@@ -116,7 +116,7 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
                 color = "#FF4500" 
             else:
                 # Dimmed color
-                color = "#E0E0E0"
+                color = "#B0B0B0"
                 # Also maybe reduce size?
                 # size = size * 0.5
 
@@ -178,7 +178,7 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
                 color = "#FF4500"
                 width = width * 1.5 # Thicker
             else:
-                color = "#E0E0E0"
+                color = "#B0B0B0"
                 width = 0.5 # Thinner
 
         vis_edges.append({
