@@ -184,41 +184,93 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 ### `/tools/generate_visualization`
 
-- **リクエストボディ例 1 (次数中心性でサイズ、コミュニティで色分け)**
+- **Request Body:**
 
 ```json
 {
   "network_id": 12345,
-  "layout_name": "spring",
+  "focus_network_id": 67890, // Optional: Subgraph ID to focus on
   "node_size_config": {
     "attribute": "degree_centrality",
     "scale_type": "LINEAR",
-    "min_size": 3,
-    "max_size": 25
+    "min_size": 5,
+    "max_size": 15
   },
   "node_color_config": {
     "attribute": "community_id",
-    "scale_type": "CATEGORICAL",
-    "color_map": {
-      "0": "#ff6384",
-      "1": "#36a2eb",
-      "2": "#ffce56"
+    "scale_type": "CATEGORICAL"
+  },
+  "edge_width_config": {
+    "attribute": "weight",
+    "scale_type": "LINEAR",
+    "min_width": 1,
+    "max_width": 5
+  },
+  "context_config": { // Optional: Configuration for nodes NOT in focus_network_id
+    "visible": true,
+    "opacity": 0.1,
+    "color": "#eeeeee"
+  },
+  "focus_config": { // Optional: Overrides for nodes IN focus_network_id
+    "node_size_config": { ... }, // Resolves to focus_network_id attributes
+    "node_color_config": { ... }
+  }
+}
+```
+
+**Visualization Patterns:**
+
+The API supports three main patterns for subgraph visualization, controlled by how `network_id`, `focus_network_id`, and configurations are combined.
+
+**Pattern 1: Global Focus (Highlight Only)**
+*   **Layout**: Global (calculated on `network_id`)
+*   **Metrics**: Global (calculated on `network_id`)
+*   **Context**: Dimmed background
+*   **Use Case**: "Show me where this subgraph is in the whole network."
+
+```json
+{
+  "network_id": 12345,
+  "focus_network_id": 67890,
+  "node_size_config": { "attribute": "degree_centrality" }, // Global Degree
+  "context_config": { "opacity": 0.1 },
+  "focus_config": {} // Inherits Global Degree
+}
+```
+
+**Pattern 2: Contextual Subgraph Analysis**
+*   **Layout**: Global (calculated on `network_id`)
+*   **Metrics**: **Subgraph** (calculated on `focus_network_id`)
+*   **Context**: Dimmed background
+*   **Use Case**: "Show the subgraph in context, but size nodes by their importance WITHIN the subgraph."
+
+```json
+{
+  "network_id": 12345,
+  "focus_network_id": 67890,
+  "context_config": { "opacity": 0.1 },
+  "focus_config": {
+    // OVERRIDE: Use attributes from focus_network_id (67890)
+    "node_size_config": {
+      "attribute": "degree_centrality", // Subgraph Degree
+      "min_size": 10, "max_size": 30
     }
   }
 }
 ```
 
-- **リクエストボディ例 2 (媒介中心性で色分け)**
+**Pattern 3: Isolated Subgraph Analysis**
+*   **Layout**: **Subgraph** (calculated on `network_id` which IS the subgraph)
+*   **Metrics**: **Subgraph**
+*   **Context**: None
+*   **Use Case**: "Extract the subgraph and optimize its layout for detailed inspection."
 
 ```json
 {
-  "network_id": 12345,
-  "layout_name": "kamada_kawai",
-  "node_color_config": {
-    "attribute": "betweenness_centrality",
-    "scale_type": "LINEAR",
-    "gradient": ["#d1e0ff", "#003399"]
-  }
+  "network_id": 67890, // Subgraph IS the Main Network now
+  // No focus_network_id needed
+  "node_size_config": { "attribute": "degree_centrality" } // Subgraph Degree
+  // Layout is calculated for 67890 directly
 }
 ```
 

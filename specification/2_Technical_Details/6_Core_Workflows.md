@@ -299,7 +299,7 @@ sequenceDiagram
     participant NetworkXAPI
     participant DB
 
-    User->>LLM: "次数中心性でサイズを決め、上位1人を青..."
+    User->>LLM: "次数中心性でサイズを決め、上位1人を青、その周辺（サブグラフ）を水色、それ以外をグレーにして"
     
     note right of LLM: 1. 次数中心性を計算
     LLM->>Backend: calculate_centrality(type="degree")
@@ -316,11 +316,11 @@ sequenceDiagram
     Backend->>NetworkXAPI: POST /tools/create_ego_network
     NetworkXAPI-->>Backend: subgraph_id (e.g., 999)
 
-    note right of LLM: 4. 複合ルールで可視化生成
-    LLM->>Backend: generate_visualization({<br/>  node_size_config: {attribute: "degree_centrality"},<br/>  overlay_network_id: 999,<br/>  overlay_config: {highlight: "lightblue", dimmed: "gray"},<br/>  custom_node_colors: [{node_id: "n1", color: "blue"}]<br/>})
+    note right of LLM: 4. 複合ルールで可視化生成 (Pattern 2: Contextual Subgraph)
+    LLM->>Backend: generate_visualization({<br/>  network_id: 12345,<br/>  focus_network_id: 999,<br/>  node_size_config: {attribute: "degree_centrality"},<br/>  context_config: {color: "gray", opacity: 0.3},<br/>  focus_config: {node_color_config: {static_color: "lightblue"}},<br/>  custom_node_colors: [{node_id: "n1", color: "blue"}]<br/>})
     Backend->>NetworkXAPI: POST /tools/generate_visualization
     
-    note right of NetworkXAPI: 優先順位に従い色を決定:<br/>1. Custom (Blue)<br/>2. Overlay (Lightblue)<br/>3. Dimmed (Gray)
+    note right of NetworkXAPI: 優先順位に従い色を決定:<br/>1. Custom (Blue)<br/>2. Focus Config (Lightblue)<br/>3. Context Config (Gray)
     NetworkXAPI-->>Backend: Render Data
     Backend-->>User: Render Update
 ```
