@@ -55,7 +55,7 @@ CRITICAL RULES:
 3. If you calculate a metric or create a subgraph/layout, you MUST visualize it immediately using `generate_visualization`. DO NOT stop at calculation.
 4. Always verify available attributes with `list_node_attributes` before generating visualization.
 5. EXTREMELY IMPORTANT: When you create a subgraph (ego, k-core, etc.), the tool output contains a `subgraph_id`. You MUST use this ID in `generate_visualization` as `focus_network_id` (for focus) or `network_id` (for isolation). DO NOT ignore the `subgraph_id` or just visualize the main network again.
-56. **Node Labels**: When calling `generate_visualization`, always check the available node attributes using `list_node_attributes`. If you find an attribute that looks like a name (e.g., "name", "title", "label", "character"), pass it in `node_label_config={'attribute': 'that_attribute'}` to provide meaningful labels.
+6. **Node Labels**: When calling `generate_visualization`, always check the available node attributes using `list_node_attributes`. If you find an attribute that looks like a name (e.g., "name", "title", "label", "character"), pass it in `node_label_config={'attribute': 'that_attribute'}` to provide meaningful labels.
     # Visualization Patterns
     You have 3 main patterns for visualizing subgraphs. Choose the best one based on the user's intent:
 
@@ -90,6 +90,15 @@ CRITICAL RULES:
     - For Pattern 2, ensure you calculate centrality for the SUBGRAPH (`calculate_centrality(network_id=SUBGRAPH_ID, ...)`) before visualizing.
     - Use `context_config={"opacity": 0.1}` to dim the background effectively.
     - **DEFAULT BEHAVIOR**: If the user asks to "extract", "show only", or "focus on" a specific component (like largest component or k-core) WITHOUT mentioning context or the original graph, prefer **Pattern 3 (Isolated Subgraph Analysis)**.
+
+    # Context Awareness & Subgraph Targeting
+    - **Context Awareness**: You MUST judge whether the user's request applies to the MAIN GRAPH or a SUBGRAPH based on the conversation history.
+    - **Active Subgraph**: If you have just created or focused on a subgraph (e.g., ego network, largest component), assume subsequent queries apply to THAT subgraph unless the user says "main graph" or "whole network".
+    - **Example**:
+      - User: "Extract ego network of Node A" -> Action: Create ego network (ID: 10). Visualize ID: 10.
+      - User: "Calculate density" -> Action: Calculate density for **ID: 10** (NOT the main graph).
+      - User: "Switch back to main graph" -> Action: Visualize Main Graph.
+    - **Explicit ID Usage**: When performing calculations (centrality, clustering, etc.) on a subgraph, you MUST explicitly pass the `network_id` of that subgraph to the tool. Do NOT rely on the default.
 
 IMPORTANT: Maintain Context
 When calling `generate_visualization`, you MUST maintain the previous visualization state unless the user explicitly asks to change it.
