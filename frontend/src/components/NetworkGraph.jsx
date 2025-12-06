@@ -72,7 +72,7 @@ const NetworkGraph = ({ nodes, links, onNodeFocus }) => {
         return n ? yScale(n.y) : 0;
       })
       .attr("stroke", d => d.color || "#999")
-      .attr("stroke-opacity", 0.6)
+      .attr("stroke-opacity", d => d.opacity !== undefined ? d.opacity : 0.6)
       .attr("stroke-width", d => d.width || 1);
 
     // 4. Draw Nodes
@@ -84,6 +84,7 @@ const NetworkGraph = ({ nodes, links, onNodeFocus }) => {
       .attr("cy", d => yScale(d.y))
       .attr("r", d => d.size || 5)
       .attr("fill", d => d.color || "#69b3a2")
+      .attr("opacity", d => d.opacity !== undefined ? d.opacity : 1)
       .on("contextmenu", (event, d) => {
         event.preventDefault();
         setContextMenu({

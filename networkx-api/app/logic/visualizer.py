@@ -3,40 +3,32 @@ from app import models
 from app.logic import utils
 from typing import Dict, Any, List, Set
 
-def generate_visualization_data(network_id: int, db: Session, layout_name="spring", node_size_config=None, node_color_config=None, edge_width_config=None, edge_color_config=None, overlay_network_id=None, overlay_config=None, custom_node_colors=None):
-    # 1. Identify required attributes
-    required_node_attrs = {f"{layout_name}_x", f"{layout_name}_y"}
-    if node_size_config and node_size_config.get("attribute"):
-        required_node_attrs.add(node_size_config["attribute"])
-    if node_color_config and node_color_config.get("attribute"):
-        required_node_attrs.add(node_color_config["attribute"])
-        
-    required_edge_attrs = set()
-    if edge_width_config and edge_width_config.get("attribute"):
-        required_edge_attrs.add(edge_width_config["attribute"])
-    if edge_color_config and edge_color_config.get("attribute"):
-        required_edge_attrs.add(edge_color_config["attribute"])
+def generate_visualization_data(
+    network_id: int, 
+    db: Session, 
+    layout_name="spring", 
+    node_size_config=None, 
+    node_color_config=None, 
+    edge_width_config=None, 
+    edge_color_config=None, 
+    focus_network_id=None, 
+    context_config=None, 
+    focus_config=None,
+    custom_node_colors=None
+):
+    # --- Helper Functions ---
+    def collect_required_attrs(config, attr_set):
+        if config and config.get("attribute"):
+            attr_set.add(config["attribute"])
 
-    # 2. Fetch Attribute Definitions (Name -> ID)
-    node_attr_defs = db.query(models.NodeAttribute).filter(
-        models.NodeAttribute.network_id == network_id,
-        models.NodeAttribute.attribute_name.in_(required_node_attrs)
-    ).all()
-    node_attr_map = {attr.attribute_name: attr.id for attr in node_attr_defs}
-    
-    edge_attr_defs = db.query(models.EdgeAttribute).filter(
-        models.EdgeAttribute.network_id == network_id,
-        models.EdgeAttribute.attribute_name.in_(required_edge_attrs)
-    ).all()
-    edge_attr_map = {attr.attribute_name: attr.id for attr in edge_attr_defs}
+    def fetch_attr_map(net_id, attr_names, model):
+        if not attr_names: return {}
+        defs = db.query(model).filter(
+            model.network_id == net_id,
+            model.attribute_name.in_(attr_names)
+        ).all()
+        return {attr.attribute_name: attr.id for attr in defs}
 
-    # 3. Fetch Attribute Values (Bulk)
-    # We want a map: values[entity_id][attr_name] = value
-    
-    node_values = _fetch_attribute_values(db, models.NodeAttributeValue, models.NodeFloatAttributeValue, models.NodeTextAttributeValue, list(node_attr_map.values()))
-    edge_values = _fetch_attribute_values(db, models.EdgeAttributeValue, models.EdgeFloatAttributeValue, models.EdgeTextAttributeValue, list(edge_attr_map.values()))
-
-    # Helper to get value from our map
     def get_val(entity_id, attr_name, attr_map, values_map):
         if attr_name not in attr_map: return None
         attr_id = attr_map[attr_name]
@@ -44,9 +36,7 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
             return values_map[entity_id][attr_id]
         return None
 
-    # 4. Calculate Stats for Normalization (Min/Max)
-    # We can do this from the fetched values in memory
-    def get_stats(config, attr_map, values_map):
+    def calculate_stats(config, attr_map, values_map):
         if not config or not config.get("attribute"): return None, 0, 0
         attr_name = config["attribute"]
         if attr_name not in attr_map: return None, 0, 0
@@ -62,60 +52,97 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
         if not vals: return None, 0, 0
         return True, min(vals), max(vals)
 
-    node_size_stats = get_stats(node_size_config, node_attr_map, node_values)
-    node_color_stats = get_stats(node_color_config, node_attr_map, node_values)
-    edge_width_stats = get_stats(edge_width_config, edge_attr_map, edge_values)
-    edge_color_stats = get_stats(edge_color_config, edge_attr_map, edge_values)
+    # --- 1. Identify Required Attributes (Global & Focus) ---
+    global_node_attrs = {f"{layout_name}_x", f"{layout_name}_y"}
+    collect_required_attrs(node_size_config, global_node_attrs)
+    collect_required_attrs(node_color_config, global_node_attrs)
 
-    # 5. Build Visualization Data
+    focus_node_attrs = set()
+    if focus_config:
+        collect_required_attrs(focus_config.get("node_size_config"), focus_node_attrs)
+        collect_required_attrs(focus_config.get("node_color_config"), focus_node_attrs)
+
+    required_edge_attrs = set()
+    collect_required_attrs(edge_width_config, required_edge_attrs)
+    collect_required_attrs(edge_color_config, required_edge_attrs)
+
+    # --- 2. Fetch Attribute Definitions ---
+    # Global attributes (from network_id)
+    global_node_attr_map = fetch_attr_map(network_id, global_node_attrs, models.NodeAttribute)
+    edge_attr_map = fetch_attr_map(network_id, required_edge_attrs, models.EdgeAttribute)
+
+    # Focus attributes (from focus_network_id)
+    focus_node_attr_map = {}
+    if focus_network_id and focus_node_attrs:
+        focus_node_attr_map = fetch_attr_map(focus_network_id, focus_node_attrs, models.NodeAttribute)
+
+    # --- 3. Fetch Attribute Values ---
+    # We need values for ALL nodes in the main network for global attributes
+    global_node_values = _fetch_attribute_values(db, models.NodeAttributeValue, models.NodeFloatAttributeValue, models.NodeTextAttributeValue, list(global_node_attr_map.values()))
+    edge_values = _fetch_attribute_values(db, models.EdgeAttributeValue, models.EdgeFloatAttributeValue, models.EdgeTextAttributeValue, list(edge_attr_map.values()))
+
+    # We need values for FOCUS nodes for focus attributes
+    focus_node_values = {}
+    focus_node_map = {} # node_id_str -> db_id (in focus network)
+    
+    if focus_network_id:
+        # Fetch all nodes in focus network to build the map
+        focus_nodes = db.query(models.Node).filter(models.Node.network_id == focus_network_id).all()
+        focus_node_map = {n.node_id: n.id for n in focus_nodes}
+        
+        if focus_node_attr_map:
+            # Fetch values for these nodes
+            # Optimization: We could filter by node IDs, but _fetch_attribute_values filters by attribute IDs which is efficient enough if attributes are specific to network
+            focus_node_values = _fetch_attribute_values(db, models.NodeAttributeValue, models.NodeFloatAttributeValue, models.NodeTextAttributeValue, list(focus_node_attr_map.values()))
+
+    # --- 4. Calculate Stats ---
+    # Global Stats
+    node_size_stats = calculate_stats(node_size_config, global_node_attr_map, global_node_values)
+    node_color_stats = calculate_stats(node_color_config, global_node_attr_map, global_node_values)
+    edge_width_stats = calculate_stats(edge_width_config, edge_attr_map, edge_values)
+    edge_color_stats = calculate_stats(edge_color_config, edge_attr_map, edge_values)
+
+    # Focus Stats
+    focus_node_size_stats = (None, 0, 0)
+    focus_node_color_stats = (None, 0, 0)
+    if focus_config:
+        focus_node_size_stats = calculate_stats(focus_config.get("node_size_config"), focus_node_attr_map, focus_node_values)
+        focus_node_color_stats = calculate_stats(focus_config.get("node_color_config"), focus_node_attr_map, focus_node_values)
+
+    # --- 5. Build Visualization Data ---
     nodes = db.query(models.Node).filter(models.Node.network_id == network_id).all()
     smart_defaults = utils.calculate_smart_node_size(len(nodes))
     
-    # Overlay Logic: Fetch subgraph nodes if overlay_network_id is provided
-    overlay_node_ids = set()
-    if overlay_network_id:
-        overlay_nodes = db.query(models.Node.node_id).filter(models.Node.network_id == overlay_network_id).all()
-        overlay_node_ids = {n.node_id for n in overlay_nodes}
-    
+    # Identify Focus Nodes (using string ID set for fast lookup)
+    focus_node_ids_str = set(focus_node_map.keys())
+
     vis_nodes = []
     
-    # Pre-calculate Ranking Color Map if needed
+    # Pre-calculate Ranking/Custom Color Maps (Global)
     ranking_color_map = {}
     if node_color_config and node_color_config.get("scale_type") == "RANKING":
         attr_name = node_color_config.get("attribute")
-        if attr_name in node_attr_map:
-            attr_id = node_attr_map[attr_name]
-            # Collect all values: (node_id, value)
-            # node_values is {node_id: {attr_id: val}}
+        if attr_name in global_node_attr_map:
+            attr_id = global_node_attr_map[attr_name]
             values_list = []
-            for nid, attrs in node_values.items():
+            for nid, attrs in global_node_values.items():
                 if attr_id in attrs:
                     val = attrs[attr_id]
                     if isinstance(val, (int, float)):
                         values_list.append((nid, val))
-            
-            # Sort descending
             values_list.sort(key=lambda x: x[1], reverse=True)
-            
-            # Apply rules
             rules = node_color_config.get("ranking_rules", [])
             current_idx = 0
             for rule in rules:
                 count = rule.get("top", 0)
                 color = rule.get("color", "#999999")
-                
-                # Assign color to the next 'count' nodes
                 end_idx = min(current_idx + count, len(values_list))
                 for i in range(current_idx, end_idx):
                     nid = values_list[i][0]
                     ranking_color_map[nid] = color
-                
                 current_idx = end_idx
-                if current_idx >= len(values_list):
-                    break
+                if current_idx >= len(values_list): break
 
-    
-    # Pre-calculate Custom Color Map
     custom_color_map = {}
     if custom_node_colors:
         for item in custom_node_colors:
@@ -126,37 +153,35 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
     layout_y_attr = f"{layout_name}_y"
 
     for n in nodes:
-        # Defaults
+        # Determine if node is in focus
+        is_focused = n.node_id in focus_node_ids_str
+        
+        # --- Visibility Check ---
+        if not is_focused and context_config and context_config.get("visible") is False:
+            continue # Skip rendering this node
+
+        # --- Base Attributes (Global) ---
         size = smart_defaults["default"]
         color = "#5384ED"
+        opacity = 1.0
         
-        # Size
+        # Global Size
         if node_size_stats[0]:
-            val = get_val(n.id, node_size_config["attribute"], node_attr_map, node_values)
+            val = get_val(n.id, node_size_config["attribute"], global_node_attr_map, global_node_values)
             if isinstance(val, (int, float)):
                 target_min = node_size_config.get("min", smart_defaults["min"])
                 target_max = node_size_config.get("max", smart_defaults["max"])
                 size = utils.normalize(val, node_size_stats[1], node_size_stats[2], target_min, target_max)
 
-        # Color
-        # 4. Determine Color
+        # Global Color
         specific_color = None
-        
-        # Priority 1: Custom Node Colors (Direct Override)
-        # custom_color_map keys are Original IDs (node_id), not DB IDs (id)
         if str(n.node_id) in custom_color_map:
             specific_color = custom_color_map[str(n.node_id)]
         
-        # Priority 2: Config-based (Ranking, Categorical, Linear)
-        if not specific_color and node_color_config and node_color_stats[0]: # Check if config exists and has valid stats
+        if not specific_color and node_color_config and node_color_stats[0]:
             attr_name = node_color_config.get("attribute")
-            scale_type = node_color_config.get("scale_type", "LINEAR") # Default was LINEAR
-            
-            val = None
-            if attr_name in node_attr_map:
-                attr_id = node_attr_map[attr_name]
-                if attr_id in node_values.get(n.id, {}):
-                    val = node_values[n.id][attr_id]
+            scale_type = node_color_config.get("scale_type", "LINEAR")
+            val = get_val(n.id, attr_name, global_node_attr_map, global_node_values)
             
             if scale_type == "LINEAR" and isinstance(val, (int, float)):
                 gradient = node_color_config.get("gradient", ["#d1e0ff", "#003399"])
@@ -169,35 +194,63 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
                 if n.id in ranking_color_map:
                     specific_color = ranking_color_map[n.id]
 
-        # Apply Logic
-        if overlay_network_id:
-            if n.node_id in overlay_node_ids:
-                # Inside Overlay
-                if specific_color:
-                    color = specific_color
-                else:
-                    color = overlay_config.get("highlight_color", "#FF4500") if overlay_config else "#FF4500"
-            else:
-                # Outside Overlay
-                # Priority: Custom Color > Dimmed Color
-                if str(n.node_id) in custom_color_map:
-                    color = custom_color_map[str(n.node_id)]
-                else:
-                    color = overlay_config.get("dimmed_color", "#B0B0B0") if overlay_config else "#B0B0B0"
+        if specific_color:
+            color = specific_color
         else:
-            # No Overlay
-            if specific_color:
-                color = specific_color
-            else:
-                # If no specific color was determined, use a default.
-                # The original code used "#5384ED" as a general default,
-                # and node_color_config.get("default_color", "#B0B0B0") for RANKING if not found.
-                # Let's use the general default if no config, or config's default if present.
-                color = node_color_config.get("default_color", "#5384ED") if node_color_config else "#5384ED"
+            color = node_color_config.get("default_color", "#5384ED") if node_color_config else "#5384ED"
 
-        # Layout
-        x = get_val(n.id, layout_x_attr, node_attr_map, node_values)
-        y = get_val(n.id, layout_y_attr, node_attr_map, node_values)
+        # --- Focus/Context Overrides ---
+        if focus_network_id:
+            if is_focused:
+                # Apply Focus Config Overrides
+                if focus_config:
+                    # Get the DB ID of this node in the focus network
+                    focus_db_id = focus_node_map.get(n.node_id)
+                    
+                    if focus_db_id:
+                        # Focus Size
+                        f_size_conf = focus_config.get("node_size_config")
+                        if f_size_conf and focus_node_size_stats[0]:
+                            val = get_val(focus_db_id, f_size_conf["attribute"], focus_node_attr_map, focus_node_values)
+                            if isinstance(val, (int, float)):
+                                target_min = f_size_conf.get("min", smart_defaults["min"])
+                                target_max = f_size_conf.get("max", smart_defaults["max"])
+                                size = utils.normalize(val, focus_node_size_stats[1], focus_node_size_stats[2], target_min, target_max)
+
+                        # Focus Color
+                        f_color_conf = focus_config.get("node_color_config")
+                        if f_color_conf:
+                            if f_color_conf.get("static_color"):
+                                color = f_color_conf["static_color"]
+                            elif focus_node_color_stats[0]:
+                                attr_name = f_color_conf.get("attribute")
+                                scale_type = f_color_conf.get("scale_type", "LINEAR")
+                                val = get_val(focus_db_id, attr_name, focus_node_attr_map, focus_node_values)
+                                
+                                if scale_type == "LINEAR" and isinstance(val, (int, float)):
+                                    gradient = f_color_conf.get("gradient", ["#d1e0ff", "#003399"])
+                                    color = utils.interpolate_color(val, focus_node_color_stats[1], focus_node_color_stats[2], gradient[0], gradient[1])
+                                elif scale_type == "CATEGORICAL":
+                                    color_map = f_color_conf.get("color_map", {})
+                                    if str(val) in color_map:
+                                        color = color_map[str(val)]
+
+            else:
+                # Apply Context Config
+                if context_config:
+                    opacity = context_config.get("opacity", 0.1)
+                    if context_config.get("color"):
+                        color = context_config["color"]
+                    
+                    if context_config.get("size"):
+                        size = context_config["size"]
+                    elif not node_size_stats[0]:
+                        # If no global sizing is active, default context nodes to minimum size
+                        size = smart_defaults["min"]
+
+        # --- Layout ---
+        x = get_val(n.id, layout_x_attr, global_node_attr_map, global_node_values)
+        y = get_val(n.id, layout_y_attr, global_node_attr_map, global_node_values)
         if x is None: x = 0.5
         if y is None: y = 0.5
 
@@ -207,26 +260,32 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
             "x": x,
             "y": y,
             "size": size, 
-            "color": color 
+            "color": color,
+            "opacity": opacity
         })
 
+    # --- Edges ---
     edges = db.query(models.Edge).filter(models.Edge.network_id == network_id).all()
     smart_edge_defaults = utils.calculate_smart_edge_width(len(edges))
     vis_edges = []
     
     for e in edges:
-        source_node = db.query(models.Node).get(e.source_node_id) # This is still N+1 if not careful, but usually cached by identity map if nodes loaded
+        source_node = db.query(models.Node).get(e.source_node_id)
         target_node = db.query(models.Node).get(e.target_node_id)
         
-        # Optimization: We loaded all nodes above. SQLAlchemy Identity Map should handle this.
-        # But to be safe, we can build a map of id->node_id_str
-        # Let's trust Identity Map for now as we just queried them.
-        
-        # Defaults
+        # Determine if edge is in focus (both source and target must be in focus)
+        is_focused = False
+        if focus_network_id:
+            is_focused = (source_node.node_id in focus_node_ids_str) and (target_node.node_id in focus_node_ids_str)
+
+        if not is_focused and context_config and context_config.get("visible") is False:
+            continue
+
         width = smart_edge_defaults["default"]
         color = "#999"
+        opacity = 1.0
 
-        # Width
+        # Global Width/Color
         if edge_width_stats[0]:
             val = get_val(e.id, edge_width_config["attribute"], edge_attr_map, edge_values)
             if isinstance(val, (int, float)):
@@ -234,11 +293,9 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
                 target_max = edge_width_config.get("max", smart_edge_defaults["max"])
                 width = utils.normalize(val, edge_width_stats[1], edge_width_stats[2], target_min, target_max)
 
-        # Color
         if edge_color_stats[0]:
             val = get_val(e.id, edge_color_config["attribute"], edge_attr_map, edge_values)
             scale_type = edge_color_config.get("scale_type", "LINEAR")
-            
             if scale_type == "LINEAR" and isinstance(val, (int, float)):
                 gradient = edge_color_config.get("gradient", ["#eeeeee", "#000000"])
                 color = utils.interpolate_color(val, edge_color_stats[1], edge_color_stats[2], gradient[0], gradient[1])
@@ -246,21 +303,26 @@ def generate_visualization_data(network_id: int, db: Session, layout_name="sprin
                 color_map = edge_color_config.get("color_map", {})
                 if str(val) in color_map:
                     color = color_map[str(val)]
-        
-        # Overlay Override
-        if overlay_network_id:
-            if source_node.node_id in overlay_node_ids and target_node.node_id in overlay_node_ids:
-                color = overlay_config.get("highlight_color", "#FF4500") if overlay_config else "#FF4500"
-                width = width * 1.5 # Thicker
+
+        # Focus/Context Overrides
+        if focus_network_id:
+            if is_focused:
+                # Focus overrides (if any)
+                # Currently we only support node focus config in detail, but edge focus config could be added similarly.
+                # For now, just highlight if context is dimmed.
+                pass 
             else:
-                color = overlay_config.get("dimmed_color", "#B0B0B0") if overlay_config else "#B0B0B0"
-                width = 0.5 # Thinner
+                if context_config:
+                    opacity = context_config.get("opacity", 0.1)
+                    if context_config.get("color"):
+                        color = context_config["color"]
 
         vis_edges.append({
             "source": source_node.node_id,
             "target": target_node.node_id,
             "width": width,
-            "color": color
+            "color": color,
+            "opacity": opacity
         })
 
     return {"nodes": vis_nodes, "links": vis_edges}

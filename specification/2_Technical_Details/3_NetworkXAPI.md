@@ -213,9 +213,22 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
   },
   "focus_config": { // Optional: Overrides for nodes IN focus_network_id
     "node_size_config": { ... }, // Resolves to focus_network_id attributes
+  "focus_config": { // Optional: Overrides for nodes IN focus_network_id
+    "node_size_config": { ... }, // Resolves to focus_network_id attributes
     "node_color_config": { ... }
   }
 }
+
+**Note on Default Behavior:**
+If `focus_network_id` is provided but `context_config` is omitted, the API defaults to the following configuration to ensure the focus effect is visible:
+```json
+"context_config": {
+  "visible": true,
+  "opacity": 0.1,
+  "color": null // Keep original color
+}
+```
+If you wish to show the context at full opacity, you must explicitly provide `"context_config": { "opacity": 1.0 }`.
 ```
 
 **Visualization Patterns:**

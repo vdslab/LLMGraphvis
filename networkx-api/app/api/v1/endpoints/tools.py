@@ -21,12 +21,14 @@ class CalculateCentralityRequest(BaseModel):
 
 class GenerateVisualizationRequest(BaseModel):
     network_id: int
+    focus_network_id: Optional[int] = None
     layout_name: Optional[str] = "spring"
     node_size_config: Optional[Dict[str, Any]] = None
     node_color_config: Optional[Dict[str, Any]] = None
     edge_width_config: Optional[Dict[str, Any]] = None
     edge_color_config: Optional[Dict[str, Any]] = None
-    overlay_network_id: Optional[int] = None
+    context_config: Optional[Dict[str, Any]] = None
+    focus_config: Optional[Dict[str, Any]] = None
 
 class CalculateLayoutRequest(BaseModel):
     network_id: int
@@ -115,7 +117,9 @@ def generate_visualization(request: GenerateVisualizationRequest, db: Session = 
             node_color_config=request.node_color_config,
             edge_width_config=request.edge_width_config,
             edge_color_config=request.edge_color_config,
-            overlay_network_id=request.overlay_network_id
+            focus_network_id=request.focus_network_id,
+            context_config=request.context_config,
+            focus_config=request.focus_config
         )
         return vis_data
     except Exception as e:
