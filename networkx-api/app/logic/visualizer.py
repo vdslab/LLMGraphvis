@@ -145,6 +145,34 @@ def generate_visualization_data(
                 current_idx = end_idx
                 if current_idx >= len(values_list): break
 
+    categorical_color_map = {}
+    if node_color_config and node_color_config.get("scale_type") == "CATEGORICAL":
+        attr_name = node_color_config.get("attribute")
+        provided_map = node_color_config.get("color_map", {})
+        # Start with provided map
+        categorical_color_map = provided_map.copy()
+
+        if attr_name in global_node_attr_map:
+            attr_id = global_node_attr_map[attr_name]
+            unique_values = set()
+            
+            # Collect unique values from all nodes
+            for attrs in global_node_values.values():
+                if attr_id in attrs:
+                    unique_values.add(str(attrs[attr_id]))
+            
+            sorted_values = sorted(list(unique_values))
+            
+            # Identify which values need a color
+            needed_values = [v for v in sorted_values if v not in categorical_color_map]
+            
+            if needed_values:
+                # Generate simple palette
+                palette = utils.generate_categorical_palette(len(needed_values))
+                for i, val in enumerate(needed_values):
+                     categorical_color_map[val] = palette[i]
+
+
     custom_color_map = {}
     if custom_node_colors:
         for item in custom_node_colors:
@@ -180,7 +208,15 @@ def generate_visualization_data(
         if str(n.node_id) in custom_color_map:
             specific_color = custom_color_map[str(n.node_id)]
         
-        if not specific_color and node_color_config and node_color_stats[0]:
+        # Determine if we should attempt to color based on config
+        should_color = False
+        if node_color_config:
+            if node_color_stats[0]:
+                 should_color = True
+            elif node_color_config.get("scale_type") == "CATEGORICAL" and node_color_config.get("attribute") in global_node_attr_map:
+                 should_color = True
+
+        if not specific_color and should_color:
             attr_name = node_color_config.get("attribute")
             scale_type = node_color_config.get("scale_type", "LINEAR")
             val = get_val(n.id, attr_name, global_node_attr_map, global_node_values)
@@ -189,9 +225,8 @@ def generate_visualization_data(
                 gradient = node_color_config.get("gradient", ["#d1e0ff", "#003399"])
                 specific_color = utils.interpolate_color(val, node_color_stats[1], node_color_stats[2], gradient[0], gradient[1])
             elif scale_type == "CATEGORICAL":
-                color_map = node_color_config.get("color_map", {})
-                if str(val) in color_map:
-                    specific_color = color_map[str(val)]
+                if str(val) in categorical_color_map:
+                    specific_color = categorical_color_map[str(val)]
             elif scale_type == "RANKING":
                 if n.id in ranking_color_map:
                     specific_color = ranking_color_map[n.id]

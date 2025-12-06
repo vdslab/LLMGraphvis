@@ -69,3 +69,26 @@ def calculate_smart_edge_width(num_edges: int) -> dict:
         "min": round(base_width * 0.5, 1),
         "max": round(base_width * 3.0, 1)
     }
+
+def generate_categorical_palette(n: int) -> list:
+    """
+    Generate a list of n distinct hex colors.
+    """
+    # A standard qualitative palette (Tableau 20 / d3.schemeCategory20 like)
+    base_palette = [
+        "#1f77b4", "#aec7e8", "#ff7f0e", "#ffbb78", "#2ca02c", "#98df8a",
+        "#d62728", "#ff9896", "#9467bd", "#c5b0d5", "#8c564b", "#c49c94",
+        "#e377c2", "#f7b6d2", "#7f7f7f", "#c7c7c7", "#bcbd22", "#dbdb8d",
+        "#17becf", "#9edae5"
+    ]
+    
+    if n <= len(base_palette):
+        return base_palette[:n]
+    
+    # If we need more, we might need to generate them or cycle
+    # For now, let's just cycle if > 20, but maybe with a slight modification?
+    # Simple cycling:
+    palette = []
+    for i in range(n):
+        palette.append(base_palette[i % len(base_palette)])
+    return palette
