@@ -25,7 +25,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 | `GET` | `/tools/list_node_attributes` | ネットワークに存在するノード属性（計算済みまたは元から存在）の一覧を返す。 |
 | `GET` | `/tools/list_edge_attributes` | ネットワークに存在するエッジ属性（計算済みまたは元から存在）の一覧を返す。 |
 | `POST` | `/tools/calculate_centrality` | 中心性指標を計算して永続化する。具体的には、まず属性の**定義**（例: 'degree_centrality'）が`node_attributes`に存在するか確認し、なければ`network_id`に紐付けて作成する。次に、各ノードの計算**値**を、定義のIDを参照して`node_attribute_values`に保存する。レスポンスは計算完了のステータスのみを返す。 |
-| `POST` | `/tools/calculate_layout` | レイアウト座標を計算して永続化する。`layout_name`（例: 'circular'）を受け取り、`{layout_name}_x`, `{layout_name}_y` という属性として保存する。レスポンスは計算完了のステータスのみを返す。 |
+| `POST` | `/tools/calculate_layout` | レイアウト座標を計算して永続化する。`layout_name`（例: 'forceatlas2', 'spiral'）を受け取り、`{layout_name}_x`, `{layout_name}_y` という属性として保存する。レスポンスは計算完了のステータスのみを返す。 |
 | `POST` | `/tools/generate_visualization` | レイアウト、ノードサイズ、ノードカラー等の視覚的割り当てに関するすべてのパラメータを受け取り、最終的なレンダリングデータを動的に生成して返す。**レイアウト計算は行わず、計算済みの座標データを使用する。新しいレイアウトを適用する場合は、事前に`/tools/calculate_layout`を呼び出す必要がある。** サブグラフのオーバーレイ表示もサポートする。 |
 | `POST` | `/tools/create_ego_network` | 指定されたノードを中心としたEgo Graph（指定ホップ数以内のノード群）を新しいネットワークとして作成する。 |
 | `POST` | `/tools/create_subgraph_from_nodes` | 指定されたノードIDのリストからサブグラフを新しいネットワークとして作成する。 |
@@ -68,7 +68,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 - **Description**: 指定されたレイアウトアルゴリズムで座標を計算し、ノード属性として保存する。
 - **Request Body**:
   - `network_id`: int
-  - `layout_name`: str ("spring", "circular", "kamada_kawai", "shell", "spectral")
+  - `layout_name`: str ("spring" (same as "fruchterman_reingold"), "forceatlas2", "circular", "kamada_kawai", "shell", "spectral", "spiral")
 - **Response**:
   - `status`: str ("success")
   - `message`: str
@@ -169,7 +169,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 ```json
 {
   "network_id": 12345,
-  "layout_name": "circular"
+  "layout_name": "forceatlas2"
 }
 ```
 
