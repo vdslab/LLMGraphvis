@@ -22,7 +22,8 @@ const DebugGenerateVisualizationPage = () => {
         setError(null);
         setResponse(null);
         try {
-            const body = JSON.parse(requestBody);
+            // Allow single quotes and relaxed JSON by evaluating as JS object
+            const body = (new Function("return " + requestBody))();
             // Call the proxied endpoint
             const res = await axios.post('/nx-api/tools/generate_visualization', body);
             setResponse(res.data);
@@ -32,6 +33,20 @@ const DebugGenerateVisualizationPage = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleDownload = () => {
+        if (!response) return;
+        const jsonString = JSON.stringify(response, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const href = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = href;
+        link.download = `visualization_response_${Date.now()}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(href);
     };
 
     return (
@@ -66,7 +81,23 @@ const DebugGenerateVisualizationPage = () => {
                     {response && (
                         <>
                             <div style={{ padding: '10px', borderBottom: '1px solid #eee', background: '#f9f9f9', height: '200px', overflow: 'auto' }}>
-                                <strong>Response JSON:</strong>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                                    <strong>Response JSON:</strong>
+                                    <button 
+                                        onClick={handleDownload}
+                                        style={{
+                                            padding: '5px 10px',
+                                            backgroundColor: '#28a745',
+                                            color: 'white',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontSize: '12px'
+                                        }}
+                                    >
+                                        Download JSON
+                                    </button>
+                                </div>
                                 <pre style={{ fontSize: '12px', margin: 0 }}>{JSON.stringify(response, null, 2)}</pre>
                             </div>
                             <div style={{ flex: 1, position: 'relative' }}>

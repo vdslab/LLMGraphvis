@@ -27,14 +27,21 @@ const NetworkGraph = ({ nodes, links }) => {
     const yMax = yExtent[1] !== undefined ? yExtent[1] : 1;
 
     const padding = 40;
+    const availWidth = width - 2 * padding;
+    const availHeight = height - 2 * padding;
 
-    const xScale = d3.scaleLinear()
-      .domain([xMin, xMax])
-      .range([padding, width - padding]);
+    const dataWidth = xMax - xMin || 1; // Avoid divide by zero
+    const dataHeight = yMax - yMin || 1;
 
-    const yScale = d3.scaleLinear()
-      .domain([yMin, yMax])
-      .range([padding, height - padding]);
+    // Calculate uniform scale to fit within available space
+    const scale = Math.min(availWidth / dataWidth, availHeight / dataHeight);
+
+    // Calculate offsets to center the graph
+    const xOffset = (width - dataWidth * scale) / 2 - xMin * scale;
+    const yOffset = (height - dataHeight * scale) / 2 - yMin * scale;
+
+    const xScale = (val) => val * scale + xOffset;
+    const yScale = (val) => val * scale + yOffset;
 
     // Group for zoomable content
     const g = svg.append("g");
@@ -65,21 +72,36 @@ const NetworkGraph = ({ nodes, links }) => {
         return n ? yScale(n.y) : 0;
       })
       .attr("stroke", d => d.color || "#999")
-      .attr("stroke-opacity", d => d.opacity !== undefined ? d.opacity : 0.6)
+      .attr("stroke-opacity", 0.3) // NetworkX default/script specified
       .attr("stroke-width", d => d.width || 1);
 
     // 4. Draw Nodes
-    const node = g.append("g")
-      .selectAll("circle")
+    const nodeGroup = g.append("g")
+      .selectAll("g")
       .data(nodes)
-      .join("circle")
-      .attr("cx", d => xScale(d.x))
-      .attr("cy", d => yScale(d.y))
-      .attr("r", d => d.size || 5)
+      .join("g")
+      .attr("transform", d => `translate(${xScale(d.x)},${yScale(d.y)})`);
+
+    nodeGroup.append("circle")
+      .attr("r", d => {
+         // NetworkX node_size is area. User script uses size * 10.
+         // Area = pi * r^2 = size * 10
+         // r = sqrt(size * 10 / pi)
+         const size = d.size || 5;
+         return Math.sqrt(size * 10 / Math.PI);
+      })
       .attr("fill", d => d.color || "#69b3a2")
       .attr("opacity", d => d.opacity !== undefined ? d.opacity : 1);
 
-    node.append("title")
+    nodeGroup.append("text")
+      .text(d => d.label)
+      .attr("font-size", "6px")
+      .attr("text-anchor", "middle")
+      .attr("dy", ".35em") // Vertical center
+      .attr("fill", "#000")
+      .style("pointer-events", "none"); // Let clicks pass through
+
+    nodeGroup.append("title")
       .text(d => d.label);
 
     // 5. Add Zoom/Pan
