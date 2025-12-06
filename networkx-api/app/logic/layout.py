@@ -23,21 +23,46 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
             G.add_edge(u, v)
     
     # Calculate Layout
-    if layout_name == "spring":
+    # Calculate Layout
+    if layout_name == "spring" or layout_name == "fruchterman_reingold":
         # Heuristic for k: 1/sqrt(N) is default. 
-        # Increasing it slightly (e.g. 1.5/sqrt(N)) helps spread nodes out.
+        # Increasing it to 2.0/sqrt(N) helps spread nodes out more significantly.
         num_nodes = len(G.nodes)
-        k = 1.5 / math.sqrt(num_nodes) if num_nodes > 0 else None
-        pos = nx.spring_layout(G, k=k, iterations=100, seed=42)
+        k = 2.0 / math.sqrt(num_nodes) if num_nodes > 0 else None
+        # Increased iterations for better convergence
+        pos = nx.spring_layout(G, k=k, iterations=1000, seed=42)
+        
+    elif layout_name == "forceatlas2":
+        # ForceAtlas2 - requires verify if available, but confirmed in environment
+        try:
+            # Attempt to use the networkx wrapper if available
+            if hasattr(nx, 'forceatlas2_layout'):
+                 pos = nx.forceatlas2_layout(G, metric="euclidean", seed=42)
+            else:
+                 # Fallback to spring if not actually available despite checks
+                 print("ForceAtlas2 not found, falling back to spring")
+                 pos = nx.spring_layout(G, seed=42)
+        except Exception as e:
+            print(f"Error checking ForceAtlas2: {e}, falling back to spring")
+            pos = nx.spring_layout(G, seed=42)
+
     elif layout_name == "circular":
         pos = nx.circular_layout(G)
+        
     elif layout_name == "kamada_kawai":
         pos = nx.kamada_kawai_layout(G)
+        
     elif layout_name == "shell":
         pos = nx.shell_layout(G)
+        
     elif layout_name == "spectral":
         pos = nx.spectral_layout(G)
+        
+    elif layout_name == "spiral":
+        pos = nx.spiral_layout(G)
+        
     else:
+        # Default fallback
         pos = nx.spring_layout(G, seed=42)
     
     # Save to DB - Bulk Update Strategy
