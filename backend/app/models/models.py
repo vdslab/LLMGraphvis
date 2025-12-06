@@ -21,6 +21,8 @@ class Network(Base):
     name = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    graphml_content = Column(Text, nullable=False)
+
     parent_network_id = Column(Integer, ForeignKey("networks.id"), nullable=True)
 
     subgraphs = relationship("Network", back_populates="parent_network")

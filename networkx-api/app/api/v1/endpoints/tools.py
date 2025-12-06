@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from app.core import database
 from app import models
-from app.logic import graph_processor, visualizer
+from app.logic import importer, layout, centrality, subgraph, visualizer
 
 router = APIRouter(
     prefix="/tools",
@@ -66,10 +66,10 @@ def initialize_network(request: InitializeNetworkRequest, db: Session = Depends(
     try:
         # 1. Parse GraphML and save to DB
         # Returns the actual network_id used (may be new if collision occurred)
-        final_network_id = graph_processor.parse_and_save_graphml(request.network_id, request.graphml_data, db)
+        final_network_id = importer.parse_and_save_graphml(request.network_id, request.graphml_data, db)
         
         # 2. Calculate initial layout using the CORRECT network_id
-        graph_processor.calculate_layout(final_network_id, "spring", db)
+        layout.calculate_layout(final_network_id, "spring", db)
         
         # 3. Generate initial visualization
         vis_data = visualizer.generate_visualization_data(final_network_id, db)
@@ -94,15 +94,15 @@ def list_edge_attributes(network_id: int, db: Session = Depends(database.get_db)
 @router.post("/calculate_centrality")
 def calculate_centrality(request: CalculateCentralityRequest, db: Session = Depends(database.get_db)):
     try:
-        graph_processor.calculate_centrality(request.network_id, request.centrality_type, db)
+        centrality.calculate_centrality(request.network_id, request.centrality_type, db)
         return {"status": "success", "message": f"{request.centrality_type} centrality calculated."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/calculate_layout")
-def calculate_layout(request: CalculateLayoutRequest, db: Session = Depends(database.get_db)):
+def calculate_layout_endpoint(request: CalculateLayoutRequest, db: Session = Depends(database.get_db)):
     try:
-        graph_processor.calculate_layout(request.network_id, request.layout_name, db)
+        layout.calculate_layout(request.network_id, request.layout_name, db)
         return {"status": "success", "message": f"Layout '{request.layout_name}' calculated and saved."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -134,7 +134,7 @@ def generate_visualization(request: GenerateVisualizationRequest, db: Session = 
 @router.post("/create_ego_network")
 def create_ego_network(request: CreateEgoNetworkRequest, db: Session = Depends(database.get_db)):
     try:
-        result = graph_processor.create_ego_network(request.source_network_id, request.center_node_id, request.radius, db)
+        result = subgraph.create_ego_network(request.source_network_id, request.center_node_id, request.radius, db)
         return result
     except Exception as e:
         import traceback
@@ -144,7 +144,7 @@ def create_ego_network(request: CreateEgoNetworkRequest, db: Session = Depends(d
 @router.post("/create_subgraph_from_nodes")
 def create_subgraph_from_nodes(request: CreateSubgraphFromNodesRequest, db: Session = Depends(database.get_db)):
     try:
-        result = graph_processor.create_subgraph_from_nodes(request.source_network_id, request.node_ids, db)
+        result = subgraph.create_subgraph_from_nodes(request.source_network_id, request.node_ids, db)
         return result
     except Exception as e:
         import traceback
@@ -154,7 +154,7 @@ def create_subgraph_from_nodes(request: CreateSubgraphFromNodesRequest, db: Sess
 @router.post("/create_path_subgraph")
 def create_path_subgraph(request: CreatePathSubgraphRequest, db: Session = Depends(database.get_db)):
     try:
-        result = graph_processor.create_path_subgraph(request.source_network_id, request.source_node_id, request.target_node_id, db)
+        result = subgraph.create_path_subgraph(request.source_network_id, request.source_node_id, request.target_node_id, db)
         return result
     except Exception as e:
         import traceback
@@ -164,7 +164,7 @@ def create_path_subgraph(request: CreatePathSubgraphRequest, db: Session = Depen
 @router.post("/create_k_core_subgraph")
 def create_k_core_subgraph(request: CreateKCoreSubgraphRequest, db: Session = Depends(database.get_db)):
     try:
-        result = graph_processor.create_k_core_subgraph(request.source_network_id, request.k, db)
+        result = subgraph.create_k_core_subgraph(request.source_network_id, request.k, db)
         return result
     except Exception as e:
         import traceback
@@ -174,7 +174,7 @@ def create_k_core_subgraph(request: CreateKCoreSubgraphRequest, db: Session = De
 @router.post("/create_largest_component_subgraph")
 def create_largest_component_subgraph(request: CreateLargestComponentSubgraphRequest, db: Session = Depends(database.get_db)):
     try:
-        result = graph_processor.create_largest_component_subgraph(request.source_network_id, db)
+        result = subgraph.create_largest_component_subgraph(request.source_network_id, db)
         return result
     except Exception as e:
         import traceback
@@ -190,9 +190,9 @@ def get_subgraphs(network_id: int, db: Session = Depends(database.get_db)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/get_top_nodes")
-def get_top_nodes(request: GetTopNodesRequest, db: Session = Depends(database.get_db)):
+def get_top_nodes_endpoint(request: GetTopNodesRequest, db: Session = Depends(database.get_db)):
     try:
-        result = graph_processor.get_top_nodes(request.network_id, request.metric, request.k, db)
+        result = centrality.get_top_nodes(request.network_id, request.metric, request.k, db)
         return result
     except Exception as e:
         import traceback

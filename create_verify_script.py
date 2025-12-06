@@ -9,7 +9,7 @@ sys.path.append(os.path.join(os.getcwd(), "networkx-api"))
 
 from app.core.database import Base
 from app import models
-from app.logic.graph_processor import parse_and_save_graphml
+from app.logic.importer import parse_and_save_graphml
 
 # Use the container DB URL (assuming running from host but mapping works if port is exposed)
 # But wait, earlier I found that localhost:5432 might be a different DB.
@@ -34,7 +34,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.database import SQLALCHEMY_DATABASE_URL
 from app import models
-from app.logic.graph_processor import parse_and_save_graphml
+from app.logic.importer import parse_and_save_graphml
 
 def verify():
     engine = create_engine(SQLALCHEMY_DATABASE_URL)

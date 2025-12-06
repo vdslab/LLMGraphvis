@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.core.database import SQLALCHEMY_DATABASE_URL
 from app import models
-from app.logic.graph_processor import parse_and_save_graphml
+from app.logic.importer import parse_and_save_graphml
 
 def verify():
     engine = create_engine(SQLALCHEMY_DATABASE_URL)
