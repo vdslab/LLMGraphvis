@@ -258,6 +258,8 @@ const NetworkChatPage = () => {
     };
   }, [resize, stopResizing]);
 
+  const [showLabels, setShowLabels] = useState(false);
+
   // Don't render anything if not authenticated
   if (!isAuthenticated) {
     return null;  // Redirecting to login via useEffect
@@ -295,7 +297,31 @@ const NetworkChatPage = () => {
       {/* Main content */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          <NetworkGraph nodes={nodes} links={links} />
+          {/* Graph Controls */}
+          {nodes.length > 0 && (
+            <div style={{ 
+              position: 'absolute', 
+              top: 10, 
+              left: 10, 
+              zIndex: 5,
+              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+              padding: '8px',
+              borderRadius: '5px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}>
+              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '14px' }}>
+                <input
+                  type="checkbox"
+                  checked={showLabels}
+                  onChange={(e) => setShowLabels(e.target.checked)}
+                  style={{ marginRight: '8px' }}
+                />
+                Show Labels
+              </label>
+            </div>
+          )}
+
+          <NetworkGraph nodes={nodes} links={links} showLabels={showLabels} />
           {nodes.length === 0 && (
             <div style={{
               position: 'absolute',

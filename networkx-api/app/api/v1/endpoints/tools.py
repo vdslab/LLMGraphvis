@@ -29,6 +29,7 @@ class GenerateVisualizationRequest(BaseModel):
     edge_color_config: Optional[Dict[str, Any]] = None
     context_config: Optional[Dict[str, Any]] = None
     focus_config: Optional[Dict[str, Any]] = None
+    node_label_config: Optional[Dict[str, Any]] = None
 
 class CalculateLayoutRequest(BaseModel):
     network_id: int
@@ -121,7 +122,8 @@ def generate_visualization(request: GenerateVisualizationRequest, db: Session = 
             edge_color_config=request.edge_color_config,
             focus_network_id=request.focus_network_id,
             context_config=request.context_config,
-            focus_config=request.focus_config
+            focus_config=request.focus_config,
+            node_label_config=request.node_label_config
         )
         return vis_data
     except Exception as e:

@@ -163,7 +163,7 @@ sequenceDiagram
 2.  **LLMによるプランニングとツールの実行**:
     - BackendはバックグラウンドでLLMとの対話を開始する。
     - LLMの思考プロセスや、`list_node_attributes`、`calculate_centrality`、`calculate_layout`、`generate_visualization`といったツールの実行状況は、`thinking_stream`や`tool_execution`といった専用のSSEイベントを通じて逐一フロントエンドに通知される。
-    - **重要**: LLMは計算を実行した後、必ず再度`list_node_attributes`を呼び出して、新しい属性が利用可能になったことを確認してから`generate_visualization`を呼び出す。
+    - **重要**: LLMは計算を実行した後、必ず再度`list_node_attributes`を呼び出して、新しい属性が利用可能になったことを確認してから`generate_visualization`を呼び出す。また、**「name」や「label」などの属性が存在する場合、それを識別可能なラベルとして自動的に選択する。**
 
 3.  **最終的な結果の通知**:
     - `generate_visualization`が完了すると、Backendは2つの重要な情報をSSEで送信する。
@@ -317,7 +317,7 @@ sequenceDiagram
     NetworkXAPI-->>Backend: subgraph_id (e.g., 999)
 
     note right of LLM: 4. 複合ルールで可視化生成 (Pattern 2: Contextual Subgraph)
-    LLM->>Backend: generate_visualization({<br/>  network_id: 12345,<br/>  focus_network_id: 999,<br/>  node_size_config: {attribute: "degree_centrality"},<br/>  context_config: {color: "gray", opacity: 0.3},<br/>  focus_config: {node_color_config: {static_color: "lightblue"}},<br/>  custom_node_colors: [{node_id: "n1", color: "blue"}]<br/>})
+    LLM->>Backend: generate_visualization({<br/>  network_id: 12345,<br/>  focus_network_id: 999,<br/>  node_size_config: {attribute: "degree_centrality"},<br/>  node_label_config: {attribute: "name"},<br/>  context_config: {color: "gray", opacity: 0.3},<br/>  focus_config: {node_color_config: {static_color: "lightblue"}},<br/>  custom_node_colors: [{node_id: "n1", color: "blue"}]<br/>})
     Backend->>NetworkXAPI: POST /tools/generate_visualization
     
     note right of NetworkXAPI: 優先順位に従い色を決定:<br/>1. Custom (Blue)<br/>2. Focus Config (Lightblue)<br/>3. Context Config (Gray)

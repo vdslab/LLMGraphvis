@@ -214,8 +214,10 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
   "focus_config": { // Optional: Overrides for nodes IN focus_network_id
     "node_size_config": { ... }, // Resolves to focus_network_id attributes
   "focus_config": { // Optional: Overrides for nodes IN focus_network_id
-    "node_size_config": { ... }, // Resolves to focus_network_id attributes
     "node_color_config": { ... }
+  },
+  "node_label_config": { // Optional: Attribute to use as node label
+    "attribute": "name"
   }
 }
 

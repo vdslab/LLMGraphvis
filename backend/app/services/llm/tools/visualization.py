@@ -109,6 +109,14 @@ definitions = [
                         )
                     }
                 ),
+                "node_label_config": types.Schema(
+                    type="OBJECT",
+                    description="Configuration for node labels. You should check available attributes (using list_node_attributes) and pick the most appropriate one (e.g. 'name', 'title') to use as a label.",
+                    properties={
+                        "attribute": types.Schema(type="STRING", description="Name of the attribute to use as label.")
+                    },
+                    required=["attribute"]
+                ),
                 "custom_node_colors": types.Schema(
                     type="ARRAY",
                     description="List of specific node-color pairs. Overrides all other color settings for these nodes. Useful for highlighting specific nodes identified by the LLM.",
@@ -142,7 +150,8 @@ async def generate_visualization(args: dict, context: dict) -> dict:
         "focus_network_id": args.get("focus_network_id") or args.get("overlay_network_id"),
         "context_config": args.get("context_config") or args.get("overlay_config"), # Simple fallback, though structures might differ slightly
         "focus_config": args.get("focus_config"),
-        "custom_node_colors": args.get("custom_node_colors")
+        "custom_node_colors": args.get("custom_node_colors"),
+        "node_label_config": args.get("node_label_config")
     }
 
     # Robustness: If focus_network_id is set but context_config is missing, apply default dimming.

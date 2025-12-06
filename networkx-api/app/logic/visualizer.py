@@ -14,7 +14,8 @@ def generate_visualization_data(
     focus_network_id=None, 
     context_config=None, 
     focus_config=None,
-    custom_node_colors=None
+    custom_node_colors=None,
+    node_label_config=None
 ):
     # --- Helper Functions ---
     def collect_required_attrs(config, attr_set):
@@ -56,6 +57,7 @@ def generate_visualization_data(
     global_node_attrs = {f"{layout_name}_x", f"{layout_name}_y"}
     collect_required_attrs(node_size_config, global_node_attrs)
     collect_required_attrs(node_color_config, global_node_attrs)
+    collect_required_attrs(node_label_config, global_node_attrs)
 
     focus_node_attrs = set()
     if focus_config:
@@ -254,9 +256,19 @@ def generate_visualization_data(
         if x is None: x = 0.5
         if y is None: y = 0.5
 
+        # --- Label Selection ---
+        label = n.label
+        if node_label_config and node_label_config.get("attribute"):
+            val = get_val(n.id, node_label_config["attribute"], global_node_attr_map, global_node_values)
+            if val is not None:
+                label = str(val)
+        
+        if not label:
+            label = n.node_id
+
         vis_nodes.append({
             "id": n.node_id,
-            "label": n.label,
+            "label": label,
             "x": x,
             "y": y,
             "size": size, 

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
-const NetworkGraph = ({ nodes, links }) => {
+const NetworkGraph = ({ nodes, links, showLabels = false }) => {
   const svgRef = useRef();
 
   useEffect(() => {
@@ -93,13 +93,16 @@ const NetworkGraph = ({ nodes, links }) => {
       .attr("fill", d => d.color || "#69b3a2")
       .attr("opacity", d => d.opacity !== undefined ? d.opacity : 1);
 
-    nodeGroup.append("text")
-      .text(d => d.label)
-      .attr("font-size", "6px")
-      .attr("text-anchor", "middle")
-      .attr("dy", ".35em") // Vertical center
-      .attr("fill", "#000")
-      .style("pointer-events", "none"); // Let clicks pass through
+    if (showLabels) {
+        nodeGroup.append("text")
+          .text(d => d.label)
+          .attr("font-size", "10px") // User might want readable size, 6px is tiny
+          .attr("text-anchor", "middle")
+          .attr("dy", -10) // Offset above node
+          .attr("fill", "#333")
+          .style("pointer-events", "none")
+          .style("text-shadow", "1px 1px 1px white"); // Readability
+    }
 
     nodeGroup.append("title")
       .text(d => d.label);
@@ -113,7 +116,7 @@ const NetworkGraph = ({ nodes, links }) => {
 
     svg.call(zoom);
 
-  }, [nodes, links]);
+  }, [nodes, links, showLabels]);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
