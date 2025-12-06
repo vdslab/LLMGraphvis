@@ -43,36 +43,49 @@ def _ensure_attributes(network_id: int, attr_types: Dict[str, str], model_class,
     keys = set(attr_types.keys())
     if not keys: return {}
     
-    # Find existing
-    existing = db.query(model_class).filter(
+    from sqlalchemy.dialects.postgresql import insert
+    
+    # We want to identify IDs for both existing and newly created attributes.
+    # Approach:
+    # 1. Try to fetch all existing first (fast read).
+    # 2. Insert missing ones.
+    # 3. Fetch again (or assume we have them).
+    # OR better: Upsert-like flow. 
+    # But since we just need the map, let's do:
+    # 1. Bulk Insert with ON CONFLICT DO NOTHING.
+    # 2. Select all matching (network_id, keys).
+    
+    # Step 1: Prepare data for missing or existing check
+    # Note: bulk_insert_mappings doesn't support ON CONFLICT easily in generic SQLAlchemy w/o native dialect usage.
+    # Let's use dialect specific insert.
+    
+    values = [
+        {
+            "network_id": network_id,
+            "attribute_name": key,
+            "data_type": attr_types.get(key, "string")
+        }
+        for key in keys
+    ]
+    
+    stmt = insert(model_class).values(values)
+    stmt = stmt.on_conflict_do_nothing(
+        index_elements=['network_id', 'attribute_name'] # Constraint name usage is safer if known, but index elements work for unique constraints
+    )
+    
+    db.execute(stmt)
+    db.commit()
+    
+    # Step 2: Fetch all IDs (now guaranteed to exist)
+    # We could try to use RETURNING but ON CONFLICT DO NOTHING returns nothing for existing rows.
+    # So a simple SELECT after ensure is efficient enough here since metadata count is low (<< nodes/edges).
+    
+    all_attrs = db.query(model_class).filter(
         model_class.network_id == network_id,
         model_class.attribute_name.in_(keys)
     ).all()
     
-    attr_map = {attr.attribute_name: attr.id for attr in existing}
-    
-    # Create missing
-    missing = keys - set(attr_map.keys())
-    new_attrs = []
-    for key in missing:
-        new_attrs.append({
-            "network_id": network_id, 
-            "attribute_name": key,
-            "data_type": attr_types.get(key, "string")
-        })
-    
-    if new_attrs:
-        db.bulk_insert_mappings(model_class, new_attrs)
-        db.commit()
-        
-        # Fetch all again to get IDs
-        all_attrs = db.query(model_class).filter(
-            model_class.network_id == network_id,
-            model_class.attribute_name.in_(keys)
-        ).all()
-        attr_map = {attr.attribute_name: attr.id for attr in all_attrs}
-        
-    return attr_map
+    return {attr.attribute_name: attr.id for attr in all_attrs}
 
 def _get_or_create_attribute(network_id: int, name: str, model_class, db: Session, data_type: str = "string"):
     attr = db.query(model_class).filter(
