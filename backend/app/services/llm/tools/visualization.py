@@ -128,7 +128,8 @@ definitions = [
 ]
 
 async def generate_visualization(args: dict, context: dict) -> dict:
-    network_id = context['network_id']
+    # Allow overriding network_id to visualize subgraphs or other networks
+    network_id = args.get('network_id') or context['network_id']
     queue = context['queue']
     
     vis_config = {

@@ -700,7 +700,7 @@ def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str], db: 
 
     return {"new_network_id": new_network_id, "name": new_network.name}
 
-    return [{"node_id": node_id, "score": score} for node_id, score in top_nodes]
+
 
 def _resolve_node_id(G, node_id_input: str) -> str:
     """

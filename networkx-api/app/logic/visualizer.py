@@ -269,9 +269,14 @@ def generate_visualization_data(
     smart_edge_defaults = utils.calculate_smart_edge_width(len(edges))
     vis_edges = []
     
+    node_lookup = {n.id: n for n in nodes}
+
     for e in edges:
-        source_node = db.query(models.Node).get(e.source_node_id)
-        target_node = db.query(models.Node).get(e.target_node_id)
+        source_node = node_lookup.get(e.source_node_id)
+        target_node = node_lookup.get(e.target_node_id)
+        
+        if not source_node or not target_node:
+            continue
         
         # Determine if edge is in focus (both source and target must be in focus)
         is_focused = False

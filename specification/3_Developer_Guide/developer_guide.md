@@ -226,6 +226,7 @@ npm run dev
 NetworkX APIの `/tools/generate_visualization` エンドポイントを直接テストし、レスポンスのJSONデータと描画結果を確認できるページです。
 
 - **URL**: `/debug/networkxapi-tools/generate_visualization`
+- **注意**: この機能は開発モード（`import.meta.env.DEV`が`true`）でのみ利用可能です。本番ビルドには含まれません。
 - **機能**:
     - JSON形式でリクエストボディを入力
     - NetworkX APIへの直接リクエスト送信
