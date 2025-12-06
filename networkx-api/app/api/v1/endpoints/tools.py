@@ -64,15 +64,17 @@ class GetTopNodesRequest(BaseModel):
 def initialize_network(request: InitializeNetworkRequest, db: Session = Depends(database.get_db)):
     try:
         # 1. Parse GraphML and save to DB
-        graph_processor.parse_and_save_graphml(request.network_id, request.graphml_data, db)
+        # Returns the actual network_id used (may be new if collision occurred)
+        final_network_id = graph_processor.parse_and_save_graphml(request.network_id, request.graphml_data, db)
         
-        # 2. Calculate initial layout
-        graph_processor.calculate_layout(request.network_id, "spring", db)
+        # 2. Calculate initial layout using the CORRECT network_id
+        graph_processor.calculate_layout(final_network_id, "spring", db)
         
         # 3. Generate initial visualization
-        vis_data = visualizer.generate_visualization_data(request.network_id, db)
+        vis_data = visualizer.generate_visualization_data(final_network_id, db)
         
-        return vis_data
+        # Return both visualization and the confirmed network_id
+        return {"network": vis_data, "network_id": final_network_id}
     except Exception as e:
         import traceback
         traceback.print_exc()

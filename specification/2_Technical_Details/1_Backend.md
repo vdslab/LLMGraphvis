@@ -133,8 +133,9 @@ graph TD
     - **Tool Execution**:
      - `list_node_attributes()`: `network_service.list_node_attributes` を呼び出し、NetworkXAPIからノード属性一覧を取得。
      - `list_edge_attributes()`: `network_service.list_edge_attributes` を呼び出し、NetworkXAPIからエッジ属性一覧を取得。
-     - `calculate_centrality(type)`: `network_service.calculate_centrality` を呼び出し、NetworkXAPIで計算を実行。
-     - `calculate_layout(name)`: `network_service.calculate_layout` を呼び出し、NetworkXAPIで計算を実行。
+     - `calculate_centrality(type, network_id?)`: `network_service.calculate_centrality` を呼び出し、NetworkXAPIで計算を実行。
+     - `calculate_layout(name, network_id?)`: `network_service.calculate_layout` を呼び出し、NetworkXAPIで計算を実行。
+     - `get_top_nodes(metric, k, network_id?)`: `network_service.get_top_nodes` を呼び出し、重要なノードを取得。
      - `generate_visualization(config)`: `network_service.generate_visualization` を呼び出し、NetworkXAPIから可視化データを取得。
     - ネットワークの現状を把握するために`list_attributes`を呼び出し、必要な属性（例：`degree_centrality`）が存在するか確認します。
     - 属性の計算が必要な場合は`calculate_centrality`を呼び出し、その後`generate_visualization`を呼び出して可視化を更新するプランをBackendに返します。

@@ -15,8 +15,7 @@ const NetworkChatPage = () => {
     chatId,
     fetchMessages,
     uploadNetwork,
-    createChat,
-    sendMessage // Import sendMessage
+    createChat
   } = useChatStore();
   const { nodes, links } = useNetworkStore();
   const fileInputRef = useRef(null);
@@ -198,16 +197,6 @@ const NetworkChatPage = () => {
     }
   }, [id, setChatId, isAuthenticated, retryTrigger]);
 
-  const handleNodeFocus = async (nodeId) => {
-    if (!nodeId) return;
-    const message = `Create an ego network for node ${nodeId}`;
-    try {
-      await sendMessage(parseInt(id), message);
-    } catch (error) {
-      console.error("Failed to send focus message:", error);
-    }
-  };
-
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -306,7 +295,7 @@ const NetworkChatPage = () => {
       {/* Main content */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          <NetworkGraph nodes={nodes} links={links} onNodeFocus={handleNodeFocus} />
+          <NetworkGraph nodes={nodes} links={links} />
           {nodes.length === 0 && (
             <div style={{
               position: 'absolute',

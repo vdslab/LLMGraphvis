@@ -1,15 +1,8 @@
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
-const NetworkGraph = ({ nodes, links, onNodeFocus }) => {
+const NetworkGraph = ({ nodes, links }) => {
   const svgRef = useRef();
-  const [contextMenu, setContextMenu] = React.useState(null);
-
-  useEffect(() => {
-    const handleClickOutside = () => setContextMenu(null);
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, []);
 
   useEffect(() => {
     if (!nodes.length) return;
@@ -84,15 +77,7 @@ const NetworkGraph = ({ nodes, links, onNodeFocus }) => {
       .attr("cy", d => yScale(d.y))
       .attr("r", d => d.size || 5)
       .attr("fill", d => d.color || "#69b3a2")
-      .attr("opacity", d => d.opacity !== undefined ? d.opacity : 1)
-      .on("contextmenu", (event, d) => {
-        event.preventDefault();
-        setContextMenu({
-          x: event.pageX,
-          y: event.pageY,
-          nodeId: d.id
-        });
-      });
+      .attr("opacity", d => d.opacity !== undefined ? d.opacity : 1);
 
     node.append("title")
       .text(d => d.label);
@@ -102,7 +87,6 @@ const NetworkGraph = ({ nodes, links, onNodeFocus }) => {
       .scaleExtent([0.1, 10])
       .on("zoom", (event) => {
         g.attr("transform", event.transform);
-        setContextMenu(null); // Close menu on zoom/pan
       });
 
     svg.call(zoom);
@@ -112,28 +96,6 @@ const NetworkGraph = ({ nodes, links, onNodeFocus }) => {
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <svg ref={svgRef} style={{ width: '100%', height: '100%' }}></svg>
-      {contextMenu && (
-        <div
-          style={{
-            position: 'fixed',
-            top: contextMenu.y,
-            left: contextMenu.x,
-            backgroundColor: 'white',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            padding: '5px',
-            zIndex: 1000,
-            boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
-            cursor: 'pointer'
-          }}
-          onClick={() => {
-            if (onNodeFocus) onNodeFocus(contextMenu.nodeId);
-            setContextMenu(null);
-          }}
-        >
-          Focus (Ego Network)
-        </div>
-      )}
     </div>
   );
 };

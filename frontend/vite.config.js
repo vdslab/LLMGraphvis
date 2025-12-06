@@ -16,6 +16,11 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, ''),
         },
+        '/nx-api': {
+          target: env.VITE_NX_API_URL || 'http://networkx-api:8001',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/nx-api/, ''),
+        },
       },
     },
   }

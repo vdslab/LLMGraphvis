@@ -141,8 +141,23 @@ def create_chat(
 async def handle_upload_background(chat_id: int, network_id: int, graphml_data: str):
     logger.info(f"Background upload started for chat_id={chat_id}, network_id={network_id}")
     try:
-        # Initialize network and get visualization data
-        vis_data = await network_service.initialize_network(network_id, graphml_data)
+        # Initialize network and get response containing visualization and final_network_id
+        result = await network_service.initialize_network(network_id, graphml_data)
+        
+        vis_data = result.get("network")
+        final_network_id = result.get("network_id")
+        
+        # If network_id changed (collision handling), update the Chat record
+        if final_network_id != network_id:
+            logger.info(f"Network ID updated from {network_id} to {final_network_id} due to collision/re-upload.")
+            db_session = database.SessionLocal()
+            try:
+                chat = db_session.query(models.Chat).filter(models.Chat.id == chat_id).first()
+                if chat:
+                    chat.network_id = final_network_id
+                    db_session.commit()
+            finally:
+                db_session.close()
         
         # Broadcast render_update
         logger.info(f"Broadcasting render_update for chat_id={chat_id}")

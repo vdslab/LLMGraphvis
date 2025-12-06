@@ -9,6 +9,10 @@ definitions = [
         parameters=types.Schema(
             type="OBJECT",
             properties={
+                "network_id": types.Schema(
+                    type="INTEGER",
+                    description="Optional ID of the network/subgraph to calculate for. Defaults to the current active network."
+                ),
                 "centrality_type": types.Schema(
                     type="STRING",
                     description="Type of centrality. Options: degree, betweenness, closeness, eigenvector",
@@ -24,6 +28,10 @@ definitions = [
         parameters=types.Schema(
             type="OBJECT",
             properties={
+                "network_id": types.Schema(
+                    type="INTEGER",
+                    description="Optional ID of the network/subgraph to query. Defaults to the current active network."
+                ),
                 "metric": types.Schema(
                     type="STRING",
                     description="Centrality metric to use. Options: degree, betweenness, closeness, eigenvector",
@@ -37,21 +45,21 @@ definitions = [
 ]
 
 async def calculate_centrality(args: dict, context: dict) -> dict:
-    network_id = context['network_id']
+    network_id = args.get("network_id", context['network_id'])
     queue = context['queue']
     centrality_type = args.get("centrality_type", "degree")
     
-    await queue.put({"event": "thinking_stream", "data": json.dumps({"content": f"Calculating {centrality_type} centrality..."})})
+    await queue.put({"event": "thinking_stream", "data": json.dumps({"content": f"Calculating {centrality_type} centrality for network {network_id}..."})})
     await network_service.calculate_centrality(network_id, centrality_type)
     return {"status": "success", "message": f"Calculated {centrality_type} centrality."}
 
 async def get_top_nodes(args: dict, context: dict) -> dict:
-    network_id = context['network_id']
+    network_id = args.get("network_id", context['network_id'])
     queue = context['queue']
     metric = args.get("metric")
     k = args.get("k", 10)
     
-    await queue.put({"event": "thinking_stream", "data": json.dumps({"content": f"Finding top {k} nodes by {metric} centrality..."})})
+    await queue.put({"event": "thinking_stream", "data": json.dumps({"content": f"Finding top {k} nodes by {metric} centrality for network {network_id}..."})})
     result = await network_service.get_top_nodes(network_id, metric, k)
     return {"top_nodes": result}
 

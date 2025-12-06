@@ -28,24 +28,39 @@ def verify_tools():
             data=json.dumps({"network_id": net_id, "graphml_data": graphml}).encode('utf-8'),
             headers={'Content-Type': 'application/json'}
         )
-        urllib.request.urlopen(req)
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            print(f"Status: {data.get('status', 'success')}")
+            # Check if network_id is returned
+            if 'network_id' in data:
+                print(f"Returned Network ID: {data['network_id']}")
         print("Network initialized.")
     except Exception as e:
         print(f"Failed to initialize: {e}")
         sys.exit(1)
 
-    # 2. Trigger Duplicate Error (Reproduction)
-    print_step("2. Triggering Duplicate Error (Should fail if not fixed)")
+    print_step("2. Triggering Duplicate (Should succeed with NEW ID)")
     try:
         req = urllib.request.Request(
             f"{BASE_URL}/initialize_network",
             data=json.dumps({"network_id": net_id, "graphml_data": graphml}).encode('utf-8'),
             headers={'Content-Type': 'application/json'}
         )
-        urllib.request.urlopen(req)
-        print("Warning: Duplicate initialization succeeded (unexpected if not fixed).")
+        with urllib.request.urlopen(req) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            print(f"Status: {data.get('status', 'success')}")
+            if 'network_id' in data:
+                new_id = data['network_id']
+                print(f"Returned Network ID: {new_id}")
+                if new_id != net_id:
+                    print(f"SUCCESS: Network ID changed from {net_id} to {new_id}")
+                else:
+                    print(f"FAILURE: Network ID did NOT change (remained {net_id})")
+            else:
+                print("FAILURE: No network_id returned")
+
     except urllib.error.HTTPError as e:
-        print(f"Caught expected error (if not fixed): {e}")
+        print(f"FAILURE: Request failed: {e}")
 
     # 3. Create Subgraph
     print_step("3. Creating Subgraph")

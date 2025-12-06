@@ -17,6 +17,8 @@ async def initialize_network(network_id: int, graphml_data: str):
             f"{NETWORKX_API_URL}/tools/initialize_network",
             json={"network_id": network_id, "graphml_data": graphml_data}
         )
+        if response.is_error:
+            logger.error(f"NetworkXAPI Error (initialize_network): {response.status_code} - {response.text}")
         response.raise_for_status()
         return response.json()
 
@@ -47,6 +49,8 @@ async def calculate_centrality(network_id: int, centrality_type: str):
             f"{NETWORKX_API_URL}/tools/calculate_centrality",
             json={"network_id": network_id, "centrality_type": centrality_type}
         )
+        if response.is_error:
+            logger.error(f"NetworkXAPI Error (calculate_centrality): {response.status_code} - {response.text}")
         response.raise_for_status()
         return response.json()
 
@@ -57,6 +61,8 @@ async def calculate_layout(network_id: int, layout_name: str):
             f"{NETWORKX_API_URL}/tools/calculate_layout",
             json={"network_id": network_id, "layout_name": layout_name}
         )
+        if response.is_error:
+            logger.error(f"NetworkXAPI Error (calculate_layout): {response.status_code} - {response.text}")
         response.raise_for_status()
         return response.json()
 
@@ -69,6 +75,8 @@ async def generate_visualization(network_id: int, params: dict):
             f"{NETWORKX_API_URL}/tools/generate_visualization",
             json=payload
         )
+        if response.is_error:
+            logger.error(f"NetworkXAPI Error (generate_visualization): {response.status_code} - {response.text}")
         response.raise_for_status()
         return response.json()
 
@@ -150,5 +158,7 @@ async def get_top_nodes(network_id: int, metric: str, k: int = 10) -> List[Dict[
             f"{NETWORKX_API_URL}/tools/get_top_nodes",
             json={"network_id": network_id, "metric": metric, "k": k}
         )
+        if response.is_error:
+            logger.error(f"NetworkXAPI Error (get_top_nodes): {response.status_code} - {response.text}")
         response.raise_for_status()
         return response.json()

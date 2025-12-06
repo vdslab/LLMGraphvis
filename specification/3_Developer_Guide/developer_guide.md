@@ -216,3 +216,32 @@ npm run dev
 - [React](https://reactjs.org/)
 - [Zustand](https://github.com/pmndrs/zustand)
 - [Google JavaScript Style Guide](https://google.github.io/styleguide/jsguide.html)
+
+## 8. デバッグ機能
+
+開発支援用のデバッグ機能として、以下のページが用意されています。
+
+### 8.1. NetworkX API 視覚化デバッグ
+
+NetworkX APIの `/tools/generate_visualization` エンドポイントを直接テストし、レスポンスのJSONデータと描画結果を確認できるページです。
+
+- **URL**: `/debug/networkxapi-tools/generate_visualization`
+- **機能**:
+    - JSON形式でリクエストボディを入力
+    - NetworkX APIへの直接リクエスト送信
+    - レスポンスJSONの表示
+    - 返却されたノード・リンクデータに基づくグラフ描画のプレビュー
+
+**使用例 (Request Body):**
+
+```json
+{
+  "network_id": 1,
+  "layout_name": "spring",
+  "node_size_config": {
+    "attribute": "pagerank",
+    "min": 5,
+    "max": 20
+  }
+}
+```

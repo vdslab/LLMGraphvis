@@ -17,10 +17,32 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
 
     # Ensure Network exists in DB
     network = db.query(models.Network).filter(models.Network.id == network_id).first()
+    
+    final_network_id = network_id
+    
     if not network:
+        # Should typically exist if called from Backend, but if not, create it
         network = models.Network(id=network_id, name=f"Network {network_id}")
         db.add(network)
         db.commit()
+    else:
+        # Check if network already has data (nodes)
+        existing_node_count = db.query(models.Node).filter(models.Node.network_id == network_id).count()
+        if existing_node_count > 0:
+            # COLLISION: Network exists and has data.
+            # Create a NEW network instead of overwriting.
+            import datetime
+            new_network = models.Network(
+                name=f"{network.name} (Uploaded {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')})"
+            )
+            db.add(new_network)
+            db.commit()
+            db.refresh(new_network)
+            final_network_id = new_network.id
+            
+            # Note: We do NOT delete the old data. We just switch to a new ID.
+
+    network_id = final_network_id # Use the confirmed ID for all subsequent operations
 
     # --- 1. Bulk Insert Nodes ---
     nodes_data = []
@@ -185,6 +207,8 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
         if edge_text_vals:
             db.bulk_insert_mappings(models.EdgeTextAttributeValue, edge_text_vals)
         db.commit()
+    
+    return final_network_id
 
 
 def calculate_layout(network_id: int, layout_name: str, db: Session):
@@ -338,6 +362,37 @@ def calculate_centrality(network_id: int, centrality_type: str, db: Session):
     return centrality
 
 # --- Helpers ---
+
+def _clear_network_data(network_id: int, db: Session):
+    """
+    Clears all graph data (nodes, edges, attribute values) for a network.
+    Does NOT delete the Network record itself or Attribute Definitions (to preserve schema if reused).
+    """
+    # 1. Delete Edge Attribute Values (and their children)
+    # Get all EdgeAttributeValue IDs for this network
+    eav_ids = [r[0] for r in db.query(models.EdgeAttributeValue.id).join(models.Edge).filter(models.Edge.network_id == network_id).all()]
+    
+    if eav_ids:
+        db.query(models.EdgeFloatAttributeValue).filter(models.EdgeFloatAttributeValue.edge_attribute_value_id.in_(eav_ids)).delete(synchronize_session=False)
+        db.query(models.EdgeTextAttributeValue).filter(models.EdgeTextAttributeValue.edge_attribute_value_id.in_(eav_ids)).delete(synchronize_session=False)
+        db.query(models.EdgeAttributeValue).filter(models.EdgeAttributeValue.id.in_(eav_ids)).delete(synchronize_session=False)
+
+    # 2. Delete Node Attribute Values (and their children)
+    # Get all NodeAttributeValue IDs
+    nav_ids = [r[0] for r in db.query(models.NodeAttributeValue.id).join(models.Node).filter(models.Node.network_id == network_id).all()]
+    
+    if nav_ids:
+        db.query(models.NodeFloatAttributeValue).filter(models.NodeFloatAttributeValue.node_attribute_value_id.in_(nav_ids)).delete(synchronize_session=False)
+        db.query(models.NodeTextAttributeValue).filter(models.NodeTextAttributeValue.node_attribute_value_id.in_(nav_ids)).delete(synchronize_session=False)
+        db.query(models.NodeAttributeValue).filter(models.NodeAttributeValue.id.in_(nav_ids)).delete(synchronize_session=False)
+
+    # 3. Delete Edges
+    db.query(models.Edge).filter(models.Edge.network_id == network_id).delete(synchronize_session=False)
+
+    # 4. Delete Nodes
+    db.query(models.Node).filter(models.Node.network_id == network_id).delete(synchronize_session=False)
+    
+    db.commit()
 
 def _ensure_attributes(network_id: int, attr_types: Dict[str, str], model_class, db: Session) -> Dict[str, int]:
     """
