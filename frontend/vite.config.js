@@ -7,21 +7,27 @@ export default defineConfig(({ mode }) => {
   // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
   const env = loadEnv(mode, process.cwd(), '')
 
+  const proxyConfig = {
+    '/api': {
+      target: env.VITE_API_URL || 'http://localhost:8000',
+      changeOrigin: true,
+      rewrite: (path) => path.replace(/^\/api/, ''),
+    },
+  }
+
+  // Only enable NetworkX API proxy in development mode
+  if (mode === 'development') {
+    proxyConfig['/nx-api'] = {
+      target: env.VITE_NX_API_URL || 'http://networkx-api:8001',
+      changeOrigin: true,
+      rewrite: (path) => path.replace(/^\/nx-api/, ''),
+    }
+  }
+
   return {
     plugins: [react()],
     server: {
-      proxy: {
-        '/api': {
-          target: env.VITE_API_URL || 'http://localhost:8000',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, ''),
-        },
-        '/nx-api': {
-          target: env.VITE_NX_API_URL || 'http://networkx-api:8001',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/nx-api/, ''),
-        },
-      },
+      proxy: proxyConfig,
     },
   }
 })

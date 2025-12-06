@@ -38,7 +38,9 @@ function App() {
             </ProtectedRoute>
           } 
         />
-        <Route path="/debug/networkxapi-tools/generate_visualization" element={<DebugGenerateVisualizationPage />} />
+        {import.meta.env.DEV && (
+          <Route path="/debug/networkxapi-tools/generate_visualization" element={<DebugGenerateVisualizationPage />} />
+        )}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
