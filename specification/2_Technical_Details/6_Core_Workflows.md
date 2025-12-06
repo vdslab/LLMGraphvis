@@ -237,7 +237,7 @@ sequenceDiagram
     NetworkXAPI-->>Backend: Subgraph Info
     Backend-->>LLM: Success Message
 
-    LLM->>Backend: generate_visualization(overlay_network_id=...)
+    LLM->>Backend: generate_visualization(focus_network_id=...)
     Backend-->>User: Render Update
 ```
 
@@ -322,5 +322,30 @@ sequenceDiagram
     
     note right of NetworkXAPI: 優先順位に従い色を決定:<br/>1. Custom (Blue)<br/>2. Focus Config (Lightblue)<br/>3. Context Config (Gray)
     NetworkXAPI-->>Backend: Render Data
+    Backend-->>User: Render Update
+```
+
+## 6.9. 独立したサブグラフ表示フロー
+
+**目的:** 「サブグラフだけを見せて」といった指示に対し、メインの表示対象を親ネットワークからサブグラフ自体（Pattern 3）に切り替えるフローです。
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant LLM
+    participant Backend
+    participant NetworkXAPI
+    participant DB
+
+    User->>LLM: "今のEgo Networkだけを詳しく見たい"
+    
+    note right of LLM: コンテキストにあるサブグラフIDを特定
+    
+    note right of LLM: network_id をサブグラフIDに切り替えて可視化を要求 (Pattern 3: Isolated Subgraph)
+    LLM->>Backend: generate_visualization({<br/>  network_id: 999, <br/>  focus_network_id: null <br/>})
+    Backend->>NetworkXAPI: POST /tools/generate_visualization
+    
+    NetworkXAPI->>DB: Fetch Nodes of Network 999
+    NetworkXAPI-->>Backend: Render Data (nodes/links of subgraph only)
     Backend-->>User: Render Update
 ```

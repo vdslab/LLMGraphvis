@@ -305,15 +305,21 @@ The API supports three main patterns for subgraph visualization, controlled by h
 }
 ```
 
-- **リクエストボディ例 4 (サブグラフのオーバーレイ表示と色設定)**
+- **リクエストボディ例 4 (サブグラフのフォーカス表示とコンテキスト設定)**
 
 ```json
 {
   "network_id": 12345,
-  "overlay_network_id": 67890, // サブグラフID
-  "overlay_config": {
-    "highlight_color": "#FF0000", // サブグラフに含まれるノード・エッジの色
-    "dimmed_color": "#EEEEEE"      // それ以外のノード・エッジの色
+  "focus_network_id": 67890, // サブグラフID (Focus)
+  "context_config": {
+    "color": "#EEEEEE",        // Focus外のノード色
+    "opacity": 0.1,           // Focus外の透明度
+    "visible": true
+  },
+  "focus_config": {
+    "node_color_config": {
+      "static_color": "#FF0000" // Focus内のノード色 (赤)
+    }
   }
 }
 ```
@@ -331,24 +337,29 @@ The API supports three main patterns for subgraph visualization, controlled by h
 }
 ```
 
-- **リクエストボディ例 6 (複合的な可視化: サイズ + オーバーレイ + 個別色指定)**
+- **リクエストボディ例 6 (複合的な可視化: サイズ + フォーカス + 個別色指定)**
 
 ```json
 {
   "network_id": 12345,
-  "overlay_network_id": 67890, // サブグラフID
+  "focus_network_id": 67890, // サブグラフID
   "node_size_config": {
     "attribute": "degree_centrality",
     "scale_type": "LINEAR",
     "min": 5,
     "max": 20
   },
-  "overlay_config": {
-    "highlight_color": "#87CEEB", // サブグラフ内は水色
-    "dimmed_color": "#D3D3D3"     // サブグラフ外はグレー
+  "context_config": {
+    "color": "#D3D3D3",       // Context (サブグラフ外) はグレー
+    "opacity": 0.3
+  },
+  "focus_config": {
+    "node_color_config": {
+      "static_color": "#87CEEB" // Focus (サブグラフ内) は水色
+    }
   },
   "custom_node_colors": [
-    { "node_id": "n1", "color": "blue" } // 特定の重要ノードだけ青 (オーバーレイ設定より優先)
+    { "node_id": "n1", "color": "blue" } // 特定の重要ノードだけ青 (Focus設定より優先)
   ]
 }
 ```
