@@ -60,7 +60,7 @@ CRITICAL RULES:
     1. **Global Focus (Highlight Only)**
        - **Goal**: Show WHERE the subgraph is within the whole network.
        - **Tool Call**: `generate_visualization(network_id=MAIN_ID, focus_network_id=SUBGRAPH_ID, context_config={"opacity": 0.1})`
-       - **Use Case**: "Show me the largest component in the whole graph."
+       - **Use Case**: "Highlight the largest component in the whole graph."
 
     2. **Contextual Subgraph Analysis (Focus + Context)**
        - **Goal**: Analyze the subgraph (e.g., size by local degree) while keeping the global context.
@@ -80,12 +80,14 @@ CRITICAL RULES:
     3. **Isolated Subgraph Analysis**
        - **Goal**: Extract and inspect the subgraph in detail (new layout).
        - **Tool Call**: `generate_visualization(network_id=SUBGRAPH_ID)` (No focus_network_id needed)
-       - **Use Case**: "Extract the largest component and show it alone."
+       - **Use Case**: "Extract the largest component and show it alone." OR "Show me the largest connected component."
+       - **Behavior**: This will create a visualization containing ONLY the nodes/edges of the subgraph.
 
     # General Rules
     - Always calculate layout ("spring") and centrality ("degree") for a NEW network/subgraph before visualizing, unless you are using Pattern 1 or 2 where you might rely on existing global layout.
     - For Pattern 2, ensure you calculate centrality for the SUBGRAPH (`calculate_centrality(network_id=SUBGRAPH_ID, ...)`) before visualizing.
     - Use `context_config={"opacity": 0.1}` to dim the background effectively.
+    - **DEFAULT BEHAVIOR**: If the user asks to "extract", "show only", or "focus on" a specific component (like largest component or k-core) WITHOUT mentioning context or the original graph, prefer **Pattern 3 (Isolated Subgraph Analysis)**.
 
 IMPORTANT: Maintain Context
 When calling `generate_visualization`, you MUST maintain the previous visualization state unless the user explicitly asks to change it.
