@@ -33,18 +33,11 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
         pos = nx.spring_layout(G, k=k, iterations=1000, seed=42)
         
     elif layout_name == "forceatlas2":
-        # ForceAtlas2 - requires verify if available, but confirmed in environment
-        try:
-            # Attempt to use the networkx wrapper if available
-            if hasattr(nx, 'forceatlas2_layout'):
-                 pos = nx.forceatlas2_layout(G, metric="euclidean", seed=42)
-            else:
-                 # Fallback to spring if not actually available despite checks
-                 print("ForceAtlas2 not found, falling back to spring")
-                 pos = nx.spring_layout(G, seed=42)
-        except Exception as e:
-            print(f"Error checking ForceAtlas2: {e}, falling back to spring")
-            pos = nx.spring_layout(G, seed=42)
+        if hasattr(nx, 'forceatlas2_layout'):
+             pos = nx.forceatlas2_layout(G, seed=42)
+        else:
+             print("ForceAtlas2 not found in NetworkX, falling back to spring")
+             pos = nx.spring_layout(G, seed=42)
 
     elif layout_name == "circular":
         pos = nx.circular_layout(G)

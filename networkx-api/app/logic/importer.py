@@ -24,7 +24,7 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
     
     if not network:
         # Should typically exist if called from Backend, but if not, create it
-        network = models.Network(id=network_id, name=f"Network {network_id}")
+        network = models.Network(id=network_id, name=f"Network {network_id}", graphml_content=graphml_content.decode('utf-8') if isinstance(graphml_content, bytes) else graphml_content)
         db.add(network)
         db.commit()
     else:
@@ -34,7 +34,8 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
             # COLLISION: Network exists and has data.
             # Create a NEW network instead of overwriting.
             new_network = models.Network(
-                name=f"{network.name} (Uploaded {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')})"
+                name=f"{network.name} (Uploaded {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')})",
+                graphml_content=graphml_content.decode('utf-8') if isinstance(graphml_content, bytes) else graphml_content
             )
             db.add(new_network)
             db.commit()

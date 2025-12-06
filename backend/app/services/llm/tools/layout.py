@@ -16,7 +16,7 @@ definitions = [
                 "layout_name": types.Schema(
                     type="STRING",
                     description="Name of the layout algorithm.",
-                    enum=["spring", "circular", "kamada_kawai", "shell", "spectral"]
+                    enum=["spring", "circular", "kamada_kawai", "shell", "spectral", "forceatlas2", "spiral", "fruchterman_reingold"]
                 )
             },
             required=["layout_name"]
