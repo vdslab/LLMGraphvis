@@ -1,10 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from app.core import database
 from app import models
-from app.logic import importer, layout, centrality, subgraph, visualizer
+from app.logic import importer, layout, centrality, subgraph, visualizer, exporter
 
 router = APIRouter(
     prefix="/tools",
@@ -194,6 +194,15 @@ def get_top_nodes_endpoint(request: GetTopNodesRequest, db: Session = Depends(da
     try:
         result = centrality.get_top_nodes(request.network_id, request.metric, request.k, db)
         return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+@router.get("/export_network")
+def export_network(network_id: int, db: Session = Depends(database.get_db)):
+    try:
+        xml_content = exporter.export_network_to_graphml(network_id, db)
+        return Response(content=xml_content, media_type="application/xml")
     except Exception as e:
         import traceback
         traceback.print_exc()

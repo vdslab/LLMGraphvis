@@ -47,7 +47,7 @@ class ChatWithNetwork(Chat):
 class ChatMessageBase(BaseModel):
     role: str
     content: str
-    meta_data: Optional[Dict[str, Any]] = None
+    content: str
 
 class ChatMessageCreate(ChatMessageBase):
     pass

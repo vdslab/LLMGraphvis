@@ -21,7 +21,7 @@ class Network(Base):
     name = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    graphml_content = Column(Text, nullable=False)
+
 
     parent_network_id = Column(Integer, ForeignKey("networks.id"), nullable=True)
 
@@ -56,7 +56,7 @@ class ChatMessage(Base):
     chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False)
     role = Column(String, nullable=False)
     content = Column(Text, nullable=False)
-    meta_data = Column(JSON)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     chat = relationship("Chat", back_populates="messages")

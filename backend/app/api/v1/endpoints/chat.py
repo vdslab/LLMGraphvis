@@ -124,10 +124,8 @@ def create_chat(
     logger.info(f"Creating new chat: {chat.name} for user {current_user.id}")
     user_id = current_user.id
     
-    # Create Network
     db_network = models.Network(
-        name=f"{chat.name} Network",
-        graphml_content='<?xml version="1.0" encoding="UTF-8"?><graphml xmlns="http://graphml.graphdrawing.org/xmlns"><graph id="G" edgedefault="undirected"></graph></graphml>'
+        name=f"{chat.name} Network"
     )
     db.add(db_network)
     db.commit()
