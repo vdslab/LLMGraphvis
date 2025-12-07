@@ -90,9 +90,32 @@ def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str], db: 
     if not source_network:
         raise ValueError(f"Source network {source_network_id} not found")
 
-    # 2. Create New Network
+    # 2. Determine Network Name
+    if suffix == "Subgraph":
+        # Create a deterministic name for ad-hoc subgraphs based on node IDs
+        # Sort to ensure order doesn't matter
+        sorted_ids = sorted(node_ids)
+        # Check length to avoid massive names? For now just join.
+        # If too long, maybe we truncate? Let's keep it simple as agreed.
+        nodes_str = ",".join(sorted_ids)
+        if len(nodes_str) > 50:
+             nodes_str = nodes_str[:47] + "..."
+        target_name = f"Subgraph ({nodes_str})"
+    else:
+        target_name = suffix
+
+    # 3. Check for Existing Subgraph (Reuse)
+    existing_network = db.query(models.Network).filter(
+        models.Network.parent_network_id == source_network_id,
+        models.Network.name == target_name
+    ).first()
+
+    if existing_network:
+        return {"new_network_id": existing_network.id, "name": existing_network.name}
+
+    # 4. Create New Network
     new_network = models.Network(
-        name=f"{source_network.name} - {suffix}", 
+        name=target_name, 
         parent_network_id=source_network_id
     )
     db.add(new_network)
