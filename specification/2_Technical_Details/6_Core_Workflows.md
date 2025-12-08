@@ -232,9 +232,15 @@ sequenceDiagram
 
     LLM->>Backend: create_subgraph_from_nodes(node_ids=["n1", "n2"])
     Backend->>NetworkXAPI: POST /tools/create_subgraph_from_nodes
-    NetworkXAPI->>DB: Create Subgraph Network
-    DB-->>NetworkXAPI: New Network ID
-    NetworkXAPI-->>Backend: Subgraph Info
+    NetworkXAPI->>DB: Check if same subgraph exists
+    DB-->>NetworkXAPI: Existing ID (if found) or None
+    alt Subgraph Exists
+        NetworkXAPI-->>Backend: Reuse Existing ID
+    else Subgraph Not Exists
+        NetworkXAPI->>DB: Create Subgraph Network
+        DB-->>NetworkXAPI: New Network ID
+        NetworkXAPI-->>Backend: Subgraph Info
+    end
     Backend-->>LLM: Success Message
 
     LLM->>Backend: generate_visualization(focus_network_id=...)
