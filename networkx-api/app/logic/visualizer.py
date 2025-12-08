@@ -6,7 +6,7 @@ from typing import Dict, Any, List, Set
 def generate_visualization_data(
     network_id: int, 
     db: Session, 
-    layout_name="spring", 
+    layout_name="forceatlas2", 
     node_size_config=None, 
     node_color_config=None, 
     edge_width_config=None, 

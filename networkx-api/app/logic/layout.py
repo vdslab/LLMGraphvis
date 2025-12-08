@@ -26,15 +26,25 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
     # Calculate Layout
     if layout_name == "spring" or layout_name == "fruchterman_reingold":
         # Heuristic for k: 1/sqrt(N) is default. 
-        # Increasing it to 2.0/sqrt(N) helps spread nodes out more significantly.
+        # Increasing it to 2.5/sqrt(N) helps spread nodes out more significantly.
         num_nodes = len(G.nodes)
-        k = 2.0 / math.sqrt(num_nodes) if num_nodes > 0 else None
+        k = 2.5 / math.sqrt(num_nodes) if num_nodes > 0 else None
         # Increased iterations for better convergence
         pos = nx.spring_layout(G, k=k, iterations=1000, seed=42)
         
     elif layout_name == "forceatlas2":
         if hasattr(nx, 'forceatlas2_layout'):
-             pos = nx.forceatlas2_layout(G, seed=42)
+             # Optimized parameters for general visualization
+             # scaling_ratio: Higher values = more spread out
+             # gravity: Stronger gravity pulls disconnected components together
+             # max_iter: More iterations for better stability
+             pos = nx.forceatlas2_layout(
+                 G, 
+                 max_iter=2000,
+                 scaling_ratio=50.0, # Increased spread
+                 gravity=1.0, 
+                 seed=42
+             )
         else:
              print("ForceAtlas2 not found in NetworkX, falling back to spring")
              pos = nx.spring_layout(G, seed=42)

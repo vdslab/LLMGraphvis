@@ -15,8 +15,8 @@ definitions = [
                 ),
                 "layout_name": types.Schema(
                     type="STRING",
-                    description="Name of the layout algorithm.",
-                    enum=["spring", "circular", "kamada_kawai", "shell", "spectral", "forceatlas2", "spiral", "fruchterman_reingold"]
+                    description="Name of the layout algorithm. 'forceatlas2' is the recommended default.",
+                    enum=['circular', 'forceatlas2', 'fruchterman_reingold', 'kamada_kawai', 'shell', 'spectral', 'spiral', 'spring']
                 )
             },
             required=["layout_name"]
@@ -27,7 +27,7 @@ definitions = [
 async def calculate_layout(args: dict, context: dict) -> dict:
     network_id = args.get("network_id", context['network_id'])
     queue = context['queue']
-    layout_name = args.get("layout_name", "spring")
+    layout_name = args.get("layout_name", "forceatlas2")
     
     await queue.put({"event": "thinking_stream", "data": json.dumps({"content": f"Calculating {layout_name} layout for network {network_id}..."})})
     await network_service.calculate_layout(network_id, layout_name)

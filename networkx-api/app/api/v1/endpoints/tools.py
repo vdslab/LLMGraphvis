@@ -22,7 +22,7 @@ class CalculateCentralityRequest(BaseModel):
 class GenerateVisualizationRequest(BaseModel):
     network_id: int
     focus_network_id: Optional[int] = None
-    layout_name: Optional[str] = "spring"
+    layout_name: Optional[str] = "forceatlas2"
     node_size_config: Optional[Dict[str, Any]] = None
     node_color_config: Optional[Dict[str, Any]] = None
     edge_width_config: Optional[Dict[str, Any]] = None
@@ -69,7 +69,7 @@ def initialize_network(request: InitializeNetworkRequest, db: Session = Depends(
         final_network_id = importer.parse_and_save_graphml(request.network_id, request.graphml_data, db)
         
         # 2. Calculate initial layout using the CORRECT network_id
-        layout.calculate_layout(final_network_id, "spring", db)
+        layout.calculate_layout(final_network_id, "forceatlas2", db)
         
         # 3. Generate initial visualization
         vis_data = visualizer.generate_visualization_data(final_network_id, db)

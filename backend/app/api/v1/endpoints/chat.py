@@ -60,7 +60,7 @@ async def get_chat(
         # Generate default visualization data
         vis_data = await network_service.generate_visualization(
             chat.network_id, 
-            {"layout_name": "spring"} # Default layout
+            {"layout_name": "forceatlas2"} # Default layout
         )
         
         return {
