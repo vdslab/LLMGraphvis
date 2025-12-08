@@ -15,8 +15,8 @@ definitions = [
                 ),
                 "layout_name": types.Schema(
                     type="STRING",
-                    description="Name of the layout algorithm to use (e.g., 'spring', 'circular'). Defaults to 'spring'.",
-                    enum=["spring", "circular", "kamada_kawai", "shell", "spectral"]
+                    description="Name of the layout algorithm to use (e.g., 'spring', 'forceatlas2'). Defaults to 'forceatlas2'.",
+                    enum=["spring", "circular", "kamada_kawai", "shell", "spectral", "forceatlas2"]
                 ),
                 "node_size_config": types.Schema(
                     type="OBJECT",
@@ -141,7 +141,7 @@ async def generate_visualization(args: dict, context: dict) -> dict:
     queue = context['queue']
     
     vis_config = {
-        "layout_name": args.get("layout_name", "spring"),
+        "layout_name": args.get("layout_name", "forceatlas2"),
         "node_size_config": args.get("node_size_config"),
         "node_color_config": args.get("node_color_config"),
         "edge_width_config": args.get("edge_width_config"),

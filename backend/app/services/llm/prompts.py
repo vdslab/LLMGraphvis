@@ -4,13 +4,13 @@ User Request: "Show popular nodes" (or friends, connections)
 Step 1: Call `list_node_attributes()` to see what's available (e.g. found 'name').
 Step 2: Call `calculate_centrality(centrality_type='degree')`
 Step 3: Call `list_node_attributes()` AGAIN to confirm the new attribute is available.
-Step 4: Call `generate_visualization(layout_name='spring', node_size_config={'attribute': 'degree_centrality', ...}, node_label_config={'attribute': 'name'})`
+Step 4: Call `generate_visualization(layout_name='forceatlas2', node_size_config={'attribute': 'degree_centrality', ...}, node_label_config={'attribute': 'name'})`
 
 User Request: "Show bridges"
 Step 1: Call `list_node_attributes()` (e.g. found 'title').
 Step 2: Call `calculate_centrality(centrality_type='betweenness')`
 Step 3: Call `list_node_attributes()`
-Step 4: Call `generate_visualization(layout_name='spring', node_size_config={'attribute': 'betweenness_centrality', ...}, node_label_config={'attribute': 'title'})`
+Step 4: Call `generate_visualization(layout_name='forceatlas2', node_size_config={'attribute': 'betweenness_centrality', ...}, node_label_config={'attribute': 'title'})`
 
 User Request: "Apply circular layout"
 Step 1: Call `list_node_attributes()` (e.g. found 'character_name').
@@ -24,7 +24,7 @@ Step 2: Call `generate_visualization(edge_width_config={'attribute': 'weight', '
 
 User Request: "Color the top 2 nodes by degree blue, and the rest gray"
 Step 1: Call `calculate_centrality(centrality_type='degree')` (if not already done)
-Step 2: Call `generate_visualization(layout_name='spring', node_color_config={'attribute': 'degree_centrality', 'scale_type': 'RANKING', 'ranking_rules': [{'top': 2, 'color': 'blue'}], 'default_color': 'gray'}, node_label_config={'attribute': 'name'})`
+Step 2: Call `generate_visualization(layout_name='forceatlas2', node_color_config={'attribute': 'degree_centrality', 'scale_type': 'RANKING', 'ranking_rules': [{'top': 2, 'color': 'blue'}], 'default_color': 'gray'}, node_label_config={'attribute': 'name'})`
 
 User Request: "Create an ego network for the most central node"
 Step 1: Call `get_top_nodes(metric='degree', k=1)` to find the node ID (e.g., 'n1').
@@ -86,7 +86,7 @@ CRITICAL RULES:
        - **Behavior**: This will create a visualization containing ONLY the nodes/edges of the subgraph.
 
     # General Rules
-    - Always calculate layout ("spring") and centrality ("degree") for a NEW network/subgraph before visualizing, unless you are using Pattern 1 or 2 where you might rely on existing global layout.
+    - Always calculate layout ("forceatlas2") and centrality ("degree") for a NEW network/subgraph before visualizing, unless you are using Pattern 1 or 2 where you might rely on existing global layout.
     - For Pattern 2, ensure you calculate centrality for the SUBGRAPH (`calculate_centrality(network_id=SUBGRAPH_ID, ...)`) before visualizing.
     - Use `context_config={"opacity": 0.1}` to dim the background effectively.
     - **DEFAULT BEHAVIOR**: If the user asks to "extract", "show only", or "focus on" a specific component (like largest component or k-core) WITHOUT mentioning context or the original graph, prefer **Pattern 3 (Isolated Subgraph Analysis)**.
@@ -105,7 +105,7 @@ When calling `generate_visualization`, you MUST maintain the previous visualizat
 - If the user previously asked for "circular layout", KEEP `layout_name='circular'` in subsequent calls.
 - If the user previously asked to size nodes by "degree", KEEP `node_size_config={'attribute': 'degree_centrality', ...}`.
 - If the user previously asked to color nodes by "community", KEEP `node_color_config={'attribute': 'community_id', ...}`.
-- DO NOT revert to defaults ("spring" layout, etc.) unless the user's new request specifically conflicts with the previous state or requires a reset.
+- DO NOT revert to defaults ("forceatlas2" layout, etc.) unless the user's new request specifically conflicts with the previous state or requires a reset.
 - Infer the current state from the conversation history.
 
 IMPORTANT: Final Response
