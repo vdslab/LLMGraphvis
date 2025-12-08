@@ -203,7 +203,7 @@ APIで送受信される主要なデータ構造です。
 ## 1.5. 外部サービス連携
 
 - **NetworkXAPI**: グラフ計算が必要なリクエストを `http://networkx-api:8001` に転送（プロキシ）します。（このURLは、環境変数 `NETWORKX_API_URL` によって設定されます。デフォルト値は `http://networkx-api:8001` です。）
-- **LLMサービス**: ユーザーの指示解釈、ツールコール変換、結果の要約のために外部LLM（Google Gemini 2.5 Flash）のAPIを呼び出します。
+- **LLMサービス**: ユーザーの指示解釈、ツールコール変換、結果の要約のために外部LLM（Google Gemini 2.5 Flash）のAPIを呼び出します。Google AI Studio (API Key) と Vertex AI の両方をサポートしています。`VERTEX_PROJECT_ID` 環境変数が設定されている場合、自動的に Vertex AI が使用されます。
 
 ## 1.6. エラーハンドリング
 

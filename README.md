@@ -153,6 +153,11 @@ GOOGLE_API_KEY=your-gemini-api-key
 DATABASE_URL=postgresql://postgres:postgres@db:5432/graphvisagent
 SECRET_KEY=your-secret-key
 NETWORKX_API_URL=http://networkx-api:8001
+
+# Optional: Vertex AI Configuration (overrides GOOGLE_API_KEY)
+# VERTEX_PROJECT_ID=your-project-id
+# VERTEX_LOCATION=us-central1
+# GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/credentials.json
 ```
 
 ### Running Locally
