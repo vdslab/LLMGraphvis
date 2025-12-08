@@ -31,7 +31,7 @@ POSTGRES_DB=graphvisagent
 
 3. **Start all services**:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 This will start:
@@ -43,10 +43,10 @@ This will start:
 4. **Wait for services to be ready** (about 30 seconds):
 ```bash
 # Check if all services are running
-docker-compose ps
+docker compose ps
 
 # Check backend logs
-docker-compose logs -f backend
+docker compose logs -f backend
 ```
 
 ## Using the Application
@@ -129,18 +129,18 @@ Once the backend is running, you can access:
 ### Services won't start
 ```bash
 # Check logs
-docker-compose logs
+docker compose logs
 
 # Restart services
-docker-compose down
-docker-compose up -d
+docker compose down
+docker compose up -d
 ```
 
 ### Database connection errors
 ```bash
 # Reset the database
-docker-compose down -v
-docker-compose up -d
+docker compose down -v
+docker compose up -d
 ```
 
 ### Frontend can't connect to backend
@@ -150,7 +150,7 @@ docker-compose up -d
 
 ### LLM not responding
 - Verify `GOOGLE_API_KEY` is set correctly in `.env`
-- Check backend logs: `docker-compose logs backend`
+- Check backend logs: `docker compose logs backend`
 - Ensure you have API quota available
 
 ### SSE connection issues
@@ -185,10 +185,10 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 
 ```bash
 # Stop all services
-docker-compose down
+docker compose down
 
 # Stop and remove volumes (resets database)
-docker-compose down -v
+docker compose down -v
 ```
 
 ## Next Steps
@@ -201,6 +201,6 @@ docker-compose down -v
 ## Support
 
 For issues or questions:
-1. Check the logs: `docker-compose logs`
+1. Check the logs: `docker compose logs`
 2. Review the [Implementation Guide](IMPLEMENTATION_GUIDE.md)
 3. Check the [Specification](specification/README.md)

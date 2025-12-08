@@ -13,16 +13,16 @@ from app.logic.importer import parse_and_save_graphml
 
 # Use the container DB URL (assuming running from host but mapping works if port is exposed)
 # But wait, earlier I found that localhost:5432 might be a different DB.
-# However, I successfully dropped tables in the container DB using docker-compose exec.
+# However, I successfully dropped tables in the container DB using docker compose exec.
 # And networkx-api recreated them.
 # So if I want to verify, I should probably run this script INSIDE the container or fix my connection.
 
 # Since I can't easily run python script inside container without copying it,
 # I will try to connect to localhost:5432 again.
 # If it fails to find tables, I know I'm hitting the wrong DB.
-# But I can use the same trick: use docker-compose exec to run psql to verify.
+# But I can use the same trick: use docker compose exec to run psql to verify.
 
-# Actually, I can use `docker-compose exec networkx-api python3` to run a script if I mount it.
+# Actually, I can use `docker compose exec networkx-api python3` to run a script if I mount it.
 # The volume is `./networkx-api:/app`.
 # So if I put the script in `networkx-api/verify_logic.py`, I can run it inside container.
 

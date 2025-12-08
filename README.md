@@ -11,7 +11,7 @@ A web application for interactive network visualization powered by LLM (Gemini A
 export GOOGLE_API_KEY="your-api-key-here"
 
 # 2. Start all services
-docker-compose up -d
+docker compose up -d
 
 # 3. Open your browser
 # Frontend: http://localhost:5173
@@ -122,7 +122,7 @@ python test_complete_flow.py
 ```
 
 ### Manual Testing
-1. Start the services: `docker-compose up -d`
+1. Start the services: `docker compose up -d`
 2. Open http://localhost:5173
 3. Register/Login
 4. Create a chat
@@ -159,7 +159,7 @@ NETWORKX_API_URL=http://networkx-api:8001
 
 **With Docker:**
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 **Without Docker:**
@@ -218,7 +218,7 @@ See [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) for complete API document
 For issues or questions:
 1. Check the [Implementation Guide](IMPLEMENTATION_GUIDE.md)
 2. Review the [Quick Start Guide](QUICKSTART.md)
-3. Check the logs: `docker-compose logs`
+3. Check the logs: `docker compose logs`
 
 ---
 

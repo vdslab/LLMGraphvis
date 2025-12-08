@@ -232,7 +232,7 @@ if response.candidates[0].content.parts:
 ### Prerequisites
 1. Start all services:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 2. Set environment variables:

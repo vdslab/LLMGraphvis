@@ -35,7 +35,7 @@ cp .env.example .env
 
 ### ステップ2: データベースの起動
 
-Dockerを使用してPostgreSQLデータベースを起動します。`docker-compose` のような抽象化レイヤーは使わず、直接コマンドを実行します。
+Dockerを使用してPostgreSQLデータベースを起動します。`docker compose` のような抽象化レイヤーは使わず、直接コマンドを実行します。
 
 ```bash
 # .envファイルからデータベース設定を読み込んでコンテナを起動します

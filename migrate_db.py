@@ -3,7 +3,7 @@ import os
 
 # DB Connection URL
 # Host is localhost because we are running from the host machine (agent env)
-# Port is 5432 as exposed in docker-compose
+# Port is 5432 as exposed in docker compose
 DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/graphvis"
 
 def migrate():
