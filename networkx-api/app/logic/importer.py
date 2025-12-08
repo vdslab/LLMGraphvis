@@ -3,8 +3,18 @@ from sqlalchemy.orm import Session
 from app import models
 import io
 import datetime
-from typing import Dict, List, Any
+import itertools
+from typing import Dict, List, Any, Generator
 from .attributes import _ensure_attributes
+
+def chunked_iterable(iterable, size):
+    """Yield chunks of size from iterable."""
+    it = iter(iterable)
+    while True:
+        chunk = tuple(itertools.islice(it, size))
+        if not chunk:
+            break
+        yield chunk
 
 def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
     from sqlalchemy.dialects.postgresql import insert
@@ -19,11 +29,13 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
     except Exception as e:
         raise ValueError(f"Failed to parse GraphML: {e}")
 
-    nodes_iter = list(G.nodes(data=True))
-    edges_iter = list(G.edges(data=True))
+    # Use iterators directly to save memory
+    nodes_iter = G.nodes(data=True)
+    edges_iter = G.edges(data=True)
 
-    total_nodes = len(nodes_iter)
-    total_edges = len(edges_iter)
+    # Note: G.number_of_nodes() is O(1) for NetworkX graphs
+    total_nodes = G.number_of_nodes()
+    total_edges = G.number_of_edges()
 
     node_attr_types = {}
     edge_attr_types = {}
@@ -67,8 +79,16 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
         CHUNK_SIZE = 5000
         node_map = {} # node_id_str -> db_id
         
-        for i in range(0, total_nodes, CHUNK_SIZE):
-            chunk = nodes_iter[i:i + CHUNK_SIZE]
+        # Must restart iterator if we want to iterate twice? 
+        # Actually, we need to iterate twice: once for nodes table, once for attributes.
+        # But `nodes_iter` is an iterator from NetworkX view. It might be consumable or lightweight view.
+        # G.nodes(data=True) returns a NodeDataView which is iterable multiple times.
+        # However, to be safe and consistent with memory optimization, we should try to do single pass if possible?
+        # No, we need db_ids for attributes. So we must insert nodes first.
+        # NetworkX views are re-iterable.
+        
+        # 1st Pass: Nodes
+        for chunk in chunked_iterable(G.nodes(data=True), CHUNK_SIZE):
             nodes_data = []
             for node_id, data in chunk:
                 nodes_data.append({
@@ -97,8 +117,7 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
         # --- 2. Bulk Insert Edges with ID Return ---
         edge_map = {} # edge_id_str -> db_id
         
-        for i in range(0, total_edges, CHUNK_SIZE):
-            chunk = edges_iter[i:i + CHUNK_SIZE]
+        for chunk in chunked_iterable(G.edges(data=True), CHUNK_SIZE):
             edges_data = []
             for u, v, data in chunk:
                 if str(u) in node_map and str(v) in node_map:
@@ -131,18 +150,11 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
 
         # --- 3b. Bulk Insert Attribute Values ---
         
-        # Optimize Attribute Value Insertion
-        # We can also use chunks and avoid fetching all NAVs back if we can structure it right.
-        # However, NAV insertion is a bit more complex (parent -> child).
-        # For now, let's just chunk the standard flow but optimize the parent-child linking if possible.
-        # Actually, returning IDs from NAV insert helps avoid re-fetching all NAVs.
-        
         # Prepare data for NodeAttributeValue
         # We iterate nodes again.
         
         # Chunks for Attributes
-        for i in range(0, total_nodes, CHUNK_SIZE):
-            chunk = nodes_iter[i:i + CHUNK_SIZE]
+        for chunk in chunked_iterable(G.nodes(data=True), CHUNK_SIZE):
             
             nav_data = [] # (node_id_str, attr_name, value) for processing
             
@@ -150,7 +162,9 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
             batch_nav_inserts = []
             
             for node_id, data in chunk:
-                db_node_id = node_map[str(node_id)]
+                db_node_id = node_map.get(str(node_id))
+                if not db_node_id: continue # Should not happen
+
                 for key, value in data.items():
                     if key == 'label': continue
                     if key in node_attr_map:
@@ -179,7 +193,7 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
                     nav_id = local_nav_map.get((db_node_id, attr_id))
                     
                     if nav_id:
-                         if isinstance(value, (int, float)):
+                         if isinstance(value, (int, float)) and not isinstance(value, bool):
                              node_float_vals.append({"node_attribute_value_id": nav_id, "float_value": float(value)})
                          else:
                              node_text_vals.append({"node_attribute_value_id": nav_id, "text_value": str(value)})
@@ -190,8 +204,7 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
                     db.execute(insert(models.NodeTextAttributeValue).values(node_text_vals))
 
         # Edge Attributes
-        for i in range(0, total_edges, CHUNK_SIZE):
-            chunk = edges_iter[i:i + CHUNK_SIZE]
+        for chunk in chunked_iterable(G.edges(data=True), CHUNK_SIZE):
             
             eav_data = []
             batch_eav_inserts = []
@@ -225,7 +238,7 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
                      eav_id = local_eav_map.get((db_edge_id, attr_id))
                      
                      if eav_id:
-                         if isinstance(value, (int, float)):
+                         if isinstance(value, (int, float)) and not isinstance(value, bool):
                              edge_float_vals.append({"edge_attribute_value_id": eav_id, "float_value": float(value)})
                          else:
                              edge_text_vals.append({"edge_attribute_value_id": eav_id, "text_value": str(value)})

@@ -29,18 +29,18 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
         # Increasing it to 2.5/sqrt(N) helps spread nodes out more significantly.
         num_nodes = len(G.nodes)
         k = 2.5 / math.sqrt(num_nodes) if num_nodes > 0 else None
-        # Increased iterations for better convergence
-        pos = nx.spring_layout(G, k=k, iterations=1000, seed=42)
+        # Reduced iterations for performance (initial load) - was 1000
+        pos = nx.spring_layout(G, k=k, iterations=50, seed=42)
         
     elif layout_name == "forceatlas2":
         if hasattr(nx, 'forceatlas2_layout'):
              # Optimized parameters for general visualization
              # scaling_ratio: Higher values = more spread out
              # gravity: Stronger gravity pulls disconnected components together
-             # max_iter: More iterations for better stability
+             # max_iter: Reduced for performance - was 2000
              pos = nx.forceatlas2_layout(
                  G, 
-                 max_iter=2000,
+                 max_iter=500,
                  scaling_ratio=50.0, # Increased spread
                  gravity=1.0, 
                  seed=42
