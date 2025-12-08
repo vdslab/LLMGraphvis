@@ -35,7 +35,7 @@ def _clear_network_data(network_id: int, db: Session):
     
     db.commit()
 
-def _ensure_attributes(network_id: int, attr_types: Dict[str, str], model_class, db: Session) -> Dict[str, int]:
+def _ensure_attributes(network_id: int, attr_types: Dict[str, str], model_class, db: Session, commit: bool = True) -> Dict[str, int]:
     """
     Ensure attributes exist for the given keys and return a map of {name: id}.
     attr_types: Dict mapping attribute name to data_type ("float", "string", etc.)
@@ -74,7 +74,12 @@ def _ensure_attributes(network_id: int, attr_types: Dict[str, str], model_class,
     )
     
     db.execute(stmt)
-    db.commit()
+
+    # Avoid extra commits when the caller wraps operations in a transaction
+    if commit:
+        db.commit()
+    else:
+        db.flush()
     
     # Step 2: Fetch all IDs (now guaranteed to exist)
     # We could try to use RETURNING but ON CONFLICT DO NOTHING returns nothing for existing rows.
