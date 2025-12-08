@@ -34,6 +34,9 @@ services:
       - ALGORITHM=${ALGORITHM}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
       - KEEP_ALIVE_TIMEOUT=${KEEP_ALIVE_TIMEOUT}
+      - VERTEX_PROJECT_ID=${VERTEX_PROJECT_ID}
+      - VERTEX_LOCATION=${VERTEX_LOCATION}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/application_default_credentials.json
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--timeout-keep-alive", "${KEEP_ALIVE_TIMEOUT}"]
     depends_on:
       db:
@@ -41,6 +44,7 @@ services:
     restart: always
     volumes:
       - ./backend:/app
+      - ${GOOGLE_APPLICATION_CREDENTIALS}:/app/application_default_credentials.json
 
   networkx-api:
     build: ./networkx-api

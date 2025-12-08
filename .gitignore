@@ -14,3 +14,4 @@ dist/
 .gemini/
 
 sample_data/concert_networks/*
+backend/application_default_credentials.json

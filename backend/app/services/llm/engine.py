@@ -11,7 +11,15 @@ logger = get_logger(__name__)
 load_dotenv()
 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-client = genai.Client(api_key=GOOGLE_API_KEY)
+VERTEX_PROJECT_ID = os.getenv("VERTEX_PROJECT_ID")
+VERTEX_LOCATION = os.getenv("VERTEX_LOCATION", "us-central1")
+
+if VERTEX_PROJECT_ID:
+    logger.info(f"Using Vertex AI with Project ID: {VERTEX_PROJECT_ID}, Location: {VERTEX_LOCATION}")
+    client = genai.Client(vertexai=True, project=VERTEX_PROJECT_ID, location=VERTEX_LOCATION)
+else:
+    logger.info("Using Google AI Studio with API Key")
+    client = genai.Client(api_key=GOOGLE_API_KEY)
 
 async def execute_tool_loop(initial_response, network_id, history, queue, tool_config, chat_id, db):
     """Handle the loop of tool executions."""
