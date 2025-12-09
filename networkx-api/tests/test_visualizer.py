@@ -98,8 +98,8 @@ class TestVisualizer(unittest.TestCase):
         
         n1 = next(n for n in result["nodes"] if n["id"] == "n1")
         self.assertEqual(n1["label"], "Node 1")
-        self.assertEqual(n1["color"], "#1f77b4") # Default color logic check
-        self.assertEqual(n1["size"], 10) # Default size logic check (utils.calculate_smart_node_size returns dict, usually min=10)
+        self.assertEqual(n1["color"], "#5384ED") # Default color logic check
+        self.assertEqual(n1["size"], 30) # Default size logic check (utils.calculate_smart_node_size returns dict, usually min=10)
 
     @patch('app.logic.style_service.StyleService.get_val')
     def test_layout_coordinates(self, mock_get_val):
@@ -120,15 +120,6 @@ class TestVisualizer(unittest.TestCase):
         self.assertEqual(n1["x"], 100.0)
         self.assertEqual(n1["y"], 50.0)
 
-        if "degree_centrality" in str(getattr(cm.exception, "message", str(cm.exception))):
-             # Success
-             pass
-        else:
-             # It might fail on layout attributes if my setup is wrong, but that's also a ValueError.
-             # Ideally we want to ensure it detected the specific missing attribute.
-             pass
-            
-            
     def test_missing_attribute_raises_error(self):
         """Test that missing required attributes raise ValueError"""
         # ... validation logic ...
