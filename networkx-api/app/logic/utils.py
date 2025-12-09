@@ -7,7 +7,7 @@ def normalize(value, min_val, max_val, target_min, target_max):
 
 def interpolate_color(value: float, min_val: float, max_val: float, start_color: str, end_color: str) -> str:
     """
-    Interpolate between two hex colors.
+    Interpolate between two colors (hex or names).
     """
     if max_val == min_val:
         return start_color
@@ -15,13 +15,33 @@ def interpolate_color(value: float, min_val: float, max_val: float, start_color:
     ratio = (value - min_val) / (max_val - min_val)
     ratio = max(0, min(1, ratio)) # Clamp
     
+    # Basic color map for common names
+    COLOR_MAP = {
+        "red": "#FF0000", "green": "#008000", "blue": "#0000FF",
+        "white": "#FFFFFF", "black": "#000000", "yellow": "#FFFF00",
+        "cyan": "#00FFFF", "magenta": "#FF00FF", "gray": "#808080",
+        "grey": "#808080", "orange": "#FFA500", "purple": "#800080",
+        "pink": "#FFC0CB", "brown": "#A52A2A", "lightgray": "#D3D3D3",
+        "darkgray": "#A9A9A9"
+    }
+    
+    def resolve_color(c):
+        if c.lower() in COLOR_MAP: return COLOR_MAP[c.lower()]
+        return c
+
     # Parse hex
     def hex_to_rgb(h):
-        h = h.lstrip('#')
-        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+        try:
+            h = h.lstrip('#')
+            if len(h) == 3: # Handle short hex #RGB
+                h = ''.join([c*2 for c in h])
+            return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+        except Exception:
+            # Fallback to black if parsing fails
+            return (0, 0, 0)
         
-    s_rgb = hex_to_rgb(start_color)
-    e_rgb = hex_to_rgb(end_color)
+    s_rgb = hex_to_rgb(resolve_color(start_color))
+    e_rgb = hex_to_rgb(resolve_color(end_color))
     
     # Interpolate
     r = int(s_rgb[0] + (e_rgb[0] - s_rgb[0]) * ratio)
