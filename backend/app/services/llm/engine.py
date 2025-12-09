@@ -4,7 +4,7 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from app.core.logging import get_logger
-from . import mcp_client
+from . import mcp_client, local_tools
 from .prompts import SYSTEM_INSTRUCTION
 
 logger = get_logger(__name__)
@@ -46,20 +46,16 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
                         "data": json.dumps({"tool": function_name, "status": "started", "args": function_args})
                     })
                     
-                    try:
-                        # Inject network_id if missing and needed
-                        # Most tools need it.
-                        if "network_id" not in function_args and network_id:
-                            function_args["network_id"] = network_id
-
-                        context = {
-                            "network_id": network_id,
-                            "queue": queue,
-                            "chat_id": chat_id,
-                            "db": db
-                        }
-                            # function_result = await tools.execute_tool(function_name, function_args, context)
-                        function_result = await mcp_client.execute_tool(function_name, function_args)
+                        if function_name in ["switch_to_main_network", "switch_to_parent_network"]:
+                             logger.info(f"Executing LOCAL tool: {function_name}")
+                             function_result = await local_tools.execute_local_tool(function_name, function_args, context)
+                        else:
+                             # Inject network_id if missing and needed
+                             if "network_id" not in function_args and network_id:
+                                 function_args["network_id"] = network_id
+                             
+                             function_result = await mcp_client.execute_tool(function_name, function_args)
+                             
                         status = "completed"
                         error_msg = None
                     except Exception as e:
@@ -87,12 +83,17 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
                     logger.info(f"--- Gemini API Request (Tool Loop) ---")
                     logger.info(f"Tool Output: {function_result}")
                     
+                    # Re-fetch tool definitions (or we could pass them in to avoid re-fetching)
+                    mcp_tools = await mcp_client.get_tools_as_gemini_functions()
+                    local_tool_defs = local_tools.get_local_tools()
+                    all_tools = mcp_tools + local_tool_defs
+
                     current_response = await client.aio.models.generate_content(
                         model="gemini-2.5-flash",
                         contents=history,
                         config=types.GenerateContentConfig(
                             system_instruction=SYSTEM_INSTRUCTION,
-                            tools=[types.Tool(function_declarations=await mcp_client.get_tools_as_gemini_functions())],
+                            tools=all_tools,
                             tool_config=tool_config,
                             temperature=0.1,
                         )
