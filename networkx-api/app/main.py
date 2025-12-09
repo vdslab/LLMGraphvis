@@ -26,3 +26,12 @@ app.mount("/mcp", mcp.sse_app())
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+from app.api.v1.endpoints import networks, analysis, layout, visualization, subgraphs
+
+app.include_router(networks.router, prefix="/api/v1/networks", tags=["networks"])
+app.include_router(analysis.router, prefix="/api/v1/networks", tags=["analysis"]) # Analysis is typically under a network
+app.include_router(layout.router, prefix="/api/v1/networks", tags=["layout"])
+app.include_router(visualization.router, prefix="/api/v1/networks", tags=["visualization"])
+app.include_router(subgraphs.router, prefix="/api/v1/networks", tags=["subgraphs"])
+
