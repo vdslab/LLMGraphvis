@@ -73,7 +73,17 @@ async def create_ego_network(args: dict, context: dict) -> dict:
     
     await queue.put({"event": "thinking_stream", "data": json.dumps({"content": f"Creating ego network for {center_node_id}..."})})
     result = await network_service.create_ego_network(network_id, center_node_id, radius)
-    return {"status": "success", "message": f"Created ego network: {result['name']}", "subgraph_id": result['new_network_id']}
+    
+    # Auto-switch context
+    db = context['db']
+    chat_id = context['chat_id']
+    from app import models
+    chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
+    if chat:
+        chat.network_id = result['new_network_id']
+        db.commit()
+
+    return {"status": "success", "message": f"Created ego network: {result['name']}. Switched focus to this subgraph.", "subgraph_id": result['new_network_id']}
 
 async def create_subgraph_from_nodes(args: dict, context: dict) -> dict:
     network_id = context['network_id']
@@ -82,7 +92,17 @@ async def create_subgraph_from_nodes(args: dict, context: dict) -> dict:
     
     await queue.put({"event": "thinking_stream", "data": json.dumps({"content": f"Creating subgraph from {len(node_ids)} nodes..."})})
     result = await network_service.create_subgraph_from_nodes(network_id, node_ids)
-    return {"status": "success", "message": f"Created subgraph: {result['name']}", "subgraph_id": result['new_network_id']}
+
+    # Auto-switch context
+    db = context['db']
+    chat_id = context['chat_id']
+    from app import models
+    chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
+    if chat:
+        chat.network_id = result['new_network_id']
+        db.commit()
+
+    return {"status": "success", "message": f"Created subgraph: {result['name']}. Switched focus to this subgraph.", "subgraph_id": result['new_network_id']}
 
 async def create_path_subgraph(args: dict, context: dict) -> dict:
     network_id = context['network_id']
@@ -92,7 +112,17 @@ async def create_path_subgraph(args: dict, context: dict) -> dict:
     
     await queue.put({"event": "thinking_stream", "data": json.dumps({"content": f"Creating path subgraph from {source_node_id} to {target_node_id}..."})})
     result = await network_service.create_path_subgraph(network_id, source_node_id, target_node_id)
-    return {"status": "success", "message": f"Created path subgraph: {result['name']}", "subgraph_id": result['new_network_id']}
+
+    # Auto-switch context
+    db = context['db']
+    chat_id = context['chat_id']
+    from app import models
+    chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
+    if chat:
+        chat.network_id = result['new_network_id']
+        db.commit()
+
+    return {"status": "success", "message": f"Created path subgraph: {result['name']}. Switched focus to this subgraph.", "subgraph_id": result['new_network_id']}
 
 async def create_k_core_subgraph(args: dict, context: dict) -> dict:
     network_id = context['network_id']
@@ -101,15 +131,35 @@ async def create_k_core_subgraph(args: dict, context: dict) -> dict:
     
     await queue.put({"event": "thinking_stream", "data": json.dumps({"content": f"Creating {k}-core subgraph..."})})
     result = await network_service.create_k_core_subgraph(network_id, k)
-    return {"status": "success", "message": f"Created k-core subgraph: {result['name']}", "subgraph_id": result['new_network_id']}
+
+    # Auto-switch context
+    db = context['db']
+    chat_id = context['chat_id']
+    from app import models
+    chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
+    if chat:
+        chat.network_id = result['new_network_id']
+        db.commit()
+
+    return {"status": "success", "message": f"Created k-core subgraph: {result['name']}. Switched focus to this subgraph.", "subgraph_id": result['new_network_id']}
 
 async def create_largest_component_subgraph(args: dict, context: dict) -> dict:
     network_id = context['network_id']
     queue = context['queue']
     
-    await queue.put({"event": "thinking_stream", "data": json.dumps({"content": "Creating largest component subgraph..."})})
+    await queue.put({"event": "thinking_stream", "data": json.dumps({"content": f"Creating largest component subgraph..."})})
     result = await network_service.create_largest_component_subgraph(network_id)
-    return {"status": "success", "message": f"Created largest component subgraph: {result['name']}", "subgraph_id": result['new_network_id']}
+    
+    # Auto-switch context
+    db = context['db']
+    chat_id = context['chat_id']
+    from app import models # Lazy import to avoid circular dep if any
+    chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
+    if chat:
+        chat.network_id = result['new_network_id']
+        db.commit()
+
+    return {"status": "success", "message": f"Created largest component subgraph: {result['name']}. Switched focus to this subgraph.", "subgraph_id": result['new_network_id']}
 
 async def get_subgraphs(args: dict, context: dict) -> dict:
     network_id = context['network_id']

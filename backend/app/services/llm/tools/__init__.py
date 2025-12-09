@@ -1,6 +1,6 @@
 from typing import List, Dict, Callable, Any
 from google.genai import types
-from . import attributes, centrality, visualization, layout, subgraph
+from . import attributes, centrality, visualization, layout, subgraph, navigation
 
 def get_definitions() -> List[types.FunctionDeclaration]:
     """Aggregate all tool definitions."""
@@ -10,6 +10,7 @@ def get_definitions() -> List[types.FunctionDeclaration]:
     definitions.extend(visualization.definitions)
     definitions.extend(layout.definitions)
     definitions.extend(subgraph.definitions)
+    definitions.extend(navigation.definitions)
     return definitions
 
 def get_handlers() -> Dict[str, Callable]:
@@ -20,6 +21,7 @@ def get_handlers() -> Dict[str, Callable]:
     handlers.update(visualization.handlers)
     handlers.update(layout.handlers)
     handlers.update(subgraph.handlers)
+    handlers.update(navigation.handlers)
     return handlers
 
 async def execute_tool(function_name: str, function_args: dict, context: dict) -> dict:

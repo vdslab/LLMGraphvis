@@ -161,6 +161,17 @@ async def generate_visualization(args: dict, context: dict) -> dict:
     await queue.put({"event": "thinking_stream", "data": json.dumps({"content": "Creating visualization..."})})
     vis_data = await network_service.generate_visualization(network_id, vis_config)
     
+    # Auto-switch context if network_id changed explicitly
+    # This prevents reverting to the previous network in the next turn
+    if args.get('network_id') and args.get('network_id') != context['network_id']:
+        db = context['db']
+        chat_id = context['chat_id']
+        from app import models
+        chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
+        if chat:
+            chat.network_id = network_id
+            db.commit()
+
     await queue.put({"event": "render_update", "data": json.dumps(vis_data)})
     return {"status": "success", "message": "Visualization created."}
 

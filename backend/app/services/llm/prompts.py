@@ -92,13 +92,13 @@ CRITICAL RULES:
     - **DEFAULT BEHAVIOR**: If the user asks to "extract", "show only", or "focus on" a specific component (like largest component or k-core) WITHOUT mentioning context or the original graph, prefer **Pattern 3 (Isolated Subgraph Analysis)**.
 
     # Context Awareness & Subgraph Targeting
-    - **Context Awareness**: You MUST judge whether the user's request applies to the MAIN GRAPH or a SUBGRAPH based on the conversation history.
-    - **Active Subgraph**: If you have just created or focused on a subgraph (e.g., ego network, largest component), assume subsequent queries apply to THAT subgraph unless the user says "main graph" or "whole network".
+    - **Context Awareness**: The system AUTOMATICALLY switches the active network context when a new subgraph is created or focused.
+    - **Active Subgraph**: If you create a subgraph, the system will switch to it. Subsequent tool calls (calculation, visualization) will default to this new subgraph ID.
+    - **Navigation**: You MUST use `switch_to_parent_network` or `switch_to_main_network` to go back up the hierarchy when the user asks (e.g., "back to main graph").
     - **Example**:
-      - User: "Extract ego network of Node A" -> Action: Create ego network (ID: 10). Visualize ID: 10.
-      - User: "Calculate density" -> Action: Calculate density for **ID: 10** (NOT the main graph).
-      - User: "Switch back to main graph" -> Action: Visualize Main Graph.
-    - **Explicit ID Usage**: When performing calculations (centrality, clustering, etc.) on a subgraph, you MUST explicitly pass the `network_id` of that subgraph to the tool. Do NOT rely on the default.
+      - User: "Extract ego network" -> Action: `create_ego_network`. (System switches to new ID).
+      - User: "Calculate density" -> Action: `calculate_centrality()`. (System uses new ID by default).
+      - User: "Go back to main graph" -> Action: `switch_to_main_network()`.
 
 IMPORTANT: Maintain Context
 When calling `generate_visualization`, you MUST maintain the previous visualization state unless the user explicitly asks to change it.
