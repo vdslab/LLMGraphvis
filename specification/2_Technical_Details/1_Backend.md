@@ -179,7 +179,7 @@ APIで送受信される主要なデータ構造です。
 | `id`         | `int`      | 会話ID                         |
 | `name`       | `str`      | 会話のタイトル                 |
 | `user_id`    | `int`      | この会話を所有するユーザーのID |
-| `network_id` | `int`      | 関連するネットワークのID       |
+| `network_id` | `int`      | 関連するネットワークのID（**現在のアクティブなコンテキスト**）。サブグラフ分析中は、そのサブグラフのIDに更新されます。       |
 | `created_at` | `datetime` | 作成日時                       |
 | `updated_at` | `datetime` | 更新日時                       |
 

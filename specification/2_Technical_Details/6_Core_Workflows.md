@@ -241,7 +241,10 @@ sequenceDiagram
         DB-->>NetworkXAPI: New Network ID
         NetworkXAPI-->>Backend: Subgraph Info
     end
-    Backend-->>LLM: Success Message
+    
+    note right of Backend: Backend Automatically Updates Chat Context<br/>(chat.network_id = subgraph_id)
+    Backend->>DB: Update Chat.network_id
+    Backend-->>LLM: Success Message w/ Context Switch Info
 
     LLM->>Backend: generate_visualization(focus_network_id=...)
     Backend-->>User: Render Update
@@ -255,6 +258,7 @@ sequenceDiagram
     participant LLM
     participant Backend
     participant NetworkXAPI
+    participant DB
 
     User->>LLM: "Node AとNode Bの最短経路のサブグラフを作って"
     LLM->>Backend: create_path_subgraph(source="A", target="B")
@@ -262,6 +266,10 @@ sequenceDiagram
     NetworkXAPI->>NetworkXAPI: Calculate Shortest Path
     NetworkXAPI->>DB: Create Subgraph
     NetworkXAPI-->>Backend: Subgraph Info
+
+    note right of Backend: Backend Automatically Updates Chat Context
+    Backend->>DB: Update Chat.network_id
+    
     Backend-->>LLM: Success Message
     LLM-->>B: 最終応答メッセージ
 ```
@@ -321,6 +329,7 @@ sequenceDiagram
     LLM->>Backend: create_ego_network(center="n1", radius=1)
     Backend->>NetworkXAPI: POST /tools/create_ego_network
     NetworkXAPI-->>Backend: subgraph_id (e.g., 999)
+    note right of Backend: Context Switch -> 999
 
     note right of LLM: 4. 複合ルールで可視化生成 (Pattern 2: Contextual Subgraph)
     LLM->>Backend: generate_visualization({<br/>  network_id: 12345,<br/>  focus_network_id: 999,<br/>  node_size_config: {attribute: "degree_centrality"},<br/>  node_label_config: {attribute: "name"},<br/>  context_config: {color: "gray", opacity: 0.3},<br/>  focus_config: {node_color_config: {static_color: "lightblue"}},<br/>  custom_node_colors: [{node_id: "n1", color: "blue"}]<br/>})
@@ -351,7 +360,39 @@ sequenceDiagram
     LLM->>Backend: generate_visualization({<br/>  network_id: 999, <br/>  focus_network_id: null <br/>})
     Backend->>NetworkXAPI: POST /tools/generate_visualization
     
+    note right of Backend: Explicit Network Switch -> 999
+    Backend->>DB: Update Chat.network_id
+
     NetworkXAPI->>DB: Fetch Nodes of Network 999
     NetworkXAPI-->>Backend: Render Data (nodes/links of subgraph only)
     Backend-->>User: Render Update
+```
+
+## 6.10. ネットワーク階層ナビゲーションフロー
+
+**目的:** 「全体に戻って」や「親ネットワークに戻って」という指示に対し、コンテキストを上位のネットワークに戻すフローです。
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant LLM
+    participant Backend
+    participant DB
+
+    User->>LLM: "元のグラフに戻って"
+    LLM->>Backend: switch_to_main_network()
+    
+    Backend->>DB: Get current Chat.network_id
+    DB-->>Backend: Current ID (Subgraph)
+    Backend->>DB: Find root network ID
+    DB-->>Backend: Root ID (Main Graph)
+    
+    note right of Backend: Update Context Case
+    Backend->>DB: Chat.network_id = Root ID
+    
+    Backend-->>LLM: Success Message (Switched to Main ID)
+    
+    note right of LLM: Visualize the main network
+    LLM->>Backend: generate_visualization(network_id=Root ID)
+    Backend-->>User: Render Update (Main Graph)
 ```
