@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from google.genai import types
 from app import models
 from app.core.logging import get_logger
-from . import engine, history, events, tools
+from . import engine, history, events, mcp_client
 from .engine import client
 from .prompts import SYSTEM_INSTRUCTION
 
@@ -29,7 +29,8 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
         })
         
         # 2. Initial LLM Call
-        tool_definitions = tools.get_definitions()
+        # tool_definitions = tools.get_definitions()
+        tool_definitions = await mcp_client.get_tools_as_gemini_functions()
         tool_config = types.ToolConfig(function_calling_config=types.FunctionCallingConfig(mode="AUTO"))
         
         logger.info("Calling Gemini API...")

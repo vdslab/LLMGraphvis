@@ -5,239 +5,110 @@
 - NetworkXライブラリに関する知識
 - FastAPIに関する開発経験
 
-NetworkXAPIは、ネットワークに関する計算処理と、その結果の永続化に特化したREST APIサービスです。計算結果などの状態はすべて外部のデータベースに永続化するため、サービス自体は**ステートレス**に設計されており、水平スケールが可能です。
+NetworkXAPIは、ネットワークに関する計算処理と、その結果の永続化に特化した**MCP (Model Context Protocol) サーバー**です。FastAPI上で動作し、SSE (Server-Sent Events) を通じてツールを公開します。
 
 ## 3.1. 役割
 
-- `API`サービスからCPU負荷の高い計算処理をオフロードする。
-- **データベースに直接接続**し、計算結果（レイアウト座標、中心性指標など）を、ネットワークの**永続的な属性として**型別に分離されたテーブル（`node_float_attribute_values`など）に永続化する。
-- 属性が未計算の場合のみ`NetworkX`ライブラリを利用して計算を実行する。
-- LLMが定義した動的なリクエストに基づき、属性計算、レイアウト計算、視覚マッピングを一度に実行し、**最終的なレンダリングデータを生成して返す**。
-- 様々な形式のGraphMLファイルをシステムで一貫して扱える標準形式に変換・正規化する。
+- **MCP Server**: GenAIのための標準化されたインターフェース（MCP）を提供し、LLMが直接的にツールを認識・実行できる環境を提供する。
+- **ステートレス計算**: 内部状態を持たず、計算結果は全てデータベースに永続化する。
+- **SSEエンドポイント**: `/sse` エンドポイントを通じてMCPプロトコルによる通信を行う。既存のRESTエンドポイントはMCPツールに置き換えられる。
 
-## 3.2. APIエンドポイント一覧
+## 3.2. MCPツール一覧
 
-`API`サービスから内部的に呼び出される、主要なツールエンドポイントです。
+`API`サービス（MCP Client）から呼び出される、主要なツールです。
 
-| Method | Path | 説明 |
-|:---|:---|:---|
-| `POST` | `/tools/initialize_network` | GraphMLデータを受け取り、初期化を行う。**指定された`network_id`に既にデータ（ノード）が存在する場合は、上書きせずに新しい`network_id`を発行して新規ネットワークとして保存する。** 処理内容は、1.正規化、2.DB保存、3.初期レイアウト(Spring)計算、4.初期レンダリングデータ生成。レスポンスには最終的に使用された`network_id`が含まれる。 |
-| `GET` | `/tools/list_node_attributes` | ネットワークに存在するノード属性（計算済みまたは元から存在）の一覧を返す。 |
-| `GET` | `/tools/list_edge_attributes` | ネットワークに存在するエッジ属性（計算済みまたは元から存在）の一覧を返す。 |
-| `POST` | `/tools/calculate_centrality` | 中心性指標を計算して永続化する。具体的には、まず属性の**定義**（例: 'degree_centrality'）が`node_attributes`に存在するか確認し、なければ`network_id`に紐付けて作成する。次に、各ノードの計算**値**を、定義のIDを参照して`node_attribute_values`に保存する。レスポンスは計算完了のステータスのみを返す。 |
-| `POST` | `/tools/calculate_layout` | レイアウト座標を計算して永続化する。`layout_name`（例: 'forceatlas2', 'spiral'）を受け取り、`{layout_name}_x`, `{layout_name}_y` という属性として保存する。レスポンスは計算完了のステータスのみを返す。 |
-| `POST` | `/tools/generate_visualization` | レイアウト、ノードサイズ、ノードカラー等の視覚的割り当てに関するすべてのパラメータを受け取り、最終的なレンダリングデータを動的に生成して返す。**レイアウト計算は行わず、計算済みの座標データを使用する。新しいレイアウトを適用する場合は、事前に`/tools/calculate_layout`を呼び出す必要がある。** サブグラフのオーバーレイ表示もサポートする。 |
-| `POST` | `/tools/create_ego_network` | 指定されたノードを中心としたEgo Graph（指定ホップ数以内のノード群）を新しいネットワークとして作成する。**同じ条件（中心ノード、半径）で作成されたサブグラフが既に存在する場合は、新規作成せずに既存の`network_id`を返す（再利用）。** |
-| `POST` | `/tools/create_subgraph_from_nodes` | 指定されたノードIDのリストからサブグラフを新しいネットワークとして作成する。**ノードリストに基づいて一意な名前（`Subgraph (A,B,...)`）を生成し、同名のサブグラフが存在する場合は再利用する。** |
-| `POST` | `/tools/create_path_subgraph` | 指定された2ノード間の最短経路をサブグラフとして新しいネットワークとして作成する。**既存のパスサブグラフがある場合は再利用する。** |
-| `POST` | `/tools/create_k_core_subgraph` | K-Core（次数k以上のノード群）を抽出し、新しいネットワークとして作成する。**同じk値のK-Coreサブグラフがある場合は再利用する。** |
-| `POST` | `/tools/create_largest_component_subgraph` | 最大連結成分を抽出し、新しいネットワークとして作成する。**既に作成済みの場合は再利用する。** |
-| `GET` | `/tools/get_subgraphs` | 指定されたネットワークの子ネットワーク（サブグラフ）の一覧を取得する。 |
-| `POST` | `/tools/get_top_nodes` | 指定された中心性指標に基づいて、上位k個のノードを取得する。 |
+| Tool Name | 説明 |
+|:---|:---|
+| `initialize_network` | GraphMLデータを受け取り、初期化を行う。**指定された`network_id`に既にデータ（ノード）が存在する場合は、上書きせずに新しい`network_id`を発行して新規ネットワークとして保存する。** 処理内容は、1.正規化、2.DB保存、3.初期レイアウト(Spring)計算、4.初期レンダリングデータ生成。レスポンスには最終的に使用された`network_id`が含まれる。 |
+| `list_node_attributes` | ネットワークに存在するノード属性（計算済みまたは元から存在）の一覧を返す。 |
+| `list_edge_attributes` | ネットワークに存在するエッジ属性（計算済みまたは元から存在）の一覧を返す。 |
+| `calculate_centrality` | 中心性指標を計算して永続化する。具体的には、まず属性の**定義**（例: 'degree_centrality'）が`node_attributes`に存在するか確認し、なければ`network_id`に紐付けて作成する。次に、各ノードの計算**値**を、定義のIDを参照して`node_attribute_values`に保存する。レスポンスは計算完了のステータスのみを返す。 |
+| `calculate_layout` | レイアウト座標を計算して永続化する。`layout_name`（例: 'forceatlas2', 'spiral'）を受け取り、`{layout_name}_x`, `{layout_name}_y` という属性として保存する。レスポンスは計算完了のステータスのみを返す。 |
+| `generate_visualization` | レイアウト、ノードサイズ、ノードカラー等の視覚的割り当てに関するすべてのパラメータを受け取り、最終的なレンダリングデータを動的に生成して返す。**レイアウト計算は行わず、計算済みの座標データを使用する。新しいレイアウトを適用する場合は、事前に`calculate_layout`を呼び出す必要がある。** サブグラフのオーバーレイ表示もサポートする。 |
+| `create_ego_network` | 指定されたノードを中心としたEgo Graph（指定ホップ数以内のノード群）を新しいネットワークとして作成する。**同じ条件（中心ノード、半径）で作成されたサブグラフが既に存在する場合は、新規作成せずに既存の`network_id`を返す（再利用）。** |
+| `create_subgraph_from_nodes` | 指定されたノードIDのリストからサブグラフを新しいネットワークとして作成する。**ノードリストに基づいて一意な名前（`Subgraph (A,B,...)`）を生成し、同名のサブグラフが存在する場合は再利用する。** |
+| `create_path_subgraph` | 指定された2ノード間の最短経路をサブグラフとして新しいネットワークとして作成する。**既存のパスサブグラフがある場合は再利用する。** |
+| `create_k_core_subgraph` | K-Core（次数k以上のノード群）を抽出し、新しいネットワークとして作成する。**同じk値のK-Coreサブグラフがある場合は再利用する。** |
+| `create_largest_component_subgraph` | 最大連結成分を抽出し、新しいネットワークとして作成する。**既に作成済みの場合は再利用する。** |
+| `get_subgraphs` | 指定されたネットワークの子ネットワーク（サブグラフ）の一覧を取得する。 |
+| `get_top_nodes` | 指定された中心性指標に基づいて、上位k個のノードを取得する。 |
 
 ## 3.3. API詳細
 
-### `/tools/list_node_attributes`
-- **Method**: `GET`
+### `list_node_attributes`
 - **Parameters**: `network_id`
 - **Description**: Returns a list of node attributes with metadata (data type, statistics).
-- **Response**:
-  ```json
-  [
-    {
-      "name": "degree",
-      "data_type": "float",
-      "stats": {
-        "min": 0,
-        "max": 15
-      }
-    },
-    {
-      "name": "group",
-      "data_type": "string",
-      "stats": {
-        "unique_count": 3,
-        "top_values": ["A", "B", "C"]
-      }
-    }
-  ]
-  ```
 
-### `/tools/list_edge_attributes`
-- **Method**: `GET`
+### `list_edge_attributes`
 - **Parameters**: `network_id`
 - **Description**: Returns a list of edge attributes with metadata (data type, statistics).
-- **Response**: Same structure as `list_node_attributes`.
 
-### 3. 中心性計算
-- **Endpoint**: `POST /tools/calculate_centrality`
+### `calculate_centrality`
 - **Description**: 指定された中心性指標を計算し、ノード属性として保存する。
-- **Request Body**:
+- **Arguments**:
   - `network_id`: int
   - `centrality_type`: str ("degree", "betweenness", "closeness", "eigenvector")
-- **Response**:
-  - `status`: str ("success")
-  - `message`: str
 
-### 4. レイアウト計算
-- **Endpoint**: `POST /tools/calculate_layout`
+### `calculate_layout`
 - **Description**: 指定されたレイアウトアルゴリズムで座標を計算し、ノード属性として保存する。
-- **Request Body**:
+- **Arguments**:
   - `network_id`: int
-  - `layout_name`: str ("spring" (same as "fruchterman_reingold"), "forceatlas2", "circular", "kamada_kawai", "shell", "spectral", "spiral")
-- **Response**:
-  - `status`: str ("success")
-  - `message`: str
-  - **Note**: `spring` and `forceatlas2` layouts use dynamic parameters based on the network size to optimize visualization (e.g., scaling ratio, iterations).
+  - `layout_name`: str ("spring", "forceatlas2", "circular", "kamada_kawai", "shell", "spectral", "spiral")
 
-
-### 5. サブグラフ作成 (Ego Network)
-- **Endpoint**: `POST /tools/create_ego_network`
+### `create_ego_network`
 - **Description**: 指定ノードを中心としたEgo Graphを作成する。
-- **Request Body**:
+- **Arguments**:
   - `source_network_id`: int
   - `center_node_id`: str
   - `radius`: int
-- **Response**:
-  - `new_network_id`: int
-  - `name`: str
 
-### 6. サブグラフ作成 (From Nodes)
-- **Endpoint**: `POST /tools/create_subgraph_from_nodes`
+### `create_subgraph_from_nodes`
 - **Description**: ノードIDリストからサブグラフを作成する。
-- **Request Body**:
+- **Arguments**:
   - `source_network_id`: int
   - `node_ids`: List[str]
-- **Response**:
-  - `new_network_id`: int
-  - `name`: str
 
-### 7. サブグラフ作成 (Path)
-- **Endpoint**: `POST /tools/create_path_subgraph`
+### `create_path_subgraph`
 - **Description**: 最短経路のサブグラフを作成する。
-- **Request Body**:
+- **Arguments**:
   - `source_network_id`: int
   - `source_node_id`: str
   - `target_node_id`: str
-- **Response**:
-  - `new_network_id`: int
-  - `name`: str
 
-### 8. サブグラフ作成 (K-Core)
-- **Endpoint**: `POST /tools/create_k_core_subgraph`
+### `create_k_core_subgraph`
 - **Description**: K-Coreサブグラフを作成する。
-- **Request Body**:
+- **Arguments**:
   - `source_network_id`: int
   - `k`: int
-- **Response**:
-  - `new_network_id`: int
-  - `name`: str
 
-### 9. サブグラフ作成 (Largest Component)
-- **Endpoint**: `POST /tools/create_largest_component_subgraph`
+### `create_largest_component_subgraph`
 - **Description**: 最大連結成分のサブグラフを作成する。
-- **Request Body**:
+- **Arguments**:
   - `source_network_id`: int
-- **Response**:
-  - `new_network_id`: int
-  - `name`: str
 
-### 10. サブグラフ一覧取得
-- **Endpoint**: `GET /tools/get_subgraphs`
+### `get_subgraphs`
 - **Description**: サブグラフの一覧を取得する。
-- **Parameters**:
-  - `network_id` (query): 親ネットワークID
-- **Response**:
-  - `subgraphs`: List[{ "id": int, "name": str, "created_at": str }]
+- **Arguments**:
+  - `network_id`: int
 
-### 11. 重要ノード取得
-- **Endpoint**: `POST /tools/get_top_nodes`
+### `get_top_nodes`
 - **Description**: 指定された中心性指標に基づいて、上位k個のノードを取得する。
-- **Request Body**:
+- **Arguments**:
   - `network_id`: int
   - `metric`: str ("degree", "betweenness", "closeness", "eigenvector")
   - `k`: int (default: 10)
-- **Response**:
-  - `top_nodes`: List[{ "node_id": str, "score": float }]
 
-### `/tools/calculate_centrality`
+### `generate_visualization`
+- **Arguments**:
+  - `network_id`: int
+  - `focus_network_id`: int (Optional)
+  - `node_size_config`: dict (Optional)
+  - `node_color_config`: dict (Optional)
+  - `edge_width_config`: dict (Optional)
+  - `context_config`: dict (Optional)
+  - `focus_config`: dict (Optional)
+  - `node_label_config`: dict (Optional)
 
-- **Request Body:**
-
-```json
-{
-  "network_id": 12345,
-  "centrality_type": "degree"
-}
-```
-
-- **Response Body (Success):**
-
-```json
-{
-  "status": "success",
-  "message": "degree centrality calculated."
-}
-```
-
-### `/tools/calculate_layout`
-
-- **Request Body:**
-
-```json
-{
-  "network_id": 12345,
-  "layout_name": "forceatlas2"
-}
-```
-
-- **Response Body (Success):**
-
-```json
-{
-  "status": "success",
-  "message": "Layout 'circular' calculated and saved."
-}
-```
-
-### `/tools/generate_visualization`
-
-- **Request Body:**
-
-```json
-{
-  "network_id": 12345,
-  "focus_network_id": 67890, // Optional: Subgraph ID to focus on
-  "node_size_config": {
-    "attribute": "degree_centrality",
-    "scale_type": "LINEAR",
-    "min_size": 5,
-    "max_size": 15
-  },
-  "node_color_config": {
-    "attribute": "community_id",
-    "scale_type": "CATEGORICAL"
-  },
-  "edge_width_config": {
-    "attribute": "weight",
-    "scale_type": "LINEAR",
-    "min_width": 1,
-    "max_width": 5
-  },
-  "context_config": { // Optional: Configuration for nodes NOT in focus_network_id
-    "visible": true,
-    "opacity": 0.1,
-    "color": "#eeeeee"
-  },
-  "focus_config": { // Optional: Overrides for nodes IN focus_network_id
-    "node_size_config": { ... }, // Resolves to focus_network_id attributes
-  "focus_config": { // Optional: Overrides for nodes IN focus_network_id
-    "node_color_config": { ... }
-  },
-  "node_label_config": { // Optional: Attribute to use as node label
-    "attribute": "name"
-  }
-}
 
 **Note on Default Behavior:**
 If `focus_network_id` is provided but `context_config` is omitted, the API defaults to the following configuration to ensure the focus effect is visible:

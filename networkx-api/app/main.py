@@ -17,6 +17,9 @@ app = FastAPI(title="GraphVisAgent NetworkXAPI")
 
 app.include_router(tools.router)
 
+from app.mcp_server import mcp
+app.mount("/sse", mcp.sse_app(mount_path="/sse"))
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}

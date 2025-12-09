@@ -4,7 +4,7 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv
 from app.core.logging import get_logger
-from . import tools
+from . import mcp_client
 from .prompts import SYSTEM_INSTRUCTION
 
 logger = get_logger(__name__)
@@ -46,15 +46,20 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
                         "data": json.dumps({"tool": function_name, "status": "started", "args": function_args})
                     })
                     
-                    # Execute
                     try:
+                        # Inject network_id if missing and needed
+                        # Most tools need it.
+                        if "network_id" not in function_args and network_id:
+                            function_args["network_id"] = network_id
+
                         context = {
                             "network_id": network_id,
                             "queue": queue,
                             "chat_id": chat_id,
                             "db": db
                         }
-                        function_result = await tools.execute_tool(function_name, function_args, context)
+                            # function_result = await tools.execute_tool(function_name, function_args, context)
+                        function_result = await mcp_client.execute_tool(function_name, function_args)
                         status = "completed"
                         error_msg = None
                     except Exception as e:
@@ -87,7 +92,7 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
                         contents=history,
                         config=types.GenerateContentConfig(
                             system_instruction=SYSTEM_INSTRUCTION,
-                            tools=[types.Tool(function_declarations=tools.get_definitions())],
+                            tools=[types.Tool(function_declarations=await mcp_client.get_tools_as_gemini_functions())],
                             tool_config=tool_config,
                             temperature=0.1,
                         )
