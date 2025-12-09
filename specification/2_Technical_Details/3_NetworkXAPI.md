@@ -72,6 +72,8 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 - **Response**:
   - `status`: str ("success")
   - `message`: str
+  - **Note**: `spring` and `forceatlas2` layouts use dynamic parameters based on the network size to optimize visualization (e.g., scaling ratio, iterations).
+
 
 ### 5. サブグラフ作成 (Ego Network)
 - **Endpoint**: `POST /tools/create_ego_network`

@@ -23,25 +23,35 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
             G.add_edge(u, v)
     
     # Calculate Layout
-    # Calculate Layout
+    # Dynamic parameter adjustment based on network size
+    num_nodes = len(G.nodes)
+    
     if layout_name == "spring" or layout_name == "fruchterman_reingold":
         # Heuristic for k: 1/sqrt(N) is default. 
         # Increasing it to 2.5/sqrt(N) helps spread nodes out more significantly.
-        num_nodes = len(G.nodes)
         k = 2.5 / math.sqrt(num_nodes) if num_nodes > 0 else None
-        # Reduced iterations for performance (initial load) - was 1000
-        pos = nx.spring_layout(G, k=k, iterations=50, seed=42)
+        
+        # Dynamic iterations: increased for smaller graphs for better convergence
+        iterations = 100 if num_nodes < 500 else 50
+        
+        pos = nx.spring_layout(G, k=k, iterations=iterations, seed=42)
         
     elif layout_name == "forceatlas2":
         if hasattr(nx, 'forceatlas2_layout'):
-             # Optimized parameters for general visualization
-             # scaling_ratio: Higher values = more spread out
+             # Dynamic scaling ratio to prevent hairballs in larger networks
+             # Base scaling: 50.0
+             # Factor: Increases logarithmically with node count
+             scaling_factor = 1 + (math.log10(num_nodes) * 0.5) if num_nodes > 0 else 1.0
+             scaling_ratio = 50.0 * scaling_factor
+             
+             # Increase iterations for larger networks
+             max_iter = 1000 if num_nodes > 500 else 500
+             
              # gravity: Stronger gravity pulls disconnected components together
-             # max_iter: Reduced for performance - was 2000
              pos = nx.forceatlas2_layout(
                  G, 
-                 max_iter=500,
-                 scaling_ratio=50.0, # Increased spread
+                 max_iter=max_iter,
+                 scaling_ratio=scaling_ratio, 
                  gravity=1.0, 
                  seed=42
              )
