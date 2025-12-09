@@ -49,6 +49,7 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
                     try:
                         if function_name in ["switch_to_main_network", "switch_to_parent_network"]:
                              logger.info(f"Executing LOCAL tool: {function_name}")
+                             context = {"chat_id": chat_id, "db": db}
                              function_result = await local_tools.execute_local_tool(function_name, function_args, context)
                         else:
                              # Inject network_id if missing and needed
