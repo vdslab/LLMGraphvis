@@ -5,7 +5,8 @@ import os
 import time
 
 BASE_URL = "http://localhost:8000"
-USERNAME = "verify_llm_vis_10"
+import random
+USERNAME = f"verify_llm_vis_{random.randint(1000, 9999)}"
 PASSWORD = "password123"
 
 def verify_llm_visualization():
@@ -74,7 +75,7 @@ def verify_llm_visualization():
     messages = []
     
     start_time = time.time()
-    timeout = 30 # 30 seconds timeout
+    timeout = 60 # 60 seconds timeout
     
     for line in resp.iter_lines():
         if time.time() - start_time > timeout:

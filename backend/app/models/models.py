@@ -44,6 +44,7 @@ class Chat(Base):
     network_id = Column(Integer, ForeignKey("networks.id"), nullable=False, unique=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    visualization_state = Column(JSON, nullable=True)
 
     user = relationship("User", back_populates="chats")
     network = relationship("Network", back_populates="chat")
@@ -53,9 +54,10 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id = Column(Integer, primary_key=True, index=True)
-    chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False)
+    chat_id = Column("conversation_id", Integer, ForeignKey("chats.id"), nullable=False)
     role = Column(String, nullable=False)
     content = Column(Text, nullable=False)
+    meta_data = Column(JSON, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

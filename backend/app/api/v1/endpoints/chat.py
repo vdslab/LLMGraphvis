@@ -138,7 +138,8 @@ def create_chat(
     user_id = current_user.id
     
     db_network = models.Network(
-        name=f"{chat.name} Network"
+        name=f"{chat.name} Network",
+        graphml_content='<?xml version="1.0" encoding="UTF-8"?><graphml xmlns="http://graphml.graphdrawing.org/xmlns"></graphml>'
     )
     db.add(db_network)
     db.commit()
