@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from app.api.v1.endpoints import tools
 from app.core.database import engine, Base
 
 # Create database tables
@@ -15,10 +14,8 @@ except Exception as e:
 
 app = FastAPI(title="GraphVisAgent NetworkXAPI")
 
-app.include_router(tools.router)
-
 from app.mcp_server import mcp
-app.mount("/sse", mcp.sse_app(mount_path="/sse"))
+app.mount("/mcp", mcp.sse_app())
 
 @app.get("/health")
 def health_check():

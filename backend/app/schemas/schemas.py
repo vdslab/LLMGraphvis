@@ -12,7 +12,7 @@ class User(UserBase):
     id: int
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Token(BaseModel):
     access_token: str
@@ -35,14 +35,14 @@ class Chat(ChatBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ChatWithNetwork(Chat):
     """Chat with network information"""
     network: Optional[Dict[str, Any]] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ChatMessageBase(BaseModel):
     role: str
@@ -58,7 +58,7 @@ class ChatMessage(ChatMessageBase):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class ChatProcessMessage(BaseModel):
     content: str
