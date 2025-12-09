@@ -22,26 +22,47 @@ async def get_tools_as_gemini_functions() -> list[types.Tool]:
             result = await session.list_tools()
             tools = result.tools
             
-            gemini_tools = []
+            gemini_tools_list = []
             for tool in tools:
-                gemini_tools.append(_convert_to_gemini(tool))
+                fd = _convert_to_gemini(tool)
+                gemini_tools_list.append(types.Tool(function_declarations=[fd]))
                 
-            # Wrap in a generic Tool object for Gemini
-            return [types.Tool(function_declarations=gemini_tools)]
+            return gemini_tools_list
 
 def _convert_to_gemini(mcp_tool) -> types.FunctionDeclaration:
     """
     Converts an MCP Tool definition to a Gemini FunctionDeclaration.
     """
-    tool_name = getattr(mcp_tool, "name", None) or mcp_tool.get("name")
-    tool_desc = getattr(mcp_tool, "description", None) or mcp_tool.get("description")
+    tool_name = str(getattr(mcp_tool, "name", None) or mcp_tool.get("name"))
+    tool_desc = str(getattr(mcp_tool, "description", None) or mcp_tool.get("description"))
     tool_schema = getattr(mcp_tool, "inputSchema", None) or mcp_tool.get("inputSchema")
     
+    # Sanitize schema: remove 'title' which can confuse some parsers
+    if tool_schema:
+        tool_schema = _sanitize_schema(tool_schema)
+
     return types.FunctionDeclaration(
         name=tool_name,
         description=tool_desc,
         parameters=tool_schema
     )
+
+def _sanitize_schema(schema: dict) -> dict:
+    """Recursively remove 'title' from JSON schema."""
+    if not isinstance(schema, dict):
+        return schema
+    
+    new_schema = schema.copy()
+    if "title" in new_schema:
+        del new_schema["title"]
+        
+    for key, value in new_schema.items():
+        if isinstance(value, dict):
+            new_schema[key] = _sanitize_schema(value)
+        elif isinstance(value, list):
+            new_schema[key] = [_sanitize_schema(item) if isinstance(item, dict) else item for item in value]
+            
+    return new_schema
 
 async def execute_tool(tool_name: str, arguments: dict):
     """
