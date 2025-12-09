@@ -25,7 +25,7 @@ sequenceDiagram
     participant U as ユーザー
     participant F as Frontend
     participant B as API Service (Backend)
-    participant N as NetworkXAPI (REST API)
+    participant N as NetworkXAPI (MCP Server)
     participant DB as Database
 
     %% Step 1: User creates a new chat
@@ -86,7 +86,7 @@ sequenceDiagram
     participant F as Frontend
     participant B as API Service (Backend)
     participant LLM as LLM Service (Gemini 2.5 Flash)
-    participant N as NetworkXAPI (REST API)
+    participant N as NetworkXAPI (MCP Server)
     participant DB as Database
 
     note over F, B: このフローが開始される時点で、クライアントは<br/>既にSSE接続を確立済みであるとする。
