@@ -83,13 +83,27 @@ def initialize_network(request: InitializeNetworkRequest, db: Session = Depends(
 
 @router.get("/list_node_attributes")
 def list_node_attributes(network_id: int, db: Session = Depends(database.get_db)):
-    attributes = db.query(models.NodeAttribute).filter(models.NodeAttribute.network_id == network_id).all()
-    return [attr.attribute_name for attr in attributes]
+    from app.logic import attributes
+    return attributes.get_attribute_stats(
+        network_id, 
+        models.NodeAttribute, 
+        models.NodeAttributeValue, 
+        models.NodeFloatAttributeValue, 
+        models.NodeTextAttributeValue, 
+        db
+    )
 
 @router.get("/list_edge_attributes")
 def list_edge_attributes(network_id: int, db: Session = Depends(database.get_db)):
-    attributes = db.query(models.EdgeAttribute).filter(models.EdgeAttribute.network_id == network_id).all()
-    return [attr.attribute_name for attr in attributes]
+    from app.logic import attributes
+    return attributes.get_attribute_stats(
+        network_id, 
+        models.EdgeAttribute, 
+        models.EdgeAttributeValue, 
+        models.EdgeFloatAttributeValue, 
+        models.EdgeTextAttributeValue, 
+        db
+    )
 
 @router.post("/calculate_centrality")
 def calculate_centrality(request: CalculateCentralityRequest, db: Session = Depends(database.get_db)):

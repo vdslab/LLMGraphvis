@@ -37,21 +37,37 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 ## 3.3. API詳細
 
-### 1. 属性一覧取得 (Node)
-- **Endpoint**: `GET /tools/list_node_attributes`
-- **Description**: ネットワーク内の利用可能なノード属性一覧を取得する。
-- **Parameters**:
-  - `network_id` (query): ネットワークID
+### `/tools/list_node_attributes`
+- **Method**: `GET`
+- **Parameters**: `network_id`
+- **Description**: Returns a list of node attributes with metadata (data type, statistics).
 - **Response**:
-  - `attributes`: List[str] - 属性名のリスト
+  ```json
+  [
+    {
+      "name": "degree",
+      "data_type": "float",
+      "stats": {
+        "min": 0,
+        "max": 15
+      }
+    },
+    {
+      "name": "group",
+      "data_type": "string",
+      "stats": {
+        "unique_count": 3,
+        "top_values": ["A", "B", "C"]
+      }
+    }
+  ]
+  ```
 
-### 2. 属性一覧取得 (Edge)
-- **Endpoint**: `GET /tools/list_edge_attributes`
-- **Description**: ネットワーク内の利用可能なエッジ属性一覧を取得する。
-- **Parameters**:
-  - `network_id` (query): ネットワークID
-- **Response**:
-  - `attributes`: List[str] - 属性名のリスト
+### `/tools/list_edge_attributes`
+- **Method**: `GET`
+- **Parameters**: `network_id`
+- **Description**: Returns a list of edge attributes with metadata (data type, statistics).
+- **Response**: Same structure as `list_node_attributes`.
 
 ### 3. 中心性計算
 - **Endpoint**: `POST /tools/calculate_centrality`

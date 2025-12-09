@@ -4,12 +4,12 @@ from app.services import network_service
 definitions = [
     types.FunctionDeclaration(
         name="list_node_attributes",
-        description="List all available node attributes for the network.",
+        description="List all available node attributes for the network. Returns metadata including data type and statistics (min/max for numbers, unique values for text) to help choose visualization mappings.",
         parameters=types.Schema(type="OBJECT", properties={})
     ),
     types.FunctionDeclaration(
         name="list_edge_attributes",
-        description="List all available edge attributes for the network.",
+        description="List all available edge attributes for the network. Returns metadata including data type and statistics (min/max for numbers, unique values for text) to help choose visualization mappings.",
         parameters=types.Schema(type="OBJECT", properties={})
     )
 ]
