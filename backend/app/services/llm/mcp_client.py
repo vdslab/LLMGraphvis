@@ -33,10 +33,14 @@ def _convert_to_gemini(mcp_tool) -> types.FunctionDeclaration:
     """
     Converts an MCP Tool definition to a Gemini FunctionDeclaration.
     """
+    tool_name = getattr(mcp_tool, "name", None) or mcp_tool.get("name")
+    tool_desc = getattr(mcp_tool, "description", None) or mcp_tool.get("description")
+    tool_schema = getattr(mcp_tool, "inputSchema", None) or mcp_tool.get("inputSchema")
+    
     return types.FunctionDeclaration(
-        name=mcp_tool.name,
-        description=mcp_tool.description,
-        parameters=mcp_tool.inputSchema
+        name=tool_name,
+        description=tool_desc,
+        parameters=tool_schema
     )
 
 async def execute_tool(tool_name: str, arguments: dict):
@@ -66,7 +70,7 @@ async def execute_tool(tool_name: str, arguments: dict):
                     import json
                     return json.loads(output_text)
                 except:
-                    return output_text
+                    return {"content": output_text}
     except Exception as e:
         import traceback
         traceback.print_exc()

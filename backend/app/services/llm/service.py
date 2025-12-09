@@ -39,7 +39,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
         logger.info(f"--- Gemini API Request ---")
         logger.info(f"Model: gemini-2.5-flash")
         logger.info(f"System Instruction: {SYSTEM_INSTRUCTION[:100]}...")
-        logger.info(f"Tools: {[t.name for t in tool_definitions]}")
+        logger.info(f"Tools: {[fn.name for t in tool_definitions for fn in (t.function_declarations or [])]}")
         logger.info(f"History (Last 2): {chat_history[-2:] if len(chat_history) > 1 else chat_history}")
         
         response = await client.aio.models.generate_content(
@@ -47,7 +47,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
             contents=chat_history,
             config=types.GenerateContentConfig(
                 system_instruction=SYSTEM_INSTRUCTION,
-                tools=[types.Tool(function_declarations=tool_definitions)],
+                tools=tool_definitions,
                 tool_config=tool_config,
                 temperature=0.1,
             )
