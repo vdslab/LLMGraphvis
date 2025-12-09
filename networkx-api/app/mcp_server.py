@@ -6,7 +6,7 @@ import json
 from typing import List, Dict, Any, Optional
 
 # Initialize FastMCP Server
-mcp = FastMCP("NetworkX Agent")
+mcp = FastMCP("NetworkX Agent", host="0.0.0.0")
 
 def get_db_session():
     """Helper to get a database session."""

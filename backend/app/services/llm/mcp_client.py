@@ -14,7 +14,7 @@ async def get_tools_as_gemini_functions() -> list[types.Tool]:
     and converts them to Gemini-compatible function declarations.
     """
     # Note: We use sse_client for HTTP/SSE connection
-    async with sse_client(SSE_ENDPOINT, headers={"Host": "localhost:8001"}) as (read, write):
+    async with sse_client(SSE_ENDPOINT) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             
@@ -43,26 +43,31 @@ async def execute_tool(tool_name: str, arguments: dict):
     """
     Executes a tool on the NetworkXAPI MCP Server.
     """
-    async with sse_client(SSE_ENDPOINT, headers={"Host": "localhost:8001"}) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            
-            result = await session.call_tool(tool_name, arguments)
-            
-            if result.isError:
-                raise RuntimeError(f"Tool execution failed: {result.content}")
-            
-            # MCP returns a list of content (TextContent, ImageContent, etc.)
-            # For our use case, we mostly expect simplified text/JSON back.
-            # We'll join text content.
-            output_text = ""
-            for content in result.content:
-                if content.type == "text":
-                    output_text += content.text
-            
-            # Try parsing as JSON if possible, otherwise return string
-            try:
-                import json
-                return json.loads(output_text)
-            except:
-                return output_text
+    try:
+        async with sse_client(SSE_ENDPOINT) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                
+                result = await session.call_tool(tool_name, arguments)
+                
+                if result.isError:
+                    raise RuntimeError(f"Tool execution failed: {result.content}")
+                
+                # MCP returns a list of content (TextContent, ImageContent, etc.)
+                # For our use case, we mostly expect simplified text/JSON back.
+                # We'll join text content.
+                output_text = ""
+                for content in result.content:
+                    if content.type == "text":
+                        output_text += content.text
+                
+                # Try parsing as JSON if possible, otherwise return string
+                try:
+                    import json
+                    return json.loads(output_text)
+                except:
+                    return output_text
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise e

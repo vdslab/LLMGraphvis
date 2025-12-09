@@ -37,9 +37,19 @@ class Chat(ChatBase):
     class Config:
         from_attributes = True
 
+class Network(BaseModel):
+    id: int
+    name: str
+    network_id: Optional[int] = None # For compatibility if needed, though usually just id
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
 class ChatWithNetwork(Chat):
     """Chat with network information"""
-    network: Optional[Dict[str, Any]] = None
+    network: Optional[Any] = None # Allow both Dict and Network model
     
     class Config:
         from_attributes = True

@@ -80,8 +80,16 @@ async def get_chat(
         
     except Exception as e:
         print(f"Failed to fetch visualization for chat {chat_id}: {e}")
-        # Fallback to returning chat without network data if fails (or empty network)
-        return chat
+        # Fallback to returning chat with empty network data if fails
+        return {
+            "id": chat.id,
+            "name": chat.name,
+            "user_id": chat.user_id,
+            "network_id": chat.network_id,
+            "created_at": chat.created_at,
+            "updated_at": chat.updated_at,
+            "network": None
+        }
 
 @router.get("/{chat_id}/messages", response_model=List[schemas.ChatMessage])
 def get_messages(

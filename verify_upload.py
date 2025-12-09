@@ -64,13 +64,29 @@ async def verify_upload():
         print("Uploading file...")
         upload_res = await client.post(f"{BACKEND_URL}/chat/{chat_id}/upload", files=files, headers=headers)
         
-        if upload_res.status_code == 200:
+        if upload_res.status_code == 202:
             print("Upload request accepted (background task).")
         else:
             print(f"Upload failed immediately: {upload_res.status_code} {upload_res.text}")
+            return # Don't proceed if upload upload failed
             
-        # 4. Wait a bit and check backend logs (manually via another tool)
-        # We can also check status via SSE if we were a browser, but here just triggering it is enough.
+        # 4. Wait for background task
+        print("Waiting for background processing...")
+        await asyncio.sleep(5)
+        
+        # 5. Check Chat State (GET /chat/{id}) to confirm network data is present
+        print(f"Checking chat state for {chat_id}...")
+        chat_state_res = await client.get(f"{BACKEND_URL}/chat/{chat_id}", headers=headers)
+        if chat_state_res.status_code == 200:
+            print("Get chat succeeded.")
+            data = chat_state_res.json()
+            # print(data)
+            if "network" in data and data["network"]:
+                 print("Network data present in response.")
+            else:
+                 print("Network field missing or empty.")
+        else:
+            print(f"Get chat failed: {chat_state_res.status_code} {chat_state_res.text}")
 
 if __name__ == "__main__":
     asyncio.run(verify_upload())

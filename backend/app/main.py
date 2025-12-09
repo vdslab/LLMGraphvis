@@ -104,6 +104,22 @@ app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(networks.router)
 
+@app.get("/debug/mcp")
+async def debug_mcp_connection():
+    import httpx
+    import os
+    url = os.getenv("NETWORKX_API_URL", "http://networkx-api:8000") + "/mcp/sse"
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(url)
+            return {"status": resp.status_code, "headers": dict(resp.headers), "text_preview": resp.text[:100]}
+        except Exception as e:
+            return {"error": str(e)}
+
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to GraphVisAgent API"}
+
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
