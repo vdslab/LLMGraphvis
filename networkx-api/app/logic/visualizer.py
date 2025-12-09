@@ -21,7 +21,12 @@ def generate_visualization_data(
     # --- 1. Identify Required Attributes ---
     global_attrs_configs = [node_size_config, node_color_config, node_label_config]
     global_node_attrs = StyleService.collect_required_attributes(global_attrs_configs)
-    global_node_attrs.update({f"{layout_name}_x", f"{layout_name}_y"})
+    
+    # Layout attributes are strictly required
+    layout_x_attr = f"{layout_name}_x"
+    layout_y_attr = f"{layout_name}_y"
+    global_node_attrs.add(layout_x_attr)
+    global_node_attrs.add(layout_y_attr)
     
     edge_attrs_configs = [edge_width_config, edge_color_config]
     required_edge_attrs = StyleService.collect_required_attributes(edge_attrs_configs)
@@ -40,6 +45,20 @@ def generate_visualization_data(
     focus_node_attr_map = {}
     focus_node_values = {}
     focus_node_map = {}
+    
+    # --- Validation: Ensure all requested attributes exist ---
+    missing_attrs = []
+    for attr in global_node_attrs:
+        if attr not in global_node_attr_map:
+            missing_attrs.append(f"Node attribute '{attr}'")
+    
+    for attr in required_edge_attrs:
+        if attr not in edge_attr_map:
+            missing_attrs.append(f"Edge attribute '{attr}'")
+            
+    if missing_attrs:
+        raise ValueError(f"Missing required attributes for visualization: {', '.join(missing_attrs)}. Please calculate them first.")
+        
     if focus_network_id:
         focus_node_map = _get_focus_node_map(db, focus_network_id)
         if focus_node_attrs:

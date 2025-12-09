@@ -112,17 +112,8 @@ def generate_visualization(
     """
     db = get_db_session()
     try:
-        # Check if layout needs calculation (basic check)
-        attr_x_name = f"{layout_name}_x"
-        attr_y_name = f"{layout_name}_y"
-        
-        attrs = db.query(models.NodeAttribute).filter(
-            models.NodeAttribute.network_id == network_id,
-            models.NodeAttribute.attribute_name.in_([attr_x_name, attr_y_name])
-        ).count()
-        
-        if attrs < 2:
-            layout.calculate_layout(network_id, layout_name, db)
+        # Removed auto-layout calculation logic. 
+        # The visualizer.generate_visualization_data will raise ValueError if layout is missing.
             
         return visualizer.generate_visualization_data(
             network_id, 
