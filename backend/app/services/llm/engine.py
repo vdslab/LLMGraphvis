@@ -46,6 +46,7 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
                         "data": json.dumps({"tool": function_name, "status": "started", "args": function_args})
                     })
                     
+                    try:
                         if function_name in ["switch_to_main_network", "switch_to_parent_network"]:
                              logger.info(f"Executing LOCAL tool: {function_name}")
                              function_result = await local_tools.execute_local_tool(function_name, function_args, context)
