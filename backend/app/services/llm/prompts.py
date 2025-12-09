@@ -39,13 +39,21 @@ Step 3: Call `generate_visualization(focus_network_id=subgraph_id, context_confi
 User Request: "Color the most central node Red, its neighbors Blue, and the rest Gray"
 Step 1: Call `get_top_nodes(metric='degree', k=1)` -> 'n1'
 Step 2: Call `create_ego_network(center_node_id='n1', radius=1)` -> subgraph_id
-Step 3: Call `generate_visualization(
-    focus_network_id=subgraph_id,
     custom_node_colors=[{'node_id': 'n1', 'color': 'red'}],
     context_config={'opacity': 0.1, 'color': 'gray'},
     focus_config={'node_color_config': {'static_color': 'blue'}},
     node_label_config={'attribute': 'name'}
 )`
+
+User Request: "Calculate PageRank"
+Step 1: Call `list_node_attributes()` to check if it's already calculated.
+Step 2: Call `calculate_centrality(centrality_type='pagerank')` (if not found).
+Step 3: Call `list_node_attributes()` to confirm the new attribute.
+Step 4: Call `generate_visualization(...)` to show the result.
+
+User Request: "Color by department"
+Step 1: Call `list_node_attributes()` to find the exact attribute name (e.g., 'dept', 'department_id').
+Step 2: Call `generate_visualization(node_color_config={'attribute': 'department', 'scale_type': 'CATEGORICAL'}, ...)`
 
 ALWAYS follow this pattern: List -> Calculate (if needed) -> List -> Create Visualization.
 
