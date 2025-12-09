@@ -31,6 +31,8 @@ def initialize_network(network_id: int, graphml_data: str) -> dict:
         vis_data = visualizer.generate_visualization_data(final_network_id, db)
         
         return {"network": vis_data, "network_id": final_network_id}
+    except Exception as e:
+        return f"Error: {str(e)}"
     finally:
         db.close()
 
@@ -47,6 +49,8 @@ def list_node_attributes(network_id: int) -> list:
             models.NodeTextAttributeValue,
             db
         )
+    except Exception as e:
+        return f"Error: {str(e)}"
     finally:
         db.close()
 
@@ -63,6 +67,8 @@ def list_edge_attributes(network_id: int) -> list:
             models.EdgeTextAttributeValue,
             db
         )
+    except Exception as e:
+        return f"Error: {str(e)}"
     finally:
         db.close()
 
@@ -76,6 +82,8 @@ def calculate_centrality(network_id: int, centrality_type: str) -> str:
     try:
         centrality.calculate_centrality(network_id, centrality_type, db)
         return f"{centrality_type} centrality calculated."
+    except Exception as e:
+        return f"Error: {str(e)}"
     finally:
         db.close()
 
@@ -89,6 +97,8 @@ def calculate_layout(network_id: int, layout_name: str) -> str:
     try:
         layout.calculate_layout(network_id, layout_name, db)
         return f"Layout '{layout_name}' calculated and saved."
+    except Exception as e:
+        return f"Error: {str(e)}"
     finally:
         db.close()
 
@@ -129,6 +139,8 @@ def generate_visualization(
             node_label_config=node_label_config,
             custom_node_colors=custom_node_colors
         )
+    except Exception as e:
+        return f"Error: {str(e)}"
     finally:
         db.close()
 
@@ -138,6 +150,8 @@ def create_ego_network(source_network_id: int, center_node_id: str, radius: int)
     db = get_db_session()
     try:
         return subgraph.create_ego_network(source_network_id, center_node_id, radius, db)
+    except Exception as e:
+        return f"Error: {str(e)}"
     finally:
         db.close()
 
@@ -147,6 +161,8 @@ def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str]) -> d
     db = get_db_session()
     try:
         return subgraph.create_subgraph_from_nodes(source_network_id, node_ids, db)
+    except Exception as e:
+        return f"Error: {str(e)}"
     finally:
         db.close()
 
@@ -156,6 +172,8 @@ def create_path_subgraph(source_network_id: int, source_node_id: str, target_nod
     db = get_db_session()
     try:
         return subgraph.create_path_subgraph(source_network_id, source_node_id, target_node_id, db)
+    except Exception as e:
+        return f"Error: {str(e)}"
     finally:
         db.close()
 
@@ -165,6 +183,8 @@ def create_k_core_subgraph(source_network_id: int, k: int) -> dict:
     db = get_db_session()
     try:
         return subgraph.create_k_core_subgraph(source_network_id, k, db)
+    except Exception as e:
+        return f"Error: {str(e)}"
     finally:
         db.close()
 
@@ -174,6 +194,8 @@ def create_largest_component_subgraph(source_network_id: int) -> dict:
     db = get_db_session()
     try:
         return subgraph.create_largest_component_subgraph(source_network_id, db)
+    except Exception as e:
+        return f"Error: {str(e)}"
     finally:
         db.close()
 
@@ -184,6 +206,8 @@ def get_subgraphs(network_id: int) -> list:
     try:
         subgraphs = db.query(models.Network).filter(models.Network.parent_network_id == network_id).all()
         return [{"id": s.id, "name": s.name, "created_at": str(s.created_at)} for s in subgraphs]
+    except Exception as e:
+        return f"Error: {str(e)}"
     finally:
         db.close()
 
@@ -193,6 +217,8 @@ def get_top_nodes(network_id: int, metric: str, k: int = 10) -> list:
     db = get_db_session()
     try:
         return centrality.get_top_nodes(network_id, metric, k, db)
+    except Exception as e:
+        return f"Error: {str(e)}"
     finally:
         db.close()
 
@@ -202,5 +228,7 @@ def export_network(network_id: int) -> str:
     db = get_db_session()
     try:
         return exporter.export_network_to_graphml(network_id, db)
+    except Exception as e:
+        return f"Error: {str(e)}"
     finally:
         db.close()
