@@ -9,7 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app import models
-from app.services import llm_service
+from app.services.llm import service as llm_service
 from unittest.mock import MagicMock, AsyncMock
 
 # Mock network_service to avoid actual API calls
@@ -32,7 +32,7 @@ async def verify_vis_state_save():
             db.refresh(user)
 
         # Create a dummy network
-        network = models.Network(name="Test Network")
+        network = models.Network(name="Test Network", graphml_content="<graphml></graphml>")
         db.add(network)
         db.commit()
         db.refresh(network)
@@ -88,9 +88,12 @@ async def verify_vis_state_save():
         traceback.print_exc()
     finally:
         # Cleanup
-        if 'chat' in locals():
+        if 'chat' in locals() and chat and chat.id:
+            # We must fetch recent object from DB or merge it to delete
+            db.merge(chat)
             db.delete(chat)
-        if 'network' in locals():
+        if 'network' in locals() and network and network.id:
+            db.merge(network)
             db.delete(network)
         # User cleanup might be skipped if we want to reuse it or if it existed before
         db.commit()

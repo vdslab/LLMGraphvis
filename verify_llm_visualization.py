@@ -68,9 +68,10 @@ def verify_llm_visualization():
     # Manual SSE parsing
     resp = session.get(f"{BASE_URL}/chat/{chat_id}/stream", stream=True)
     
-    tool_executed = False
+    tool_called = False
     render_updated = False
     centrality_calculated = False
+    messages = []
     
     start_time = time.time()
     timeout = 30 # 30 seconds timeout
