@@ -15,7 +15,7 @@ definitions = [
                 ),
                 "layout_name": types.Schema(
                     type="STRING",
-                    description="Name of the layout algorithm to use (e.g., 'spring', 'forceatlas2'). Defaults to 'forceatlas2'.",
+                    description="Name of the layout algorithm to use. SELECT A SUITABLE LAYOUT BASED ON CONVERSATION FLOW: 'forceatlas2' (default, good for large graphs/clustering), 'circular' (for rings), 'kamada_kawai' (balanced), 'shell' (concentric), 'spectral', 'spring'.",
                     enum=["spring", "circular", "kamada_kawai", "shell", "spectral", "forceatlas2"]
                 ),
                 "node_size_config": types.Schema(

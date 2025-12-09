@@ -124,12 +124,36 @@ def calculate_layout_endpoint(request: CalculateLayoutRequest, db: Session = Dep
 @router.post("/generate_visualization")
 def generate_visualization(request: GenerateVisualizationRequest, db: Session = Depends(database.get_db)):
     try:
-        # Note: We do NOT calculate layout here anymore. 
-        # We assume it's already calculated or we use default/fallback in visualizer.
+        # Check if layout is already calculated
+        layout_name = request.layout_name or "forceatlas2"
+        attr_x_name = f"{layout_name}_x"
+        attr_y_name = f"{layout_name}_y"
+        
+        attrs = db.query(models.NodeAttribute).filter(
+            models.NodeAttribute.network_id == request.network_id,
+            models.NodeAttribute.attribute_name.in_([attr_x_name, attr_y_name])
+        ).all()
+        
+        should_calculate = False
+        if len(attrs) < 2:
+            should_calculate = True
+        else:
+            # Check if values exist (at least one to confirm it wasn't just defined and left empty)
+            attr_ids = [a.id for a in attrs]
+            val_exists = db.query(models.NodeAttributeValue).filter(
+                models.NodeAttributeValue.attribute_id.in_(attr_ids)
+            ).first()
+            if not val_exists:
+                should_calculate = True
+        
+        if should_calculate:
+            print(f"Layout '{layout_name}' not found or incomplete for network {request.network_id}. Calculating...")
+            layout.calculate_layout(request.network_id, layout_name, db)
+
         vis_data = visualizer.generate_visualization_data(
             request.network_id, 
             db, 
-            layout_name=request.layout_name,
+            layout_name=layout_name,
             node_size_config=request.node_size_config,
             node_color_config=request.node_color_config,
             edge_width_config=request.edge_width_config,
