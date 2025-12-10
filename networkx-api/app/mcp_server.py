@@ -57,14 +57,165 @@ def get_network_graphml(network_id: int) -> str:
     """Returns the raw GraphML content of the network."""
     db = get_db_session()
     try:
-        # First try to get from DB if we stored it (we added column but might not populate it nicely yet? 
-        # Actually importer.parse_and_save_graphml parses it. 
-        # Let's use exporter to regenerate it to be safe and consistent with current state)
         return exporter.export_network_to_graphml(network_id, db)
     except Exception as e:
         return f"Error exporting GraphML: {str(e)}"
     finally:
         db.close()
+
+@mcp.resource("network://{network_id}/attributes/nodes")
+def get_node_attributes(network_id: int) -> str:
+    """Lists available node attributes with metadata (type, min/max, distinct values)."""
+    db = get_db_session()
+    try:
+        stats = attributes.get_attribute_stats(
+            network_id,
+            models.NodeAttribute,
+            models.NodeAttributeValue,
+            models.NodeFloatAttributeValue,
+            models.NodeTextAttributeValue,
+            db
+        )
+        return json.dumps(stats)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+    finally:
+        db.close()
+
+@mcp.resource("network://{network_id}/attributes/edges")
+def get_edge_attributes(network_id: int) -> str:
+    """Lists available edge attributes with metadata."""
+    db = get_db_session()
+    try:
+        stats = attributes.get_attribute_stats(
+            network_id,
+            models.EdgeAttribute,
+            models.EdgeAttributeValue,
+            models.EdgeFloatAttributeValue,
+            models.EdgeTextAttributeValue,
+            db
+        )
+        return json.dumps(stats)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+    finally:
+        db.close()
+
+@mcp.resource("network://{network_id}/subgraphs")
+def get_subgraphs_resource(network_id: int) -> str:
+    """List all subgraphs created from the given parent network."""
+    db = get_db_session()
+    try:
+        subgraphs = db.query(models.Network).filter(models.Network.parent_network_id == network_id).all()
+        return json.dumps([{"id": s.id, "name": s.name, "created_at": str(s.created_at)} for s in subgraphs])
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+    finally:
+        db.close()
+
+@mcp.resource("network://{network_id}/centrality/{metric}/top")
+def get_top_nodes_resource(network_id: int, metric: str) -> str:
+    """Returns the top 10 nodes based on a centrality metric."""
+    db = get_db_session()
+    try:
+        # Default to k=10 for resource access
+        nodes = centrality.get_top_nodes(network_id, metric, 10, db)
+        return json.dumps(nodes)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+    finally:
+        db.close()
+
+@mcp.resource("network://{network_id}/structure")
+def get_structure_resource(network_id: int) -> str:
+    """Returns basic structural statistics of the network."""
+    db = get_db_session()
+    try:
+        # Simple stats calculation (could be moved to logic later)
+        node_count = db.query(models.Node).filter(models.Node.network_id == network_id).count()
+        edge_count = db.query(models.Edge).filter(models.Edge.network_id == network_id).count()
+        
+        # Calculate density (approximate for undirected)
+        density = 0
+        if node_count > 1:
+            possible_edges = node_count * (node_count - 1) / 2
+            density = edge_count / possible_edges if possible_edges > 0 else 0
+
+        return json.dumps({
+            "node_count": node_count,
+            "edge_count": edge_count,
+            "density": density,
+            "is_directed": False # Simplified assumption for now
+        })
+    except Exception as e:
+         return json.dumps({"error": str(e)})
+    finally:
+        db.close()
+
+
+# --- Prompts ---
+
+@mcp.prompt("analyze-structure")
+def analyze_structure_prompt(network_id: int) -> list[dict]:
+    return [
+        {
+            "role": "user",
+            "content": {
+                "type": "text",
+                "text": f"""Please analyze the structural characteristics of network {network_id}.
+1. Read the network structure stats: `read_resource("network://{network_id}/structure")`
+2. specific structural features using `calculate_centrality` if needed.
+3. Summarize the topology (e.g., dense/sparse, centralized/decentralized)."""
+            }
+        }
+    ]
+
+@mcp.prompt("recommend-visualization")
+def recommend_visualization_prompt(network_id: int) -> list[dict]:
+    return [
+        {
+            "role": "user",
+            "content": {
+                "type": "text",
+                "text": f"""I need a recommendation for visualizing network {network_id}.
+1. Check available attributes: `read_resource("network://{network_id}/attributes/nodes")`
+2. Check structural stats: `read_resource("network://{network_id}/structure")`
+3. Propose a layout and mapping (color/size) that best reveals patterns in the data."""
+            }
+        }
+    ]
+
+@mcp.prompt("investigate-attributes")
+def investigate_attributes_prompt(network_id: int) -> list[dict]:
+    return [
+        {
+            "role": "user",
+            "content": {
+                "type": "text",
+                "text": f"""I want to investigate the attributes of network {network_id}.
+1. List all node attributes: `read_resource("network://{network_id}/attributes/nodes")`
+2. Identify which attributes are numerical vs categorical.
+3. Look for any interesting distributions or potential correlations to explore."""
+            }
+        }
+    ]
+
+@mcp.prompt("find-important-nodes")
+def find_important_nodes_prompt(network_id: int) -> list[dict]:
+    return [
+        {
+            "role": "user",
+            "content": {
+                "type": "text",
+                "text": f"""Identify the most important nodes in network {network_id}.
+1. Calculate basic centrality metrics if not present: `calculate_centrality` (degree, betweenness).
+2. Retrieve top nodes: `read_resource("network://{network_id}/centrality/degree/top")`
+3. Explain why these nodes are important in the context of the network structure."""
+            }
+        }
+    ]
+
+# --- Tools ---
 
 @mcp.tool()
 def initialize_network(network_id: int, graphml_data: str) -> dict:
@@ -85,42 +236,6 @@ def initialize_network(network_id: int, graphml_data: str) -> dict:
         vis_data = visualizer.generate_visualization_data(final_network_id, db)
         
         return {"network": vis_data, "network_id": final_network_id}
-    except Exception as e:
-        return f"Error: {str(e)}"
-    finally:
-        db.close()
-
-@mcp.tool()
-def list_node_attributes(network_id: int) -> list:
-    """Lists available node attributes with metadata (type, min/max, distinct values)."""
-    db = get_db_session()
-    try:
-        return attributes.get_attribute_stats(
-            network_id,
-            models.NodeAttribute,
-            models.NodeAttributeValue,
-            models.NodeFloatAttributeValue,
-            models.NodeTextAttributeValue,
-            db
-        )
-    except Exception as e:
-        return f"Error: {str(e)}"
-    finally:
-        db.close()
-
-@mcp.tool()
-def list_edge_attributes(network_id: int) -> list:
-    """Lists available edge attributes with metadata."""
-    db = get_db_session()
-    try:
-        return attributes.get_attribute_stats(
-            network_id,
-            models.EdgeAttribute,
-            models.EdgeAttributeValue,
-            models.EdgeFloatAttributeValue,
-            models.EdgeTextAttributeValue,
-            db
-        )
     except Exception as e:
         return f"Error: {str(e)}"
     finally:
@@ -263,40 +378,6 @@ def create_largest_component_subgraph(source_network_id: int) -> dict:
         if "new_network_id" in result:
              result["network_id"] = result["new_network_id"]
         return result
-    except Exception as e:
-        return f"Error: {str(e)}"
-    finally:
-        db.close()
-
-@mcp.tool()
-def get_subgraphs(network_id: int) -> list:
-    """List all subgraphs created from the given parent network."""
-    db = get_db_session()
-    try:
-        subgraphs = db.query(models.Network).filter(models.Network.parent_network_id == network_id).all()
-        return [{"id": s.id, "name": s.name, "created_at": str(s.created_at)} for s in subgraphs]
-    except Exception as e:
-        return f"Error: {str(e)}"
-    finally:
-        db.close()
-
-@mcp.tool()
-def get_top_nodes(network_id: int, metric: str, k: int = 10) -> list:
-    """Returns the top K nodes based on a centrality metric."""
-    db = get_db_session()
-    try:
-        return centrality.get_top_nodes(network_id, metric, k, db)
-    except Exception as e:
-        return f"Error: {str(e)}"
-    finally:
-        db.close()
-
-@mcp.tool()
-def export_network(network_id: int) -> str:
-    """Exports the network to GraphML format."""
-    db = get_db_session()
-    try:
-        return exporter.export_network_to_graphml(network_id, db)
     except Exception as e:
         return f"Error: {str(e)}"
     finally:

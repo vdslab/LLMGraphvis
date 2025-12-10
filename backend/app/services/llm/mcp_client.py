@@ -26,6 +26,24 @@ async def get_tools_as_gemini_functions() -> list[types.Tool]:
             for tool in tools:
                 fd = _convert_to_gemini(tool)
                 gemini_tools_list.append(types.Tool(function_declarations=[fd]))
+
+            # Add read_resource client-side tool
+            gemini_tools_list.append(types.Tool(function_declarations=[
+                types.FunctionDeclaration(
+                    name="read_resource",
+                    description="Reads a resource from the MCP server using its URI.",
+                    parameters={
+                        "type": "OBJECT",
+                        "properties": {
+                            "uri": {
+                                "type": "STRING",
+                                "description": "The URI of the resource to read (e.g., network://1/attributes/nodes)"
+                            }
+                        },
+                        "required": ["uri"]
+                    }
+                )
+            ]))
                 
             return gemini_tools_list
 
@@ -73,6 +91,14 @@ async def execute_tool(tool_name: str, arguments: dict):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 
+                # Handle client-side tools
+                if tool_name == "read_resource":
+                    uri = arguments.get("uri")
+                    result = await session.read_resource(uri)
+                    # Resource content is a list of ReadResourceResult
+                    # We assume text content for now
+                    return json.loads(result.contents[0].text)
+
                 result = await session.call_tool(tool_name, arguments)
                 
                 if result.isError:

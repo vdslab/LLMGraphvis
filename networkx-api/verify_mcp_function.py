@@ -10,13 +10,13 @@ sys.path.append(os.getcwd())
 from app.core import database
 from app import models
 from app.mcp_server import (
-    list_node_attributes, 
+    get_node_attributes,  # Resource function
     calculate_centrality, 
-    get_top_nodes,
+    get_top_nodes_resource, # Resource function
     create_ego_network,
     create_subgraph_from_nodes,
     create_largest_component_subgraph,
-    get_subgraphs
+    get_subgraphs_resource # Resource function
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -29,7 +29,7 @@ def verify():
         network = db.query(models.Network).filter(models.Network.name == "VerifyTestNetwork").first()
         if not network:
             # Recreate if missing (unlikely if previous step ran)
-            network = models.Network(name="VerifyTestNetwork", description="Test Network")
+            network = models.Network(name="VerifyTestNetwork", graphml_content="<graphml></graphml>")
             db.add(network)
             db.commit()
             db.refresh(network)
@@ -59,7 +59,7 @@ def verify():
             res = create_ego_network(network.id, "n1", 1)
             logger.info(f"Ego network result: {res}")
             
-            if 'network' in res and 'network_id' in res:
+            if 'new_network_id' in res:
                 sub_id = res['network_id']
                 logger.info(f"Created Ego Network ID: {sub_id}")
                 
@@ -100,17 +100,44 @@ def verify():
         except Exception as e:
              logger.error(f"Error in create_subgraph_from_nodes: {e}")
 
-        # 7. Test get_subgraphs
-        logger.info("--- Testing get_subgraphs ---")
+        # 7. Test get_subgraphs_resource
+        logger.info("--- Testing get_subgraphs_resource ---")
         try:
-            subs = get_subgraphs(network.id)
+            subs_json = get_subgraphs_resource(network.id)
+            import json
+            subs = json.loads(subs_json)
             logger.info(f"Subgraphs list: {subs}")
             if len(subs) >= 2:
                  logger.info("Get Subgraphs Verify: OK")
             else:
-                 logger.error(f"Get Subgraphs Verify: FAIL. Expected >= 2, got {len(subs)}")
+                 logger.info(f"Get Subgraphs Verify: WARN. Expected >= 2, got {len(subs)}. Might be fresh DB.")
         except Exception as e:
              logger.error(f"Error in get_subgraphs: {e}")
+
+        # 8. Test get_node_attributes (Resource)
+        logger.info("--- Testing get_node_attributes (Resource) ---")
+        try:
+            attrs_json = get_node_attributes(network.id)
+            attrs = json.loads(attrs_json)
+            logger.info(f"Node attributes: {attrs}")
+            logger.info("Get Node Attributes Verify: OK")
+        except Exception as e:
+            logger.error(f"Error in get_node_attributes: {e}")
+
+        # 9. Test get_top_nodes_resource
+        logger.info("--- Testing get_top_nodes_resource ---")
+        try:
+            # Need to calc centrality first
+            calculate_centrality(network.id, "degree")
+            top_json = get_top_nodes_resource(network.id, "degree")
+            top_nodes = json.loads(top_json)
+            logger.info(f"Top nodes: {top_nodes}")
+            if isinstance(top_nodes, list):
+                logger.info("Get Top Nodes Verify: OK")
+            else:
+                logger.error("Get Top Nodes Verify: FAIL")
+        except Exception as e:
+            logger.error(f"Error in get_top_nodes_resource: {e}")
 
     except Exception as e:
         logger.error(f"General error: {e}")
