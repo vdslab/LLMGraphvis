@@ -60,3 +60,51 @@ def list_edge_attributes(network_id: int, db: Session = Depends(get_db)):
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+from app.schemas.network import UpdateNetworkMetadataRequest, NetworkMetadataResponse
+
+@router.get("/{network_id}/metadata", response_model=NetworkMetadataResponse)
+def get_network_metadata(network_id: int, db: Session = Depends(get_db)):
+    """Get network metadata."""
+    network = db.query(models.Network).filter(models.Network.id == network_id).first()
+    if not network:
+        raise HTTPException(status_code=404, detail="Network not found")
+    
+    return NetworkMetadataResponse(
+        id=network.id,
+        name=network.name,
+        description=network.description,
+        created_at=network.created_at,
+        updated_at=network.updated_at,
+        is_subgraph=network.parent_network_id is not None,
+        parent_network_id=network.parent_network_id
+    )
+
+@router.put("/{network_id}/metadata", response_model=NetworkMetadataResponse)
+def update_network_metadata(
+    network_id: int, 
+    request: UpdateNetworkMetadataRequest, 
+    db: Session = Depends(get_db)
+):
+    """Update network metadata (name, description)."""
+    network = db.query(models.Network).filter(models.Network.id == network_id).first()
+    if not network:
+        raise HTTPException(status_code=404, detail="Network not found")
+    
+    if request.name is not None:
+        network.name = request.name
+    if request.description is not None:
+        network.description = request.description
+    
+    db.commit()
+    db.refresh(network)
+    
+    return NetworkMetadataResponse(
+        id=network.id,
+        name=network.name,
+        description=network.description,
+        created_at=network.created_at,
+        updated_at=network.updated_at,
+        is_subgraph=network.parent_network_id is not None,
+        parent_network_id=network.parent_network_id
+    )
