@@ -55,7 +55,7 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id = Column(Integer, primary_key=True, index=True)
-    chat_id = Column("conversation_id", Integer, ForeignKey("chats.id"), nullable=False)
+    chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False)
     role = Column(String, nullable=False)
     content = Column(Text, nullable=False)
     meta_data = Column(JSON, nullable=True)

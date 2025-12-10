@@ -11,10 +11,10 @@ SSE_ENDPOINT = f"{NETWORKX_API_URL}/mcp/sse"
 async def get_tools_as_gemini_functions() -> list[types.Tool]:
     """
     Connects to the NetworkXAPI MCP Server, discovers tools, 
-    Computes tools.
+    Converts MCP tools to Gemini function declarations.
     """
     # Note: We use sse_client for HTTP/SSE connection
-    async with sse_client(SSE_ENDPOINT, headers={"Host": "localhost:8001"}) as (read, write):
+    async with sse_client(SSE_ENDPOINT) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             
@@ -69,7 +69,7 @@ async def execute_tool(tool_name: str, arguments: dict):
     Executes a tool on the NetworkXAPI MCP Server.
     """
     try:
-        async with sse_client(SSE_ENDPOINT, headers={"Host": "localhost:8001"}) as (read, write):
+        async with sse_client(SSE_ENDPOINT) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 
@@ -95,4 +95,4 @@ async def execute_tool(tool_name: str, arguments: dict):
     except Exception as e:
         import traceback
         traceback.print_exc()
-        raise e
+        raise

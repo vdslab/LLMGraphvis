@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from app import models
 from app.logic import utils
 from app.logic.style_service import StyleService
-from typing import Dict, Any, List, Set, Optional, Tuple
+from typing import Dict, Any, List, Set, Tuple
 
 def generate_visualization_data(
     network_id: int, 

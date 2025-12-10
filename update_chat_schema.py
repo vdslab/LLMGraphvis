@@ -6,7 +6,7 @@ from sqlalchemy import create_engine, text
 sys.path.append(os.path.join(os.getcwd(), "backend"))
 
 from app.core.database import engine
-from app import models
+
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/graphvis")
 

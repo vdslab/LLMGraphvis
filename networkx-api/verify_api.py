@@ -1,9 +1,9 @@
 
 import requests
-import json
+
 import networkx as nx
 
-BASE_URL = "http://localhost:8000/api/v1/networks"
+BASE_URL = "http://localhost:8001/api/v1/networks"
 
 
 def test_api():
