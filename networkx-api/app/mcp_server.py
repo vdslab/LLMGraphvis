@@ -13,6 +13,60 @@ def get_db_session():
     return database.SessionLocal()
 
 @mcp.tool()
+def update_network_metadata(network_id: int, description: str = None, name: str = None) -> str:
+    """Updates the network's name or description."""
+    db = get_db_session()
+    try:
+        network = db.query(models.Network).filter(models.Network.id == network_id).first()
+        if not network:
+            return f"Error: Network {network_id} not found."
+        
+        if description is not None:
+            network.description = description
+        if name is not None:
+            network.name = name
+            
+        db.commit()
+        return f"Network {network_id} metadata updated."
+    except Exception as e:
+        db.rollback()
+        return f"Error: {str(e)}"
+    finally:
+        db.close()
+
+@mcp.resource("network://{network_id}/metadata")
+def get_network_metadata(network_id: int) -> str:
+    """Returns network metadata (name, description, created_at) as JSON."""
+    db = get_db_session()
+    try:
+        network = db.query(models.Network).filter(models.Network.id == network_id).first()
+        if not network:
+            return json.dumps({"error": "Network not found"})
+            
+        return json.dumps({
+            "id": network.id,
+            "name": network.name,
+            "description": network.description,
+            "created_at": str(network.created_at)
+        })
+    finally:
+        db.close()
+
+@mcp.resource("network://{network_id}/graphml")
+def get_network_graphml(network_id: int) -> str:
+    """Returns the raw GraphML content of the network."""
+    db = get_db_session()
+    try:
+        # First try to get from DB if we stored it (we added column but might not populate it nicely yet? 
+        # Actually importer.parse_and_save_graphml parses it. 
+        # Let's use exporter to regenerate it to be safe and consistent with current state)
+        return exporter.export_network_to_graphml(network_id, db)
+    except Exception as e:
+        return f"Error exporting GraphML: {str(e)}"
+    finally:
+        db.close()
+
+@mcp.tool()
 def initialize_network(network_id: int, graphml_data: str) -> dict:
     """
     Initializes a network from GraphML data.
