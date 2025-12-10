@@ -33,6 +33,12 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
         
         if current_response.candidates and current_response.candidates[0].content.parts:
             for part in current_response.candidates[0].content.parts:
+                if part.text:
+                    await queue.put({
+                        "event": "thinking_stream",
+                        "data": json.dumps({"content": part.text})
+                    })
+                
                 if hasattr(part, 'function_call') and part.function_call:
                     has_function_call = True
                     function_call = part.function_call
@@ -45,6 +51,7 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
                         "event": "tool_execution",
                         "data": json.dumps({"tool": function_name, "status": "started", "args": function_args})
                     })
+
                     
                     try:
                         if function_name in ["switch_to_main_network", "switch_to_parent_network"]:
