@@ -203,7 +203,10 @@ def create_ego_network(source_network_id: int, center_node_id: str, radius: int)
     """Creates an Ego Network subgraph (nodes within radius hops from center)."""
     db = get_db_session()
     try:
-        return subgraph.create_ego_network(source_network_id, center_node_id, radius, db)
+        result = subgraph.create_ego_network(source_network_id, center_node_id, radius, db)
+        if "new_network_id" in result:
+             result["network_id"] = result["new_network_id"]
+        return result
     except Exception as e:
         return f"Error: {str(e)}"
     finally:
@@ -214,7 +217,10 @@ def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str]) -> d
     """Creates a subgraph containing the specified nodes."""
     db = get_db_session()
     try:
-        return subgraph.create_subgraph_from_nodes(source_network_id, node_ids, db)
+        result = subgraph.create_subgraph_from_nodes(source_network_id, node_ids, db)
+        if "new_network_id" in result:
+             result["network_id"] = result["new_network_id"]
+        return result
     except Exception as e:
         return f"Error: {str(e)}"
     finally:
@@ -225,7 +231,10 @@ def create_path_subgraph(source_network_id: int, source_node_id: str, target_nod
     """Creates a subgraph consisting of the shortest path between two nodes."""
     db = get_db_session()
     try:
-        return subgraph.create_path_subgraph(source_network_id, source_node_id, target_node_id, db)
+        result = subgraph.create_path_subgraph(source_network_id, source_node_id, target_node_id, db)
+        if "new_network_id" in result:
+             result["network_id"] = result["new_network_id"]
+        return result
     except Exception as e:
         return f"Error: {str(e)}"
     finally:
@@ -236,7 +245,10 @@ def create_k_core_subgraph(source_network_id: int, k: int) -> dict:
     """Creates a k-Core subgraph (maximal subgraph where every node has degree >= k)."""
     db = get_db_session()
     try:
-        return subgraph.create_k_core_subgraph(source_network_id, k, db)
+        result = subgraph.create_k_core_subgraph(source_network_id, k, db)
+        if "new_network_id" in result:
+             result["network_id"] = result["new_network_id"]
+        return result
     except Exception as e:
         return f"Error: {str(e)}"
     finally:
@@ -247,7 +259,10 @@ def create_largest_component_subgraph(source_network_id: int) -> dict:
     """Creates a subgraph from the largest connected component of the network."""
     db = get_db_session()
     try:
-        return subgraph.create_largest_component_subgraph(source_network_id, db)
+        result = subgraph.create_largest_component_subgraph(source_network_id, db)
+        if "new_network_id" in result:
+             result["network_id"] = result["new_network_id"]
+        return result
     except Exception as e:
         return f"Error: {str(e)}"
     finally:
