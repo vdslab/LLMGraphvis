@@ -120,5 +120,6 @@ async def execute_tool(tool_name: str, arguments: dict):
                     return {"content": output_text}
     except Exception as e:
         import traceback
+        logger.error(f"Error executing tool {tool_name} with args {arguments}: {e}")
         traceback.print_exc()
         raise

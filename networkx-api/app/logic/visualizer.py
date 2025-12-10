@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from app import models
 from app.logic import utils
 from app.logic.style_service import StyleService
-from typing import Dict, Any, List, Set, Tuple
+from typing import Dict, Any, List, Set, Tuple, Optional
 
 def generate_visualization_data(
     network_id: int, 
@@ -52,22 +52,11 @@ def generate_visualization_data(
                 focus_node_attr_map, focus_node_values = _fetch_node_data(db, focus_network_id, focus_node_attrs)
     
     # --- Validation: Ensure all requested attributes exist ---
-    missing_attrs = []
-    for attr in global_node_attrs:
-        if attr not in global_node_attr_map:
-            missing_attrs.append(f"Node attribute '{attr}' (Network {network_id})")
-    
-    for attr in required_edge_attrs:
-        if attr not in edge_attr_map:
-            missing_attrs.append(f"Edge attribute '{attr}' (Network {network_id})")
-
-    if focus_network_id and focus_node_attrs:
-        for attr in focus_node_attrs:
-            if attr not in focus_node_attr_map:
-                missing_attrs.append(f"Node attribute '{attr}' (Focus Network {focus_network_id})")
-            
-    if missing_attrs:
-        raise ValueError(f"Missing required attributes for visualization: {', '.join(missing_attrs)}. Please calculate them first.")
+    _validate_attributes(
+        network_id, global_node_attrs, global_node_attr_map,
+        required_edge_attrs, edge_attr_map,
+        focus_network_id, focus_node_attrs, focus_node_attr_map
+    )
 
     # --- 3. Calculate Stats ---
     node_size_stats = StyleService.calculate_stats(node_size_config, global_node_attr_map, global_node_values)
@@ -92,14 +81,79 @@ def generate_visualization_data(
                 custom_color_map[str(item["node_id"])] = item["color"]
 
     # --- 5. Build Nodes ---
+    vis_nodes = _build_vis_nodes(
+        db, network_id, 
+        node_size_config, node_size_stats,
+        node_color_config, node_color_stats,
+        global_node_attr_map, global_node_values,
+        layout_name, layout_x_attr, layout_y_attr,
+        node_label_config,
+        focus_network_id, focus_node_map, focus_config, focus_node_size_stats, focus_node_color_stats,
+        focus_node_attr_map, focus_node_values,
+        context_config,
+        ranking_color_map, categorical_color_map, custom_color_map
+    )
+
+    # --- 6. Build Edges ---
+    vis_edges = _build_vis_edges(
+        db, network_id, vis_nodes,
+        edge_width_config, edge_width_stats,
+        edge_color_config, edge_color_stats,
+        edge_attr_map, edge_values,
+        focus_network_id, focus_node_map,
+        context_config
+    )
+
+    return {"nodes": vis_nodes, "links": vis_edges}
+
+
+# --- internal Helpers ---
+
+def _validate_attributes(
+    network_id: int,
+    node_attrs: Set[str], node_attr_map: Dict[str, int],
+    edge_attrs: Set[str], edge_attr_map: Dict[str, int],
+    focus_network_id: Optional[int],
+    focus_node_attrs: Set[str], focus_node_attr_map: Dict[str, int]
+):
+    missing_attrs = []
+    for attr in node_attrs:
+        if attr not in node_attr_map:
+            missing_attrs.append(f"Node attribute '{attr}' (Network {network_id})")
+    
+    for attr in edge_attrs:
+        if attr not in edge_attr_map:
+            missing_attrs.append(f"Edge attribute '{attr}' (Network {network_id})")
+
+    if focus_network_id and focus_node_attrs:
+        for attr in focus_node_attrs:
+            if attr not in focus_node_attr_map:
+                missing_attrs.append(f"Node attribute '{attr}' (Focus Network {focus_network_id})")
+            
+    if missing_attrs:
+        raise ValueError(f"Missing required attributes for visualization: {', '.join(missing_attrs)}. Please calculate them first.")
+
+
+def _build_vis_nodes(
+    db: Session, network_id: int,
+    node_size_config: Dict, node_size_stats: Tuple,
+    node_color_config: Dict, node_color_stats: Tuple,
+    global_node_attr_map: Dict, global_node_values: Dict,
+    layout_name: str, layout_x_attr: str, layout_y_attr: str,
+    node_label_config: Dict,
+    focus_network_id: Optional[int], focus_node_map: Dict, focus_config: Dict,
+    focus_node_size_stats: Tuple, focus_node_color_stats: Tuple,
+    focus_node_attr_map: Dict, focus_node_values: Dict,
+    context_config: Dict,
+    ranking_color_map: Dict, categorical_color_map: Dict, custom_color_map: Dict
+) -> List[Dict]:
+    
     nodes = db.query(models.Node).filter(models.Node.network_id == network_id).all()
     smart_defaults = utils.calculate_smart_node_size(len(nodes))
     focus_node_ids_str = set(focus_node_map.keys())
     
     vis_nodes = []
-    layout_x_attr = f"{layout_name}_x"
-    layout_y_attr = f"{layout_name}_y"
-
+    
     for n in nodes:
         is_focused = n.node_id in focus_node_ids_str
         
@@ -179,24 +233,44 @@ def generate_visualization_data(
             "color": color,
             "opacity": opacity
         })
+    return vis_nodes
 
-    # --- 6. Build Edges ---
+
+def _build_vis_edges(
+    db: Session, network_id: int, vis_nodes: List[Dict],
+    edge_width_config: Dict, edge_width_stats: Tuple,
+    edge_color_config: Dict, edge_color_stats: Tuple,
+    edge_attr_map: Dict, edge_values: Dict,
+    focus_network_id: Optional[int], focus_node_map: Dict,
+    context_config: Dict
+) -> List[Dict]:
+    
     edges = db.query(models.Edge).filter(models.Edge.network_id == network_id).all()
     smart_edge_defaults = utils.calculate_smart_edge_width(len(edges))
     vis_edges = []
     
-    node_lookup = {n.id: n for n in nodes}
+    # Create lookup from node_id string to whether it exists in vis_nodes
+    # We only want to visualize edges connecting visible nodes
+    visible_node_ids = {n["id"] for n in vis_nodes}
+    focus_node_ids_str = set(focus_node_map.keys())
+
+    # Create mapping from PK to node_id str
+    node_id_map = {n.id: n.node_id for n in db.query(models.Node.id, models.Node.node_id).filter(models.Node.network_id == network_id).all()}
 
     for e in edges:
-        source_node = node_lookup.get(e.source_node_id)
-        target_node = node_lookup.get(e.target_node_id)
+        source_node_id = node_id_map.get(e.source_node_id)
+        target_node_id = node_id_map.get(e.target_node_id)
         
-        if not source_node or not target_node:
+        if not source_node_id or not target_node_id:
+            continue
+        
+        # Check explicit visibility
+        if source_node_id not in visible_node_ids or target_node_id not in visible_node_ids:
             continue
         
         is_focused = False
         if focus_network_id:
-            is_focused = (source_node.node_id in focus_node_ids_str) and (target_node.node_id in focus_node_ids_str)
+            is_focused = (source_node_id in focus_node_ids_str) and (target_node_id in focus_node_ids_str)
 
         if not is_focused and context_config and context_config.get("visible") is False:
             continue
@@ -219,17 +293,15 @@ def generate_visualization_data(
                     color = context_config["color"]
 
         vis_edges.append({
-            "source": source_node.node_id,
-            "target": target_node.node_id,
+            "source": source_node_id,
+            "target": target_node_id,
             "width": width,
             "color": color,
             "opacity": opacity
         })
+        
+    return vis_edges
 
-    return {"nodes": vis_nodes, "links": vis_edges}
-
-
-# --- internal Helpers ---
 
 def _fetch_node_data(db: Session, network_id: int, result_attrs: Set[str]) -> Tuple[Dict[str, int], Dict[int, Dict[int, Any]]]:
     if not result_attrs:
