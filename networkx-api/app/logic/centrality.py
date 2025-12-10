@@ -30,6 +30,8 @@ def calculate_centrality(network_id: int, centrality_type: str, db: Session):
         centrality = nx.closeness_centrality(G)
     elif centrality_type == "eigenvector":
         centrality = nx.eigenvector_centrality(G, max_iter=1000)
+    elif centrality_type == "pagerank":
+        centrality = nx.pagerank(G, alpha=0.85)
     else:
         raise ValueError(f"Unknown centrality type: {centrality_type}")
         
