@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useAuthStore } from '../stores/authStore';
+// import { useAuthStore } from '../stores/authStore';
 
 const api = axios.create({
   baseURL: '/api', // Proxy handles the rest
@@ -58,7 +58,7 @@ api.interceptors.response.use(
 
       // Redirect to login or clear auth state
       // We can't use hooks here directly, but we can access the store
-      useAuthStore.getState().logout();
+      // useAuthStore.getState().logout(); // Avoid circular dependency
       window.location.href = '/login';
     }
     return Promise.reject(error);

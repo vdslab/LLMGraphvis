@@ -7,7 +7,7 @@ export const useNetworkStore = create((set) => ({
   
   setNetworkData: (data) => {
     // data: { nodes: [], links: [] }
-    set({ nodes: data.nodes, links: data.links });
+    set({ nodes: data?.nodes || [], links: data?.links || [] });
   },
   
   setNetworkId: (id) => set({ networkId: id }),
