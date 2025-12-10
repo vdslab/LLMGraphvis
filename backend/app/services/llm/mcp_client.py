@@ -1,4 +1,5 @@
 import os
+import json
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
@@ -114,7 +115,6 @@ async def execute_tool(tool_name: str, arguments: dict):
                 
                 # Try parsing as JSON if possible, otherwise return string
                 try:
-                    import json
                     return json.loads(output_text)
                 except:
                     return {"content": output_text}

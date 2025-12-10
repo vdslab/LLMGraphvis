@@ -5,7 +5,7 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
-async def switch_to_main_network(chat_id: int, db: Session) -> str:
+async def switch_to_main_network(chat_id: int, db: Session) -> dict:
     """
     Switches the chat context back to the main (root) network.
     Use this when the user wants to go back to the original full graph.
@@ -13,12 +13,12 @@ async def switch_to_main_network(chat_id: int, db: Session) -> str:
     try:
         chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
         if not chat:
-            return "Chat not found"
+            return {"content": "Chat not found"}
 
         # Find the current network to traverse up
         current_network = db.query(models.Network).filter(models.Network.id == chat.network_id).first()
         if not current_network:
-            return "Current network context not found"
+            return {"content": "Current network context not found"}
 
         # Traverse up to find the root
         root_network = current_network
@@ -33,13 +33,13 @@ async def switch_to_main_network(chat_id: int, db: Session) -> str:
         chat.network_id = root_network.id
         db.commit()
         
-        return f"Context switched to Main Network (ID: {root_network.id})."
+        return {"content": f"Context switched to Main Network (ID: {root_network.id})."}
     
     except Exception as e:
         logger.error(f"Error in switch_to_main_network: {e}")
-        return f"Failed to switch to main network: {str(e)}"
+        return {"content": f"Failed to switch to main network: {str(e)}"}
 
-async def switch_to_parent_network(chat_id: int, db: Session) -> str:
+async def switch_to_parent_network(chat_id: int, db: Session) -> dict:
     """
     Switches the chat context to the parent network of the current subgraph.
     Use this when the user wants to go up one level in the hierarchy.
@@ -47,24 +47,24 @@ async def switch_to_parent_network(chat_id: int, db: Session) -> str:
     try:
         chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
         if not chat:
-            return "Chat not found"
+            return {"content": "Chat not found"}
 
         current_network = db.query(models.Network).filter(models.Network.id == chat.network_id).first()
         if not current_network:
-             return "Current network context not found"
+             return {"content": "Current network context not found"}
              
         if current_network.parent_network_id is None:
-            return "Already at the top-level network. Cannot switch to parent."
+            return {"content": "Already at the top-level network. Cannot switch to parent."}
             
         # Update chat context
         chat.network_id = current_network.parent_network_id
         db.commit()
         
-        return f"Context switched to Parent Network (ID: {current_network.parent_network_id})."
+        return {"content": f"Context switched to Parent Network (ID: {current_network.parent_network_id})."}
 
     except Exception as e:
         logger.error(f"Error in switch_to_parent_network: {e}")
-        return f"Failed to switch to parent network: {str(e)}"
+        return {"content": f"Failed to switch to parent network: {str(e)}"}
 
 def get_local_tools() -> list[types.Tool]:
     """Returns the list of local tools as Gemini FunctionDeclarations."""
