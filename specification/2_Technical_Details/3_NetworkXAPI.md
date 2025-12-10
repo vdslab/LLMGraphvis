@@ -20,6 +20,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 | Tool Name | 説明 |
 |:---|:---|
 | `initialize_network` | GraphMLデータを受け取り、初期化を行う。**指定された`network_id`に既にデータ（ノード）が存在する場合は、上書きせずに新しい`network_id`を発行して新規ネットワークとして保存する。** 処理内容は、1.正規化、2.DB保存、3.初期レイアウト(Spring)計算、4.初期レンダリングデータ生成。レスポンスには最終的に使用された`network_id`が含まれる。 |
+| `update_network_metadata` | ネットワークの名前や説明（description）を更新する。LLMがネットワークのコンテキスト（例：「これは空手クラブの相関図です」）を理解・保持するために使用する。 |
 | `list_node_attributes` | ネットワークに存在するノード属性（計算済みまたは元から存在）の一覧を返す。 |
 | `list_edge_attributes` | ネットワークに存在するエッジ属性（計算済みまたは元から存在）の一覧を返す。 |
 | `calculate_centrality` | 中心性指標を計算して永続化する。具体的には、まず属性の**定義**（例: 'degree_centrality'）が`node_attributes`に存在するか確認し、なければ`network_id`に紐付けて作成する。次に、各ノードの計算**値**を、定義のIDを参照して`node_attribute_values`に保存する。レスポンスは計算完了のステータスのみを返す。 |
@@ -34,7 +35,23 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 | `get_top_nodes` | 指定された中心性指標に基づいて、上位k個のノードを取得する。 |
 | `export_network` | ネットワークをGraphML形式でエクスポートする。 |
 
-## 3.3. ツール定義詳細
+## 3.3. MCPリソース一覧
+ 
+MCPのリソース機能を通じて、ネットワークの生データやメタデータへの直接アクセスを提供します。
+ 
+| Resource URI | 説明 |
+|:---|:---|
+| `network://{id}/metadata` | ネットワークのメタデータ（ID, 名前, 説明, 作成日時）をJSON形式で取得する。 |
+| `network://{id}/graphml` | ネットワークの完全なGraphMLデータを取得する。 |
+ 
+## 3.4. ツール定義詳細
+
+### `update_network_metadata`
+- **Description**: ネットワークの名前や説明を更新する。
+- **Arguments**:
+  - `network_id`: int
+  - `description`: str (Optional)
+  - `name`: str (Optional)
 
 ### `list_node_attributes`
 - **Parameters**: `network_id`
@@ -304,3 +321,37 @@ LLMは、ユーザーの「次数が多いノードを大きく、コミュニ�
 - **ステートレス化**: 視覚ルールを永続化しないため、データベースの状態がシンプルになります。
 - **柔軟性の向上**: LLMが対話の都度、最適な視覚表現をゼロベースで考案・指示できるため、より文脈に応じたインタラクティブな分析が可能になります。
 - **シンプル化**: Backendは、LLMからのツールコールをNetworkXAPIに中継し、結果をフロントエンドに流すだけの単純なプロキシとなり、システム全体のデータフローが大幅に簡潔になります。
+
+## 3.5. REST API エンドポイント (MCP Feature Parity)
+
+MCPツールと同等の機能をREST API経由でも利用可能にするため、以下のエンドポイントを提供します。
+
+### `GET /api/v1/networks/{network_id}/metadata`
+ネットワークのメタデータ（名前、説明など）を取得します。
+
+**Response:**
+```json
+{
+  "id": 1,
+  "name": "Network Name",
+  "description": "Network Description",
+  "created_at": "...",
+  "updated_at": "...",
+  "is_subgraph": false,
+  "parent_network_id": null
+}
+```
+
+### `PUT /api/v1/networks/{network_id}/metadata`
+ネットワークのメタデータを更新します。
+
+**Request:**
+```json
+{
+  "name": "New Name",
+  "description": "New Description"
+}
+```
+
+**Response:** 更新後のメタデータ（GETと同じ形式）
+
