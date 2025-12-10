@@ -45,24 +45,29 @@ def generate_visualization_data(
     focus_node_attr_map = {}
     focus_node_values = {}
     focus_node_map = {}
+
+    if focus_network_id:
+        focus_node_map = _get_focus_node_map(db, focus_network_id)
+        if focus_node_attrs:
+                focus_node_attr_map, focus_node_values = _fetch_node_data(db, focus_network_id, focus_node_attrs)
     
     # --- Validation: Ensure all requested attributes exist ---
     missing_attrs = []
     for attr in global_node_attrs:
         if attr not in global_node_attr_map:
-            missing_attrs.append(f"Node attribute '{attr}'")
+            missing_attrs.append(f"Node attribute '{attr}' (Network {network_id})")
     
     for attr in required_edge_attrs:
         if attr not in edge_attr_map:
-            missing_attrs.append(f"Edge attribute '{attr}'")
+            missing_attrs.append(f"Edge attribute '{attr}' (Network {network_id})")
+
+    if focus_network_id and focus_node_attrs:
+        for attr in focus_node_attrs:
+            if attr not in focus_node_attr_map:
+                missing_attrs.append(f"Node attribute '{attr}' (Focus Network {focus_network_id})")
             
     if missing_attrs:
         raise ValueError(f"Missing required attributes for visualization: {', '.join(missing_attrs)}. Please calculate them first.")
-        
-    if focus_network_id:
-        focus_node_map = _get_focus_node_map(db, focus_network_id)
-        if focus_node_attrs:
-             focus_node_attr_map, focus_node_values = _fetch_node_data(db, focus_network_id, focus_node_attrs)
 
     # --- 3. Calculate Stats ---
     node_size_stats = StyleService.calculate_stats(node_size_config, global_node_attr_map, global_node_values)
