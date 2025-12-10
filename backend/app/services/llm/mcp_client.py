@@ -98,7 +98,10 @@ async def execute_tool(tool_name: str, arguments: dict):
                     result = await session.read_resource(uri)
                     # Resource content is a list of ReadResourceResult
                     # We assume text content for now
-                    return json.loads(result.contents[0].text)
+                    parsed_result = json.loads(result.contents[0].text)
+                    if isinstance(parsed_result, list):
+                        return {"result": parsed_result}
+                    return parsed_result
 
                 result = await session.call_tool(tool_name, arguments)
                 
@@ -115,7 +118,10 @@ async def execute_tool(tool_name: str, arguments: dict):
                 
                 # Try parsing as JSON if possible, otherwise return string
                 try:
-                    return json.loads(output_text)
+                    parsed_result = json.loads(output_text)
+                    if isinstance(parsed_result, list):
+                        return {"result": parsed_result}
+                    return parsed_result
                 except:
                     return {"content": output_text}
     except Exception as e:
