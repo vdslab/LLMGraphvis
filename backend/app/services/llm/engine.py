@@ -68,6 +68,22 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
                         function_result = {"error": error_msg}
                         status = "failed"
                     
+                    
+                    # Logic to identify visualization updates and send render_update event
+                    if status == "completed" and isinstance(function_result, dict):
+                        vis_data = None
+                        if function_name == "generate_visualization":
+                            vis_data = function_result
+                        elif function_name == "initialize_network" and "network" in function_result:
+                            vis_data = function_result["network"]
+                        
+                        if vis_data:
+                            logger.info(f"Emitting render_update for {function_name}")
+                            await queue.put({
+                                "event": "render_update",
+                                "data": json.dumps(vis_data)
+                            })
+
                     # Notify end
                     await queue.put({
                         "event": "tool_execution",
