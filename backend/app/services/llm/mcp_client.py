@@ -11,7 +11,7 @@ SSE_ENDPOINT = f"{NETWORKX_API_URL}/mcp/sse"
 async def get_tools_as_gemini_functions() -> list[types.Tool]:
     """
     Connects to the NetworkXAPI MCP Server, discovers tools, 
-    and converts them to Gemini-compatible function declarations.
+    Computes tools.
     """
     # Note: We use sse_client for HTTP/SSE connection
     async with sse_client(SSE_ENDPOINT, headers={"Host": "localhost:8001"}) as (read, write):

@@ -40,6 +40,7 @@ class Chat(ChatBase):
 class Network(BaseModel):
     id: int
     name: str
+    description: Optional[str] = None
     network_id: Optional[int] = None # For compatibility if needed, though usually just id
     created_at: datetime
     updated_at: datetime
