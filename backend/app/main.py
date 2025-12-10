@@ -3,11 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from app.api.v1.endpoints import auth, chat, networks
 from app.core.database import engine, Base
+from app.core import logging
+from app.middleware.logging import LoggingMiddleware
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
-
-
 
 # Create FastAPI app with Swagger UI configuration
 app = FastAPI(
@@ -21,6 +21,9 @@ app = FastAPI(
         "defaultModelsExpandDepth": 1   # Limit models display depth
     }
 )
+
+# Add logging middleware
+app.add_middleware(LoggingMiddleware)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -99,12 +102,9 @@ app.add_middleware(
 )
 
 # Include routers
-# Include routers
 app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(networks.router)
-
-
 
 @app.get("/")
 def read_root():

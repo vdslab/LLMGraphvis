@@ -106,7 +106,11 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
                     
                     # Log Request Details (Tool Loop)
                     logger.info(f"--- Gemini API Request (Tool Loop) ---")
-                    logger.info(f"Tool Output: {function_result}")
+                    
+                    # Truncate output for logging
+                    result_str = str(function_result)
+                    result_log = result_str[:500] + "..." if len(result_str) > 500 else result_str
+                    logger.info(f"Tool Output: {result_log}")
                     
                     # Re-fetch tool definitions (or we could pass them in to avoid re-fetching)
                     mcp_tools = await mcp_client.get_tools_as_gemini_functions()
