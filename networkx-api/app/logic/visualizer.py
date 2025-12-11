@@ -30,7 +30,6 @@ def generate_visualization_data(
     _validate_edge_configs(edge_width_config, edge_color_config)
     
     if layout_name is None:
-    if layout_name is None:
         layout_name = network.last_layout_name if network.last_layout_name else "forceatlas2"
     
     # Also resolve other configs if None? 
