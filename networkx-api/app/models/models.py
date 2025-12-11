@@ -15,7 +15,7 @@ class Network(Base):
     graphml_content = Column(Text, nullable=True)
 
     # Visual State Tracking
-    last_layout_name = Column(String, default="forceatlas2")
+    last_layout_name = Column(String, nullable=True) # Set explicitly during initialization
     last_node_size_config = Column(JSON, nullable=True)
     last_node_color_config = Column(JSON, nullable=True)
     last_edge_width_config = Column(JSON, nullable=True)
