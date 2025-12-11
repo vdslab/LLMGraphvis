@@ -44,7 +44,7 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
              # gravity=0.05 is quite weak, standard is 1.0. 
              # The user complained about previous one being bad. 
              # Let's use defaults but slightly more iterations.
-             pos = nx.forceatlas2_layout(G, max_iter=500, seed=42)
+             pos = nx.forceatlas2_layout(G, max_iter=2000, scaling_ratio=20.0, seed=42)
         except AttributeError:
              # Fallback if somehow not available (though we verified it is)
              # or if older version in prod? (Unlikely given verification)
