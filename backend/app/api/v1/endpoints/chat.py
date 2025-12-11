@@ -162,6 +162,11 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
         vis_data = result.get("network")
         final_network_id = result.get("network_id")
         
+        if final_network_id is None:
+            error_msg = result.get("content", "Unknown error during network initialization")
+            logger.error(f"Network initialization failed: {error_msg}")
+            raise ValueError(f"Network initialization failed: {error_msg}")
+
         # If network_id changed (collision handling), update the Chat record
         if final_network_id != network_id:
             logger.info(f"Network ID updated from {network_id} to {final_network_id} due to collision/re-upload.")

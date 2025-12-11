@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app import models
-from app.logic import utils
+from app.logic.common_utils import calculate_smart_node_size, calculate_smart_edge_width
+from app.logic import common_utils as utils
 from app.logic.style_service import StyleService
 from typing import Dict, Any, List, Set, Tuple, Optional
 
@@ -184,7 +185,7 @@ def _build_vis_nodes(
 ) -> List[Dict]:
     
     nodes = db.query(models.Node).filter(models.Node.network_id == network_id).all()
-    smart_defaults = utils.calculate_smart_node_size(len(nodes))
+    smart_defaults = calculate_smart_node_size(len(nodes))
     focus_node_ids_str = set(focus_node_map.keys())
     
     vis_nodes = []
@@ -281,7 +282,7 @@ def _build_vis_edges(
 ) -> List[Dict]:
     
     edges = db.query(models.Edge).filter(models.Edge.network_id == network_id).all()
-    smart_edge_defaults = utils.calculate_smart_edge_width(len(edges))
+    smart_edge_defaults = calculate_smart_edge_width(len(edges))
     vis_edges = []
     
     # Create lookup from node_id string to whether it exists in vis_nodes

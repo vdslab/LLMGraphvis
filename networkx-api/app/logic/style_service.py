@@ -1,5 +1,5 @@
 from typing import Dict, Any, List, Set, Tuple, Optional
-from app.logic import utils
+from app.logic import common_utils as utils
 
 class StyleService:
     """
