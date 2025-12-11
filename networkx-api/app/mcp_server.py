@@ -299,6 +299,54 @@ def generate_visualization(
     """
     Generates the final visualization data (nodes and links) for the frontend.
     Handles layout application, size/color mapping, and focus+context rendering.
+
+    **Configuration Dictionaries:**
+
+    1. **node_color_config**:
+        - **scale_type** (str): "LINEAR", "CATEGORICAL", or "RANKING".
+        - **attribute** (str): The node attribute name to use.
+        - **gradient** (List[str]): [start_color, end_color] for "LINEAR".
+        - **color_map** (Dict[str, str]): {value: color_hex} for "CATEGORICAL".
+        - **ranking_rules** (List[Dict]): For "RANKING". List of {"top": int, "color": str}.
+        - **default_color** (str): Fallback color.
+        
+        *Example (Categorical - "Country"):*
+        ```json
+        {
+          "scale_type": "CATEGORICAL",
+          "attribute": "Country",
+          "color_map": {"USA": "#FF0000", "Japan": "#FFFFFF"}
+        }
+        ```
+        
+        *Example (Ranking - "PageRank"):*
+        ```json
+        {
+          "scale_type": "RANKING",
+          "attribute": "pagerank",
+          "ranking_rules": [
+             {"top": 5, "color": "#FF0000"},
+             {"top": 10, "color": "#00FF00"}
+          ]
+        }
+        ```
+
+    2. **node_size_config**:
+        - **attribute** (str): The node attribute for sizing.
+        - **min** (float): Min radius.
+        - **max** (float): Max radius.
+        - **default** (float): Default radius (if attribute missing).
+
+    3. **edge_width_config**:
+        - **attribute** (str): Edge attribute.
+        - **min** (float): Min width.
+        - **max** (float): Max width.
+
+    4. **edge_color_config**:
+         - **attribute** (str): Edge attribute.
+         - **scale_type** (str): "LINEAR" or "CATEGORICAL".
+         - **gradient** (List[str]): [start_color, end_color].
+         - **color_map** (Dict[str, str]): {value: color}.
     """
     db = get_db_session()
     try:
