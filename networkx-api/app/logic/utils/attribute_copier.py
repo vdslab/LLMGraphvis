@@ -70,64 +70,91 @@ class AttributeCopier:
         
         if not old_ids or not old_attr_ids: return
 
-        # Chunking might be needed for large datasets, but assuming reasonable size for now
-        old_vals = self.db.query(model_val).filter(
-            getattr(model_val, parent_col).in_(old_ids),
-            model_val.attribute_id.in_(old_attr_ids)
-        ).all()
+        # Process in chunks to prevent OOM
+        chunk_size = 500
+        total = len(old_ids)
         
-        new_vals_data = []
-        
-        for val in old_vals:
-            new_pk = id_map.get(getattr(val, parent_col))
-            new_attr_id = attr_id_map.get(val.attribute_id)
-            if new_pk and new_attr_id:
-                new_vals_data.append({
-                    parent_col: new_pk,
-                    "attribute_id": new_attr_id
-                })
-        
-        if new_vals_data:
-            self.db.bulk_insert_mappings(model_val, new_vals_data)
-            self.db.commit()
+        for i in range(0, total, chunk_size):
+            chunk_old_ids = old_ids[i : i + chunk_size]
             
-            # Fetch back to get IDs
-            new_ids = list(id_map.values())
-            new_attr_ids = list(attr_id_map.values())
-            
-            inserted_vals = self.db.query(model_val).filter(
-                getattr(model_val, parent_col).in_(new_ids),
-                model_val.attribute_id.in_(new_attr_ids)
+            # 1. Fetch old values for this chunk
+            old_vals = self.db.query(model_val).filter(
+                getattr(model_val, parent_col).in_(chunk_old_ids),
+                model_val.attribute_id.in_(old_attr_ids)
             ).all()
             
-            # Map (parent_id, attr_id) -> new_val_id
-            val_map = {(getattr(v, parent_col), v.attribute_id): v.id for v in inserted_vals}
+            if not old_vals:
+                continue
             
-            # Now copy Float/Text values
-            new_float_data = []
-            new_text_data = []
-            
-            old_val_ids = [v.id for v in old_vals]
-            
-            old_floats = self.db.query(model_float).filter(getattr(model_float, val_parent_col).in_(old_val_ids)).all()
-            old_texts = self.db.query(model_text).filter(getattr(model_text, val_parent_col).in_(old_val_ids)).all()
-            
-            float_map = {getattr(f, val_parent_col): f.float_value for f in old_floats}
-            text_map = {getattr(t, val_parent_col): t.text_value for t in old_texts}
+            new_vals_data = []
             
             for val in old_vals:
                 new_pk = id_map.get(getattr(val, parent_col))
                 new_attr_id = attr_id_map.get(val.attribute_id)
                 if new_pk and new_attr_id:
-                    new_val_id = val_map.get((new_pk, new_attr_id))
-                    if new_val_id:
-                        if val.id in float_map:
-                            new_float_data.append({val_parent_col: new_val_id, "float_value": float_map[val.id]})
-                        if val.id in text_map:
-                            new_text_data.append({val_parent_col: new_val_id, "text_value": text_map[val.id]})
+                    new_vals_data.append({
+                        parent_col: new_pk,
+                        "attribute_id": new_attr_id
+                    })
             
-            if new_float_data:
-                self.db.bulk_insert_mappings(model_float, new_float_data)
-            if new_text_data:
-                self.db.bulk_insert_mappings(model_text, new_text_data)
-            self.db.commit()
+            if new_vals_data:
+                self.db.bulk_insert_mappings(model_val, new_vals_data)
+                self.db.commit()
+                
+                # 2. Fetch back to get IDs
+                # We filter by the new parent IDs we just inserted. 
+                # Note: this might fetch values inserted in previous chunks if IDs overlap, 
+                # but id_map keeps 1:1, so new_pks are unique to this chunk's source.
+                new_pks_inserted = list(set([d[parent_col] for d in new_vals_data]))
+                
+                inserted_vals = self.db.query(model_val).filter(
+                    getattr(model_val, parent_col).in_(new_pks_inserted),
+                    model_val.attribute_id.in_(list(attr_id_map.values()))
+                ).all()
+                
+                # Map (parent_id, attr_id) -> new_val_id
+                val_map = {(getattr(v, parent_col), v.attribute_id): v.id for v in inserted_vals}
+                
+                # 3. Copy Float/Text values
+                new_float_data = []
+                new_text_data = []
+                
+                old_val_ids = [v.id for v in old_vals]
+                
+                # Fetch float/text values for the old attribute values in this chunk
+                if old_val_ids:
+                    # We also need to chunk this if old_val_ids is too large (e.g. > parameters limit)
+                    # With chunk_size=500 and say 20 attributes -> 10,000 IDs. usually fine.
+                    # But to be safe, we can process these in sub-chunks if needed. 
+                    # For 500 nodes, 10k params is okay for Postgres (limit ~32k). 
+                    # If SQLite (limit 999), this will fail.
+                    # Let's add sub-chunking for value IDs just in case.
+                    
+                    sub_chunk_size = 500
+                    old_floats = []
+                    old_texts = []
+                    
+                    for j in range(0, len(old_val_ids), sub_chunk_size):
+                        sub_ids = old_val_ids[j : j + sub_chunk_size]
+                        old_floats.extend(self.db.query(model_float).filter(getattr(model_float, val_parent_col).in_(sub_ids)).all())
+                        old_texts.extend(self.db.query(model_text).filter(getattr(model_text, val_parent_col).in_(sub_ids)).all())
+                    
+                    float_map = {getattr(f, val_parent_col): f.float_value for f in old_floats}
+                    text_map = {getattr(t, val_parent_col): t.text_value for t in old_texts}
+                    
+                    for val in old_vals:
+                        new_pk = id_map.get(getattr(val, parent_col))
+                        new_attr_id = attr_id_map.get(val.attribute_id)
+                        if new_pk and new_attr_id:
+                            new_val_id = val_map.get((new_pk, new_attr_id))
+                            if new_val_id:
+                                if val.id in float_map:
+                                    new_float_data.append({val_parent_col: new_val_id, "float_value": float_map[val.id]})
+                                if val.id in text_map:
+                                    new_text_data.append({val_parent_col: new_val_id, "text_value": text_map[val.id]})
+                    
+                    if new_float_data:
+                        self.db.bulk_insert_mappings(model_float, new_float_data)
+                    if new_text_data:
+                        self.db.bulk_insert_mappings(model_text, new_text_data)
+                    self.db.commit()
