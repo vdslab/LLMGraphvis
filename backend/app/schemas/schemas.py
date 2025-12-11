@@ -91,6 +91,9 @@ class CreatePathSubgraphRequest(BaseModel):
 class CreateKCoreSubgraphRequest(BaseModel):
     k: int
 
+class CreateComponentContainingNodeRequest(BaseModel):
+    node_id: str
+
 class Subgraph(BaseModel):
     id: int
     name: str
