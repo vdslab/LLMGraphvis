@@ -245,6 +245,9 @@ def initialize_network(network_id: int, graphml_data: str) -> dict:
         
         return {"network": vis_data, "network_id": final_network_id}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"Error in initialize_network: {e}")
         return f"Error: {str(e)}"
     finally:
         db.close()
