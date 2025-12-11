@@ -154,3 +154,26 @@ def update_network_metadata(
         last_node_size_config=network.last_node_size_config,
         last_node_color_config=network.last_node_color_config
     )
+
+from app.schemas.filter import SubgraphFilterRequest
+from app.logic import filter
+
+@router.post("/{network_id}/subgraphs/filter")
+def create_subgraph_by_filter_endpoint(
+    network_id: int,
+    request: SubgraphFilterRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Creates a subgraph by filtering nodes based on attributes.
+    """
+    try:
+        logger.info(f"Received filter request for network {network_id}")
+        result = filter.create_subgraph_by_filter(network_id, request.conditions, request.suffix, db)
+        return result
+    except ValueError as e:
+        logger.warning(f"Filter error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error creating filtered subgraph: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
