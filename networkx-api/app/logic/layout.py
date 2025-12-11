@@ -40,21 +40,25 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
         # Check for numeric libraries
         import numpy as np
         
-        # Simple ForceAtlas2 implementation
+        # Improved ForceAtlas2 implementation
         # Constants
-        k_gra = 1.0 # Gravity
-        # Repulsion
-        k_r = 0.5 # Repulsion strength (scaling)
-        
-        # Scaling
-        # To match FA2 typical spread, we need significant repulsion
+        k_gra = 0.5 # Gravity (Reduced from 1.0)
+        k_r = 10.0 # Repulsion strength (standard factor)
         
         # Init positions
-        pos = nx.spring_layout(G, iterations=0, seed=42) # Random start
+        # Use existing positions if available? No, random start is safer for now to avoid local minima
+        pos = nx.spring_layout(G, iterations=0, seed=42) 
+        
         # Convert to numpy
-        pos_arr = np.array([pos[n] for n in G.nodes()])
         nodes_list = list(G.nodes())
+        n_node = len(nodes_list)
         node_idx = {n: i for i, n in enumerate(nodes_list)}
+        
+        pos_arr = np.array([pos[n] for n in nodes_list])
+        
+        # Degrees for repulsion weighting
+        # ForceAtlas2 uses (deg + 1)
+        deg = np.array([G.degree(n) for n in nodes_list]) + 1
         
         # Edges indices
         edges_idx = []
@@ -63,102 +67,105 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
                 edges_idx.append((node_idx[u], node_idx[v]))
         
         # Iterations
-        n_node = len(nodes_list)
-        iter_count = 100 if n_node < 500 else 50
+        iter_count = 300 if n_node < 500 else 100
         
-        # Degrees for simplified logic (optional, standard FA2 uses degrees in repulsion)
-        # Repulsion: F = kr * (deg+1)(deg+1)/dist
-        deg = np.array([G.degree(n) for n in nodes_list]) + 1
-        
-        # Scaling adjustment based on size
+        # Adaptive speed parameters
         speed = 1.0
+        speed_efficiency = 1.0
         
-        for _ in range(iter_count):
+        for i in range(iter_count):
             disp = np.zeros((n_node, 2))
             
-            # Repulsion (N^2) - vectorized
+            # 1. Repulsion (F_r = k_r * (deg_u * deg_v) / dist)
+            # Vector = F_r * (delta / dist) = k_r * deg_prod * delta / dist^2
+            
             # matrix of diffs
-            # x_diff[i, j] = x[i] - x[j]
-            # using broadcasting
             delta = pos_arr[:, np.newaxis, :] - pos_arr[np.newaxis, :, :] # (N, N, 2)
             dist_sq = np.sum(delta**2, axis=2)
-            dist_sq[dist_sq == 0] = 0.1 # Avoid div zero
+            
+            # Avoid self-repulsion and div by zero
+            # We add a small epsilon to dist_sq for stability
+            np.fill_diagonal(dist_sq, 1.0) 
             dist = np.sqrt(dist_sq)
             
-            # Repulsion force magnitude: kr * (deg_i * deg_j) / dist
-            # Direction: delta / dist
-            # Force vector: (kr * deg_product / dist^2) * delta
+            # Force Magnitude: F = k_r * (deg_i * deg_j) / dist
+            # We want Displacement Vector Contribution: F * (delta / dist) = F / dist * delta
+            # So coeff = k_r * (deg_i * deg_j) / dist^2
             
             deg_matrix = deg[:, np.newaxis] * deg[np.newaxis, :]
-            rep_force = (k_r * deg_matrix) / (dist_sq + 0.1) # Soften
             
-            # Apply only rep (i != j is handled by delta being 0? No, dist=0.1)
-            # if dist is small, rep is large.
-            # Avoid self:
-            np.fill_diagonal(rep_force, 0)
+            # Limit distance to avoid explosion
+            dist_sq[dist_sq < 0.01] = 0.01
             
-            # Compute displacement contribution
-            # disp[i] += sum(rep_force[i,j] * delta[i,j] / dist[i,j])??
-            # actually delta is vec from j to i implies pos[i]-pos[j].
-            # Force on i from j is Repulsing, so direction is pos[i]-pos[j]. Correct.
+            # Repulsion coefficient
+            coeff = (k_r * deg_matrix) / dist_sq
             
-            # We need to project rep_force along delta. 
-            # delta is vector. rep_force is magnitude/dist??
-            # Standard: Force = C / dist. Vector = Force * (delta/dist) = C * delta / dist^2.
-            # My rep_force calculation above is roughly C/dist^2.
+            # Apply Repulsion
+            # disp += sum(coeff * delta)
+            # We need to manually zero out diagonal contribution just in case
+            np.fill_diagonal(coeff, 0)
             
-            # Sum over j
-            disp += np.sum(delta * rep_force[:, :, np.newaxis], axis=1)
+            # Sum over columns (j)
+            # shape of coeff: (N, N). shape of delta: (N, N, 2).
+            # result (N, 2)
+            disp += np.sum(delta * coeff[:, :, np.newaxis], axis=1)
 
-            # Attraction (Edges)
-            # F = dist
-            # Vector = - dist * (delta/dist) = - delta
-            # or F = dist (linear attraction)
-            # FA2 standard: F = dist.
-            for u_i, v_i in edges_idx:
-                d_vec = pos_arr[u_i] - pos_arr[v_i] # u -> v
-                d_len = np.linalg.norm(d_vec)
-                if d_len == 0: continue
-                
-                # Force on u towards v: - d_vec
-                # But typically F = d implies simple spring.
-                # Displacement = Force * speed?
-                
-                # Attraction strength 1.0
-                attr_vec = -1.0 * d_vec 
-                
-                disp[u_i] += attr_vec
-                disp[v_i] -= attr_vec # Action/Reaction
+            # 2. Attraction (Edges) (F_a = dist)
+            # Vector = F_a * (delta / dist) = dist * delta / dist = delta
+            # or F_a = dist (LinLog/Noack) vs F_a = dist^2? 
+            # FA2 uses linear attraction: F = dist.
+            # So displacement towards neighbor is just vector to neighbor?
+            # Wait, classic spring layout is F=dist (Hooke's law).
+            # FA2 attraction is F(d) = d. Direction is towards neighbor.
             
-            # Gravity
-            # Pull to center (0,0)
-            # F = k_g * dist(u, 0)
-            # Vector = - pos_arr
+            for u_i, v_i in edges_idx:
+                # Vector from v to u
+                d_vec = pos_arr[u_i] - pos_arr[v_i] 
+                # Attract v towards u, u towards v
+                # F vector on u: - d_vec
+                # F vector on v: d_vec
+                
+                # Apply weight 1.0
+                disp[u_i] -= d_vec
+                disp[v_i] += d_vec
+            
+            # 3. Gravity
+            # Pull to center. Stronger for distant nodes.
+            # Force = k_g * (deg + 1) * dist_to_center
+            # This keeps disconnected components from flying away.
+            # Using simple linear gravity without degree for stability for now.
             disp -= k_gra * pos_arr
             
-            # Apply
-            # Limit max displacement for stability
-            max_disp = 100.0
+            # 4. Update Positions with Speed
+            # Simple global speed (simplified from FA2's local speed)
             length = np.linalg.norm(disp, axis=1)
-            # If length > max_disp, scale down
+            
+            # Avoid large jumps
+            max_disp = 100.0
             too_fast = length > max_disp
             if np.any(too_fast):
-                disp[too_fast] = disp[too_fast] * (max_disp / length[too_fast][:, np.newaxis])
+                scale = max_disp / length[too_fast]
+                disp[too_fast] *= scale[:, np.newaxis]
             
             pos_arr += disp * (0.1 * speed)
+            
+            # Cooling (optional)
+            # speed *= 0.99
             
         # Normalize to [-1, 1]
         if n_node > 0:
             min_vals = np.min(pos_arr, axis=0)
             max_vals = np.max(pos_arr, axis=0)
             range_vals = max_vals - min_vals
-            range_vals[range_vals == 0] = 1.0 # Avoid div zero
             
             # Center
-            pos_arr = pos_arr - min_vals - (range_vals / 2.0)
-            # Scale to [-1, 1] (so range becomes 2)
+            center = (max_vals + min_vals) / 2.0
+            pos_arr = pos_arr - center
+            
+            # Scale
             max_range = np.max(range_vals)
-            pos_arr = pos_arr * (2.0 / max_range)
+            if max_range > 0:
+                pos_arr = pos_arr * (2.0 / max_range)
         
         # update dict
         pos = {nodes_list[i]: pos_arr[i] for i in range(n_node)}
@@ -227,7 +234,14 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
         db.commit()
 
     # 4. Update Network Record with last layout name
-    network = db.query(models.Network).filter(models.Network.id == network_id).first()
-    if network:
-        network.last_layout_name = layout_name
+    from sqlalchemy import text
+    try:
+        db.execute(
+            text("UPDATE networks SET last_layout_name = :algo WHERE id = :nid"),
+            {"algo": layout_name, "nid": network_id}
+        )
         db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Warning: Failed to update last_layout_name: {e}")
+        # non-critical, proceed
