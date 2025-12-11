@@ -14,3 +14,8 @@ class NetworkMetadataResponse(BaseModel):
     updated_at: datetime
     is_subgraph: bool
     parent_network_id: Optional[int] = None
+    
+    # Visual State Excerpt
+    last_layout_name: Optional[str] = None
+    last_node_size_config: Optional[dict] = None
+    last_node_color_config: Optional[dict] = None
