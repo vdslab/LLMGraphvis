@@ -1,16 +1,24 @@
 import networkx as nx
 from sqlalchemy.orm import Session
 from app import models
+from app.core.logging import get_logger
 from typing import List, Dict, Any, Tuple
 from .layout import calculate_layout
+from .utils.attribute_copier import AttributeCopier
+from .utils.node_utils import resolve_node_id
+
+logger = get_logger(__name__)
 
 def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str], db: Session, suffix: str = "Subgraph") -> Dict[str, Any]:
     """
     Creates a new network as a subgraph containing the specified nodes.
     """
+    logger.info(f"Creating subgraph from network {source_network_id} with {len(node_ids)} nodes (suffix='{suffix}')")
+    
     # 1. Get Source Network
     source_network = db.query(models.Network).filter(models.Network.id == source_network_id).first()
     if not source_network:
+        logger.error(f"Source network {source_network_id} not found")
         raise ValueError(f"Source network {source_network_id} not found")
 
     # 2. Determine Network Name & Check Existing
@@ -21,6 +29,7 @@ def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str], db: 
     ).first()
 
     if existing_network:
+        logger.info(f"Returning existing subgraph: {existing_network.id} ({target_name})")
         return {"new_network_id": existing_network.id, "name": existing_network.name}
 
     # 3. Create New Network
@@ -33,17 +42,22 @@ def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str], db: 
     db.commit()
     db.refresh(new_network)
     new_network_id = new_network.id
+    logger.info(f"Created new network ID: {new_network_id}")
 
     # 4. Copy Nodes
     node_map = _copy_nodes(db, source_network_id, new_network_id, node_ids)
+    logger.debug(f"Copied {len(node_map)} nodes")
 
     # 5. Copy Edges (Induced Subgraph)
     edge_map = _copy_edges(db, source_network_id, new_network_id, node_map)
+    logger.debug(f"Copied {len(edge_map)} edges")
 
     # 6. Copy Attributes Schema & Values
-    _copy_attributes(db, source_network_id, new_network_id, node_map, edge_map)
+    copier = AttributeCopier(db)
+    copier.copy_attributes(source_network_id, new_network_id, node_map, edge_map)
 
     # 7. Calculate Initial Layout
+    logger.info("Calculating initial layout (spring)...")
     calculate_layout(new_network_id, "spring", db)
 
     return {"new_network_id": new_network_id, "name": new_network.name}
@@ -129,151 +143,11 @@ def _copy_edges(db: Session, source_network_id: int, new_network_id: int, node_m
                 
     return edge_map
 
-def _copy_attributes(db: Session, source_network_id: int, new_network_id: int, node_map: Dict[int, int], edge_map: Dict[int, int]):
-    """
-    Copies both node and edge attributes definitions and values.
-    """
-    # Copy Node Attribute Definitions
-    node_attr_id_map = _copy_attribute_definitions(db, source_network_id, new_network_id, models.NodeAttribute)
-    
-    # Copy Edge Attribute Definitions
-    edge_attr_id_map = _copy_attribute_definitions(db, source_network_id, new_network_id, models.EdgeAttribute)
-    
-    # Copy Node Attribute Values
-    _copy_values(db, models.NodeAttributeValue, models.NodeFloatAttributeValue, models.NodeTextAttributeValue, 
-                node_map, node_attr_id_map, "node_id", "node_attribute_value_id")
-                
-    # Copy Edge Attribute Values
-    _copy_values(db, models.EdgeAttributeValue, models.EdgeFloatAttributeValue, models.EdgeTextAttributeValue, 
-                edge_map, edge_attr_id_map, "edge_id", "edge_attribute_value_id")
-
-def _copy_attribute_definitions(db: Session, source_network_id: int, new_network_id: int, model_class) -> Dict[int, int]:
-    """
-    Copies attribute definitions for a given model (NodeAttribute or EdgeAttribute).
-    Returns map of old_attr_id -> new_attr_id.
-    """
-    source_attrs = db.query(model_class).filter(model_class.network_id == source_network_id).all()
-    attr_id_map = {}
-    
-    new_attrs_data = []
-    for attr in source_attrs:
-        new_attrs_data.append({
-            "network_id": new_network_id,
-            "attribute_name": attr.attribute_name,
-            "data_type": attr.data_type
-        })
-        
-    if new_attrs_data:
-        db.bulk_insert_mappings(model_class, new_attrs_data)
-        db.commit()
-        
-        new_attrs = db.query(model_class).filter(model_class.network_id == new_network_id).all()
-        source_attr_map = {a.attribute_name: a.id for a in source_attrs}
-        for new_attr in new_attrs:
-            old_id = source_attr_map.get(new_attr.attribute_name)
-            if old_id:
-                attr_id_map[old_id] = new_attr.id
-                
-    return attr_id_map
-
-# --- Data Copying Helper ---
-
-def _copy_values(db: Session, model_val, model_float, model_text, id_map, attr_id_map, parent_col, val_parent_col):
-    # Fetch old values
-    old_ids = list(id_map.keys())
-    old_attr_ids = list(attr_id_map.keys())
-    
-    if not old_ids or not old_attr_ids: return
-
-    # Chunking might be needed for large datasets, but assuming reasonable size for now
-    old_vals = db.query(model_val).filter(
-        getattr(model_val, parent_col).in_(old_ids),
-        model_val.attribute_id.in_(old_attr_ids)
-    ).all()
-    
-    new_vals_data = []
-    
-    for val in old_vals:
-        new_pk = id_map.get(getattr(val, parent_col))
-        new_attr_id = attr_id_map.get(val.attribute_id)
-        if new_pk and new_attr_id:
-            new_vals_data.append({
-                parent_col: new_pk,
-                "attribute_id": new_attr_id
-            })
-    
-    if new_vals_data:
-        db.bulk_insert_mappings(model_val, new_vals_data)
-        db.commit()
-        
-        # Fetch back to get IDs
-        new_ids = list(id_map.values())
-        new_attr_ids = list(attr_id_map.values())
-        
-        inserted_vals = db.query(model_val).filter(
-            getattr(model_val, parent_col).in_(new_ids),
-            model_val.attribute_id.in_(new_attr_ids)
-        ).all()
-        
-        # Map (parent_id, attr_id) -> new_val_id
-        val_map = {(getattr(v, parent_col), v.attribute_id): v.id for v in inserted_vals}
-        
-        # Now copy Float/Text values
-        new_float_data = []
-        new_text_data = []
-        
-        old_val_ids = [v.id for v in old_vals]
-        
-        old_floats = db.query(model_float).filter(getattr(model_float, val_parent_col).in_(old_val_ids)).all()
-        old_texts = db.query(model_text).filter(getattr(model_text, val_parent_col).in_(old_val_ids)).all()
-        
-        float_map = {getattr(f, val_parent_col): f.float_value for f in old_floats}
-        text_map = {getattr(t, val_parent_col): t.text_value for t in old_texts}
-        
-        for val in old_vals:
-            new_pk = id_map.get(getattr(val, parent_col))
-            new_attr_id = attr_id_map.get(val.attribute_id)
-            if new_pk and new_attr_id:
-                new_val_id = val_map.get((new_pk, new_attr_id))
-                if new_val_id:
-                    if val.id in float_map:
-                        new_float_data.append({val_parent_col: new_val_id, "float_value": float_map[val.id]})
-                    if val.id in text_map:
-                        new_text_data.append({val_parent_col: new_val_id, "text_value": text_map[val.id]})
-        
-        if new_float_data:
-            db.bulk_insert_mappings(model_float, new_float_data)
-        if new_text_data:
-            db.bulk_insert_mappings(model_text, new_text_data)
-        db.commit()
-
 
 # --- Other Subgraph Generators ---
 
-def _resolve_node_id(G, node_id_input: str) -> str:
-    """
-    Tries to resolve the node_id_input to a node in G.
-    Handles cases where LLM adds 'Node ' prefix or similar.
-    """
-    if node_id_input in G:
-        return node_id_input
-    
-    # Try stripping "node " or "Node " (case insensitive)
-    lower_input = node_id_input.lower()
-    if lower_input.startswith("node"):
-        # Remove "node" and any following whitespace
-        cleaned = lower_input.replace("node", "").strip()
-        if cleaned in G:
-            return cleaned
-            
-    # Try stripping whitespace
-    stripped = node_id_input.strip()
-    if stripped in G:
-        return stripped
-        
-    return node_id_input
-
 def create_ego_network(source_network_id: int, center_node_id: str, radius: int, db: Session) -> Dict[str, Any]:
+    logger.info(f"Creating ego network for {center_node_id} (r={radius})")
     # Reconstruct graph structure to run ego_graph
     G = nx.Graph()
     
@@ -292,7 +166,7 @@ def create_ego_network(source_network_id: int, center_node_id: str, radius: int,
             G.add_edge(u, v)
             
     # Resolve node ID
-    center_node_id = _resolve_node_id(G, center_node_id)
+    center_node_id = resolve_node_id(G, center_node_id)
             
     if center_node_id not in G:
         raise ValueError(f"Node {center_node_id} not found in network")
@@ -303,6 +177,7 @@ def create_ego_network(source_network_id: int, center_node_id: str, radius: int,
     return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix=f"Ego {center_node_id} (r={radius})")
 
 def create_path_subgraph(source_network_id: int, source_node_id: str, target_node_id: str, db: Session) -> Dict[str, Any]:
+    logger.info(f"Creating path subgraph: {source_node_id} -> {target_node_id}")
     G = nx.Graph()
     edges = db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
     nodes = db.query(models.Node).filter(models.Node.network_id == source_network_id).all()
@@ -316,17 +191,19 @@ def create_path_subgraph(source_network_id: int, source_node_id: str, target_nod
             G.add_edge(u, v)
             
     # Resolve node IDs
-    source_node_id = _resolve_node_id(G, source_node_id)
-    target_node_id = _resolve_node_id(G, target_node_id)
+    source_node_id = resolve_node_id(G, source_node_id)
+    target_node_id = resolve_node_id(G, target_node_id)
             
     try:
         path_nodes = nx.shortest_path(G, source=source_node_id, target=target_node_id)
     except nx.NetworkXNoPath:
+        logger.warning(f"No path found between {source_node_id} and {target_node_id}")
         raise ValueError(f"No path between {source_node_id} and {target_node_id}")
         
     return create_subgraph_from_nodes(source_network_id, path_nodes, db, suffix=f"Path {source_node_id}->{target_node_id}")
 
 def create_k_core_subgraph(source_network_id: int, k: int, db: Session) -> Dict[str, Any]:
+    logger.info(f"Creating k-core subgraph (k={k})")
     G = nx.Graph()
     edges = db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
     nodes = db.query(models.Node).filter(models.Node.network_id == source_network_id).all()
@@ -346,11 +223,13 @@ def create_k_core_subgraph(source_network_id: int, k: int, db: Session) -> Dict[
     node_ids = list(k_core_G.nodes())
     
     if not node_ids:
+        logger.warning(f"No k-core found for k={k}")
         raise ValueError(f"No k-core found for k={k}")
         
     return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix=f"K-Core (k={k})")
 
 def create_largest_component_subgraph(source_network_id: int, db: Session) -> Dict[str, Any]:
+    logger.info("Creating largest component subgraph")
     G = nx.Graph()
     edges = db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
     nodes = db.query(models.Node).filter(models.Node.network_id == source_network_id).all()
@@ -374,6 +253,7 @@ def create_largest_component_subgraph(source_network_id: int, db: Session) -> Di
 
 
 def create_component_containing_node(source_network_id: int, node_id: str, db: Session) -> Dict[str, Any]:
+    logger.info(f"Creating component subgraph containing node {node_id}")
     G = nx.Graph()
     edges = db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
     nodes = db.query(models.Node).filter(models.Node.network_id == source_network_id).all()
@@ -387,9 +267,10 @@ def create_component_containing_node(source_network_id: int, node_id: str, db: S
             G.add_edge(u, v)
 
     # Resolve node ID
-    node_id = _resolve_node_id(G, node_id)
+    node_id = resolve_node_id(G, node_id)
     
     if node_id not in G:
+        logger.warning(f"Node {node_id} not found in network {source_network_id}")
         raise ValueError(f"Node {node_id} not found in network")
 
     component_nodes = nx.node_connected_component(G, node_id)
