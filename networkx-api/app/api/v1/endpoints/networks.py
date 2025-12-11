@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from app.core import database
-from app.logic import importer, exporter, attributes
+from app.logic import importer, exporter, attributes, search
 from app import models
 from app.core.logging import get_logger
 
@@ -73,6 +73,28 @@ def list_edge_attributes(network_id: int, db: Session = Depends(get_db)):
         )
     except Exception as e:
         logger.error(f"Error listing edge attributes: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/{network_id}/nodes/search")
+def search_nodes(
+    network_id: int, 
+    q: str, 
+    attribute: str = None, 
+    limit: int = 10, 
+    db: Session = Depends(get_db)
+):
+    """
+    Search for nodes in a network.
+    
+    - **q**: Search query string.
+    - **attribute**: (Optional) Filter by specific attribute name.
+    - **limit**: Max results (default 10).
+    """
+    try:
+        results = search.search_nodes(network_id, q, attribute, limit, db)
+        return results
+    except Exception as e:
+        logger.error(f"Error searching nodes: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 from app.schemas.network import UpdateNetworkMetadataRequest, NetworkMetadataResponse

@@ -1,6 +1,6 @@
 from mcp.server.fastmcp import FastMCP
 from app.core import database
-from app.logic import importer, layout, centrality, visualizer, attributes, subgraph, exporter
+from app.logic import importer, layout, centrality, visualizer, attributes, subgraph, exporter, search
 from app import models
 import json
 from typing import List, Dict, Any, Optional
@@ -400,6 +400,26 @@ def create_component_containing_node(source_network_id: int, node_id: str) -> di
         if "new_network_id" in result:
              result["network_id"] = result["new_network_id"]
         return result
+    except Exception as e:
+        return f"Error: {str(e)}"
+    finally:
+        db.close()
+
+@mcp.tool()
+def search_nodes(network_id: int, query: str, attribute: str = None) -> str:
+    """
+    Searches for nodes in the network by name/label or specific attribute.
+    Returns a list of matching nodes with their IDs and names.
+    Use this to find node IDs for subgraph creation or analysis.
+    """
+    db = get_db_session()
+    try:
+        results = search.search_nodes(network_id, query, attribute_name=attribute, db=db)
+        if not results:
+            return "No matching nodes found."
+        
+        # Format for LLM readability
+        return json.dumps(results, indent=2)
     except Exception as e:
         return f"Error: {str(e)}"
     finally:
