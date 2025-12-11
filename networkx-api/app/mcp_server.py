@@ -282,7 +282,7 @@ def calculate_layout(network_id: int, layout_name: str) -> str:
 @mcp.tool()
 def generate_visualization(
     network_id: int,
-    layout_name: str = "forceatlas2",
+    layout_name: Optional[str] = None,
     focus_network_id: Optional[int] = None,
     node_size_config: Optional[dict] = None,
     node_color_config: Optional[dict] = None,
