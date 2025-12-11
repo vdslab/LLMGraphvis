@@ -453,13 +453,38 @@ def create_subgraph_by_attribute_filter(network_id: int, conditions: List[Dict[s
     db = get_db_session()
     try:
         # Convert dicts to Pydantic models
+        if not isinstance(conditions, list):
+            return "Error: 'conditions' must be a list of dictionaries."
+
         parsed_conditions = []
-        for c in conditions:
-            # Handle categories: ensure they are simple primitives
-            # Handle ranges: convert to Range objects
-            ranges = [Range(**r) for r in c.get("ranges", [])] if c.get("ranges") else None
-            categories = c.get("categories")
+        for i, c in enumerate(conditions):
+            if not isinstance(c, dict):
+                return f"Error: Condition at index {i} must be a dictionary."
             
+            if "attribute_name" not in c:
+                return f"Error: Condition at index {i} is missing 'attribute_name'."
+                
+            # Robust parsing for ranges
+            ranges_data = c.get("ranges")
+            ranges = None
+            if ranges_data:
+                if not isinstance(ranges_data, list):
+                    return f"Error: 'ranges' in condition {i} must be a list."
+                
+                parsed_ranges = []
+                for j, r in enumerate(ranges_data):
+                    if not isinstance(r, dict):
+                        return f"Error: Range at index {j} in condition {i} must be a dictionary (e.g. {{'min': 10}})."
+                    try:
+                        parsed_ranges.append(Range(**r))
+                    except Exception as e:
+                        return f"Error: Invalid range format at index {j} in condition {i}: {e}"
+                ranges = parsed_ranges
+
+            categories = c.get("categories")
+            if categories and not isinstance(categories, list):
+                 return f"Error: 'categories' in condition {i} must be a list."
+
             parsed_conditions.append(AttributeCondition(
                 attribute_name=c["attribute_name"],
                 ranges=ranges,
