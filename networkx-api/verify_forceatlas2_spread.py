@@ -27,8 +27,8 @@ def main():
     area_old, avg_dist_old = calculate_spread(pos_old)
     print(f"Old Area: {area_old:.2f}, Average Distance from Center: {avg_dist_old:.2f}")
 
-    print("Calculating layout with NEW parameters (scaling_ratio=20.0)...")
-    pos_new = nx.forceatlas2_layout(G, max_iter=2000, scaling_ratio=20.0, seed=42)
+    print("Calculating layout with NEW parameters (scaling_ratio=50.0, gravity=0.1)...")
+    pos_new = nx.forceatlas2_layout(G, max_iter=2000, scaling_ratio=50.0, gravity=0.1, seed=42)
     area_new, avg_dist_new = calculate_spread(pos_new)
     print(f"New Area: {area_new:.2f}, Average Distance from Center: {avg_dist_new:.2f}")
     
