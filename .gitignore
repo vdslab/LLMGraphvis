@@ -1,17 +1,347 @@
-# Python
+# ===========================
+# Python (General)
+# ===========================
+# Byte-compiled / optimized / DLL files
 __pycache__/
-*.py[cod]
+*.py[codz]
 *$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ===========================
+# Python (Tools & Testing)
+# ===========================
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Type checkers
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# Linting
+.ruff_cache/
+.flymake*
+
+# Translations
+*.mo
+*.pot
+
+# Sphinx documentation
+docs/_build/
+docs/_static
+docs/_templates
+
+# PyBuilder
+.pybuilder/
+target/
+
+# ===========================
+# Python (Web Frameworks)
+# ===========================
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask
+instance/
+.webassets-cache
+
+# Scrapy
+.scrapy
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# ===========================
+# Data Science & Notebooks
+# ===========================
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# SageMath
+*.sage.py
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Marimo
+marimo/_static/
+marimo/_lsp/
+__marimo__/
+
+# ===========================
+# Dependency Managers
+# ===========================
+# pyenv
+# .python-version
+pyenv
+
+# pipenv
+# Pipfile.lock
+
+# poetry
+# poetry.lock
+# poetry.toml
+
+# pdm
+.pdm-python
+.pdm-build/
+# pdm.lock
+# pdm.toml
+
+# uv
+# uv.lock
+
+# pixi
+.pixi
+# pixi.lock
+
+# PEP 582
+__pypackages__/
+
+# ===========================
+# Node.js / Frontend (General)
+# ===========================
+# Dependencies
+node_modules/
+/node_modules
+jspm_packages/
+web_modules/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Diagnostic reports
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Coverage
+lib-cov
+coverage
+*.lcov
+.nyc_output
+
+# Caches
+.npm
+.eslintcache
+.stylelintcache
+.node_repl_history
+.cache
+.parcel-cache
+
+# Build outputs
+*.tgz
+build/Release
+dist/
+/build
+
+# Yarn
+.yarn-integrity
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# ===========================
+# Frontend Frameworks
+# ===========================
+# Next.js
+.next/
+/.next/
+out/
+/out
+
+# Nuxt.js
+.nuxt
+.output
+
+# Gatsby
+# public/
+
+# VuePress / VitePress
+.vuepress/dist
+.temp
+.cache
+**/.vitepress/dist
+**/.vitepress/cache
+
+# SvelteKit
+.svelte-kit/
+
+# Docusaurus
+.docusaurus
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+.vite/
+
+# ===========================
+# Infrastructure, DB & Docker
+# ===========================
+# Docker
+docker/docker
+.dotcloud
+
+# Vagrant
+.vagrant*
+Vagrantfile
+
+# Redis
+*.rdb
+*.aof
+
+# RabbitMQ / ActiveMQ
+mnesia/
+rabbitmq/
+rabbitmq-data/
+activemq-data/
+
+# DynamoDB / Firebase
+.dynamodb/
+.firebase/
+
+# Serverless
+.serverless/
+.vercel/
+
+# ===========================
+# Environments & Secrets
+# ===========================
+# General Env files
+.env
+.envrc
+.env.*
+!.env.example
+.env*.local
+
+# Virtual Environments (Python)
 .venv/
 venv/
-.env
+ENV/
+env/
+env.bak/
+venv.bak/
 
-# Node
-node_modules/
-dist/
+# Security
+*.pem
+
+# ===========================
+# Compiles, Binaries & Go
+# ===========================
+bin
+a.out
+build_src
+bundles/
+vendor/pkg/
+.gopath/
+*.test
+
+# ===========================
+# IDEs & Editors
+# ===========================
+# JetBrains (PyCharm, IntelliJ, etc)
+.idea/
+
+# VS Code
+.vscode/
+.vscode-test
+*.code-workspace
+
+# Spyder / Rope
+.spyderproject
+.spyproject
+.ropeproject
+
+# Cython debug
+cython_debug/
+
+# TernJS
+.tern-port
+
+# Temporary & Backup files
+.*.swp
+*.orig
+
+# ===========================
+# OS / Misc / VCS
+# ===========================
 .DS_Store
+Thumbs.db
+.hg/
+.git/
 
+# ===========================
+# Project Specific (Custom)
+# ===========================
+# AI / LLM Tools
 .gemini/
+.abstra/
 
+# Specific Data & Credentials
 sample_data/concert_networks/*
 backend/application_default_credentials.json

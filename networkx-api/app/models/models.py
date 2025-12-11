@@ -11,6 +11,7 @@ class Network(Base):
     name = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    description = Column(Text, nullable=True)
     graphml_content = Column(Text, nullable=True) # It seems DB has it as NotNull, but we will pass it. Marking nullable=True in python model allows us to ignore it if we want, but SQLAlchemy might error on insert if we don't pass it. Let's make it match DB if possible, but nullable=True is safer for read if some rows don't have it (though constraint says otherwise). Let's just add it.
 
 

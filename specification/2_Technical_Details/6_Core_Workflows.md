@@ -25,7 +25,7 @@ sequenceDiagram
     participant U as ユーザー
     participant F as Frontend
     participant B as API Service (Backend)
-    participant N as NetworkXAPI (REST API)
+    participant N as NetworkXAPI (MCP Server)
     participant DB as Database
 
     %% Step 1: User creates a new chat
@@ -46,7 +46,7 @@ sequenceDiagram
     %% Step 3: Backend accepts the request and starts background task
     B-->>F: 202 Accepted
     note right of B: FastAPIのBackgroundTasksを使い、<br/>後続の重い処理をバックグラウンドで実行
-    B->>N: POST /tools/initialize_network (network_id, graphml_data)
+    B->>N: Call MCP Tool: initialize_network (network_id, graphml_data)
     note right of B: ネットワークの初期化と<br/>初期レンダリングデータ生成を要求
 
     %% Step 4: Frontend waits for SSE event
@@ -86,7 +86,7 @@ sequenceDiagram
     participant F as Frontend
     participant B as API Service (Backend)
     participant LLM as LLM Service (Gemini 2.5 Flash)
-    participant N as NetworkXAPI (REST API)
+    participant N as NetworkXAPI (MCP Server)
     participant DB as Database
 
     note over F, B: このフローが開始される時点で、クライアントは<br/>既にSSE接続を確立済みであるとする。
@@ -105,7 +105,7 @@ sequenceDiagram
 
     %% Step 2: Backend executes tools and streams status
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_node_attributes", status: "started" })
-    B->>N: GET /tools/list_node_attributes (network_id)
+    B->>N: Call MCP Tool: list_node_attributes (network_id)
     N->>DB: 属性テーブル群から属性名一覧をクエリ
     DB-->>N: 属性リスト
     N-->>B: 属性リスト（例: ['weight', 'community_id']）
@@ -117,7 +117,7 @@ sequenceDiagram
 
     %% Step 4: Backend executes calculate_centrality
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "started" })
-    B->>N: POST /tools/calculate_centrality
+    B->>N: Call MCP Tool: calculate_centrality
     N-->>B: 計算完了
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "completed" })
     
@@ -126,7 +126,7 @@ sequenceDiagram
 
     %% Step 5: Backend executes list_node_attributes (Verification)
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_node_attributes", status: "started" })
-    B->>N: GET /tools/list_node_attributes
+    B->>N: Call MCP Tool: list_node_attributes
     N-->>B: 更新された属性リスト
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_node_attributes", status: "completed" })
 
@@ -135,7 +135,7 @@ sequenceDiagram
 
     %% Step 6: Backend executes generate_visualization
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "generate_visualization", status: "started" })
-    B->>N: POST /tools/generate_visualization
+    B->>N: Call MCP Tool: generate_visualization
     N-->>B: 最終レンダリングデータ { nodes: [...], links: [...] }
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "generate_visualization", status: "completed" })
 
@@ -195,7 +195,7 @@ sequenceDiagram
     LLM-->>B: ツール呼び出しを要求 (calculate_centrality, centrality_type:"pagerank")
 
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "started" })
-    B->>N: /tools/calculate_centrality (network_id, centrality_type:"pagerank")
+    B->>N: Call MCP Tool: calculate_centrality (network_id, centrality_type:"pagerank")
     note over N: "pagerank" は未実装のためエラーを返す
     N-->>B: 実行失敗の応答 (エラーメッセージ)
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "failed", error: "..." })
@@ -224,14 +224,14 @@ sequenceDiagram
 
     User->>LLM: "次数中心性が高い上位2ノードのサブグラフを作って"
     LLM->>Backend: get_top_nodes(metric="degree", k=2)
-    Backend->>NetworkXAPI: POST /tools/get_top_nodes
+    Backend->>NetworkXAPI: Call MCP Tool: get_top_nodes
     NetworkXAPI->>DB: Calculate & Query
     DB-->>NetworkXAPI: Top Nodes List
     NetworkXAPI-->>Backend: [{"node_id": "n1", ...}, {"node_id": "n2", ...}]
     Backend-->>LLM: Top Nodes Data
 
     LLM->>Backend: create_subgraph_from_nodes(node_ids=["n1", "n2"])
-    Backend->>NetworkXAPI: POST /tools/create_subgraph_from_nodes
+    Backend->>NetworkXAPI: Call MCP Tool: create_subgraph_from_nodes
     NetworkXAPI->>DB: Check if same subgraph exists
     DB-->>NetworkXAPI: Existing ID (if found) or None
     alt Subgraph Exists
@@ -262,7 +262,7 @@ sequenceDiagram
 
     User->>LLM: "Node AとNode Bの最短経路のサブグラフを作って"
     LLM->>Backend: create_path_subgraph(source="A", target="B")
-    Backend->>NetworkXAPI: POST /tools/create_path_subgraph
+    Backend->>NetworkXAPI: Call MCP Tool: create_path_subgraph
     NetworkXAPI->>NetworkXAPI: Calculate Shortest Path
     NetworkXAPI->>DB: Create Subgraph
     NetworkXAPI-->>Backend: Subgraph Info
@@ -288,13 +288,13 @@ sequenceDiagram
 
     User->>LLM: "次数が高い上位3ノードを赤くして"
     LLM->>Backend: calculate_centrality(type="degree")
-    Backend->>NetworkXAPI: POST /tools/calculate_centrality
+    Backend->>NetworkXAPI: Call MCP Tool: calculate_centrality
     NetworkXAPI->>DB: Save Centrality Values
     NetworkXAPI-->>Backend: Success
     Backend-->>LLM: Success
 
     LLM->>Backend: generate_visualization(node_color_config={scale_type="RANKING", ranking_rules=[{top:3, color:"red"}]})
-    Backend->>NetworkXAPI: POST /tools/generate_visualization
+    Backend->>NetworkXAPI: Call MCP Tool: generate_visualization
     NetworkXAPI->>DB: Fetch Node Values
     NetworkXAPI->>NetworkXAPI: Sort & Apply Colors
     NetworkXAPI-->>Backend: Render Data
@@ -317,23 +317,23 @@ sequenceDiagram
     
     note right of LLM: 1. 次数中心性を計算
     LLM->>Backend: calculate_centrality(type="degree")
-    Backend->>NetworkXAPI: POST /tools/calculate_centrality
+    Backend->>NetworkXAPI: Call MCP Tool: calculate_centrality
     NetworkXAPI-->>Backend: Success
     
     note right of LLM: 2. 上位ノードを特定
     LLM->>Backend: get_top_nodes(metric="degree", k=1)
-    Backend->>NetworkXAPI: POST /tools/get_top_nodes
+    Backend->>NetworkXAPI: Call MCP Tool: get_top_nodes
     NetworkXAPI-->>Backend: [{"node_id": "n1", ...}]
     
     note right of LLM: 3. Ego Networkを作成
     LLM->>Backend: create_ego_network(center="n1", radius=1)
-    Backend->>NetworkXAPI: POST /tools/create_ego_network
+    Backend->>NetworkXAPI: Call MCP Tool: create_ego_network
     NetworkXAPI-->>Backend: subgraph_id (e.g., 999)
     note right of Backend: Context Switch -> 999
 
     note right of LLM: 4. 複合ルールで可視化生成 (Pattern 2: Contextual Subgraph)
     LLM->>Backend: generate_visualization({<br/>  network_id: 12345,<br/>  focus_network_id: 999,<br/>  node_size_config: {attribute: "degree_centrality"},<br/>  node_label_config: {attribute: "name"},<br/>  context_config: {color: "gray", opacity: 0.3},<br/>  focus_config: {node_color_config: {static_color: "lightblue"}},<br/>  custom_node_colors: [{node_id: "n1", color: "blue"}]<br/>})
-    Backend->>NetworkXAPI: POST /tools/generate_visualization
+    Backend->>NetworkXAPI: Call MCP Tool: generate_visualization
     
     note right of NetworkXAPI: 優先順位に従い色を決定:<br/>1. Custom (Blue)<br/>2. Focus Config (Lightblue)<br/>3. Context Config (Gray)
     NetworkXAPI-->>Backend: Render Data
@@ -358,7 +358,7 @@ sequenceDiagram
     
     note right of LLM: network_id をサブグラフIDに切り替えて可視化を要求 (Pattern 3: Isolated Subgraph)
     LLM->>Backend: generate_visualization({<br/>  network_id: 999, <br/>  focus_network_id: null <br/>})
-    Backend->>NetworkXAPI: POST /tools/generate_visualization
+    Backend->>NetworkXAPI: Call MCP Tool: generate_visualization
     
     note right of Backend: Explicit Network Switch -> 999
     Backend->>DB: Update Chat.network_id

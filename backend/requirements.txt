@@ -10,3 +10,4 @@ httpx
 google-genai
 python-dotenv
 sse-starlette
+mcp

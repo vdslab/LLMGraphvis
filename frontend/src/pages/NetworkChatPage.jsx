@@ -164,24 +164,12 @@ const NetworkChatPage = () => {
           
           setTimeout(() => {
             if (isAuthenticated) {
-              // Trigger re-render to re-run effect and create new connection
-              // We can do this by briefly setting chatId to null then back
-              // But better to just let the user know we are reconnecting if it takes too long
               setSseError(null); // Clear previous error if any
               
-              // Force reconnection by unmounting/remounting or just creating new source
-              // Since this effect depends on [id], we can't easily force re-run without changing id
-              // Instead, we'll rely on the fact that we closed the old one, 
-              // and we can manually trigger a state update that causes re-connection?
-              // Actually, the cleanest way in this component structure is to let the user manually retry 
-              // OR we can use a state variable 'connectionKey' to force effect re-run.
-              // For now, let's just show a "Reconnecting..." message if it's not the first try
               if (retryCount > 0) {
                  setSseError("Reconnecting...");
               }
               
-              // To actually reconnect, we need to re-run the effect. 
-              // We can add a 'retryTrigger' state to the dependency array.
               setRetryTrigger(prev => prev + 1);
             }
           }, timeout);

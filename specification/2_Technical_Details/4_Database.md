@@ -162,7 +162,9 @@ CREATE TABLE users (
 CREATE TABLE networks (
     id INTEGER PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    description TEXT,
     parent_network_id INTEGER,
+    graphml_content TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     FOREIGN KEY (parent_network_id) REFERENCES networks(id)
@@ -175,7 +177,9 @@ CREATE TABLE networks (
 | :--- | :--- | :--- | :--- |
 | `id` | `INTEGER` | `PRIMARY KEY` | ネットワークの一意識別子 |
 | `name` | `VARCHAR` | `NOT NULL` | ネットワーク名 |
+| `description` | `TEXT` | `NULLABLE` | ネットワークの説明・メタデータ |
 | `parent_network_id` | `INTEGER` | `FOREIGN KEY` | 親ネットワークのID（サブグラフの場合） |
+| `graphml_content` | `TEXT` | `NULLABLE` | アップロードされたオリジナルのGraphMLデータ |
 
 - **説明**: グラフデータ全体を管理するテーブルです。
 - **リレーション**:

@@ -227,6 +227,16 @@ if response.candidates[0].content.parts:
             ))
 ```
 
+## Known Limitations & Technical Debt
+
+### Global Event Queues
+`llm_service.py` uses a global in-memory dictionary `event_queues` to manage SSE streams.
+- **Risk**: This will not work if the backend is scaled to multiple worker processes (e.g., using Gunicorn/Uvicorn with multiple workers) because memory is not shared.
+- **Recommendation**: Use Redis or a similar Pub/Sub system for production.
+
+### LLM Service Size
+`process_chat` in `llm_service.py` is large and mixes tool definitions with logic. Refactoring tool definitions into a separate module would improve readability.
+
 ## Testing
 
 ### Prerequisites
@@ -296,7 +306,7 @@ backend/
 │   │   └── chat.py          # Chat and upload endpoints
 │   ├── services/
 │   │   ├── llm_service.py   # Gemini API integration
-│   │   └── network_service.py # NetworkX API client
+│   │   └── network_service.py # NetworkXAPI client
 │   └── ...
 
 frontend/

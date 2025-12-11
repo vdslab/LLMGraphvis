@@ -16,13 +16,13 @@ export default defineConfig(({ mode }) => {
   }
 
   // Only enable NetworkX API proxy in development mode
-  if (mode === 'development') {
-    proxyConfig['/nx-api'] = {
-      target: env.VITE_NX_API_URL || 'http://networkx-api:8001',
-      changeOrigin: true,
-      rewrite: (path) => path.replace(/^\/nx-api/, ''),
-    }
-  }
+  // if (mode === 'development') {
+  //   proxyConfig['/nx-api'] = {
+  //     target: env.VITE_NX_API_URL || 'http://networkx-api:8001',
+  //     changeOrigin: true,
+  //     rewrite: (path) => path.replace(/^\/nx-api/, ''),
+  //   }
+  // }
 
   return {
     plugins: [react()],

@@ -48,7 +48,7 @@ graph TD
     subgraph "Docker Environment"
         frontendService["Frontend Service<br/>UIを提供"]
         apiService["API Service<br/>ビジネスロジック担当"]
-        networkXAPI["NetworkXAPI<br/>ネットワーク計算担当"]
+        networkXAPI["NetworkXAPI<br/>MCP Server (Network Calculation)"]
         database[("Database<br/>データ永続化")]
     end
 
@@ -57,7 +57,7 @@ graph TD
     webBrowser -- "Loads SPA (HTTPS)" --> frontendService
     webBrowser -- "API Calls (HTTPS)" --> apiService
 
-    apiService -- "ネットワーク計算依頼 (HTTP)" --> networkXAPI
+    apiService -- "MCP Tool Calls (SSE)" --> networkXAPI
     apiService -- "データ永続化 (SQL)" --> database
     networkXAPI -- "計算結果の属性を保存 (SQL)" --> database
     apiService -- "LLM呼び出し (HTTPS)" --> llmService

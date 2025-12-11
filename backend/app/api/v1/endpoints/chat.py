@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 from app import models, schemas
 from app.core import database
-from app.services import llm as llm_service, network_service
+from app.services import llm as llm_service
+from app.services.llm import mcp_client
 from app.api.v1.endpoints.auth import get_current_user
 from app.core.logging import get_logger
 
@@ -58,9 +59,13 @@ async def get_chat(
     try:
 
         # Generate default visualization data
-        vis_data = await network_service.generate_visualization(
-            chat.network_id, 
-            {"layout_name": "forceatlas2"} # Default layout
+        # Generate default visualization data
+        vis_data = await mcp_client.execute_tool(
+            "generate_visualization",
+            {
+                "network_id": chat.network_id,
+                "layout_name": "forceatlas2"
+            }
         )
         
         return {
@@ -75,8 +80,16 @@ async def get_chat(
         
     except Exception as e:
         print(f"Failed to fetch visualization for chat {chat_id}: {e}")
-        # Fallback to returning chat without network data if fails (or empty network)
-        return chat
+        # Fallback to returning chat with empty network data if fails
+        return {
+            "id": chat.id,
+            "name": chat.name,
+            "user_id": chat.user_id,
+            "network_id": chat.network_id,
+            "created_at": chat.created_at,
+            "updated_at": chat.updated_at,
+            "network": None
+        }
 
 @router.get("/{chat_id}/messages", response_model=List[schemas.ChatMessage])
 def get_messages(
@@ -105,7 +118,7 @@ async def export_network(
     chat = verify_chat_ownership(chat_id, current_user.id, db)
     
     # Call NetworkXAPI to get GraphML
-    graphml_data = await network_service.export_network(chat.network_id)
+    graphml_data = await mcp_client.execute_tool("export_network", {"network_id": chat.network_id})
     
     return Response(
         content=graphml_data,
@@ -125,7 +138,8 @@ def create_chat(
     user_id = current_user.id
     
     db_network = models.Network(
-        name=f"{chat.name} Network"
+        name=f"{chat.name} Network",
+        graphml_content='<?xml version="1.0" encoding="UTF-8"?><graphml xmlns="http://graphml.graphdrawing.org/xmlns"></graphml>'
     )
     db.add(db_network)
     db.commit()
@@ -143,7 +157,7 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
     logger.info(f"Background upload started for chat_id={chat_id}, network_id={network_id}")
     try:
         # Initialize network and get response containing visualization and final_network_id
-        result = await network_service.initialize_network(network_id, graphml_data)
+        result = await mcp_client.execute_tool("initialize_network", {"network_id": network_id, "graphml_data": graphml_data})
         
         vis_data = result.get("network")
         final_network_id = result.get("network_id")

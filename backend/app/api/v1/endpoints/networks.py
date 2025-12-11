@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from typing import List
 from app import models, schemas
 from app.core import database
-from app.services import network_service
+from app.core import database
+from app.services.llm import mcp_client
 from app.api.v1.endpoints.auth import get_current_user
 
 router = APIRouter(
@@ -39,7 +40,7 @@ async def get_subgraphs(
     if not verify_network_access(network_id, current_user.id, db):
         raise HTTPException(status_code=403, detail="Access denied")
         
-    subgraphs = await network_service.get_subgraphs(network_id)
+    subgraphs = await mcp_client.execute_tool("get_subgraphs", {"network_id": network_id})
     return subgraphs
 
 @router.post("/{network_id}/subgraphs/ego")
@@ -52,7 +53,7 @@ async def create_ego_network(
     if not verify_network_access(network_id, current_user.id, db):
         raise HTTPException(status_code=403, detail="Access denied")
         
-    result = await network_service.create_ego_network(network_id, request.center_node_id, request.radius)
+    result = await mcp_client.execute_tool("create_ego_network", {"source_network_id": network_id, "center_node_id": request.center_node_id, "radius": request.radius})
     return result
 
 @router.post("/{network_id}/subgraphs/from_nodes")
@@ -65,7 +66,7 @@ async def create_subgraph_from_nodes(
     if not verify_network_access(network_id, current_user.id, db):
         raise HTTPException(status_code=403, detail="Access denied")
         
-    result = await network_service.create_subgraph_from_nodes(network_id, request.node_ids)
+    result = await mcp_client.execute_tool("create_subgraph_from_nodes", {"source_network_id": network_id, "node_ids": request.node_ids})
     return result
 
 @router.post("/{network_id}/subgraphs/path")
@@ -78,7 +79,7 @@ async def create_path_subgraph(
     if not verify_network_access(network_id, current_user.id, db):
         raise HTTPException(status_code=403, detail="Access denied")
         
-    result = await network_service.create_path_subgraph(network_id, request.source_node_id, request.target_node_id)
+    result = await mcp_client.execute_tool("create_path_subgraph", {"source_network_id": network_id, "source_node_id": request.source_node_id, "target_node_id": request.target_node_id})
     return result
 
 @router.post("/{network_id}/subgraphs/k_core")
@@ -91,7 +92,7 @@ async def create_k_core_subgraph(
     if not verify_network_access(network_id, current_user.id, db):
         raise HTTPException(status_code=403, detail="Access denied")
         
-    result = await network_service.create_k_core_subgraph(network_id, request.k)
+    result = await mcp_client.execute_tool("create_k_core_subgraph", {"source_network_id": network_id, "k": request.k})
     return result
 
 @router.post("/{network_id}/subgraphs/largest_component")
@@ -103,7 +104,7 @@ async def create_largest_component_subgraph(
     if not verify_network_access(network_id, current_user.id, db):
         raise HTTPException(status_code=403, detail="Access denied")
         
-    result = await network_service.create_largest_component_subgraph(network_id)
+    result = await mcp_client.execute_tool("create_largest_component_subgraph", {"source_network_id": network_id})
     return result
 
 @router.get("/{network_id}/nodes/top")
@@ -117,5 +118,5 @@ async def get_top_nodes(
     if not verify_network_access(network_id, current_user.id, db):
         raise HTTPException(status_code=403, detail="Access denied")
         
-    result = await network_service.get_top_nodes(network_id, metric, k)
+    result = await mcp_client.execute_tool("get_top_nodes", {"network_id": network_id, "metric": metric, "k": k})
     return result

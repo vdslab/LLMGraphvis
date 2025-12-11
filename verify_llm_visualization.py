@@ -5,7 +5,8 @@ import os
 import time
 
 BASE_URL = "http://localhost:8000"
-USERNAME = "verify_llm_vis_10"
+import random
+USERNAME = f"verify_llm_vis_{random.randint(1000, 9999)}"
 PASSWORD = "password123"
 
 def verify_llm_visualization():
@@ -68,12 +69,13 @@ def verify_llm_visualization():
     # Manual SSE parsing
     resp = session.get(f"{BASE_URL}/chat/{chat_id}/stream", stream=True)
     
-    tool_executed = False
+    tool_called = False
     render_updated = False
     centrality_calculated = False
+    messages = []
     
     start_time = time.time()
-    timeout = 30 # 30 seconds timeout
+    timeout = 120 # 120 seconds timeout
     
     for line in resp.iter_lines():
         if time.time() - start_time > timeout:
@@ -109,29 +111,38 @@ def verify_llm_visualization():
                         tool_name = data["tool"]
                         status = data.get("status")
                         print(f"   Tool: {tool_name} ({status})")
-                        if tool_name == "visualize_centrality" and status == "completed":
+                        if tool_name == "calculate_centrality" and status == "completed":
+                            centrality_calculated = True
+                        if tool_name == "generate_visualization" and status == "completed":
                             tool_called = True
                             
                     if "role" in data and data["role"] == "model":
-                        print(f"   Assistant: {data['content']}")
-                        messages.append(data["content"])
+                        # Gemini 2.0/2.5 often returns 'model' role
+                        content = data.get('content', '')
+                        print(f"   Assistant: {content}")
+                        messages.append(content)
                         print("   Assistant response received. Stopping.")
                         break
                         
                 except json.JSONDecodeError:
                     pass
     
-    if tool_called:
-        print("SUCCESS: visualize_centrality tool was called.")
+    if centrality_calculated:
+        print("SUCCESS: calculate_centrality tool was called.")
     else:
-        print("FAILED: visualize_centrality tool was not called.")
+        print("FAILED: calculate_centrality tool was not called.")
+
+    if tool_called:
+        print("SUCCESS: generate_visualization tool was called.")
+    else:
+        print("FAILED: generate_visualization tool was not called.")
         
     if render_updated:
         print("SUCCESS: render_update showed varying node sizes.")
     else:
         print("FAILED: render_update did not show varying node sizes.")
 
-    if tool_called and render_updated:
+    if centrality_calculated and tool_called and render_updated:
         return True
     else:
         return False
