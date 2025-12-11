@@ -427,3 +427,51 @@ def search_nodes(network_id: int, query: str, attribute: str = None) -> str:
         return f"Error: {str(e)}"
     finally:
         db.close()
+
+from app.schemas.filter import AttributeCondition, Range
+
+@mcp.tool()
+def create_subgraph_by_attribute_filter(network_id: int, conditions: List[Dict[str, Any]], suffix: str = "Filtered") -> dict:
+    """
+    Creates a subgraph by filtering nodes based on attribute conditions.
+    
+    Args:
+        network_id: ID of the source network.
+        conditions: List of condition objects. Each condition must have:
+            - attribute_name: Name of the attribute to filter by.
+            - ranges: (Optional) List of {"min": float, "max": float}. 
+            - categories: (Optional) List of values (string or number).
+            Different conditions are AND-ed. Within a condition, ranges/categories are OR-ed.
+        suffix: Suffix for the new network name.
+        
+    Example conditions:
+    [
+        {"attribute_name": "Age", "ranges": [{"min": 10, "max": 20}]},
+        {"attribute_name": "Gender", "categories": ["F"]}
+    ]
+    """
+    db = get_db_session()
+    try:
+        # Convert dicts to Pydantic models
+        parsed_conditions = []
+        for c in conditions:
+            # Handle categories: ensure they are simple primitives
+            # Handle ranges: convert to Range objects
+            ranges = [Range(**r) for r in c.get("ranges", [])] if c.get("ranges") else None
+            categories = c.get("categories")
+            
+            parsed_conditions.append(AttributeCondition(
+                attribute_name=c["attribute_name"],
+                ranges=ranges,
+                categories=categories
+            ))
+            
+        from app.logic import filter
+        result = filter.create_subgraph_by_filter(network_id, parsed_conditions, suffix, db)
+        if "new_network_id" in result:
+             result["network_id"] = result["new_network_id"]
+        return result
+    except Exception as e:
+        return f"Error: {str(e)}"
+    finally:
+        db.close()
