@@ -47,7 +47,15 @@ def get_network_metadata(network_id: int) -> str:
             "id": network.id,
             "name": network.name,
             "description": network.description,
-            "created_at": str(network.created_at)
+            "created_at": str(network.created_at),
+            "visual_state": {
+                "last_layout_name": network.last_layout_name,
+                "last_node_size_config": network.last_node_size_config,
+                "last_node_color_config": network.last_node_color_config,
+                "last_edge_width_config": network.last_edge_width_config,
+                "last_edge_color_config": network.last_edge_color_config,
+                "last_node_label_config": network.last_node_label_config
+            }
         })
     finally:
         db.close()

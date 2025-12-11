@@ -136,13 +136,14 @@ CRITICAL RULES:
       - User: "Calculate density" -> Action: `calculate_centrality()`. (System uses new ID by default).
       - User: "Go back to main graph" -> Action: `switch_to_main_network()`.
 
-IMPORTANT: Maintain Context
+IMPORTANT: Maintain Context & Visual Consistency
 When calling `generate_visualization`, you MUST maintain the previous visualization state unless the user explicitly asks to change it.
-- If the user previously asked for "circular layout", KEEP `layout_name='circular'` in subsequent calls.
-- If the user previously asked to size nodes by "degree", KEEP `node_size_config={'attribute': 'degree_centrality', ...}`.
-- If the user previously asked to color nodes by "community", KEEP `node_color_config={'attribute': 'community_id', ...}`.
-- DO NOT revert to defaults ("forceatlas2" layout, etc.) unless the user's new request specifically conflicts with the previous state or requires a reset.
-- Infer the current state from the conversation history.
+1. Check `read_resource("network://{network_id}/metadata")` for `visual_state`. This contains the `last_layout_name` and last configs used.
+2. If `visual_state` has values, REUSE them in your next `generate_visualization` call unless overridden by the user.
+   - Example: If `last_layout_name` is "circular", keep using `layout_name="circular"`.
+   - Example: If `last_node_size_config` is set, pass it again.
+3. If the user previously asked to color nodes by "community", KEEP `node_color_config={'attribute': 'community_id', ...}`.
+4. DO NOT revert to defaults ("forceatlas2" layout, etc.) unless the user's new request specifically conflicts with the previous state or requires a reset.
 
 IMPORTANT: Final Response
 After completing the tool execution loop, provide a final response to the user. This response MUST include:
