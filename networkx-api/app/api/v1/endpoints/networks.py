@@ -91,7 +91,10 @@ def get_network_metadata(network_id: int, db: Session = Depends(get_db)):
         created_at=network.created_at,
         updated_at=network.updated_at,
         is_subgraph=network.parent_network_id is not None,
-        parent_network_id=network.parent_network_id
+        parent_network_id=network.parent_network_id,
+        last_layout_name=network.last_layout_name,
+        last_node_size_config=network.last_node_size_config,
+        last_node_color_config=network.last_node_color_config
     )
 
 @router.put("/{network_id}/metadata", response_model=NetworkMetadataResponse)
@@ -124,5 +127,8 @@ def update_network_metadata(
         created_at=network.created_at,
         updated_at=network.updated_at,
         is_subgraph=network.parent_network_id is not None,
-        parent_network_id=network.parent_network_id
+        parent_network_id=network.parent_network_id,
+        last_layout_name=network.last_layout_name,
+        last_node_size_config=network.last_node_size_config,
+        last_node_color_config=network.last_node_color_config
     )

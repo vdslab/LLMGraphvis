@@ -2,7 +2,7 @@ from typing import Optional, Dict, List, Any
 from .base import BaseSchema
 
 class VisualizationRequest(BaseSchema):
-    layout_name: Optional[str] = "forceatlas2"
+    layout_name: Optional[str] = None
     focus_network_id: Optional[int] = None
     node_size_config: Optional[Dict[str, Any]] = None
     node_color_config: Optional[Dict[str, Any]] = None
