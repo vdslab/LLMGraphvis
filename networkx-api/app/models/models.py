@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Text, UniqueConstraint, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -12,7 +12,15 @@ class Network(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     description = Column(Text, nullable=True)
-    graphml_content = Column(Text, nullable=True) # It seems DB has it as NotNull, but we will pass it. Marking nullable=True in python model allows us to ignore it if we want, but SQLAlchemy might error on insert if we don't pass it. Let's make it match DB if possible, but nullable=True is safer for read if some rows don't have it (though constraint says otherwise). Let's just add it.
+    graphml_content = Column(Text, nullable=True)
+
+    # Visual State Tracking
+    last_layout_name = Column(String, default="forceatlas2")
+    last_node_size_config = Column(JSON, nullable=True)
+    last_node_color_config = Column(JSON, nullable=True)
+    last_edge_width_config = Column(JSON, nullable=True)
+    last_edge_color_config = Column(JSON, nullable=True)
+    last_node_label_config = Column(JSON, nullable=True)
 
 
 
