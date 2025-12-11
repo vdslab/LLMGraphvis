@@ -229,8 +229,13 @@ def find_important_nodes_prompt(network_id: int) -> list[dict]:
 def initialize_network(network_id: int, graphml_data: str) -> dict:
     """
     Initializes a network from GraphML data.
-    Parses the GraphML, saves it to the database, calculates an initial layout,
-    and returns the visualization data.
+    
+    Args:
+        network_id: The ID of the network record in the database.
+        graphml_data: The **raw XML string content** of the GraphML file (not a file path).
+        
+    Returns:
+        A dictionary containing the initial visualization data and the finalized network ID.
     """
     db = get_db_session()
     try:
@@ -256,7 +261,15 @@ def initialize_network(network_id: int, graphml_data: str) -> dict:
 def calculate_centrality(network_id: int, centrality_type: str) -> str:
     """
     Calculates specific centrality for the network and saves it as a node attribute.
-    Types: degree, betweenness, closeness, eigenvector, pagerank.
+    
+    Args:
+        network_id: The ID of the network.
+        centrality_type: One of the following:
+            - "degree"
+            - "betweenness"
+            - "closeness"
+            - "eigenvector"
+            - "pagerank"
     """
     db = get_db_session()
     try:
@@ -271,7 +284,17 @@ def calculate_centrality(network_id: int, centrality_type: str) -> str:
 def calculate_layout(network_id: int, layout_name: str) -> str:
     """
     Calculates a graph layout and saves x, y coordinates as node attributes.
-    Layouts: forceatlas2, spring, circle, kamada_kawai, shell, spectral, spiral.
+    
+    Args:
+        network_id: The ID of the network.
+        layout_name: One of the following:
+            - "forceatlas2" (Recommended for most networks)
+            - "spring"
+            - "circle"
+            - "kamada_kawai"
+            - "shell"
+            - "spectral"
+            - "spiral"
     """
     db = get_db_session()
     try:
@@ -481,22 +504,35 @@ from app.schemas.filter import AttributeCondition, Range
 @mcp.tool()
 def create_subgraph_by_attribute_filter(network_id: int, conditions: List[Dict[str, Any]], suffix: str = "Filtered") -> dict:
     """
-    Creates a subgraph by filtering nodes based on attribute conditions.
+    Creates a new subgraph by filtering nodes from an existing network based on attribute conditions.
     
     Args:
         network_id: ID of the source network.
-        conditions: List of condition objects. Each condition must have:
-            - attribute_name: Name of the attribute to filter by.
-            - ranges: (Optional) List of {"min": float, "max": float}. 
-            - categories: (Optional) List of values (string or number).
-            Different conditions are AND-ed. Within a condition, ranges/categories are OR-ed.
-        suffix: Suffix for the new network name.
+        conditions: List of condition dictionaries. 
+          Different conditions in the list are combined with **AND**.
+          Inside a condition, `ranges` and `categories` are combined with **OR**.
+          
+          Each condition must have:
+          - **attribute_name** (str): Name of the attribute to filter by.
+          - **ranges** (List[Dict]): Optional list of ranges (e.g. `[{"min": 10, "max": 20}]`).
+          - **categories** (List[Any]): Optional list of exact standard values (e.g. `["Female", "Unknown"]`).
+          
+        suffix: Suffix to append to the new network's name (default: "Filtered").
         
-    Example conditions:
+    **Example:**
+    To keep nodes where (Age is 10-20 OR 50+) AND (Gender is "F"):
+    ```json
     [
-        {"attribute_name": "Age", "ranges": [{"min": 10, "max": 20}]},
-        {"attribute_name": "Gender", "categories": ["F"]}
+        {
+          "attribute_name": "Age", 
+          "ranges": [{"min": 10, "max": 20}, {"min": 50}]
+        },
+        {
+          "attribute_name": "Gender", 
+          "categories": ["F"]
+        }
     ]
+    ```
     """
     db = get_db_session()
     try:
