@@ -18,6 +18,22 @@ def generate_visualization_data(
     custom_node_colors=None,
     node_label_config=None
 ):
+    # --- 0. Resolve Visual State from DB (if defaults needed) ---
+    network = db.query(models.Network).filter(models.Network.id == network_id).first()
+    if not network:
+         raise ValueError(f"Network {network_id} not found.")
+
+    if layout_name is None:
+        layout_name = network.last_layout_name if network.last_layout_name else "forceatlas2"
+    
+    # Also resolve other configs if None? 
+    # The prompt says "REUSE", implying the LLM sends them. 
+    # But if we want to be fully stateful, we should load them if None. 
+    # However, passing None explicitly might mean "reset". 
+    # Let's stick to layout first as that's the main issue. 
+    # Actually, for configs, it complicates things (reset vs keep). 
+    # Let's trust the "update state if provided" logic for now, but layout is critical.
+
     # --- 1. Identify Required Attributes ---
     global_attrs_configs = [node_size_config, node_color_config, node_label_config]
     global_node_attrs = StyleService.collect_required_attributes(global_attrs_configs)
@@ -105,7 +121,7 @@ def generate_visualization_data(
     )
 
     # --- 7. Save Visual State ---
-    network = db.query(models.Network).filter(models.Network.id == network_id).first()
+    # network object already fetched at Step 0
     if network:
         if layout_name:
             network.last_layout_name = layout_name
