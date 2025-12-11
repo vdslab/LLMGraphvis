@@ -66,8 +66,7 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
         pos = nx.spiral_layout(G)
         
     else:
-        # Default fallback
-        pos = nx.spring_layout(G, seed=42)
+        raise ValueError(f"Unknown layout algorithm: {layout_name}")
     
     # Save to DB - Bulk Update Strategy
     # 1. Ensure attributes exist
