@@ -29,6 +29,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 | `create_path_subgraph` | 指定された2ノード間の最短経路をサブグラフとして新しいネットワークとして作成する。**既存のパスサブグラフがある場合は再利用する。レスポンスは辞書形式で、`network_id`を含む。** |
 | `create_k_core_subgraph` | K-Core（次数k以上のノード群）を抽出し、新しいネットワークとして作成する。**同じk値のK-Coreサブグラフがある場合は再利用する。レスポンスは辞書形式で、`network_id`を含む。** |
 | `create_largest_component_subgraph` | 最大連結成分を抽出し、新しいネットワークとして作成する。**既に作成済みの場合は再利用する。レスポンスは辞書形式で、`network_id`を含む。** |
+| `create_component_containing_node` | 指定されたノードを含む連結成分を抽出し、新しいネットワークとして作成する。**既に作成済みの場合は再利用する。レスポンスは辞書形式で、`network_id`を含む。** |
 
 ## 3.3. MCPリソース一覧 (Resources)
 
@@ -56,6 +57,13 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 | `find-important-nodes` | `network_id` | 複数の中心性指標や属性を組み合わせて、ネットワーク内の重要ノード（インフルエンサー、ハブなど）を特定し、その理由を説明するよう指示するメッセージセットを返す。 |
 
 ## 3.5. ツール定義詳細
+
+### `initialize_network`
+- **Description**: GraphMLデータを受け取り、初期化（パース、DB保存、初期レイアウト計算、初期レンダリングデータ生成）を行う。
+- **Arguments**:
+  - `network_id`: int
+  - `graphml_data`: str
+- **Returns**: `{"network": dict, "network_id": int}`
 
 ### `update_network_metadata`
 - **Description**: ネットワークの名前や説明を更新する。
@@ -112,6 +120,13 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
   - `source_network_id`: int
 - **Returns**: `{"network_id": int, "name": str}`
 
+### `create_component_containing_node`
+- **Description**: 指定ノードを含む連結成分のサブグラフを作成する。
+- **Arguments**:
+  - `source_network_id`: int
+  - `node_id`: str
+- **Returns**: `{"network_id": int, "name": str}`
+
 ### `generate_visualization`
 - **Arguments**:
   - `network_id`: int
@@ -158,3 +173,58 @@ MCPツールと同等の機能をREST API経由でも利用可能にするため
 ```
 
 **Response:** 更新後のメタデータ（GETと同じ形式）
+
+### `POST /api/v1/networks/{network_id}/subgraphs/ego`
+Ego Networkを作成します。
+
+**Request:**
+```json
+{
+  "center_node_id": "node_id",
+  "radius": 1
+}
+```
+
+### `POST /api/v1/networks/{network_id}/subgraphs/from-nodes`
+指定ノード群からサブグラフを作成します。
+
+**Request:**
+```json
+{
+  "node_ids": ["id1", "id2"]
+}
+```
+
+### `POST /api/v1/networks/{network_id}/subgraphs/path`
+最短経路サブグラフを作成します。
+
+**Request:**
+```json
+{
+  "source_node_id": "start",
+  "target_node_id": "end"
+}
+```
+
+### `POST /api/v1/networks/{network_id}/subgraphs/k-core`
+K-Coreサブグラフを作成します。
+
+**Request:**
+```json
+{
+  "k": 2
+}
+```
+
+### `POST /api/v1/networks/{network_id}/subgraphs/largest-component`
+最大連結成分サブグラフを作成します。
+
+### `POST /api/v1/networks/{network_id}/subgraphs/component-containing-node`
+指定ノードを含む連結成分サブグラフを作成します。
+
+**Request:**
+```json
+{
+  "node_id": "target_node"
+}
+```
