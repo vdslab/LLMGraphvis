@@ -395,4 +395,38 @@ sequenceDiagram
     note right of LLM: Visualize the main network
     LLM->>Backend: generate_visualization(network_id=Root ID)
     Backend-->>User: Render Update (Main Graph)
+
+## 6.11. 属性条件によるサブグラフ作成フロー
+
+**目的:** 「20代の女性のサブグラフを作って」といった指示に対し、属性条件を解釈してフィルタリングを実行するフローです。
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant LLM
+    participant Backend
+    participant NetworkXAPI
+    participant DB
+
+    User->>LLM: "20代の女性のサブグラフを作って"
+    
+    note right of LLM: 1. 属性を確認
+    LLM->>Backend: list_node_attributes(network_id)
+    Backend->>NetworkXAPI: Call MCP Tool: list_node_attributes
+    NetworkXAPI-->>Backend: [Age (float), Gender (string)]
+    
+    note right of LLM: 2. 条件を構築して実行
+    LLM->>Backend: create_subgraph_by_attribute_filter(<br/>  conditions=[<br/>    {attribute_name: "Age", ranges: [{min: 20, max: 29}]},<br/>    {attribute_name: "Gender", categories: ["Female"]}<br/>  ]<br/>)
+    Backend->>NetworkXAPI: Call MCP Tool: create_subgraph_by_attribute_filter
+    NetworkXAPI->>DB: Query Nodes Matching Conditions (AND/OR Logic)
+    NetworkXAPI->>DB: Create Subgraph Network
+    NetworkXAPI-->>Backend: Subgraph Info (new_network_id)
+    
+    note right of Backend: Context Switch -> new_network_id
+    Backend->>DB: Update Chat.network_id
+    
+    Backend-->>LLM: Success
+    LLM->>Backend: generate_visualization(network_id={new_network_id})
+    Backend-->>User: Render Update
+```
 ```

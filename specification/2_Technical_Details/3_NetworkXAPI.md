@@ -30,6 +30,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 | `create_k_core_subgraph` | K-Core（次数k以上のノード群）を抽出し、新しいネットワークとして作成する。**同じk値のK-Coreサブグラフがある場合は再利用する。レスポンスは辞書形式で、`network_id`を含む。** |
 | `create_largest_component_subgraph` | 最大連結成分を抽出し、新しいネットワークとして作成する。**既に作成済みの場合は再利用する。レスポンスは辞書形式で、`network_id`を含む。** |
 | `create_component_containing_node` | 指定されたノードを含む連結成分を抽出し、新しいネットワークとして作成する。**既に作成済みの場合は再利用する。レスポンスは辞書形式で、`network_id`を含む。** |
+| `create_subgraph_by_attribute_filter` | ノード属性の条件（範囲、カテゴリ、複合）に基づいてフィルタリングを行い、一致するノード群でサブグラフを作成する。**レスポンスは辞書形式で、`network_id`を含む。** |
 
 ## 3.3. MCPリソース一覧 (Resources)
 
@@ -128,6 +129,14 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
   - `node_id`: str
 - **Returns**: `{"network_id": int, "name": str}`
 
+### `create_subgraph_by_attribute_filter`
+- **Description**: 属性フィルタ条件に基づいてサブグラフを作成する。
+- **Arguments**:
+  - `network_id`: int
+  - `conditions`: List[dict] (e.g., `[{"attribute_name": "Age", "ranges": [{"min": 10, "max": 20}]}, {"attribute_name": "Gender", "categories": ["F"]}]`)
+  - `suffix`: str (Optional)
+- **Returns**: `{"network_id": int, "name": str}`
+
 ### `generate_visualization`
 - **Arguments**:
   - `network_id`: int
@@ -223,9 +232,24 @@ K-Coreサブグラフを作成します。
 ### `POST /api/v1/networks/{network_id}/subgraphs/component-containing-node`
 指定ノードを含む連結成分サブグラフを作成します。
 
-**Request:**
 ```json
 {
   "node_id": "target_node"
+}
+```
+
+### `POST /api/v1/networks/{network_id}/subgraphs/filter`
+属性フィルタリングによるサブグラフ作成。
+
+**Request:**
+```json
+{
+  "conditions": [
+    {
+      "attribute_name": "Age",
+      "ranges": [{"min": 10, "max": 20}]
+    }
+  ],
+  "suffix": "Filtered Subgraph"
 }
 ```
