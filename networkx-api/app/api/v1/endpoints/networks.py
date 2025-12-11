@@ -21,6 +21,11 @@ def initialize_network(network_id: int = Body(...), graphml_data: str = Body(...
     try:
         logger.info(f"Initializing network_id={network_id}")
         final_network_id = importer.parse_and_save_graphml(network_id, graphml_data, db)
+        
+        # Calculate default layout (Required for visualization)
+        from app.logic import layout
+        layout.calculate_layout(final_network_id, "forceatlas2", db)
+        
         logger.info(f"Network initialized successfully: network_id={final_network_id}")
         return {"network_id": final_network_id, "status": "initialized"}
     except Exception as e:

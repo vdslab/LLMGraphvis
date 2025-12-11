@@ -370,11 +370,25 @@ def create_k_core_subgraph(source_network_id: int, k: int) -> dict:
         db.close()
 
 @mcp.tool()
-def create_largest_component_subgraph(source_network_id: int) -> dict:
+def create_largest_component_subgraph(network_id: int) -> dict:
     """Creates a subgraph from the largest connected component of the network."""
     db = get_db_session()
     try:
-        result = subgraph.create_largest_component_subgraph(source_network_id, db)
+        result = subgraph.create_largest_component_subgraph(network_id, db)
+        if "new_network_id" in result:
+             result["network_id"] = result["new_network_id"]
+        return result
+    except Exception as e:
+        return f"Error: {str(e)}"
+    finally:
+        db.close()
+
+@mcp.tool()
+def create_component_containing_node(source_network_id: int, node_id: str) -> dict:
+    """Creates a subgraph from the connected component containing a specific node."""
+    db = get_db_session()
+    try:
+        result = subgraph.create_component_containing_node(source_network_id, node_id, db)
         if "new_network_id" in result:
              result["network_id"] = result["new_network_id"]
         return result

@@ -137,8 +137,28 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
             disp -= k_gra * pos_arr
             
             # Apply
-            pos_arr += disp * (0.1 * speed) # Learning rate
+            # Limit max displacement for stability
+            max_disp = 100.0
+            length = np.linalg.norm(disp, axis=1)
+            # If length > max_disp, scale down
+            too_fast = length > max_disp
+            if np.any(too_fast):
+                disp[too_fast] = disp[too_fast] * (max_disp / length[too_fast][:, np.newaxis])
             
+            pos_arr += disp * (0.1 * speed)
+            
+        # Normalize to [-1, 1]
+        if n_node > 0:
+            min_vals = np.min(pos_arr, axis=0)
+            max_vals = np.max(pos_arr, axis=0)
+            range_vals = max_vals - min_vals
+            range_vals[range_vals == 0] = 1.0 # Avoid div zero
+            
+            # Center
+            pos_arr = pos_arr - min_vals - (range_vals / 2.0)
+            # Scale to [-1, 1] (so range becomes 2)
+            max_range = np.max(range_vals)
+            pos_arr = pos_arr * (2.0 / max_range)
         
         # update dict
         pos = {nodes_list[i]: pos_arr[i] for i in range(n_node)}

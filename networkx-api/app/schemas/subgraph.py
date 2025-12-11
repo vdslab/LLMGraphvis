@@ -14,3 +14,6 @@ class NodesSubgraphRequest(BaseSchema):
 
 class KCoreRequest(BaseSchema):
     k: int
+
+class ComponentContainingNodeRequest(BaseSchema):
+    node_id: str

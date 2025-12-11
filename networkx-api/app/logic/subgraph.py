@@ -371,3 +371,28 @@ def create_largest_component_subgraph(source_network_id: int, db: Session) -> Di
     node_ids = list(largest_component)
     
     return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix="Largest Component")
+
+
+def create_component_containing_node(source_network_id: int, node_id: str, db: Session) -> Dict[str, Any]:
+    G = nx.Graph()
+    edges = db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
+    nodes = db.query(models.Node).filter(models.Node.network_id == source_network_id).all()
+    id_map = {n.id: n.node_id for n in nodes}
+    for n in nodes:
+        G.add_node(n.node_id)
+    for e in edges:
+        u = id_map.get(e.source_node_id)
+        v = id_map.get(e.target_node_id)
+        if u and v:
+            G.add_edge(u, v)
+
+    # Resolve node ID
+    node_id = _resolve_node_id(G, node_id)
+    
+    if node_id not in G:
+        raise ValueError(f"Node {node_id} not found in network")
+
+    component_nodes = nx.node_connected_component(G, node_id)
+    node_ids = list(component_nodes)
+    
+    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix=f"Component ({node_id})")

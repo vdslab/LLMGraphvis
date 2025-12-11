@@ -7,7 +7,9 @@ from app.schemas.subgraph import (
     EgoNetworkRequest, 
     NodesSubgraphRequest, 
     PathSubgraphRequest, 
-    KCoreRequest
+    PathSubgraphRequest, 
+    KCoreRequest,
+    ComponentContainingNodeRequest
 )
 
 router = APIRouter()
@@ -60,5 +62,12 @@ def create_k_core_subgraph(network_id: int, request: KCoreRequest, db: Session =
 def create_largest_component_subgraph(network_id: int, db: Session = Depends(get_db)):
     try:
         return subgraph.create_largest_component_subgraph(network_id, db)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/{network_id}/subgraphs/component-containing-node")
+def create_component_containing_node(network_id: int, request: ComponentContainingNodeRequest, db: Session = Depends(get_db)):
+    try:
+        return subgraph.create_component_containing_node(network_id, request.node_id, db)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

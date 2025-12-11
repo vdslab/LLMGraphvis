@@ -4,6 +4,9 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.sse import sse_client
 from mcp.client.stdio import stdio_client
 from google.genai import types
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
 
 # NetworkX API Configuration
 NETWORKX_API_URL = os.getenv("NETWORKX_API_URL", "http://networkx-api:8000")
@@ -87,6 +90,7 @@ async def execute_tool(tool_name: str, arguments: dict):
     """
     Executes a tool on the NetworkXAPI MCP Server.
     """
+    logger.info(f"Executing tool: {tool_name} with arguments: {arguments}")
     try:
         async with sse_client(SSE_ENDPOINT) as (read, write):
             async with ClientSession(read, write) as session:
