@@ -104,6 +104,25 @@ def generate_visualization_data(
         context_config
     )
 
+    # --- 7. Save Visual State ---
+    network = db.query(models.Network).filter(models.Network.id == network_id).first()
+    if network:
+        if layout_name:
+            network.last_layout_name = layout_name
+        
+        if node_size_config is not None:
+            network.last_node_size_config = node_size_config
+        if node_color_config is not None:
+            network.last_node_color_config = node_color_config
+        if edge_width_config is not None:
+            network.last_edge_width_config = edge_width_config
+        if edge_color_config is not None:
+            network.last_edge_color_config = edge_color_config
+        if node_label_config is not None:
+            network.last_node_label_config = node_label_config
+            
+        db.commit()
+
     return {"nodes": vis_nodes, "links": vis_edges}
 
 

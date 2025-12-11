@@ -225,3 +225,9 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
         if float_vals:
             db.bulk_insert_mappings(models.NodeFloatAttributeValue, float_vals)
         db.commit()
+
+    # 4. Update Network Record with last layout name
+    network = db.query(models.Network).filter(models.Network.id == network_id).first()
+    if network:
+        network.last_layout_name = layout_name
+        db.commit()
