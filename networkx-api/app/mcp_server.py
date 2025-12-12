@@ -186,9 +186,11 @@ def recommend_visualization_prompt(network_id: int) -> list[dict]:
             "content": {
                 "type": "text",
                 "text": f"""I need a recommendation for visualizing network {network_id}.
-1. Check available attributes: `read_resource("network://{network_id}/attributes/nodes")`. **ALWAYS** do this step first to know what attributes are available (e.g., 'nationality', 'role', 'score').
-2. Check structural stats: `read_resource("network://{network_id}/structure")`
-3. Propose a layout and mapping (color/size) that best reveals patterns in the data using ONLY existing attributes."""
+1. **MANDATORY**: Check available attributes first: `read_resource("network://{network_id}/attributes/nodes")`. 
+2. If distinct attributes exist (like 'country', 'type'), propose a `generate_visualization` call using them for `node_color_config` or `node_size_config`.
+3. If NO interesting attributes exist, use a structural metric like 'degree' (calculate it first if needed) or just use the default blue color.
+4. **Layout**: Default to 'forceatlas2' unless the user asks for a specific structure (like 'circle').
+5. **Output**: providing the specific tool call arguments."""
             }
         }
     ]
@@ -202,8 +204,8 @@ def investigate_attributes_prompt(network_id: int) -> list[dict]:
                 "type": "text",
                 "text": f"""I want to investigate the attributes of network {network_id}.
 1. List all node attributes: `read_resource("network://{network_id}/attributes/nodes")`
-2. Identify which attributes are numerical vs categorical.
-3. Look for any interesting distributions or potential correlations to explore."""
+2. If the list is empty, state that the network has no attributes.
+3. If attributes exist, identify numerical vs categorical types and suggest potential visualizations (e.g. "Color by 'gender'")."""
             }
         }
     ]
@@ -218,7 +220,7 @@ def find_important_nodes_prompt(network_id: int) -> list[dict]:
                 "text": f"""Identify the most important nodes in network {network_id}.
 1. Calculate basic centrality metrics if not present: `calculate_centrality` (degree, betweenness).
 2. Retrieve top nodes: `read_resource("network://{network_id}/centrality/degree/top")`
-3. Explain why these nodes are important in the context of the network structure."""
+3. Explain why these nodes are important (hubs, bridges) and suggest highlighting them using `focus_config` in `generate_visualization`."""
             }
         }
     ]
@@ -305,97 +307,92 @@ def calculate_layout(network_id: int, layout_name: str) -> str:
     finally:
         db.close()
 
+from app.schemas.visualization import (
+    NodeColorConfig, NodeSizeConfig, EdgeWidthConfig, EdgeColorConfig, NodeLabelConfig
+)
+from app.schemas.filter import AttributeCondition
+from contextlib import contextmanager
+import logging
+
+# ... imports ...
+
+@contextmanager
+def safe_mcp_error_handling(tool_name: str):
+    """
+    Context manager to catch exceptions, log them with traceback, 
+    and return a user-friendly error string to the MCP client.
+    """
+    try:
+        yield
+    except Exception as e:
+        import traceback
+        error_msg = f"Error in {tool_name}: {str(e)}"
+        print(traceback.format_exc()) # Ensure it goes to stdout/logs
+        # You might also want to log to app logger if available
+        # logger.error(error_msg, exc_info=True)
+        # FastMCP seems to handle return strings as text content, 
+        # so we return the error message. 
+        # Note: In a generator/context manager, we can't 'return' a value for the caller 
+        # in the same way, but the caller (the tool function) should catch this if we re-raise 
+        # or we rely on the tool function to use this pattern differently.
+        # Actually, a decorator is better for return values.
+        raise e 
+
+# Better approach: Decorator or simple helper wrapper inside functions
+def log_and_return_error(func_name: str, e: Exception) -> str:
+    import traceback
+    traceback.print_exc()
+    return f"Error: {str(e)}"
+
+# ...
+
 @mcp.tool()
 def generate_visualization(
     network_id: int,
     layout_name: Optional[str] = None,
     focus_network_id: Optional[int] = None,
-    node_size_config: Optional[dict] = None,
-    node_color_config: Optional[dict] = None,
-    edge_width_config: Optional[dict] = None,
-    edge_color_config: Optional[dict] = None,
+    node_size_config: Optional[NodeSizeConfig] = None,
+    node_color_config: Optional[NodeColorConfig] = None,
+    edge_width_config: Optional[EdgeWidthConfig] = None,
+    edge_color_config: Optional[EdgeColorConfig] = None,
     context_config: Optional[dict] = None,
     focus_config: Optional[dict] = None,
-    node_label_config: Optional[dict] = None,
+    node_label_config: Optional[NodeLabelConfig] = None,
     custom_node_colors: Optional[list] = None
 ) -> dict:
     """
     Generates the final visualization data (nodes and links) for the frontend.
     Handles layout application, size/color mapping, and focus+context rendering.
 
-    **Configuration Dictionaries:**
-
-    1. **node_color_config**:
-        - **scale_type** (str): "LINEAR", "CATEGORICAL", or "RANKING".
-        - **attribute** (str): The node attribute name to use.
-        - **gradient** (List[str]): [start_color, end_color] for "LINEAR".
-        - **color_map** (Dict[str, str]): {value: color_hex} for "CATEGORICAL".
-        - **ranking_rules** (List[Dict]): For "RANKING". List of {"top": int, "color": str}.
-        - **default_color** (str): Fallback color.
-        
-        *Example (Categorical - "your_category_attribute"):*
-        ```json
-        {
-          "scale_type": "CATEGORICAL",
-          "attribute": "your_category_attribute",
-          "color_map": {"ValueA": "#FF0000", "ValueB": "#FFFFFF"}
-        }
-        ```
-        
-        **CRITICAL NOTE**: You **MUST** verify that the chosen `attribute` exists in the network by calling `get_node_attributes` or `get_edge_attributes` BEFORE calling this tool. Do not guess attribute names (like "Country", "Type", etc.) unless you have seen them in the attribute list. If the attribute does not exist, the visualization will fail.
-        
-        *Example (Ranking - "PageRank"):*
-        ```json
-        {
-          "scale_type": "RANKING",
-          "attribute": "pagerank",
-          "ranking_rules": [
-             {"top": 5, "color": "#FF0000"},
-             {"top": 10, "color": "#00FF00"}
-          ]
-        }
-        ```
-
-    2. **node_size_config**:
-        - **attribute** (str): The node attribute for sizing.
-        - **min** (float): Min radius.
-        - **max** (float): Max radius.
-        - **default** (float): Default radius (if attribute missing).
-
-    3. **edge_width_config**:
-        - **attribute** (str): Edge attribute.
-        - **min** (float): Min width.
-        - **max** (float): Max width.
-
-    4. **edge_color_config**:
-         - **attribute** (str): Edge attribute.
-         - **scale_type** (str): "LINEAR" or "CATEGORICAL".
-         - **gradient** (List[str]): [start_color, end_color].
-         - **color_map** (Dict[str, str]): {value: color}.
+    **Note**: Complex configurations (node_color_config, etc.) are now validated strictly.
+    Ensure you structure your JSON arguments to match the defined schemas.
     """
     db = get_db_session()
     try:
-        # Removed auto-layout calculation logic. 
-        # The visualizer.generate_visualization_data will raise ValueError if layout is missing.
-            
-        return visualizer.generate_visualization_data(
-            network_id, 
-            db, 
-            layout_name=layout_name,
-            node_size_config=node_size_config,
-            node_color_config=node_color_config,
-            edge_width_config=edge_width_config,
-            edge_color_config=edge_color_config,
-            focus_network_id=focus_network_id,
-            context_config=context_config,
-            focus_config=focus_config,
-            node_label_config=node_label_config,
-            custom_node_colors=custom_node_colors
-        )
+        # Pydantic models are now passed directly; convert to dict if service expects dict
+        # or update service to handle models. For now, dumping to dict is safest to maintain service compatibility.
+        
+        vis_args = {
+            "network_id": network_id,
+            "db": db,
+            "layout_name": layout_name,
+            "focus_network_id": focus_network_id,
+            "node_size_config": node_size_config.model_dump() if node_size_config else None,
+            "node_color_config": node_color_config.model_dump() if node_color_config else None,
+            "edge_width_config": edge_width_config.model_dump() if edge_width_config else None,
+            "edge_color_config": edge_color_config.model_dump() if edge_color_config else None,
+            "context_config": context_config,
+            "focus_config": focus_config,
+            "node_label_config": node_label_config.model_dump() if node_label_config else None,
+            "custom_node_colors": custom_node_colors
+        }
+
+        return visualizer.generate_visualization_data(**vis_args)
     except Exception as e:
-        return f"Error: {str(e)}"
+        return log_and_return_error("generate_visualization", e)
     finally:
         db.close()
+
 
 @mcp.tool()
 def create_ego_network(source_network_id: int, center_node_id: str, radius: int) -> dict:
@@ -504,85 +501,27 @@ def search_nodes(network_id: int, query: str, attribute: str = None) -> str:
 from app.schemas.filter import AttributeCondition, Range
 
 @mcp.tool()
-def create_subgraph_by_attribute_filter(network_id: int, conditions: List[Dict[str, Any]], suffix: str = "Filtered") -> dict:
+def create_subgraph_by_attribute_filter(network_id: int, conditions: List[AttributeCondition], suffix: str = "Filtered") -> dict:
     """
     Creates a new subgraph by filtering nodes from an existing network based on attribute conditions.
     
     Args:
         network_id: ID of the source network.
-        conditions: List of condition dictionaries. 
+        conditions: List of attribute conditions. 
           Different conditions in the list are combined with **AND**.
           Inside a condition, `ranges` and `categories` are combined with **OR**.
           
-          Each condition must have:
-          - **attribute_name** (str): Name of the attribute to filter by.
-          - **ranges** (List[Dict]): Optional list of ranges (e.g. `[{"min": 10, "max": 20}]`).
-          - **categories** (List[Any]): Optional list of exact standard values (e.g. `["Female", "Unknown"]`).
-          
         suffix: Suffix to append to the new network's name (default: "Filtered").
-        
-    **Example:**
-    To keep nodes where (Age is 10-20 OR 50+) AND (Gender is "F"):
-    ```json
-    [
-        {
-          "attribute_name": "Age", 
-          "ranges": [{"min": 10, "max": 20}, {"min": 50}]
-        },
-        {
-          "attribute_name": "Gender", 
-          "categories": ["F"]
-        }
-    ]
-    ```
     """
     db = get_db_session()
     try:
-        # Convert dicts to Pydantic models
-        if not isinstance(conditions, list):
-            return "Error: 'conditions' must be a list of dictionaries."
-
-        parsed_conditions = []
-        for i, c in enumerate(conditions):
-            if not isinstance(c, dict):
-                return f"Error: Condition at index {i} must be a dictionary."
-            
-            if "attribute_name" not in c:
-                return f"Error: Condition at index {i} is missing 'attribute_name'."
-                
-            # Robust parsing for ranges
-            ranges_data = c.get("ranges")
-            ranges = None
-            if ranges_data:
-                if not isinstance(ranges_data, list):
-                    return f"Error: 'ranges' in condition {i} must be a list."
-                
-                parsed_ranges = []
-                for j, r in enumerate(ranges_data):
-                    if not isinstance(r, dict):
-                        return f"Error: Range at index {j} in condition {i} must be a dictionary (e.g. {{'min': 10}})."
-                    try:
-                        parsed_ranges.append(Range(**r))
-                    except Exception as e:
-                        return f"Error: Invalid range format at index {j} in condition {i}: {e}"
-                ranges = parsed_ranges
-
-            categories = c.get("categories")
-            if categories and not isinstance(categories, list):
-                 return f"Error: 'categories' in condition {i} must be a list."
-
-            parsed_conditions.append(AttributeCondition(
-                attribute_name=c["attribute_name"],
-                ranges=ranges,
-                categories=categories
-            ))
-            
         from app.logic import filter
-        result = filter.create_subgraph_by_filter(network_id, parsed_conditions, suffix, db)
+        # Conditions are already validated Pydantic models (AttributeCondition)
+        result = filter.create_subgraph_by_filter(network_id, conditions, suffix, db)
         if "new_network_id" in result:
              result["network_id"] = result["new_network_id"]
         return result
     except Exception as e:
-        return f"Error: {str(e)}"
+        return log_and_return_error("create_subgraph_by_attribute_filter", e)
     finally:
         db.close()
