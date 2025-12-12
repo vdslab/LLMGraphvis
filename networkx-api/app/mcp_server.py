@@ -394,6 +394,25 @@ def generate_visualization(
         }
 
         return visualizer.generate_visualization_data(**vis_args)
+    except ValueError as e:
+        error_msg = str(e)
+        if "Missing required attributes" in error_msg and ("_x'" in error_msg or "_y'" in error_msg):
+            # Attempt to auto-calculate layout if missing
+            try:
+                # determine layout name from error or default
+                # But visualizer determines it. We can try reusing the logic or just default to forceatlas2 if not specified
+                layout_to_use = layout_name if layout_name else "forceatlas2"
+                print(f"Auto-calculating layout '{layout_to_use}' due to missing attributes...")
+                layout.calculate_layout(network_id, layout_to_use, db)
+                db.commit() # Ensure saved
+                
+                # Retry visualization
+                vis_args["layout_name"] = layout_to_use
+                return visualizer.generate_visualization_data(**vis_args)
+            except Exception as inner_e:
+                return log_and_return_error("generate_visualization_retry", inner_e)
+        
+        return log_and_return_error("generate_visualization", e)
     except Exception as e:
         return log_and_return_error("generate_visualization", e)
     finally:
