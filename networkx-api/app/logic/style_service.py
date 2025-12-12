@@ -99,7 +99,12 @@ class StyleService:
                 sorted_values = sorted(list(unique_values))
                 needed_values = [v for v in sorted_values if v not in categorical_color_map]
                 
-                if needed_values:
+                # Only auto-fill if no default fallback is provided
+                should_autofill = True
+                if node_color_config.get("default_color"):
+                    should_autofill = False
+
+                if should_autofill and needed_values:
                     palette = utils.generate_categorical_palette(len(needed_values))
                     for i, val in enumerate(needed_values):
                          categorical_color_map[val] = palette[i]

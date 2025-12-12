@@ -151,6 +151,10 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 **Config Pattern:** Keys correspond to the API implementation. Use `generate_visualization` carefully to create rich, meaningful visualizations.
 
+**Node Coloring Examples:**
+- **Categorical with map**: `node_color_config={"scale_type": "CATEGORICAL", "attribute": "Country", "color_map": {"USA": "blue", "Japan": "red"}}` (Others will be auto-colored)
+- **Categorical with map and fallback**: `node_color_config={"scale_type": "CATEGORICAL", "attribute": "Country", "color_map": {"USA": "blue"}, "default_color": "gray"}` (Others will be gray)
+
 ## 3.6. REST API エンドポイント (MCP Feature Parity)
 
 MCPツールと同等の機能をREST API経由でも利用可能にするため、以下のエンドポイントを提供します。これらは `endpoints/networks.py`, `endpoints/subgraphs.py` 等で定義されています。
