@@ -10,3 +10,5 @@ lxml
 scipy
 mcp
 requests
+pytest
+httpx

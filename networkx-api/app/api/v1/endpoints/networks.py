@@ -8,12 +8,7 @@ from app.core.logging import get_logger
 router = APIRouter()
 logger = get_logger(__name__)
 
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+from app.core.database import get_db
 
 @router.post("/initialize")
 def initialize_network(network_id: int = Body(...), graphml_data: str = Body(...), db: Session = Depends(get_db)):

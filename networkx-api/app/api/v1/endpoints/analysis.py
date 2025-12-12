@@ -6,12 +6,7 @@ from app.schemas.analysis import CentralityRequest, TopNodesRequest
 
 router = APIRouter()
 
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+from app.core.database import get_db
 
 @router.post("/{network_id}/centrality")
 def calculate_centrality(network_id: int, request: CentralityRequest, db: Session = Depends(get_db)):

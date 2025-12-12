@@ -8,12 +8,7 @@ from app.core.logging import get_logger
 router = APIRouter()
 logger = get_logger(__name__)
 
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+from app.core.database import get_db
 
 @router.post("/{network_id}/visualization")
 def generate_visualization(network_id: int, request: VisualizationRequest, db: Session = Depends(get_db)):
@@ -24,14 +19,14 @@ def generate_visualization(network_id: int, request: VisualizationRequest, db: S
             network_id,
             db,
             layout_name=request.layout_name,
-            node_size_config=request.node_size_config,
-            node_color_config=request.node_color_config,
-            edge_width_config=request.edge_width_config,
-            edge_color_config=request.edge_color_config,
+            node_size_config=request.node_size_config.model_dump() if request.node_size_config else None,
+            node_color_config=request.node_color_config.model_dump() if request.node_color_config else None,
+            edge_width_config=request.edge_width_config.model_dump() if request.edge_width_config else None,
+            edge_color_config=request.edge_color_config.model_dump() if request.edge_color_config else None,
             focus_network_id=request.focus_network_id,
             context_config=request.context_config,
             focus_config=request.focus_config,
-            node_label_config=request.node_label_config,
+            node_label_config=request.node_label_config.model_dump() if request.node_label_config else None,
             custom_node_colors=request.custom_node_colors
         )
     except ValueError as e:
