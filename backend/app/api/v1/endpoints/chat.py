@@ -138,7 +138,7 @@ def create_chat(
     user_id = current_user.id
     
     db_network = models.Network(
-        name=f"Network {network_id}"
+        name=f"{chat.name} Network"
     )
     db.add(db_network)
     db.commit()
