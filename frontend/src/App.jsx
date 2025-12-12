@@ -6,8 +6,6 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import NetworkChatPage from './pages/NetworkChatPage';
 
-import DebugGenerateVisualizationPage from './pages/DebugGenerateVisualizationPage';
-
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuthStore();
   
@@ -38,9 +36,6 @@ function App() {
             </ProtectedRoute>
           } 
         />
-        {import.meta.env.DEV && (
-          <Route path="/debug/networkxapi-tools/generate_visualization" element={<DebugGenerateVisualizationPage />} />
-        )}
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
