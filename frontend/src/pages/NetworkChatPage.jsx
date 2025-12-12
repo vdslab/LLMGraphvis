@@ -55,6 +55,9 @@ const NetworkChatPage = () => {
     if (id && id !== 'new' && isAuthenticated) {
       const loadData = async () => {
         try {
+          // Reset network store immediately to avoid showing previous graph
+          useNetworkStore.getState().reset();
+
           // Fetch chat details (includes network visualization)
           await useChatStore.getState().fetchChat(parseInt(id));
           // Fetch messages
