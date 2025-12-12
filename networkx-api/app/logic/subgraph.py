@@ -35,8 +35,7 @@ def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str], db: 
     # 3. Create New Network
     new_network = models.Network(
         name=target_name, 
-        parent_network_id=source_network_id,
-        graphml_content='<?xml version="1.0" encoding="UTF-8"?><graphml xmlns="http://graphml.graphdrawing.org/xmlns"></graphml>'
+        parent_network_id=source_network_id
     )
     db.add(new_network)
     db.commit()

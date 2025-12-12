@@ -22,7 +22,7 @@ class Network(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     description = Column(Text, nullable=True)
-    graphml_content = Column(Text, nullable=True)
+    description = Column(Text, nullable=True)
 
     parent_network_id = Column(Integer, ForeignKey("networks.id"), nullable=True)
 
