@@ -60,16 +60,7 @@ def get_network_metadata(network_id: int) -> str:
     finally:
         db.close()
 
-@mcp.resource("network://{network_id}/graphml")
-def get_network_graphml(network_id: int) -> str:
-    """Returns the raw GraphML content of the network."""
-    db = get_db_session()
-    try:
-        return exporter.export_network_to_graphml(network_id, db)
-    except Exception as e:
-        return f"Error exporting GraphML: {str(e)}"
-    finally:
-        db.close()
+
 
 @mcp.resource("network://{network_id}/attributes/nodes")
 def get_node_attributes(network_id: int) -> str:
