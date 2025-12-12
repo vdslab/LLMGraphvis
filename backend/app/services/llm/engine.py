@@ -113,12 +113,15 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
                             elif function_name == "initialize_network" and "network" in function_result:
                                 vis_data = function_result["network"]
                             
-                            if vis_data:
+                            if vis_data and isinstance(vis_data, dict) and "nodes" in vis_data and "links" in vis_data:
                                 logger.info(f"Emitting render_update for {function_name}")
                                 await queue.put({
                                     "event": "render_update",
                                     "data": json.dumps(vis_data)
                                 })
+                            else:
+                                logger.warning(f"Skipping render_update for {function_name}: Invalid visualization data or error response")
+
 
                     # Notify end
                     await queue.put({

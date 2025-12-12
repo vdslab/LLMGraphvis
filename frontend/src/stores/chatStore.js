@@ -23,6 +23,7 @@ export const useChatStore = create((set, get) => ({
   },
   
   // Get chat details
+  fetchChat: async (chatId) => {
     const res = await getChat(chatId);
     if (res.data.network) {
       useNetworkStore.getState().setNetworkData(res.data.network);
