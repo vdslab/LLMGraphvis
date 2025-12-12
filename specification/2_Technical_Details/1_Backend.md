@@ -61,7 +61,23 @@ graph TD
 | `GET`  | `/chat/{id}/messages` | 特定のチャットのメッセージ一覧を取得する。                                                                                       |
 | `POST` | `/chat/{id}/process`           | 特定のチャットのコンテキストでメッセージを処理し、LLMやツール呼び出しを実行する。                                          |
 | `GET`  | `/chat/{id}/stream`   | Server-Sent Events (SSE) の接続を確立するエンドポイント。                                                                    |
+| `GET`  | `/chat/{id}/stream`   | Server-Sent Events (SSE) の接続を確立するエンドポイント。                                                                    |
 | `GET`  | `/chat/{id}/export`   | チャットに対応するネットワークをGraphMLファイルとしてダウンロードする。                                                        |
+
+### 1.2.4. ネットワーク操作 (`/networks`)
+
+チャットに紐づくネットワークに対して、サブグラフ作成や分析を行うエンドポイント群です。これらの操作を実行するには、そのネットワーク（またはその親）に紐づくチャットの所有権が必要です。
+
+| Method | Path | 説明 |
+| :----- | :--- | :--- |
+| `GET` | `/networks/{network_id}/subgraphs` | 親ネットワークから作成されたサブグラフの一覧を取得する。 |
+| `POST` | `/networks/{network_id}/subgraphs/ego` | 指定ノードを中心としたEgo Network（指定ホップ数以内のノード群）を作成する。 |
+| `POST` | `/networks/{network_id}/subgraphs/from_nodes` | 指定されたノードIDのリストからサブグラフを作成する。 |
+| `POST` | `/networks/{network_id}/subgraphs/path` | 指定された2ノード間の最短経路をサブグラフとして作成する。 |
+| `POST` | `/networks/{network_id}/subgraphs/k_core` | K-Core（次数k以上のノード群）を抽出し、サブグラフを作成する。 |
+| `POST` | `/networks/{network_id}/subgraphs/largest_component` | 最大連結成分を抽出し、サブグラフを作成する。 |
+| `POST` | `/networks/{network_id}/subgraphs/component_containing_node` | 指定されたノードを含む連結成分を抽出し、サブグラフを作成する。 |
+| `GET` | `/networks/{network_id}/nodes/top` | 指定された中心性指標（degree, betweenness等）に基づいて、上位k個のノードを取得する。 |
 
 #### `/chat/{id}/process` の詳細
 
