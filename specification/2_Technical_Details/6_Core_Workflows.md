@@ -429,4 +429,74 @@ sequenceDiagram
     LLM->>Backend: generate_visualization(network_id={new_network_id})
     Backend-->>User: Render Update
 ```
+
+## 6.13. LLMツール実行ループとコンテキスト管理詳細 (Engine Architecture)
+
+**目的:** `backend/app/services/llm/engine.py` に実装されている `execute_tool_loop` の内部ロジック、特に**自動コンテキスト切り替え**と**イベントストリーミング**のメカニズムを詳細に定義します。
+
+### 6.13.1. 実行ループの基本ロジック
+
+LLMサービスは、ユーザーの入力に対して最大N回（デフォルト10回）のツール実行ループを回します。
+
+1.  **Thinking Stream**: LLMが思考を出力した場合、即座に `thinking_stream` イベントとしてフロントエンドにプッシュします。
+2.  **Tool Handling**: `function_call` を検出すると、以下の処理を行います。
+    *   `tool_execution` (started) イベントを送信。
+    *   ローカルツール (`switch_to_main_network` 等) か MCPツールかを判定して実行。
+    *   **Context Injection**: ツール引数に `network_id` が不足している場合、現在のコンテキスト（`network_id`）を自動的に注入します。
+3.  **Context Switching (重要)**: ツールの実行結果に `new_network_id` が含まれている場合、**自動的にチャットのコンテキスト（DB上の `network_id`）を更新します**。
+    *   これにより、後続のツール呼び出し（同じターン内または次のターン）は、自動的に新しいサブグラフに対して実行されます。
+4.  **Render Update**: ツールが可視化データを含む結果を返した場合、`render_update` イベントを送信します。
+5.  **History Update**: 実行結果をチャット履歴に追加し、次のLLM生成ステップへ進みます。
+
+### 6.13.2. シーケンス図: サブグラフ作成時の自動コンテキスト切り替え
+
+ユーザーが「最大連結成分を作成して、それを赤く塗って」と指示した場合の内部フローです。
+
+```mermaid
+sequenceDiagram
+    participant Engine as execute_tool_loop
+    participant LLM as Gemini Model
+    participant Queue as SSE Queue
+    participant MCP as NetworkXAPI
+    participant DB as Database
+    
+    Note over Engine: ループ開始 (初期 network_id = 1)
+
+    Engine->>LLM: 会話履歴を送信
+    LLM-->>Engine: ツール呼び出し要求: 最大連結成分の作成<br/>(create_largest_component_subgraph)
+
+    Engine->>Queue: SSE送信 "tool_execution" (開始)
+    
+    Note over Engine: network_id=1 を引数に自動注入
+    Engine->>MCP: ツール実行: 最大連結成分の作成<br/>(args: {network_id: 1})
+    MCP->>DB: サブグラフを作成・保存
+    DB-->>MCP: 新しいネットワークID (例: 2)
+    MCP-->>Engine: 実行結果: { "new_network_id": 2, "name": "最大連結成分" }
+
+    Note over Engine, DB: ★ コンテキスト切り替えを検知 ★
+    Engine->>Engine: "new_network_id": 2 を確認
+    Engine->>DB: Chat.network_id を 2 に更新
+    Engine->>Engine: ローカル変数 network_id を 2 に更新
+
+    Engine->>Queue: SSE送信 "tool_execution" (完了)
+    Engine->>Engine: 結果を履歴に追加
+
+    Note over Engine: 次のループ (network_id = 2)
+
+    Engine->>LLM: 会話履歴(結果含む)を送信
+    LLM-->>Engine: ツール呼び出し要求: 可視化生成 (赤色)<br/>(generate_visualization, node_color="red")
+    
+    Engine->>Queue: SSE送信 "tool_execution" (開始)
+
+    Note over Engine: network_id=2 (新しいID) を引数に注入
+    Engine->>MCP: ツール実行: 可視化生成<br/>(args: {network_id: 2, node_color: "red"})
+    MCP-->>Engine: 実行結果: { "nodes": [...], "links": [...] }
+
+    Engine->>Queue: SSE送信 "render_update" (サブグラフID 2 のデータ)
+    Engine->>Queue: SSE送信 "tool_execution" (完了)
+
+    Engine->>LLM: 会話履歴(可視化結果含む)を送信
+    LLM-->>Engine: テキスト応答 "サブグラフを作成し、赤く塗りました。"
+    
+    Engine->>Queue: SSE送信 "message"
 ```
