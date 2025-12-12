@@ -153,103 +153,35 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 ## 3.6. REST API エンドポイント (MCP Feature Parity)
 
-MCPツールと同等の機能をREST API経由でも利用可能にするため、以下のエンドポイントを提供します。
+MCPツールと同等の機能をREST API経由でも利用可能にするため、以下のエンドポイントを提供します。これらは `endpoints/networks.py`, `endpoints/subgraphs.py` 等で定義されています。
 
-### `GET /api/v1/networks/{network_id}/metadata`
-ネットワークのメタデータ（名前、説明など）を取得します。
+### ネットワーク管理 (`/api/v1/networks`)
 
-**Response:**
-```json
-{
-  "id": 1,
-  "name": "Network Name",
-  "description": "Network Description",
-  "created_at": "...",
-  "updated_at": "...",
-  "is_subgraph": false,
-  "parent_network_id": null
-}
-```
+| Method | Path | 説明 |
+| :----- | :--- | :--- |
+| `POST` | `/initialize` | GraphMLデータを受け取り、ネットワークを初期化（パース、保存、初期レイアウト計算）する。 |
+| `GET` | `/{network_id}/metadata` | ネットワークのメタデータ（名前、説明、視覚状態）を取得する。 |
+| `PUT` | `/{network_id}/metadata` | ネットワークのメタデータを更新する。 |
+| `GET` | `/{network_id}/export` | ネットワークをGraphML形式でエクスポートする。 |
 
-### `PUT /api/v1/networks/{network_id}/metadata`
-ネットワークのメタデータを更新します。
+### ネットワーク分析・検索 (`/api/v1/networks`)
 
-**Request:**
-```json
-{
-  "name": "New Name",
-  "description": "New Description"
-}
-```
+| Method | Path | 説明 |
+| :----- | :--- | :--- |
+| `GET` | `/{network_id}/attributes/nodes` | 利用可能なノード属性（統計情報含む）の一覧を取得する。 |
+| `GET` | `/{network_id}/attributes/edges` | 利用可能なエッジ属性（統計情報含む）の一覧を取得する。 |
+| `GET` | `/{network_id}/nodes/search` | クエリ文字列または属性値でノードを検索する。 |
+| `GET` | `/{network_id}/subgraphs` | ネットワークから派生したサブグラフの一覧を取得する。 |
 
-**Response:** 更新後のメタデータ（GETと同じ形式）
+### サブグラフ作成 (`/api/v1/networks/{network_id}/subgraphs`)
 
-### `POST /api/v1/networks/{network_id}/subgraphs/ego`
-Ego Networkを作成します。
+| Method | Path | 説明 |
+| :----- | :--- | :--- |
+| `POST` | `/ego` | Ego Networkを作成する。 |
+| `POST` | `/from-nodes` | 指定ノード群からサブグラフを作成する。 |
+| `POST` | `/path` | 最短経路サブグラフを作成する。 |
+| `POST` | `/k-core` | K-Coreサブグラフを作成する。 |
+| `POST` | `/largest-component` | 最大連結成分サブグラフを作成する。 |
+| `POST` | `/component-containing-node` | 指定ノードを含む連結成分サブグラフを作成する。 |
+| `POST` | `/filter` | 属性条件に基づいてノードをフィルタリングし、サブグラフを作成する。 |
 
-**Request:**
-```json
-{
-  "center_node_id": "node_id",
-  "radius": 1
-}
-```
-
-### `POST /api/v1/networks/{network_id}/subgraphs/from-nodes`
-指定ノード群からサブグラフを作成します。
-
-**Request:**
-```json
-{
-  "node_ids": ["id1", "id2"]
-}
-```
-
-### `POST /api/v1/networks/{network_id}/subgraphs/path`
-最短経路サブグラフを作成します。
-
-**Request:**
-```json
-{
-  "source_node_id": "start",
-  "target_node_id": "end"
-}
-```
-
-### `POST /api/v1/networks/{network_id}/subgraphs/k-core`
-K-Coreサブグラフを作成します。
-
-**Request:**
-```json
-{
-  "k": 2
-}
-```
-
-### `POST /api/v1/networks/{network_id}/subgraphs/largest-component`
-最大連結成分サブグラフを作成します。
-
-### `POST /api/v1/networks/{network_id}/subgraphs/component-containing-node`
-指定ノードを含む連結成分サブグラフを作成します。
-
-```json
-{
-  "node_id": "target_node"
-}
-```
-
-### `POST /api/v1/networks/{network_id}/subgraphs/filter`
-属性フィルタリングによるサブグラフ作成。
-
-**Request:**
-```json
-{
-  "conditions": [
-    {
-      "attribute_name": "Age",
-      "ranges": [{"min": 10, "max": 20}]
-    }
-  ],
-  "suffix": "Filtered Subgraph"
-}
-```
