@@ -3,6 +3,7 @@ import os
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
+from app import models
 from app.core.logging import get_logger
 from . import mcp_client, local_tools
 from .prompts import SYSTEM_INSTRUCTION
@@ -76,8 +77,8 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
                         status = "failed"
                     
                     
-                        # Logic to identify visualization updates and send render_update event
-                        if status == "completed" and isinstance(function_result, dict):
+                    # Logic to identify visualization updates and send render_update event
+                    if status == "completed" and isinstance(function_result, dict):
                             # Context Switching Logic
                             if "new_network_id" in function_result and function_result["new_network_id"] != network_id:
                                 new_id = function_result["new_network_id"]
@@ -92,6 +93,19 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
                                 
                                 # Update local variable for next iteration
                                 network_id = new_id
+
+                                # NEW: Auto-generate visualization for the new network
+                                logger.info(f"Auto-generating visualization for new network {new_id}")
+                                try:
+                                    vis_data_result = await mcp_client.execute_tool("generate_visualization", {"network_id": new_id})
+                                    if isinstance(vis_data_result, dict) and "nodes" in vis_data_result:
+                                        logger.info(f"Emitting render_update for auto-generated visualization of network {new_id}")
+                                        await queue.put({
+                                            "event": "render_update",
+                                            "data": json.dumps(vis_data_result)
+                                        })
+                                except Exception as e:
+                                    logger.error(f"Failed to auto-generate visualization for network {new_id}: {e}")
 
                             vis_data = None
                             if function_name == "generate_visualization":
