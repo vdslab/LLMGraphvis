@@ -186,9 +186,9 @@ def recommend_visualization_prompt(network_id: int) -> list[dict]:
             "content": {
                 "type": "text",
                 "text": f"""I need a recommendation for visualizing network {network_id}.
-1. Check available attributes: `read_resource("network://{network_id}/attributes/nodes")`
+1. Check available attributes: `read_resource("network://{network_id}/attributes/nodes")`. **ALWAYS** do this step first to know what attributes are available (e.g., 'nationality', 'role', 'score').
 2. Check structural stats: `read_resource("network://{network_id}/structure")`
-3. Propose a layout and mapping (color/size) that best reveals patterns in the data."""
+3. Propose a layout and mapping (color/size) that best reveals patterns in the data using ONLY existing attributes."""
             }
         }
     ]
@@ -333,14 +333,16 @@ def generate_visualization(
         - **ranking_rules** (List[Dict]): For "RANKING". List of {"top": int, "color": str}.
         - **default_color** (str): Fallback color.
         
-        *Example (Categorical - "Country"):*
+        *Example (Categorical - "your_category_attribute"):*
         ```json
         {
           "scale_type": "CATEGORICAL",
-          "attribute": "Country",
-          "color_map": {"USA": "#FF0000", "Japan": "#FFFFFF"}
+          "attribute": "your_category_attribute",
+          "color_map": {"ValueA": "#FF0000", "ValueB": "#FFFFFF"}
         }
         ```
+        
+        **CRITICAL NOTE**: You **MUST** verify that the chosen `attribute` exists in the network by calling `get_node_attributes` or `get_edge_attributes` BEFORE calling this tool. Do not guess attribute names (like "Country", "Type", etc.) unless you have seen them in the attribute list. If the attribute does not exist, the visualization will fail.
         
         *Example (Ranking - "PageRank"):*
         ```json
