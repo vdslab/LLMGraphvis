@@ -364,6 +364,12 @@ def generate_visualization(
     Generates the final visualization data (nodes and links) for the frontend.
     Handles layout application, size/color mapping, and focus+context rendering.
 
+    **Coloring Guide**:
+    - **Categorical Mapping**: To color specific values explicitly and make others a default color, use:
+      `node_color_config={"scale_type": "CATEGORICAL", "attribute": "nationality", "color_map": {"Austrian": "red"}, "default_color": "gray"}`.
+      All nodes where nationality="Austrian" will be red. All others (including those with valid other nationalities) will be gray.
+      If `default_color` is omitted, other nationalities will be automatically assigned distinct colors from a palette.
+
     **Note**: Complex configurations (node_color_config, etc.) are now validated strictly.
     Ensure you structure your JSON arguments to match the defined schemas.
     """
