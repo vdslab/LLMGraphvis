@@ -76,20 +76,35 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
                         status = "failed"
                     
                     
-                    # Logic to identify visualization updates and send render_update event
-                    if status == "completed" and isinstance(function_result, dict):
-                        vis_data = None
-                        if function_name == "generate_visualization":
-                            vis_data = function_result
-                        elif function_name == "initialize_network" and "network" in function_result:
-                            vis_data = function_result["network"]
-                        
-                        if vis_data:
-                            logger.info(f"Emitting render_update for {function_name}")
-                            await queue.put({
-                                "event": "render_update",
-                                "data": json.dumps(vis_data)
-                            })
+                        # Logic to identify visualization updates and send render_update event
+                        if status == "completed" and isinstance(function_result, dict):
+                            # Context Switching Logic
+                            if "new_network_id" in function_result and function_result["new_network_id"] != network_id:
+                                new_id = function_result["new_network_id"]
+                                logger.info(f"Context switch detected: {network_id} -> {new_id}")
+                                
+                                # Update Database
+                                chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
+                                if chat:
+                                    chat.network_id = new_id
+                                    db.commit()
+                                    logger.info(f"Updated Chat {chat_id} context to Network {new_id}")
+                                
+                                # Update local variable for next iteration
+                                network_id = new_id
+
+                            vis_data = None
+                            if function_name == "generate_visualization":
+                                vis_data = function_result
+                            elif function_name == "initialize_network" and "network" in function_result:
+                                vis_data = function_result["network"]
+                            
+                            if vis_data:
+                                logger.info(f"Emitting render_update for {function_name}")
+                                await queue.put({
+                                    "event": "render_update",
+                                    "data": json.dumps(vis_data)
+                                })
 
                     # Notify end
                     await queue.put({
