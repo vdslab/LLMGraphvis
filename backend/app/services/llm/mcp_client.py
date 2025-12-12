@@ -61,6 +61,10 @@ def _convert_to_gemini(mcp_tool) -> types.FunctionDeclaration:
     
     # Sanitize schema: remove 'title' which can confuse some parsers
     if tool_schema:
+        # First resolve references ($ref) using $defs if present
+        if "$defs" in tool_schema or "definitions" in tool_schema:
+            tool_schema = _resolve_schema_refs(tool_schema, tool_schema)
+            
         tool_schema = _sanitize_schema(tool_schema)
 
     return types.FunctionDeclaration(
@@ -68,6 +72,52 @@ def _convert_to_gemini(mcp_tool) -> types.FunctionDeclaration:
         description=tool_desc,
         parameters=tool_schema
     )
+
+def _resolve_schema_refs(schema: dict, root: dict) -> dict:
+    """
+    Recursively resolves $ref in JSON schema by looking up definitions in root.
+    Removes $defs/definitions from the final output.
+    """
+    if not isinstance(schema, dict):
+        return schema
+
+    # If this is a reference, resolve it
+    if "$ref" in schema:
+        ref_path = schema["$ref"]
+        # Basic support for local refs like "#/$defs/MyType"
+        if ref_path.startswith("#/"):
+            parts = ref_path.split("/")
+            # Navigate the root to find the definition
+            definition = root
+            for part in parts[1:]:
+                definition = definition.get(part)
+                if definition is None:
+                    break
+            
+            if definition:
+                # Recursively resolve the found definition
+                return _resolve_schema_refs(definition, root)
+        
+        # If we can't resolve it, return as is (or handle error)
+        return schema
+
+    new_schema = {}
+    for key, value in schema.items():
+        # Skip definitions in the output as they are resolved inline
+        if key in ["$defs", "definitions"]:
+            continue
+            
+        if isinstance(value, dict):
+            new_schema[key] = _resolve_schema_refs(value, root)
+        elif isinstance(value, list):
+            new_schema[key] = [
+                _resolve_schema_refs(item, root) if isinstance(item, dict) else item 
+                for item in value
+            ]
+        else:
+            new_schema[key] = value
+            
+    return new_schema
 
 def _sanitize_schema(schema: dict) -> dict:
     """Recursively remove 'title' from JSON schema."""
@@ -77,6 +127,9 @@ def _sanitize_schema(schema: dict) -> dict:
     new_schema = schema.copy()
     if "title" in new_schema:
         del new_schema["title"]
+    # Double check for residual $defs if they weren't caught before (though _resolve handles them)
+    if "$defs" in new_schema:
+        del new_schema["$defs"]
         
     for key, value in new_schema.items():
         if isinstance(value, dict):
