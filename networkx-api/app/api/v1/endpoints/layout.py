@@ -6,12 +6,7 @@ from app.schemas.layout import LayoutRequest
 
 router = APIRouter()
 
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+from app.core.database import get_db
 
 @router.post("/{network_id}/layout")
 def calculate_layout(network_id: int, request: LayoutRequest, db: Session = Depends(get_db)):
