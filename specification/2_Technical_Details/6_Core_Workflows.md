@@ -443,9 +443,11 @@ LLMサービスは、ユーザーの入力に対して最大N回（デフォル�
     *   `tool_execution` (started) イベントを送信。
     *   ローカルツール (`switch_to_main_network` 等) か MCPツールかを判定して実行。
     *   **Context Injection**: ツール引数に `network_id` が不足している場合、現在のコンテキスト（`network_id`）を自動的に注入します。
-3.  **Context Switching (重要)**: ツールの実行結果に `new_network_id` が含まれている場合、**自動的にチャットのコンテキスト（DB上の `network_id`）を更新します**。
-    *   これにより、後続のツール呼び出し（同じターン内または次のターン）は、自動的に新しいサブグラフに対して実行されます。
-4.  **Render Update**: ツールが可視化データを含む結果を返した場合、`render_update` イベントを送信します。
+3.  **Context Switching (重要)**: ツールの実行結果に `new_network_id` が含まれている場合、以下の処理を自動的に行います。
+    *   **DB更新**: チャットのコンテキスト（DB上の `network_id`）を更新します。
+    *   **Auto-Visualization**: 自動的に `generate_visualization` ツールを実行し、新しいサブグラフの可視化データを取得します。
+    *   **Render Update**: 取得した可視化データを `render_update` イベントとして送信し、画面を即座に更新します。
+4.  **Render Update**: （通常のツール実行時）ツールが可視化データを含む結果を返した場合、`render_update` イベントを送信します。
 5.  **History Update**: 実行結果をチャット履歴に追加し、次のLLM生成ステップへ進みます。
 
 ### 6.13.2. シーケンス図: サブグラフ作成時の自動コンテキスト切り替え
@@ -477,6 +479,11 @@ sequenceDiagram
     Engine->>Engine: "new_network_id": 2 を確認
     Engine->>DB: Chat.network_id を 2 に更新
     Engine->>Engine: ローカル変数 network_id を 2 に更新
+    
+    Note over Engine: ★ 自動可視化トリガー ★
+    Engine->>MCP: ツール実行: 可視化生成 (自動)<br/>(args: {network_id: 2})
+    MCP-->>Engine: 実行結果: { "nodes": [...], "links": [...] }
+    Engine->>Queue: SSE送信 "render_update" (サブグラフID 2 のデータ)
 
     Engine->>Queue: SSE送信 "tool_execution" (完了)
     Engine->>Engine: 結果を履歴に追加
@@ -484,19 +491,7 @@ sequenceDiagram
     Note over Engine: 次のループ (network_id = 2)
 
     Engine->>LLM: 会話履歴(結果含む)を送信
-    LLM-->>Engine: ツール呼び出し要求: 可視化生成 (赤色)<br/>(generate_visualization, node_color="red")
-    
-    Engine->>Queue: SSE送信 "tool_execution" (開始)
-
-    Note over Engine: network_id=2 (新しいID) を引数に注入
-    Engine->>MCP: ツール実行: 可視化生成<br/>(args: {network_id: 2, node_color: "red"})
-    MCP-->>Engine: 実行結果: { "nodes": [...], "links": [...] }
-
-    Engine->>Queue: SSE送信 "render_update" (サブグラフID 2 のデータ)
-    Engine->>Queue: SSE送信 "tool_execution" (完了)
-
-    Engine->>LLM: 会話履歴(可視化結果含む)を送信
-    LLM-->>Engine: テキスト応答 "サブグラフを作成し、赤く塗りました。"
+    LLM-->>Engine: テキスト応答 "サブグラフを作成しました。"
     
     Engine->>Queue: SSE送信 "message"
 ```

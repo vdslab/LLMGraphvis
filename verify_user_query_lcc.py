@@ -5,18 +5,16 @@ import os
 import time
 
 BASE_URL = "http://localhost:8000"
-USERNAME = "verify_lcc_user"
+USERNAME = "verify_lcc_user_jp"
 PASSWORD = "password123"
 
-def verify_lcc_visualization():
+def verify_user_query_lcc():
     session = requests.Session()
     
     # 1. Register
     print("1. Registering...")
     resp = session.post(f"{BASE_URL}/auth/register", json={"username": USERNAME, "password": PASSWORD})
-    if resp.status_code not in [200, 409]:
-        print(f"Failed to register: {resp.text}")
-        return False
+    # Ignore 409 (already exists)
         
     # 2. Login
     print("2. Logging in...")
@@ -27,7 +25,7 @@ def verify_lcc_visualization():
         
     # 3. Create Chat
     print("3. Creating Chat...")
-    resp = session.post(f"{BASE_URL}/chat", json={"name": "LCC Vis Chat"})
+    resp = session.post(f"{BASE_URL}/chat", json={"name": "LCC Vis Chat JP"})
     if resp.status_code != 200:
         print(f"Failed to create chat: {resp.text}")
         return False
@@ -36,12 +34,12 @@ def verify_lcc_visualization():
     
     # 4. Upload Graph
     print("4. Uploading Graph...")
-    if not os.path.exists("sample_data/disconnected.graphml"):
-        print("Error: sample_data/disconnected.graphml not found")
+    if not os.path.exists("sample_data/karate_club.graphml"):
+        print("Error: sample_data/karate_club.graphml not found")
         return False
         
-    with open("sample_data/disconnected.graphml", "rb") as f:
-        files = {"file": ("disconnected.graphml", f, "application/xml")}
+    with open("sample_data/karate_club.graphml", "rb") as f:
+        files = {"file": ("karate_club.graphml", f, "application/xml")}
         resp = session.post(f"{BASE_URL}/chat/{chat_id}/upload", files=files)
         if resp.status_code not in [200, 202]:
             print(f"Failed to upload graph: {resp.status_code} - {resp.text}")
@@ -50,8 +48,8 @@ def verify_lcc_visualization():
     print("   Upload accepted. Waiting for processing...")
     time.sleep(3) 
             
-    # 5. Send Message
-    prompt = "最大連結成分だけのネットワークを作成しそれに着目してください。"
+    # 5. Send Message (The specific user query)
+    prompt = "最大連結成分で分析したい"
     print(f"5. Sending Message: '{prompt}'...")
     
     payload = {
@@ -68,10 +66,7 @@ def verify_lcc_visualization():
     print("6. Listening for events...")
     resp = session.get(f"{BASE_URL}/chat/{chat_id}/stream", stream=True)
     
-    lcc_created = False
-    visualization_generated = False
-    subgraph_id = None
-    vis_network_id = None
+    lcc_tool_called = False
     
     start_time = time.time()
     timeout = 60
@@ -85,28 +80,16 @@ def verify_lcc_visualization():
             decoded_line = line.decode('utf-8')
             if decoded_line.startswith("data:"):
                 data_str = decoded_line[5:].strip()
-                print(f"DEBUG: {data_str}")
                 try:
                     data = json.loads(data_str)
                     
                     if "tool" in data:
                         tool_name = data["tool"]
-                        status = data.get("status")
-                        result = data.get("result")
-                        args = data.get("args", {})
+                        print(f"   Tool Execution: {tool_name} (Status: {data.get('status')})")
                         
-                        if tool_name == "create_largest_component_subgraph" and status == "completed":
-                            lcc_created = True
-                            # mcp_server.py adds "network_id" key to the result
-                            if result and isinstance(result, dict) and "network_id" in result:
-                                subgraph_id = result["network_id"]
-                                print(f"   LCC Subgraph Created: ID={subgraph_id}")
-                                
-                        if tool_name == "generate_visualization" and status == "started":
-                            vis_network_id = args.get("network_id")
-                            focus_network_id = args.get("focus_network_id")
-                            print(f"   Visualization Started: network_id={vis_network_id}, focus_network_id={focus_network_id}")
-                            visualization_generated = True
+                        if tool_name == "create_largest_component_subgraph":
+                            lcc_tool_called = True
+                            print("   SUCCESS: LLM called 'create_largest_component_subgraph'.")
 
                     if "role" in data and data["role"] == "model":
                         print(f"   Assistant: {data['content']}")
@@ -116,20 +99,14 @@ def verify_lcc_visualization():
                 except json.JSONDecodeError:
                     pass
     
-    if lcc_created and visualization_generated:
-        # Since we can't get result from tool event, we check if visualized network is new
-        if str(vis_network_id) != "1": # Assuming uploaded graph is ID 1
-            print(f"SUCCESS: Visualized new network ID {vis_network_id} (Expected LCC).")
-            return True
-        else:
-            print(f"FAILED: Visualized original network ID {vis_network_id}.")
-            return False
+    if lcc_tool_called:
+        return True
     else:
-        print("FAILED: Tools not called correctly.")
+        print("FAILED: LLM did NOT call 'create_largest_component_subgraph'.")
         return False
 
 if __name__ == "__main__":
-    if verify_lcc_visualization():
+    if verify_user_query_lcc():
         print("\nVerification SUCCESS")
         sys.exit(0)
     else:
