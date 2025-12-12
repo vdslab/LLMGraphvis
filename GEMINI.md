@@ -9,7 +9,7 @@ This document contains rules and guidelines for the Gemini AI agent working on t
 ## 2. Development Guidelines
 
 ### 2.1. Adding New Tools
-1. Define endpoint in `networkx-api/app/api/v1/endpoints/tools.py`.
+1. Define endpoint in `networkx-api/app/api/v1/endpoints/`.
 2. Add logic in `networkx-api/app/logic/`.
 3. Define tool schema in `backend/app/services/llm_service.py`.
 4. Update `SYSTEM_INSTRUCTION` in `llm_service.py` if necessary.

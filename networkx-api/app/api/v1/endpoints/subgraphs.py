@@ -14,12 +14,7 @@ from app.schemas.subgraph import (
 
 router = APIRouter()
 
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+from app.core.database import get_db
 
 @router.get("/{network_id}/subgraphs")
 def get_subgraphs(network_id: int, db: Session = Depends(get_db)):
