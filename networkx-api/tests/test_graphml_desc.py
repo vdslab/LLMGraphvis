@@ -4,17 +4,10 @@ import io
 from app.logic.importer import parse_and_save_graphml
 from app.logic.attributes import clear_network_data
 from app import models
-from app.core.database import SessionLocal
+# Removed custom db_session fixture
 
-@pytest.fixture
-def db_session():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
-def test_graphml_desc_import(db_session):
+def test_graphml_desc_import(db):
     graphml_content = """<?xml version="1.0" encoding="UTF-8"?>
 <graphml xmlns="http://graphml.graphdrawing.org/xmlns"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -42,21 +35,21 @@ def test_graphml_desc_import(db_session):
     # Use a random network ID to avoid collision
     network_id = 9999
     
-    # Clean up before test
-    existing = db_session.query(models.Network).filter(models.Network.id == network_id).first()
+    # Clean up before test - Not strictly needed with SQLite function scope but good for safety
+    existing = db.query(models.Network).filter(models.Network.id == network_id).first()
     if existing:
-         clear_network_data(network_id, db_session)
-         db_session.query(models.Network).filter(models.Network.id == network_id).delete()
-         db_session.commit()
+         clear_network_data(network_id, db)
+         db.query(models.Network).filter(models.Network.id == network_id).delete()
+         db.commit()
     
-    final_network_id = parse_and_save_graphml(network_id, graphml_content, db_session)
+    final_network_id = parse_and_save_graphml(network_id, graphml_content, db)
     
     # Verify Network Description
-    network = db_session.query(models.Network).filter(models.Network.id == final_network_id).first()
+    network = db.query(models.Network).filter(models.Network.id == final_network_id).first()
     assert network.description == "This is a test network description"
     
     # Verify Attribute Description (Key Desc)
-    color_attr = db_session.query(models.NodeAttribute).filter(
+    color_attr = db.query(models.NodeAttribute).filter(
         models.NodeAttribute.network_id == final_network_id,
         models.NodeAttribute.attribute_name == "color"
     ).first()
@@ -64,7 +57,7 @@ def test_graphml_desc_import(db_session):
     assert color_attr.description == "Color of the node"
     
     # Verify Node Attribute Definition (Implicit description attr)
-    desc_attr = db_session.query(models.NodeAttribute).filter(
+    desc_attr = db.query(models.NodeAttribute).filter(
         models.NodeAttribute.network_id == final_network_id,
         models.NodeAttribute.attribute_name == "description"
     ).first()
@@ -73,9 +66,9 @@ def test_graphml_desc_import(db_session):
     
     # Verify Node Descriptions (values)
     # n0
-    n0 = db_session.query(models.Node).filter(models.Node.network_id == final_network_id, models.Node.node_id == "n0").first()
+    n0 = db.query(models.Node).filter(models.Node.network_id == final_network_id, models.Node.node_id == "n0").first()
     assert n0 is not None
-    n0_desc_val = db_session.query(models.NodeTextAttributeValue).join(models.NodeAttributeValue).filter(
+    n0_desc_val = db.query(models.NodeTextAttributeValue).join(models.NodeAttributeValue).filter(
         models.NodeAttributeValue.node_id == n0.id,
         models.NodeAttributeValue.attribute_id == desc_attr.id
     ).first()
@@ -83,8 +76,8 @@ def test_graphml_desc_import(db_session):
     assert n0_desc_val.text_value == "Description for Node 0"
 
     # n1
-    n1 = db_session.query(models.Node).filter(models.Node.network_id == final_network_id, models.Node.node_id == "n1").first()
-    n1_desc_val = db_session.query(models.NodeTextAttributeValue).join(models.NodeAttributeValue).filter(
+    n1 = db.query(models.Node).filter(models.Node.network_id == final_network_id, models.Node.node_id == "n1").first()
+    n1_desc_val = db.query(models.NodeTextAttributeValue).join(models.NodeAttributeValue).filter(
         models.NodeAttributeValue.node_id == n1.id,
         models.NodeAttributeValue.attribute_id == desc_attr.id
     ).first()
@@ -92,27 +85,27 @@ def test_graphml_desc_import(db_session):
     assert n1_desc_val.text_value == "Description for Node 1"
 
     # Verify Edge Descriptions
-    edge_desc_attr = db_session.query(models.EdgeAttribute).filter(
+    edge_desc_attr = db.query(models.EdgeAttribute).filter(
         models.EdgeAttribute.network_id == final_network_id,
         models.EdgeAttribute.attribute_name == "description"
     ).first()
     assert edge_desc_attr is not None
     
     # Edge e0 (n0-n1)
-    edge = db_session.query(models.Edge).filter(
+    edge = db.query(models.Edge).filter(
         models.Edge.network_id == final_network_id,
         models.Edge.source_node_id == n0.id,
         models.Edge.target_node_id == n1.id
     ).first()
     if not edge:
-         edge = db_session.query(models.Edge).filter(
+         edge = db.query(models.Edge).filter(
             models.Edge.network_id == final_network_id,
             models.Edge.source_node_id == n1.id,
             models.Edge.target_node_id == n0.id
         ).first()
     assert edge is not None
     
-    edge_val = db_session.query(models.EdgeTextAttributeValue).join(models.EdgeAttributeValue).filter(
+    edge_val = db.query(models.EdgeTextAttributeValue).join(models.EdgeAttributeValue).filter(
         models.EdgeAttributeValue.edge_id == edge.id,
         models.EdgeAttributeValue.attribute_id == edge_desc_attr.id
     ).first()

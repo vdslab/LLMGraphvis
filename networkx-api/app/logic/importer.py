@@ -5,7 +5,7 @@ from app import models
 import datetime
 import itertools
 from typing import Dict, List, Any, Generator
-from .attributes import _ensure_attributes
+from .attributes import ensure_attributes
 from app.logic.parsing.graphml_parser import GraphMLParser
 
 def chunked_iterable(iterable, size):
@@ -50,7 +50,9 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
         edge_attr_types['description'] = 'string'
 
     # Wrap writes in a single transaction to reduce commit overhead
-    with db.begin():
+    # Check if transaction is already active (e.g. during tests)
+    ctx = db.begin_nested() if db.in_transaction() else db.begin()
+    with ctx:
         # Ensure Network exists in DB
         network = db.query(models.Network).filter(models.Network.id == network_id).first()
         
