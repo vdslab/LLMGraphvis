@@ -34,6 +34,7 @@ def test_graphml_desc_import(db_session):
     </edge>
   </graph>
   <key id="d0" for="node" attr.name="color" attr.type="string">
+    <desc>Color of the node</desc>
     <default>yellow</default>
   </key>
 </graphml>
@@ -55,7 +56,15 @@ def test_graphml_desc_import(db_session):
     network = db_session.query(models.Network).filter(models.Network.id == final_network_id).first()
     assert network.description == "This is a test network description"
     
-    # Verify Node Attribute Definition
+    # Verify Attribute Description (Key Desc)
+    color_attr = db_session.query(models.NodeAttribute).filter(
+        models.NodeAttribute.network_id == final_network_id,
+        models.NodeAttribute.attribute_name == "color"
+    ).first()
+    assert color_attr is not None
+    assert color_attr.description == "Color of the node"
+    
+    # Verify Node Attribute Definition (Implicit description attr)
     desc_attr = db_session.query(models.NodeAttribute).filter(
         models.NodeAttribute.network_id == final_network_id,
         models.NodeAttribute.attribute_name == "description"

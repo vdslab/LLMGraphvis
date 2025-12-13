@@ -33,14 +33,15 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
     network_desc = None
     node_descs = {} # node_id -> desc
     edge_descs = {} # (source, target) -> desc
+    
+    # Key descriptions: attr_name -> desc
+    node_attr_descs = {}
+    edge_attr_descs = {}
 
     try:
-        
         root = ET.fromstring(graphml_content)
         
         # GraphML namespace handling
-        # Usually {http://graphml.graphdrawing.org/xmlns}
-        # We can dynamically detect or just try find with namespace
         ns_map = {'g': 'http://graphml.graphdrawing.org/xmlns'}
         
         # Helper to find with flexible namespace
@@ -48,10 +49,26 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
             # Try with namespace
             d = element.find('g:desc', ns_map)
             if d is not None: return d.text
-            # Try without namespace (if file doesn't use it strict)
+            # Try without namespace
             d = element.find('desc')
             if d is not None: return d.text
             return None
+
+        # Parse Keys (Attribute Definitions)
+        # Look for <key> at root level
+        for key_elem in root.findall('g:key', ns_map) + root.findall('key'):
+             attr_name = key_elem.get('attr.name')
+             for_type = key_elem.get('for', 'all')
+             desc = find_desc(key_elem)
+             
+             if attr_name and desc:
+                 if for_type == 'node':
+                     node_attr_descs[attr_name] = desc
+                 elif for_type == 'edge':
+                     edge_attr_descs[attr_name] = desc
+                 elif for_type == 'all':
+                     node_attr_descs[attr_name] = desc
+                     edge_attr_descs[attr_name] = desc
 
         # Find Graph
         graph_elem = root.find('g:graph', ns_map)
@@ -225,8 +242,14 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
                     edge_map[row.edge_id] = row.id
 
         # --- 3. Process Attributes ---
-        node_attr_map = _ensure_attributes(network_id, node_attr_types, models.NodeAttribute, db, commit=False)
-        edge_attr_map = _ensure_attributes(network_id, edge_attr_types, models.EdgeAttribute, db, commit=False)
+        node_attr_map = _ensure_attributes(
+            network_id, node_attr_types, models.NodeAttribute, db, commit=False,
+            descriptions=node_attr_descs
+        )
+        edge_attr_map = _ensure_attributes(
+            network_id, edge_attr_types, models.EdgeAttribute, db, commit=False,
+            descriptions=edge_attr_descs
+        )
 
         # --- 3b. Bulk Insert Attribute Values ---
         
