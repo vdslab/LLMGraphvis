@@ -57,12 +57,14 @@ const NodeDetailsPanel = ({ selectedNode, onClose, onAskAI }) => {
             {Object.entries(attributes).map(([key, value]) => (
               <React.Fragment key={key}>
                 <div style={{ color: '#666', fontSize: '0.9rem' }}>{key}:</div>
-                <div style={{ fontSize: '0.9rem' }}>{String(value)}</div>
+                <div style={{ fontSize: '0.9rem', wordBreak: 'break-all' }}>{String(value)}</div>
               </React.Fragment>
             ))}
           </div>
         </div>
       )}
+
+      {/* Visual Properties removed as per user request */ }
 
       <button
         onClick={() => onAskAI(selectedNode)}

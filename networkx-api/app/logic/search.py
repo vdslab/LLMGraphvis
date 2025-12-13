@@ -111,7 +111,16 @@ def get_node_details(network_id: int, node_id: str, db: Session) -> Optional[Dic
         "attributes": {}
     }
     
-    # 1. Float Values
+    # 1. Fetch all possible attributes for this network to ensure we show the full schema
+    all_attrs = db.query(models.NodeAttribute).filter(
+        models.NodeAttribute.network_id == network_id
+    ).all()
+    
+    # Initialize all attributes to None
+    for attr in all_attrs:
+        details["attributes"][attr.attribute_name] = None
+    
+    # 2. Fetch Float Values
     float_attrs = db.query(models.NodeAttribute.attribute_name, models.NodeFloatAttributeValue.float_value)\
         .join(models.NodeAttributeValue, models.NodeAttribute.id == models.NodeAttributeValue.attribute_id)\
         .join(models.NodeFloatAttributeValue, models.NodeAttributeValue.id == models.NodeFloatAttributeValue.node_attribute_value_id)\
@@ -120,7 +129,7 @@ def get_node_details(network_id: int, node_id: str, db: Session) -> Optional[Dic
     for name, val in float_attrs:
         details["attributes"][name] = val
         
-    # 2. Text Values
+    # 3. Fetch Text Values
     text_attrs = db.query(models.NodeAttribute.attribute_name, models.NodeTextAttributeValue.text_value)\
         .join(models.NodeAttributeValue, models.NodeAttribute.id == models.NodeAttributeValue.attribute_id)\
         .join(models.NodeTextAttributeValue, models.NodeAttributeValue.id == models.NodeTextAttributeValue.node_attribute_value_id)\
