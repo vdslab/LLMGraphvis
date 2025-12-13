@@ -5,6 +5,7 @@ import io
 import datetime
 import itertools
 from typing import Dict, List, Any, Generator
+import xml.etree.ElementTree as ET
 from .attributes import _ensure_attributes
 
 def chunked_iterable(iterable, size):
