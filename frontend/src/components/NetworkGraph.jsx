@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
-const NetworkGraph = ({ nodes, links, showLabels = false }) => {
+const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick }) => {
   const svgRef = useRef();
 
   useEffect(() => {
@@ -80,7 +80,14 @@ const NetworkGraph = ({ nodes, links, showLabels = false }) => {
       .selectAll("g")
       .data(nodes)
       .join("g")
-      .attr("transform", d => `translate(${xScale(d.x)},${yScale(d.y)})`);
+      .attr("transform", d => `translate(${xScale(d.x)},${yScale(d.y)})`)
+      .style("cursor", "pointer") // Indicate clickable
+      .on("click", (event, d) => {
+        if (onNodeClick) {
+          event.stopPropagation(); // Prevent zoom click-through if necessary
+          onNodeClick(d);
+        }
+      });
 
     nodeGroup.append("circle")
       .attr("r", d => {
@@ -116,7 +123,7 @@ const NetworkGraph = ({ nodes, links, showLabels = false }) => {
 
     svg.call(zoom);
 
-  }, [nodes, links, showLabels]);
+  }, [nodes, links, showLabels, onNodeClick]);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>

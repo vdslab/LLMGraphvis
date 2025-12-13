@@ -92,6 +92,26 @@ def search_nodes(
         logger.error(f"Error searching nodes: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/{network_id}/nodes/{node_id}")
+def get_node_details(
+    network_id: int, 
+    node_id: str, 
+    db: Session = Depends(get_db)
+):
+    """
+    Get full details for a specific node.
+    """
+    try:
+        details = search.get_node_details(network_id, node_id, db)
+        if not details:
+            raise HTTPException(status_code=404, detail="Node not found")
+        return details
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting node details: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
 from app.schemas.network import UpdateNetworkMetadataRequest, NetworkMetadataResponse
 
 @router.get("/{network_id}/metadata", response_model=NetworkMetadataResponse)

@@ -78,6 +78,10 @@ export const getChatMessages = (chatId) => api.get(`/chat/${chatId}/messages`);
 export const exportNetwork = (chatId) =>
   api.get(`/chat/${chatId}/export`, { responseType: 'blob' });
 
+// Get node details
+export const getNodeDetails = (networkId, nodeId) => 
+  api.get(`/networks/${networkId}/nodes/${nodeId}`);
+
 // Create chat
 export const createChat = (name) => api.post('/chat', { name });
 
