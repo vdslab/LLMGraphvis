@@ -108,7 +108,9 @@ graph TD
 
 ### 1.3. Backendの役割: LLMとツールのオーケストレーター
 
-新アーキテクチャにおいて、Backendの役割はレンダリングデータを自ら組み立てることではなく、LLMと専門ツール（NetworkXAPI）間の指示を調整する**オーケストレーター（指揮者）**に特化します。これにより、ビジネスロジックと専門的な計算処理が明確に分離されます。
+新アーキテクチャにおいて、Backendの役割はレンダリングデータを自ら組み立てることではなく、LLMと専門ツール（NetworkXAPI）間の指示を調整する**オーケストレーター（指揮者）**に特化します。
+
+Backendは、ユーザーの入力に対して「思考(Think) → 行動(Act) → 観察(Observe)」のサイクル（ReActループ）を実行します。これにより、LLMはツール実行結果を見て次のアクションを決定できるため、動的柔軟な対応が可能になります。
 
 #### データ変換フロー図
 
@@ -128,43 +130,33 @@ graph TD
     end
 
     F -- "POST /chat/{id}/process" --> B_API
-    B_API -- "1. ユーザー指示とツールリストを送信" --> LLM
-    LLM -- "2. calculate_centralityと<br/>generate_visualizationの<br/>呼び出しプランを返す" --> B_API
-    B_API -- "3. プランに基づきツールを順次実行" --> NXAPI
-    NXAPI -- "4. 計算とマッピングを行い<br/>最終レンダリングデータを生成" --> NXAPI
-    NXAPI -- "5. 最終データを返す" --> B_API
-    B_API -- "6. HTTP Streaming (SSE)で<br/>最終データをFrontendに送信" --> F
+    B_API -- "1. ユーザー指示と履歴を送信" --> LLM
+    LLM -- "2. ツール呼び出し要求 (Act)" --> B_API
+    B_API -- "3. ツール実行 (Execute)" --> NXAPI
+    NXAPI -- "4. 実行結果 (Observe)" --> B_API
+    B_API -- "5. 結果を履歴に追加して再帰呼び出し" --> LLM
+    LLM -- "6. 最終回答 / 可視化プラン" --> B_API
+    B_API -- "7. HTTP Streaming (SSE)で\n経過と結果をFrontendに送信" --> F
 
     style B_API fill:#94e2d5,stroke:#333,stroke-width:2px
     style NXAPI fill:#f5c2e7,stroke:#333,stroke-width:2px
 ```
 
-プロセスは以下のステップで実行されます。
+プロセスは以下のステップで実行されます。詳細は **[6. 主要な処理フローとデータ生成](./6_Core_Workflows.md)** の「6.13. LLMツール実行ループとコンテキスト管理詳細」を参照してください。
 
-1.  **BackendがLLMに指示を送信**:
-    - Frontendから受け取ったユーザーの自然言語指示（例：「次数中心性でノードを色分けして」）と、利用可能なツールリスト（`list_node_attributes`, `list_edge_attributes`, `calculate_centrality`, `calculate_layout`, `generate_visualization`など）をLLMに送信します。
+1.  **Thinking & Planning**:
+    - Backendはユーザーの入力をLLMに渡します。
+    - LLMはシステムプロンプトに従い、まず「何をするべきか」を思考し、必要なツール（`list_node_attributes`など）を選択します。
 
-2.  **LLMが実行プランを計画**:
-    - LLMはユーザーの意図を解釈します。
-    - **Tool Execution**:
-     - `list_node_attributes()`: `network_service.list_node_attributes` を呼び出し、NetworkXAPIからノード属性一覧を取得。
-     - `list_edge_attributes()`: `network_service.list_edge_attributes` を呼び出し、NetworkXAPIからエッジ属性一覧を取得。
-     - `calculate_centrality(type, network_id?)`: `network_service.calculate_centrality` を呼び出し、NetworkXAPIで計算を実行。
-     - `calculate_layout(name, network_id?)`: `network_service.calculate_layout` を呼び出し、NetworkXAPIで計算を実行。
-     - `get_top_nodes(metric, k, network_id?)`: `network_service.get_top_nodes` を呼び出し、重要なノードを取得。
-     - `generate_visualization(config)`: `network_service.generate_visualization` を呼び出し、NetworkXAPIから可視化データを取得。
-    - ネットワークの現状を把握するために`list_attributes`を呼び出し、必要な属性（例：`degree_centrality`）が存在するか確認します。
-    - 属性の計算が必要な場合は`calculate_centrality`を呼び出し、その後`generate_visualization`を呼び出して可視化を更新するプランをBackendに返します。
+2.  **Tool Execution Loop**:
+    - BackendはLLMが要求したツール（MCPツールまたはローカルツール）を実行します。
+    - **Context Awareness**: 実行時に現在の `network_id` を自動的に注入します。
+    - **Verification First**: LLMは計算や可視化の前に、必ず `read_resource` や `list_attributes` を呼び出してデータの存在確認を行うよう指示されています。
 
-3.  **BackendがNetworkXAPIを呼び出す**:
-    - Backendは、LLMから受け取ったツール呼び出しプランに基づき、NetworkXAPIのエンドポイントを呼び出します。
-    - 複合的なアクションの場合、Backendはまず`/tools/calculate_centrality`を呼び出して指標を計算し、次に`/tools/generate_visualization`を呼び出してその指標を用いた可視化データを生成するという、**複数のAPIコールを順次実行**します。
-
-4.  **NetworkXAPIがレンダリングデータを生成**:
-    - NetworkXAPIは、計算（必要な場合）とマッピングを行い、フロントエンドが直接描画できる最終的なJSONデータを生成します。
-
-5.  **Backendが結果を中継**:
-    - NetworkXAPIから返された最終的なレンダリングデータを、BackendはHTTP Streaming (SSE)を通じてFrontendに送信します。Frontendはこれを受け取り、画面を更新します。
+3.  **Visualization & Response**:
+    - LLMが `generate_visualization` を呼び出すと、NetworkXAPIがレンダリングデータを生成します。
+    - Backendはこのデータを即座にSSEでクライアントにプッシュします。
+    - 最後にLLMが生成したテキスト（考察や説明）をユーザーに送信します。
 
 この設計により、Backendは視覚化の具体的なロジックに関与せず、LLMの知能とNetworkXAPIの計算能力を最大限に引き出すことに集中できます。
 

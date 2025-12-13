@@ -396,6 +396,33 @@ sequenceDiagram
     LLM->>Backend: generate_visualization(network_id=Root ID)
     Backend-->>User: Render Update (Main Graph)
 
+### 6.10.1. 親ネットワークへの切り替え (switch_to_parent_network)
+
+**目的:** 現在のサブグラフから、一つ上の階層（親ネットワーク）に戻るフローです。
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant LLM
+    participant Backend
+    participant DB
+
+    User->>LLM: "一つ上の階層に戻って"
+    LLM->>Backend: switch_to_parent_network()
+    
+    Backend->>DB: Get current Chat.network_id
+    DB-->>Backend: Current ID (Subgraph)
+    Backend->>DB: Find parent_network_id
+    DB-->>Backend: Parent ID
+    
+    note right of Backend: Update Context
+    Backend->>DB: Chat.network_id = Parent ID
+    
+    Backend-->>LLM: Success Message (Switched to Parent ID)
+    LLM->>Backend: generate_visualization(network_id=Parent ID)
+    Backend-->>User: Render Update
+```
+
 ## 6.11. 属性条件によるサブグラフ作成フロー
 
 **目的:** 「20代の女性のサブグラフを作って」といった指示に対し、属性条件を解釈してフィルタリングを実行するフローです。
@@ -449,6 +476,7 @@ LLMサービスは、ユーザーの入力に対して最大N回（デフォル�
     *   **Render Update**: 取得した可視化データを `render_update` イベントとして送信し、画面を即座に更新します。
 4.  **Render Update**: （通常のツール実行時）ツールが可視化データを含む結果を返した場合、`render_update` イベントを送信します。
 5.  **History Update**: 実行結果をチャット履歴に追加し、次のLLM生成ステップへ進みます。
+6.  **Loop Continuation**: 最大回数（デフォルト10回）まで、またはLLMが最終回答を生成するまで、ステップ1に戻ります。
 
 ### 6.13.2. シーケンス図: サブグラフ作成時の自動コンテキスト切り替え
 
