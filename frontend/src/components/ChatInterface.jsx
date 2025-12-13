@@ -5,7 +5,7 @@ import { useNetworkStore } from '../stores/networkStore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-const ChatInterface = () => {
+const ChatInterface = ({ selectedNode }) => {
   const { messages, sendMessage, isLoading, thinkingMessage, uploadNetwork, chatId } = useChatStore();
   const { nodes } = useNetworkStore();
   const [input, setInput] = useState('');
@@ -14,7 +14,13 @@ const ChatInterface = () => {
   const handleSend = async (e) => {
     e.preventDefault();
     if (!input.trim()) return;
-    await sendMessage(input);
+    
+    let content = input;
+    if (selectedNode) {
+      content += `\n\n[Context: User selected node ID: '${selectedNode.id}', Label: '${selectedNode.label}']`;
+    }
+
+    await sendMessage(content);
     setInput('');
   };
 
@@ -49,6 +55,20 @@ const ChatInterface = () => {
           </>
         )}
       </div>
+      
+      {selectedNode && (
+        <div style={{ 
+          padding: '0.5rem 1rem', 
+          backgroundColor: '#e3f2fd', 
+          borderBottom: '1px solid var(--border-color)',
+          fontSize: '0.9rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <span>Context: <strong>{selectedNode.label}</strong> (ID: {selectedNode.id})</span>
+        </div>
+      )}
       
       <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {messages.map((msg, idx) => (

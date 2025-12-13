@@ -5,6 +5,7 @@ import { useNetworkStore } from '../stores/networkStore';
 import { useAuthStore } from '../stores/authStore';
 import NetworkGraph from '../components/NetworkGraph';
 import ChatInterface from '../components/ChatInterface';
+import NodeDetailsPanel from '../components/NodeDetailsPanel';
 
 const NetworkChatPage = () => {
   const { id } = useParams();
@@ -188,6 +189,40 @@ const NetworkChatPage = () => {
     }
   }, [id, setChatId, isAuthenticated, retryTrigger]);
 
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [nodeDetailsPanelOpen, setNodeDetailsPanelOpen] = useState(false);
+
+  // Function to handle node clicks from the graph
+  const handleNodeClick = async (nodeData) => {
+    try {
+        // Optimistically set selected node with basic info
+        setSelectedNode({ id: nodeData.id, label: nodeData.label });
+        setNodeDetailsPanelOpen(true);
+
+        // Dynamically import API to avoid potential circular dependencies if any, 
+        // though standard import would work too. Using dynamic for consistency with previous thought process.
+        const api = await import('../services/api');
+        const response = await api.getNodeDetails(chatId, nodeData.id);
+        
+        if (response && response.data) {
+             setSelectedNode(prev => ({ ...prev, details: response.data }));
+        }
+    } catch (e) {
+        console.error("Failed to fetch node details:", e);
+    }
+  };
+
+  const handleCloseNodeDetails = () => {
+      setNodeDetailsPanelOpen(false);
+      setSelectedNode(null);
+  };
+   
+  const handleAskAI = (node) => {
+      // Just ensure the panel stays open or whatever logic we need.
+      // The context passing happens via props to ChatInterface
+      console.log("Asking AI about:", node);
+  };
+
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -312,7 +347,21 @@ const NetworkChatPage = () => {
             </div>
           )}
 
-          <NetworkGraph nodes={nodes} links={links} showLabels={showLabels} />
+
+          {nodeDetailsPanelOpen && selectedNode && (
+            <NodeDetailsPanel 
+              selectedNode={selectedNode} 
+              onClose={handleCloseNodeDetails} 
+              onAskAI={handleAskAI}
+            />
+          )}
+
+          <NetworkGraph 
+            nodes={nodes} 
+            links={links} 
+            showLabels={showLabels} 
+            onNodeClick={handleNodeClick}
+          />
           {nodes.length === 0 && (
             <div style={{
               position: 'absolute',
@@ -362,7 +411,7 @@ const NetworkChatPage = () => {
         />
 
         <div style={{ width: sidebarWidth, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderLeft: '1px solid var(--border-color)' }}>
-          <ChatInterface />
+          <ChatInterface selectedNode={selectedNode} />
         </div>
       </div>
     </div>
