@@ -133,3 +133,26 @@ async def get_top_nodes(
         
     result = await mcp_client.execute_tool("get_top_nodes", {"network_id": network_id, "metric": metric, "k": k})
     return result
+
+@router.get("/{network_id}/nodes/{node_id}")
+async def get_node_details(
+    network_id: int,
+    node_id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db)
+):
+    if not verify_network_access(network_id, current_user.id, db):
+        raise HTTPException(status_code=403, detail="Access denied")
+        
+    result = await mcp_client.execute_tool("read_node_details", {"network_id": network_id, "node_id": node_id})
+    
+    # helper for error handling from tool
+    if isinstance(result, dict) and "error" in result:
+         # Check if it's really a 404 or just some other error
+         # For now, let's pass it through or raise 404 if not found
+         if "not found" in result["error"].lower():
+             raise HTTPException(status_code=404, detail=result["error"])
+         # otherwise return as is or raise 500? Use 400 for bad requests
+         raise HTTPException(status_code=400, detail=result["error"])
+
+    return result
