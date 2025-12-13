@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 sys.path.append(os.getcwd())
 
 from app.logic.importer import parse_and_save_graphml
-from app.logic.attributes import _clear_network_data
+from app.logic.attributes import clear_network_data
 from app import models
 from app.core.database import SessionLocal
 
@@ -54,7 +54,7 @@ def verify_graphml_desc_import():
         # Clean up before test
         existing = db.query(models.Network).filter(models.Network.id == network_id).first()
         if existing:
-             _clear_network_data(network_id, db)
+             clear_network_data(network_id, db)
              db.query(models.Network).filter(models.Network.id == network_id).delete()
              db.commit()
         
