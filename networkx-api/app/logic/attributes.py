@@ -35,43 +35,47 @@ def _clear_network_data(network_id: int, db: Session):
     
     db.commit()
 
-def _ensure_attributes(network_id: int, attr_types: Dict[str, str], model_class, db: Session, commit: bool = True) -> Dict[str, int]:
+def _ensure_attributes(network_id: int, attr_types: Dict[str, str], model_class, db: Session, commit: bool = True, descriptions: Dict[str, str] = None) -> Dict[str, int]:
     """
     Ensure attributes exist for the given keys and return a map of {name: id}.
     attr_types: Dict mapping attribute name to data_type ("float", "string", etc.)
+    descriptions: Optional Dict mapping attribute name to description text.
     """
     keys = set(attr_types.keys())
     if not keys: return {}
     
     from sqlalchemy.dialects.postgresql import insert
     
-    # We want to identify IDs for both existing and newly created attributes.
-    # Approach:
-    # 1. Try to fetch all existing first (fast read).
-    # 2. Insert missing ones.
-    # 3. Fetch again (or assume we have them).
-    # OR better: Upsert-like flow. 
-    # But since we just need the map, let's do:
-    # 1. Bulk Insert with ON CONFLICT DO NOTHING.
-    # 2. Select all matching (network_id, keys).
-    
-    # Step 1: Prepare data for missing or existing check
-    # Note: bulk_insert_mappings doesn't support ON CONFLICT easily in generic SQLAlchemy w/o native dialect usage.
-    # Let's use dialect specific insert.
-    
+    # Step 1: Bulk Insert (Ignore duplicates)
     values = [
         {
             "network_id": network_id,
             "attribute_name": key,
-            "data_type": attr_types.get(key, "string")
+            "data_type": attr_types.get(key, "string"),
+            "description": descriptions.get(key) if descriptions else None
         }
         for key in keys
     ]
     
     stmt = insert(model_class).values(values)
-    stmt = stmt.on_conflict_do_nothing(
-        index_elements=['network_id', 'attribute_name'] # Constraint name usage is safer if known, but index elements work for unique constraints
-    )
+    
+    # If conflict, we might want to update the description if it's new?
+    # For now, let's just do ON CONFLICT UPDATE description if provided.
+    # This ensures we capture the description even if attribute existed.
+    
+    update_dict = {}
+    if descriptions:
+        update_dict = {"description": stmt.excluded.description}
+
+    if update_dict:
+        stmt = stmt.on_conflict_do_update(
+            index_elements=['network_id', 'attribute_name'],
+            set_=update_dict
+        )
+    else:
+        stmt = stmt.on_conflict_do_nothing(
+            index_elements=['network_id', 'attribute_name']
+        )
     
     db.execute(stmt)
 
@@ -82,9 +86,6 @@ def _ensure_attributes(network_id: int, attr_types: Dict[str, str], model_class,
         db.flush()
     
     # Step 2: Fetch all IDs (now guaranteed to exist)
-    # We could try to use RETURNING but ON CONFLICT DO NOTHING returns nothing for existing rows.
-    # So a simple SELECT after ensure is efficient enough here since metadata count is low (<< nodes/edges).
-    
     all_attrs = db.query(model_class).filter(
         model_class.network_id == network_id,
         model_class.attribute_name.in_(keys)
