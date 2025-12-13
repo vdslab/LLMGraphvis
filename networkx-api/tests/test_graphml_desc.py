@@ -16,10 +16,9 @@ def db_session():
 
 def test_graphml_desc_import(db_session):
     graphml_content = """<?xml version="1.0" encoding="UTF-8"?>
-<graphml xmlns="http://graphml.graphdrawing.org/xmlns"  
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns
-     http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
   <graph id="G" edgedefault="undirected">
     <desc>This is a test network description</desc>
     <node id="n0">
@@ -27,7 +26,7 @@ def test_graphml_desc_import(db_session):
       <data key="d0">green</data>
     </node>
     <node id="n1">
-       <desc>Description for Node 1</desc>
+      <desc>Description for Node 1</desc>
     </node>
     <edge id="e0" source="n0" target="n1">
       <desc>Description for Edge 0-1</desc>
