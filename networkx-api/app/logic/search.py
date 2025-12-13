@@ -6,13 +6,17 @@ from typing import List, Dict, Any, Optional
 
 logger = get_logger(__name__)
 
+# Type aliases for better readability
+NodeSearchResult = Dict[str, Any]
+NodeDetails = Dict[str, Any]
+
 def search_nodes(
     network_id: int, 
     query: str, 
     attribute_name: Optional[str] = None, 
     limit: int = 10, 
     db: Session = None
-) -> List[Dict[str, Any]]:
+) -> List[NodeSearchResult]:
     """
     Search for nodes in a network.
     
@@ -39,12 +43,28 @@ def search_nodes(
     logger.info(f"Found {len(results)} matches")
     return results
 
-def _search_by_attribute(db: Session, network_id: int, query: str, attribute_name: str, limit: int) -> List[Dict[str, Any]]:
+def _search_by_attribute(
+    db: Session, 
+    network_id: int, 
+    query: str, 
+    attribute_name: str, 
+    limit: int
+) -> List[NodeSearchResult]:
     """
     Find matches in Text Attributes with the given name.
+    
+    Args:
+        db: Database session.
+        network_id: The ID of the network.
+        query: The search string.
+        attribute_name: The name of the attribute to search in.
+        limit: Max number of results.
+        
+    Returns:
+        List of matching nodes.
     """
     # Join: Node -> NodeAttributeValue -> NodeAttribute (filter name) -> NodeTextAttributeValue (filter value)
-    q = db.query(models.Node, models.NodeTextAttributeValue.text_value)\
+    query_results = db.query(models.Node, models.NodeTextAttributeValue.text_value)\
         .join(models.NodeAttributeValue, models.Node.id == models.NodeAttributeValue.node_id)\
         .join(models.NodeAttribute, models.NodeAttributeValue.attribute_id == models.NodeAttribute.id)\
         .join(models.NodeTextAttributeValue, models.NodeAttributeValue.id == models.NodeTextAttributeValue.node_attribute_value_id)\
@@ -57,7 +77,7 @@ def _search_by_attribute(db: Session, network_id: int, query: str, attribute_nam
         .all()
         
     results = []
-    for node, match_value in q:
+    for node, match_value in query_results:
         results.append({
             "id": node.node_id, # Return the string ID used in GraphML
             "label": node.label,
@@ -66,11 +86,25 @@ def _search_by_attribute(db: Session, network_id: int, query: str, attribute_nam
         })
     return results
 
-def _search_default(db: Session, network_id: int, query: str, limit: int) -> List[Dict[str, Any]]:
+def _search_default(
+    db: Session, 
+    network_id: int, 
+    query: str, 
+    limit: int
+) -> List[NodeSearchResult]:
     """
     Simple OR search on node_id and label.
+    
+    Args:
+        db: Database session.
+        network_id: The ID of the network.
+        query: The search string.
+        limit: Max number of results.
+        
+    Returns:
+        List of matching nodes.
     """
-    q = db.query(models.Node)\
+    query_results = db.query(models.Node)\
         .filter(
             models.Node.network_id == network_id,
             or_(
@@ -82,8 +116,10 @@ def _search_default(db: Session, network_id: int, query: str, limit: int) -> Lis
         .all()
         
     results = []
-    for node in q:
+    for node in query_results:
+        # Determine what matched used logic
         match_val = node.label if node.label and query.lower() in node.label.lower() else node.node_id
+        
         results.append({
             "id": node.node_id,
             "label": node.label,
@@ -92,9 +128,21 @@ def _search_default(db: Session, network_id: int, query: str, limit: int) -> Lis
         })
     return results
 
-def get_node_details(network_id: int, node_id: str, db: Session) -> Optional[Dict[str, Any]]:
+def get_node_details(
+    network_id: int, 
+    node_id: str, 
+    db: Session
+) -> Optional[NodeDetails]:
     """
     Returns full details for a specific node, including all attributes.
+    
+    Args:
+        network_id: The ID of the network.
+        node_id: The string ID of the node.
+        db: Database session.
+        
+    Returns:
+        A dictionary with node details or None if not found.
     """
     node = db.query(models.Node).filter(
         models.Node.network_id == network_id,
