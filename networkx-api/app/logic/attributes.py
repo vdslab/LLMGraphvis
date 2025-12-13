@@ -138,6 +138,7 @@ def get_attribute_stats(network_id: int, model_attr, model_val, model_float, mod
         attr_data = {
             "name": attr.attribute_name,
             "data_type": attr.data_type,
+            "description": attr.description  # Added description
         }
         
         try:

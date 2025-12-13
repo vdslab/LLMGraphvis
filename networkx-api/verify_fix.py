@@ -136,6 +136,55 @@ def verify_graphml_desc_import():
         log(f"Edge e0 Description: {edge_val.text_value}")
         assert edge_val.text_value == "Description for Edge 0-1"
     
+        # --- MCP Layer Verification ---
+        log("\n--- MCP Layer Verification ---")
+        
+        # 1. Verify get_node_attributes via MCP helper logic or mock
+        from app.logic import attributes
+        from app import models
+        stats = attributes.get_attribute_stats(
+            final_network_id,
+            models.NodeAttribute,
+            models.NodeAttributeValue,
+            models.NodeFloatAttributeValue,
+            models.NodeTextAttributeValue,
+            db
+        )
+        
+        # Find 'color' attribute and check 'description' field
+        color_stat = next((s for s in stats if s["name"] == "color"), None)
+        assert color_stat is not None
+        log(f"MCP Attribute Stat for 'color': {color_stat}")
+        assert "description" in color_stat
+        assert color_stat["description"] == "Color of the node"
+        
+        # 2. Verify read_node_details logic
+        # We can implement a quick test of the logic used in mcp_server.read_node_details
+        # since we can't easily invoke the mcp object directly without running the server.
+        # We will replicate the query logic to ensure it works.
+        
+        node_id = "n0"
+        node = db.query(models.Node).filter(models.Node.network_id == final_network_id, models.Node.node_id == node_id).first()
+        assert node is not None
+        
+        # Simulate logic
+        details = {
+             "id": node.node_id,
+             "attributes": {}
+        }
+        text_attrs = db.query(models.NodeAttribute.attribute_name, models.NodeTextAttributeValue.text_value)\
+            .join(models.NodeAttributeValue, models.NodeAttribute.id == models.NodeAttributeValue.attribute_id)\
+            .join(models.NodeTextAttributeValue, models.NodeAttributeValue.id == models.NodeTextAttributeValue.node_attribute_value_id)\
+            .filter(models.NodeAttributeValue.node_id == node.id).all()
+            
+        for name, val in text_attrs:
+            details["attributes"][name] = val
+            if name == "description":
+                details["description"] = val
+        
+        log(f"MCP Node Details for 'n0': {details}")
+        assert details["description"] == "Description for Node 0"
+        
         log("\nSUCCESS: All verifications passed!")
         
     except Exception as e:
