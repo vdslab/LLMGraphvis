@@ -91,3 +91,44 @@ def _search_default(db: Session, network_id: int, query: str, limit: int) -> Lis
             "score": 1.0
         })
     return results
+
+def get_node_details(network_id: int, node_id: str, db: Session) -> Optional[Dict[str, Any]]:
+    """
+    Returns full details for a specific node, including all attributes.
+    """
+    node = db.query(models.Node).filter(
+        models.Node.network_id == network_id,
+        models.Node.node_id == node_id
+    ).first()
+    
+    if not node:
+        return None
+        
+    details = {
+        "id": node.node_id,
+        "label": node.label,
+        "description": None,
+        "attributes": {}
+    }
+    
+    # 1. Float Values
+    float_attrs = db.query(models.NodeAttribute.attribute_name, models.NodeFloatAttributeValue.float_value)\
+        .join(models.NodeAttributeValue, models.NodeAttribute.id == models.NodeAttributeValue.attribute_id)\
+        .join(models.NodeFloatAttributeValue, models.NodeAttributeValue.id == models.NodeFloatAttributeValue.node_attribute_value_id)\
+        .filter(models.NodeAttributeValue.node_id == node.id).all()
+        
+    for name, val in float_attrs:
+        details["attributes"][name] = val
+        
+    # 2. Text Values
+    text_attrs = db.query(models.NodeAttribute.attribute_name, models.NodeTextAttributeValue.text_value)\
+        .join(models.NodeAttributeValue, models.NodeAttribute.id == models.NodeAttributeValue.attribute_id)\
+        .join(models.NodeTextAttributeValue, models.NodeAttributeValue.id == models.NodeTextAttributeValue.node_attribute_value_id)\
+        .filter(models.NodeAttributeValue.node_id == node.id).all()
+        
+    for name, val in text_attrs:
+        details["attributes"][name] = val
+        if name == "description":
+            details["description"] = val
+            
+    return details

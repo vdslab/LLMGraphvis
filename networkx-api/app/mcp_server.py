@@ -496,7 +496,7 @@ def search_nodes(network_id: int, query: str, attribute: str = None) -> str:
         db.close()
 
 @mcp.tool()
-def read_node_details(network_id: int, node_id: str) -> str:
+def read_node_details(network_id: int, node_id: str) -> dict:
     """
     Returns full details for a specific node, including all attributes and its description.
     Use this when you need multiple attributes for a single node or need to read its 'desc'.
@@ -504,56 +504,15 @@ def read_node_details(network_id: int, node_id: str) -> str:
     db = get_db_session()
     try:
         from app.logic import search
-        # Reuse or create logic to get single node details.
-        # Since we don't have a direct function in search, implementing query here for simplicity or creating a helper.
-        # Let's use a direct query to be efficient and precise.
-        node = db.query(models.Node).filter(
-            models.Node.network_id == network_id,
-            models.Node.node_id == node_id
-        ).first()
         
-        if not node:
-            return f"Node '{node_id}' not found in network {network_id}."
-            
-        # Basic Info
-        details = {
-            "id": node.node_id,
-            "label": node.label,
-            "description": None, # Will fill if exists
-            "attributes": {}
-        }
+        details = search.get_node_details(network_id, node_id, db)
         
-        # Get Description from "description" attribute if exists
-        # We know from test_graphml_desc that descriptions are stored as an attribute named "description"
-        # but also optionally on the node itself? No, schema says descriptions are attributes.
-        # Wait, the GraphML <desc> on a node is imported as a "description" attribute value.
-        
-        # Fetch all attributes
-        # Node -> NodeAttributeValue -> (NodeAttribute, Value)
-        
-        # 1. Float Values
-        float_attrs = db.query(models.NodeAttribute.attribute_name, models.NodeFloatAttributeValue.float_value)\
-            .join(models.NodeAttributeValue, models.NodeAttribute.id == models.NodeAttributeValue.attribute_id)\
-            .join(models.NodeFloatAttributeValue, models.NodeAttributeValue.id == models.NodeFloatAttributeValue.node_attribute_value_id)\
-            .filter(models.NodeAttributeValue.node_id == node.id).all()
+        if not details:
+            return {"error": f"Node '{node_id}' not found in network {network_id}."}
             
-        for name, val in float_attrs:
-            details["attributes"][name] = val
-            
-        # 2. Text Values
-        text_attrs = db.query(models.NodeAttribute.attribute_name, models.NodeTextAttributeValue.text_value)\
-            .join(models.NodeAttributeValue, models.NodeAttribute.id == models.NodeAttributeValue.attribute_id)\
-            .join(models.NodeTextAttributeValue, models.NodeAttributeValue.id == models.NodeTextAttributeValue.node_attribute_value_id)\
-            .filter(models.NodeAttributeValue.node_id == node.id).all()
-            
-        for name, val in text_attrs:
-            details["attributes"][name] = val
-            if name == "description":
-                details["description"] = val
-                
-        return json.dumps(details, indent=2)
+        return details
     except Exception as e:
-        return f"Error: {str(e)}"
+        return {"error": str(e)}
     finally:
         db.close()
 
