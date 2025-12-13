@@ -2,7 +2,7 @@ import networkx as nx
 import math
 from sqlalchemy.orm import Session
 from app import models
-from .attributes import _get_or_create_attribute, _delete_attribute_values
+from .attributes import get_or_create_attribute, delete_attribute_values
 
 def calculate_layout(network_id: int, layout_name: str, db: Session):
     # Reconstruct graph from DB
@@ -70,12 +70,12 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
     
     # Save to DB - Bulk Update Strategy
     # 1. Ensure attributes exist
-    attr_x = _get_or_create_attribute(network_id, f"{layout_name}_x", models.NodeAttribute, db, data_type="float")
-    attr_y = _get_or_create_attribute(network_id, f"{layout_name}_y", models.NodeAttribute, db, data_type="float")
+    attr_x = get_or_create_attribute(network_id, f"{layout_name}_x", models.NodeAttribute, db, data_type="float")
+    attr_y = get_or_create_attribute(network_id, f"{layout_name}_y", models.NodeAttribute, db, data_type="float")
     
     # 2. Delete existing values for these attributes (Clean slate)
-    _delete_attribute_values(network_id, attr_x.id, models.NodeAttributeValue, db)
-    _delete_attribute_values(network_id, attr_y.id, models.NodeAttributeValue, db)
+    delete_attribute_values(network_id, attr_x.id, models.NodeAttributeValue, db)
+    delete_attribute_values(network_id, attr_y.id, models.NodeAttributeValue, db)
     
     # 3. Bulk Insert New Values
     nav_data = []

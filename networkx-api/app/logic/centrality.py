@@ -2,7 +2,7 @@ import networkx as nx
 from sqlalchemy.orm import Session
 from app import models
 from typing import List, Dict, Any
-from .attributes import _get_or_create_attribute, _delete_attribute_values
+from .attributes import get_or_create_attribute, delete_attribute_values
 
 def calculate_centrality(network_id: int, centrality_type: str, db: Session):
     # Reconstruct graph (Same as layout)
@@ -37,10 +37,10 @@ def calculate_centrality(network_id: int, centrality_type: str, db: Session):
         
     # Save to DB - Bulk Update Strategy
     attr_name = f"{centrality_type}_centrality"
-    attr = _get_or_create_attribute(network_id, attr_name, models.NodeAttribute, db, data_type="float")
+    attr = get_or_create_attribute(network_id, attr_name, models.NodeAttribute, db, data_type="float")
     
     # Delete existing
-    _delete_attribute_values(network_id, attr.id, models.NodeAttributeValue, db)
+    delete_attribute_values(network_id, attr.id, models.NodeAttributeValue, db)
     
     # Bulk Insert
     nav_data = []

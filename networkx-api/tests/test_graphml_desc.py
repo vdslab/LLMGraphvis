@@ -2,7 +2,7 @@
 import pytest
 import io
 from app.logic.importer import parse_and_save_graphml
-from app.logic.attributes import _clear_network_data
+from app.logic.attributes import clear_network_data
 from app import models
 from app.core.database import SessionLocal
 
@@ -45,7 +45,7 @@ def test_graphml_desc_import(db_session):
     # Clean up before test
     existing = db_session.query(models.Network).filter(models.Network.id == network_id).first()
     if existing:
-         _clear_network_data(network_id, db_session)
+         clear_network_data(network_id, db_session)
          db_session.query(models.Network).filter(models.Network.id == network_id).delete()
          db_session.commit()
     

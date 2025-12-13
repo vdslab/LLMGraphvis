@@ -168,13 +168,21 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
                     edge_map[row.edge_id] = row.id
 
         # --- 3. Process Attributes ---
-        node_attr_map = _ensure_attributes(
-            network_id, node_attr_types, models.NodeAttribute, db, commit=False,
-            descriptions=node_attr_descs
+        node_attr_map = ensure_attributes(
+            network_id, 
+            parser.node_attr_types, 
+            models.NodeAttribute, 
+            db, 
+            commit=False,
+            descriptions=parser.node_attr_descriptions
         )
-        edge_attr_map = _ensure_attributes(
-            network_id, edge_attr_types, models.EdgeAttribute, db, commit=False,
-            descriptions=edge_attr_descs
+        edge_attr_map = ensure_attributes(
+            network_id, 
+            parser.edge_attr_types, 
+            models.EdgeAttribute, 
+            db, 
+            commit=False,
+            descriptions=parser.edge_attr_descriptions
         )
 
         # --- 3b. Bulk Insert Attribute Values ---
