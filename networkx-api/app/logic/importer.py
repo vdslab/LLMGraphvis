@@ -29,6 +29,58 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
     except Exception as e:
         raise ValueError(f"Failed to parse GraphML: {e}")
 
+    # Extract descriptions manually using XML parsing
+    network_desc = None
+    node_descs = {} # node_id -> desc
+    edge_descs = {} # (source, target) -> desc
+
+    try:
+        
+        root = ET.fromstring(graphml_content)
+        
+        # GraphML namespace handling
+        # Usually {http://graphml.graphdrawing.org/xmlns}
+        # We can dynamically detect or just try find with namespace
+        ns_map = {'g': 'http://graphml.graphdrawing.org/xmlns'}
+        
+        # Helper to find with flexible namespace
+        def find_desc(element):
+            # Try with namespace
+            d = element.find('g:desc', ns_map)
+            if d is not None: return d.text
+            # Try without namespace (if file doesn't use it strict)
+            d = element.find('desc')
+            if d is not None: return d.text
+            return None
+
+        # Find Graph
+        graph_elem = root.find('g:graph', ns_map)
+        if graph_elem is None:
+             graph_elem = root.find('graph')
+        
+        if graph_elem is not None:
+            # Network Description
+            network_desc = find_desc(graph_elem)
+            
+            # Node Descriptions
+            for node in graph_elem.findall('g:node', ns_map) + graph_elem.findall('node'):
+                nid = node.get('id')
+                d = find_desc(node)
+                if nid and d:
+                    node_descs[nid] = d
+            
+            # Edge Descriptions
+            for edge in graph_elem.findall('g:edge', ns_map) + graph_elem.findall('edge'):
+                u = edge.get('source')
+                v = edge.get('target')
+                d = find_desc(edge)
+                if u and v and d:
+                    edge_descs[(u, v)] = d
+                    
+    except Exception as e:
+        print(f"Warning: Failed to extract descriptions from GraphML: {e}")
+        # Continue without descriptions
+
     # Use iterators directly to save memory
     nodes_iter = G.nodes(data=True)
     edges_iter = G.edges(data=True)
@@ -39,6 +91,12 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
 
     node_attr_types = {}
     edge_attr_types = {}
+    
+    # Pre-register description attribute as string if we found any
+    if node_descs:
+        node_attr_types['description'] = 'string'
+    if edge_descs:
+        edge_attr_types['description'] = 'string'
 
     # Wrap writes in a single transaction to reduce commit overhead
     with db.begin():
@@ -70,6 +128,11 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
                 # Network exists but is empty (e.g. created by Backend chat initialization).
                 # No content update needed for Network table anymore.
                 pass
+                
+        # Update Network Description if found
+        network_for_update = db.query(models.Network).filter(models.Network.id == final_network_id).first()
+        if network_desc and network_for_update:
+            network_for_update.description = network_desc
 
         network_id = final_network_id # Use the confirmed ID for all subsequent operations
 
@@ -90,10 +153,15 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
         for chunk in chunked_iterable(G.nodes(data=True), CHUNK_SIZE):
             nodes_data = []
             for node_id, data in chunk:
+                # Inject Description
+                n_id_str = str(node_id)
+                if n_id_str in node_descs:
+                    data['description'] = node_descs[n_id_str]
+                
                 nodes_data.append({
                     "network_id": network_id,
-                    "node_id": str(node_id),
-                    "label": data.get('label', str(node_id))
+                    "node_id": n_id_str,
+                    "label": data.get('label', n_id_str)
                 })
 
                 # Track attribute type inference during the first pass to avoid extra scans
@@ -119,12 +187,25 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
         for chunk in chunked_iterable(G.edges(data=True), CHUNK_SIZE):
             edges_data = []
             for u, v, data in chunk:
-                if str(u) in node_map and str(v) in node_map:
+                u_str, v_str = str(u), str(v)
+                
+                # Inject Description
+                # Try (u, v) and also (v, u) if undirected? 
+                # NX read_graphml preserves direction if graph is directed.
+                # If undirected, the XML source/target might match u/v or v/u.
+                desc = edge_descs.get((u_str, v_str))
+                if not desc and not G.is_directed():
+                     desc = edge_descs.get((v_str, u_str))
+                
+                if desc:
+                    data['description'] = desc
+
+                if u_str in node_map and v_str in node_map:
                     edges_data.append({
                         "network_id": network_id,
                         "edge_id": f"{u}-{v}",
-                        "source_node_id": node_map[str(u)],
-                        "target_node_id": node_map[str(v)],
+                        "source_node_id": node_map[u_str],
+                        "target_node_id": node_map[v_str],
                         "weight": float(data.get('weight', 1.0))
                     })
 
