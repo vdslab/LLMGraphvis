@@ -1,12 +1,12 @@
 import networkx as nx
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from app import models
-import io
 import datetime
 import itertools
 from typing import Dict, List, Any, Generator
-import xml.etree.ElementTree as ET
 from .attributes import _ensure_attributes
+from app.logic.parsing.graphml_parser import GraphMLParser
 
 def chunked_iterable(iterable, size):
     """Yield chunks of size from iterable."""
@@ -20,89 +20,22 @@ def chunked_iterable(iterable, size):
 def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
     from sqlalchemy.dialects.postgresql import insert
     
-    # Parse GraphML
+    # 1. Parse using dedicated parser
+    parser = GraphMLParser()
     try:
-        # NetworkX expects bytes or file-like object
-        if isinstance(graphml_content, str):
-            graphml_content = graphml_content.encode('utf-8')
-        
-        G = nx.read_graphml(io.BytesIO(graphml_content))
-    except Exception as e:
+        parsed_data = parser.parse(graphml_content)
+        G = parsed_data.graph
+    except ValueError as e:
         raise ValueError(f"Failed to parse GraphML: {e}")
 
-    # Extract descriptions manually using XML parsing
-    network_desc = None
-    node_descs = {} # node_id -> desc
-    edge_descs = {} # (source, target) -> desc
-    
-    # Key descriptions: attr_name -> desc
-    node_attr_descs = {}
-    edge_attr_descs = {}
-
-    try:
-        root = ET.fromstring(graphml_content)
-        
-        # GraphML namespace handling
-        ns_map = {'g': 'http://graphml.graphdrawing.org/xmlns'}
-        
-        # Helper to find with flexible namespace
-        def find_desc(element):
-            # Try with namespace
-            d = element.find('g:desc', ns_map)
-            if d is not None: return d.text
-            # Try without namespace
-            d = element.find('desc')
-            if d is not None: return d.text
-            return None
-
-        # Parse Keys (Attribute Definitions)
-        # Look for <key> at root level
-        for key_elem in root.findall('g:key', ns_map) + root.findall('key'):
-             attr_name = key_elem.get('attr.name')
-             for_type = key_elem.get('for', 'all')
-             desc = find_desc(key_elem)
-             
-             if attr_name and desc:
-                 if for_type == 'node':
-                     node_attr_descs[attr_name] = desc
-                 elif for_type == 'edge':
-                     edge_attr_descs[attr_name] = desc
-                 elif for_type == 'all':
-                     node_attr_descs[attr_name] = desc
-                     edge_attr_descs[attr_name] = desc
-
-        # Find Graph
-        graph_elem = root.find('g:graph', ns_map)
-        if graph_elem is None:
-             graph_elem = root.find('graph')
-        
-        if graph_elem is not None:
-            # Network Description
-            network_desc = find_desc(graph_elem)
-            
-            # Node Descriptions
-            for node in graph_elem.findall('g:node', ns_map) + graph_elem.findall('node'):
-                nid = node.get('id')
-                d = find_desc(node)
-                if nid and d:
-                    node_descs[nid] = d
-            
-            # Edge Descriptions
-            for edge in graph_elem.findall('g:edge', ns_map) + graph_elem.findall('edge'):
-                u = edge.get('source')
-                v = edge.get('target')
-                d = find_desc(edge)
-                if u and v and d:
-                    edge_descs[(u, v)] = d
-                    
-    except Exception as e:
-        print(f"Warning: Failed to extract descriptions from GraphML: {e}")
-        # Continue without descriptions
+    # Access metadata from parser result
+    network_desc = parsed_data.network_message
+    node_descs = parsed_data.node_messages
+    edge_descs = parsed_data.edge_messages
+    node_attr_descs = parsed_data.node_attr_descriptions
+    edge_attr_descs = parsed_data.edge_attr_descriptions
 
     # Use iterators directly to save memory
-    nodes_iter = G.nodes(data=True)
-    edges_iter = G.edges(data=True)
-
     # Note: G.number_of_nodes() is O(1) for NetworkX graphs
     total_nodes = G.number_of_nodes()
     total_edges = G.number_of_edges()
@@ -158,14 +91,6 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
         # We use chunks to avoid massive SQL statements
         CHUNK_SIZE = 5000
         node_map = {} # node_id_str -> db_id
-        
-        # Must restart iterator if we want to iterate twice? 
-        # Actually, we need to iterate twice: once for nodes table, once for attributes.
-        # But `nodes_iter` is an iterator from NetworkX view. It might be consumable or lightweight view.
-        # G.nodes(data=True) returns a NodeDataView which is iterable multiple times.
-        # However, to be safe and consistent with memory optimization, we should try to do single pass if possible?
-        # No, we need db_ids for attributes. So we must insert nodes first.
-        # NetworkX views are re-iterable.
         
         # 1st Pass: Nodes
         for chunk in chunked_iterable(G.nodes(data=True), CHUNK_SIZE):
