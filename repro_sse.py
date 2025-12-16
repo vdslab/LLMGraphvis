@@ -70,7 +70,7 @@ def verify_sse_broadcast(chat_id):
     msg_response = requests.post(
         f"{BASE_URL}/chat/{chat_id}/process",
         headers=headers,
-        json={"message": {"content": "Hello World"}}
+        json={"message": {"content": "最大連結成分について分析したい"}}
     )
     print(f"Message sent: {msg_response.status_code}")
 
