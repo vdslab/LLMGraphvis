@@ -239,6 +239,13 @@ async def handle_process_background(chat_id: int, user_message: str):
              db.add(db_msg)
              db.commit()
              logger.info(f"Saved assistant message for chat_id={chat_id}")
+
+             # Emit message_complete event
+             queue = await llm_service.get_event_queue(chat_id)
+             await queue.put({
+                 "event": "message_complete",
+                 "data": json.dumps({"id": db_msg.id})
+             })
         
     except Exception as e:
         logger.error(f"Error in process background task: {e}")
