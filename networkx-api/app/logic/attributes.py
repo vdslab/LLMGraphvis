@@ -305,4 +305,76 @@ def get_attribute_stats(
 
         result.append(attr_data)
         
-    return result
+
+def get_specific_attribute_stats(
+    network_id: int, 
+    attribute_name: str,
+    model_attr: Type[models.Base], 
+    model_val: Type[models.Base], 
+    model_float: Type[models.Base], 
+    model_text: Type[models.Base], 
+    db: Session
+) -> Optional[Dict[str, Any]]:
+    """
+    Fetch statistics for a SINGLE specific attribute.
+    """
+    attr = db.query(model_attr).filter(
+        model_attr.network_id == network_id,
+        model_attr.attribute_name == attribute_name
+    ).first()
+    
+    if not attr:
+        return None
+
+    attr_data = {
+        "name": attr.attribute_name,
+        "data_type": attr.data_type,
+        "description": attr.description
+    }
+    
+    try:
+        if attr.data_type == "float":
+            if model_val == models.NodeAttributeValue:
+                join_cond = (model_val.id == model_float.node_attribute_value_id)
+            else:
+                join_cond = (model_val.id == model_float.edge_attribute_value_id)
+
+            stats = db.query(
+                func.min(model_float.float_value),
+                func.max(model_float.float_value)
+            ).join(model_val, join_cond)\
+            .filter(model_val.attribute_id == attr.id).first()
+            
+            if stats and stats[0] is not None:
+                attr_data["stats"] = {
+                    "min": float(stats[0]),
+                    "max": float(stats[1])
+                }
+        
+        elif attr.data_type == "string":
+            if model_val == models.NodeAttributeValue:
+                join_cond = (model_val.id == model_text.node_attribute_value_id)
+            else:
+                join_cond = (model_val.id == model_text.edge_attribute_value_id)
+
+            unique_count = db.query(func.count(func.distinct(model_text.text_value)))\
+                .join(model_val, join_cond)\
+                .filter(model_val.attribute_id == attr.id).scalar()
+                
+            # For specific attribute text stats, we can return MORE top values (e.g. 20)
+            top_values = db.query(model_text.text_value, func.count(model_text.text_value).label('count'))\
+                .join(model_val, join_cond)\
+                .filter(model_val.attribute_id == attr.id)\
+                .group_by(model_text.text_value)\
+                .order_by(func.count(model_text.text_value).desc())\
+                .limit(20).all() # Higher limit for detailed inspection
+                
+            attr_data["stats"] = {
+                "unique_count": unique_count,
+                "top_values": [v[0] for v in top_values]
+            }
+    except Exception as e:
+        logger.error(f"Error calculating stats for {attr.attribute_name} in network {network_id}: {e}")
+        pass
+        
+    return attr_data
