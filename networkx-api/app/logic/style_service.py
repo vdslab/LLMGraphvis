@@ -81,6 +81,7 @@ class StyleService:
     def prepare_categorical_map(node_color_config: Dict[str, Any], global_node_attr_map: Dict[str, int], global_node_values: Dict[int, Dict[int, Any]]) -> Dict[str, str]:
         """
         Pre-calculate a map of value_str -> color for CATEGORICAL scale type.
+        Implements Top-N (default 10) logic, assigning 'Others' to Gray.
         """
         categorical_color_map = {}
         if node_color_config and node_color_config.get("scale_type") == "CATEGORICAL":
@@ -92,25 +93,59 @@ class StyleService:
 
             if attr_name in global_node_attr_map:
                 attr_id = global_node_attr_map[attr_name]
-                unique_values = set()
                 
+                # Count frequencies
+                value_counts = {}
                 for attrs in global_node_values.values():
                     if attr_id in attrs:
-                        unique_values.add(str(attrs[attr_id]))
+                        val_str = str(attrs[attr_id])
+                        value_counts[val_str] = value_counts.get(val_str, 0) + 1
                 
-                sorted_values = sorted(list(unique_values))
+                # Sort by frequency desc
+                sorted_values = sorted(value_counts.keys(), key=lambda k: value_counts[k], reverse=True)
+                
+                # Identify values needing colors (not in provided_map)
                 needed_values = [v for v in sorted_values if v not in categorical_color_map]
                 
-                # Only auto-fill if no default fallback is provided
-                should_autofill = True
-                if node_color_config.get("default_color"):
-                    should_autofill = False
-
+                # Only auto-fill if no explicitly set default color (or we want to override/augment)
+                # Strategy: We fill up to 10 distinct colors. 
+                # Anything else falls back to default_color, which we set to Gray if not set.
+                
+                should_autofill = True # We always try to fill missing holes for the top values
+                
                 if should_autofill and needed_values:
-                    palette = utils.generate_categorical_palette(len(needed_values))
-                    for i, val in enumerate(needed_values):
-                         categorical_color_map[val] = palette[i]
+                    # We only support 10 distinct colors + Gray
+                    limit = 10
+                    # Check how many colors already used in provided_map to avoid collisions? 
+                    # Simplicity: Just assign from palette to the top N needed values.
+                    
+                    palette = utils.generate_categorical_palette(limit)
+                    
+                    # Values that are "Top N" get a color. 
+                    # Others get nothing in the map -> Fallback to default.
+                    
+                    assigned_count = len(categorical_color_map)
+                    for val in needed_values:
+                        if assigned_count < limit:
+                             # Find next unused color in palette?
+                             # For now, simplistic assignment:
+                             if assigned_count < len(palette):
+                                 categorical_color_map[val] = palette[assigned_count]
+                                 assigned_count += 1
+                        else:
+                            # Reached limit, stop assigning distinct colors.
+                            # These will use default_color.
+                            break
+            
+            # Update the config in place so it persists
+            node_color_config["color_map"] = categorical_color_map
+            
+            # Ensure default color is Gray if not specified, to handle "Others"
+            if "default_color" not in node_color_config:
+                node_color_config["default_color"] = utils.GRAY_COLOR
+
         return categorical_color_map
+
 
     @staticmethod
     def get_val(entity_id: int, attr_name: str, attr_map: Dict[str, int], values_map: Dict[int, Dict[int, Any]]) -> Any:

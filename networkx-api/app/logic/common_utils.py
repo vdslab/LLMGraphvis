@@ -90,25 +90,55 @@ def calculate_smart_edge_width(num_edges: int) -> dict:
         "max": round(base_width * 3.0, 1)
     }
 
+
+# 10 distinct colors excluding generic gray
+# Based on Tableau10/D3 Category10 but replacing Gray/Silver with distinct colors
+SAFE_10_PALETTE = [
+    "#4e79a7", # Blue
+    "#f28e2b", # Orange
+    "#e15759", # Red
+    "#76b7b2", # Cyan/Teal
+    "#59a14f", # Green
+    "#edc948", # Yellow/Gold
+    "#b07aa1", # Purple
+    "#ff9da7", # Pink
+    "#9c755f", # Brown
+    "#bab0ac"  # Light Brown / Taupe (Distinct from Gray) -> Replaced with distinct color if needed in future
+]
+
+# Actually, let's make sure the last one isn't too gray-ish.
+# Re-curating to ensure high distinction and no confusion with gray.
+SAFE_10_PALETTE = [
+    "#1f77b4", # Blue
+    "#ff7f0e", # Orange
+    "#2ca02c", # Green
+    "#d62728", # Red
+    "#9467bd", # Purple
+    "#8c564b", # Brown
+    "#e377c2", # Pink
+    "#7f7f7f", # Middle Gray -> REPLACE with something else, e.g. Teal
+    "#bcbd22", # Olive
+    "#17becf"  # Cyan
+]
+# Replacing #7f7f7f (Gray) with a distinct dark yellow/gold or similar
+SAFE_10_PALETTE[7] = "#ffbb78" # Light Orange? No, let's use a distinct color.
+# Let's use a nice Indigo or similar.
+SAFE_10_PALETTE[7] = "#393b79" # Indigo
+
+GRAY_COLOR = "#d3d3d3" # Light Gray for "Others"
+
 def generate_categorical_palette(n: int) -> list:
     """
-    Generate a list of n distinct hex colors.
+    Generate a list of n distinct hex colors using SAFE_10_PALETTE.
     """
-    # A standard qualitative palette (Tableau 20 / d3.schemeCategory20 like)
-    base_palette = [
-        "#1f77b4", "#aec7e8", "#ff7f0e", "#ffbb78", "#2ca02c", "#98df8a",
-        "#d62728", "#ff9896", "#9467bd", "#c5b0d5", "#8c564b", "#c49c94",
-        "#e377c2", "#f7b6d2", "#7f7f7f", "#c7c7c7", "#bcbd22", "#dbdb8d",
-        "#17becf", "#9edae5"
-    ]
+    base_palette = SAFE_10_PALETTE
     
     if n <= len(base_palette):
         return base_palette[:n]
     
-    # If we need more, we might need to generate them or cycle
-    # For now, let's just cycle if > 20, but maybe with a slight modification?
-    # Simple cycling:
+    # Cycle if more than 10 needed (though logic usually caps at 10 now)
     palette = []
     for i in range(n):
         palette.append(base_palette[i % len(base_palette)])
     return palette
+
