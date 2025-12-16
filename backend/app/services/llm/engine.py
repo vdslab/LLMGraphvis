@@ -86,19 +86,26 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
         
         candidates = []
         if hasattr(current_response, '__aiter__'):  # It is a stream
-            async for chunk in current_response:
-                # Accumulate text and send chunks
-                if chunk.candidates:
-                    candidates.append(chunk.candidates[0]) # approximations for history reconstruction
-                    for part in chunk.candidates[0].content.parts:
-                        if part.text:
-                            current_text_chunk += part.text
-                            final_text_content += part.text # Accumulate final text
-                            # Send text chunk to frontend
-                            await queue.put({
-                                "event": "message_chunk",
-                                "data": json.dumps({"content": part.text})
-                            })
+            logger.info("Stream detected. Starting to consume response stream...")
+            try:
+
+                chunk_count = 0
+                async for chunk in current_response:
+                    chunk_count += 1
+                    # Accumulate text and send chunks
+                    if chunk.candidates:
+                        candidates.append(chunk.candidates[0]) # approximations for history reconstruction
+                        
+                        for part in chunk.candidates[0].content.parts:
+
+                            if part.text:
+                                current_text_chunk += part.text
+                                final_text_content += part.text # Accumulate final text
+                                # Send text chunk to frontend
+                                await queue.put({
+                                    "event": "message_chunk",
+                                    "data": json.dumps({"content": part.text})
+                                })
                             # Also "Thinking" is separate. 
                             # Usually if it's text, it's the answer.
                             # If it's "Thinking" (CoT), it comes as text too but usually we treat all text as answer 
@@ -137,7 +144,18 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
                                 # But let's proceed with assuming we get the call object.
                                 pass
                                 
+                                
+                logger.info(f"Stream consumption finished. Total chunks: {chunk_count}")
+            
+            except Exception as e:
+
+                logger.error(f"Error while consuming stream: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+                raise e
+
             # After iterating the stream, we have the full picture.
+
             # But wait, we need to reconstruct the `Content` object for history.
             # We can use `aggregated_response = client.aio.models.generate_content(...)` equivalent?
             # No, we just built it.
