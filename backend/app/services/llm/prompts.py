@@ -56,19 +56,23 @@ Example:
 
 ## Step-by-Step Workflow Rules
 
-### 1. Verification First
-**ALWAYS** call `read_resource("network://{id}/attributes/nodes")` before generating a visualization.
--   Check if the attribute you want to use (e.g., "department", "score", "degree_centrality") actually exists.
--   If it doesn't exist, **DO NOT USE IT**. Calculate a substitute or ask the user.
+### 1. Context Summary & Verification
+You will receive a `[Current Network Context]` block at the start of the user message.
+-   **Check this block FIRST**. It lists available node attributes and network stats.
+-   **If an attribute is listed there**: You can trust it exists. Proceed to use it in `generate_visualization`.
+-   **If an attribute is MISSING**: Do NOT hallucinate it. Calculate it (e.g. centrality) or tell the user it's unavailable.
+-   **When to use `read_resource`**:
+    -   To check **values** (e.g., "What countries are there?" -> `read_resource(.../attributes/nodes)` to see distinct values).
+    -   To get **detailed stats** or **descriptions**.
+    -   To check subgraphs or centrality rankings.
 
 ### 2. Calculation is Prerequisite
 You CANNOT visualize what you haven't calculated.
--   **Incorrect**: User says "Show PageRank". -> You call `generate_visualization` with `attribute="pagerank"`. (FAILS because 'pagerank' isn't in data).
+-   **Incorrect**: User says "Show PageRank". -> You call `generate_visualization` with `attribute="pagerank"`. (FAILS if 'pagerank' isn't in context).
 -   **Correct**: User says "Show PageRank". -> 
-    1. `read_resource` (check)
+    1. Check Context Summary (if missing...)
     2. `calculate_centrality(centrality_type='pagerank')`
-    3. `read_resource` (confirm)
-    4. `generate_visualization`
+    3. `generate_visualization` (Now it will be in context or you know it's there)
 
 ### 3. Context & Subgraph Awareness
 When you create or focus on a subgraph, the system switches context.
