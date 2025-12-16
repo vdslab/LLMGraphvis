@@ -85,7 +85,9 @@ class StyleService:
         categorical_color_map = {}
         if node_color_config and node_color_config.get("scale_type") == "CATEGORICAL":
             attr_name = node_color_config.get("attribute")
-            provided_map = node_color_config.get("color_map", {})
+            provided_map = node_color_config.get("color_map")
+            if not provided_map:
+                provided_map = {}
             categorical_color_map = provided_map.copy()
 
             if attr_name in global_node_attr_map:
@@ -208,7 +210,9 @@ class StyleService:
                 gradient = config.get("gradient", ["#eeeeee", "#000000"])
                 color = utils.interpolate_color(val, stats[1], stats[2], gradient[0], gradient[1])
             elif scale_type == "CATEGORICAL":
-                color_map = config.get("color_map", {})
+                color_map = config.get("color_map")
+                if not color_map:
+                    color_map = {}
                 if str(val) in color_map:
                     color = color_map[str(val)]
         return color
