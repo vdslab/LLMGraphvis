@@ -85,127 +85,140 @@ const NetworkChatPage = () => {
       setChatId(numericId);
       setSseError(null);
       
-      // Create SSE connection with error handling
-      const eventSource = new EventSource(`/api/chat/${numericId}/stream`, { withCredentials: true });
-      
-      // Set up event handlers
-      eventSource.addEventListener('render_update', (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log("Render Update:", data);
-          useNetworkStore.getState().setNetworkData(data);
-          useChatStore.getState().setIsLoading(false);
-          useChatStore.getState().setThinkingMessage(null);
-        } catch (e) {
-          console.error("Error parsing render_update:", e);
-        }
-      });
+      let eventSource = null;
+      let retryCount = 0;
+      const maxRetries = 3;
+      let retryTimeoutId = null;
 
-      eventSource.addEventListener('thinking_stream', (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          useChatStore.getState().setThinkingMessage(data.content || data);
-          useChatStore.getState().setIsLoading(true);
-        } catch(e) {
-          useChatStore.getState().setThinkingMessage(event.data);
-          useChatStore.getState().setIsLoading(true);
+      const connectSSE = () => {
+        // Close existing connection if any
+        if (eventSource) {
+          eventSource.close();
         }
-      });
 
-      eventSource.addEventListener('tool_execution', (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log("Tool execution:", data);
-          
-          if (data.status === 'started') {
-            useChatStore.getState().setThinkingMessage(`Executing ${data.tool}...`);
-            useChatStore.getState().setIsLoading(true);
-          } else if (data.status === 'completed') {
-            useChatStore.getState().setThinkingMessage(`${data.tool} completed`);
-          } else if (data.status === 'failed') {
-            console.error(`Tool ${data.tool} failed:`, data.error);
-            useChatStore.getState().setThinkingMessage(null);
-            useChatStore.getState().setIsLoading(false);
-          }
-        } catch (e) {
-          console.error("Error parsing tool_execution event:", e);
-        }
-      });
-
-      eventSource.addEventListener('message', (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          useChatStore.getState().addMessage(data);
-        } catch (e) {
-          console.error("Error parsing message event:", e);
-        }
-      });
-
-      eventSource.addEventListener('message_chunk', (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          useChatStore.getState().appendMessageChunk(data.content);
-        } catch (e) {
-          console.error("Error parsing message_chunk event:", e);
-        }
-      });
-      
-      eventSource.addEventListener('message_complete', (event) => {
-        try {
-           const data = JSON.parse(event.data);
-           useChatStore.getState().finalizeStreamingMessage(data.id);
-        } catch (e) {
-           console.error("Error parsing message_complete:", e);
-        }
-      });
-      
-      eventSource.addEventListener('system_message', (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log("System:", data);
-        } catch (e) {
-          console.error("Error parsing system_message:", e);
-        }
-      });
-      
-      // Enhanced error handling for SSE with retry logic
-      eventSource.onerror = (err) => {
-        console.error("SSE Error:", err);
-        eventSource.close();
-
-        // Don't show error immediately, try to reconnect
-        const retryCount = window.sseRetryCount || 0;
-        const maxRetries = 3;
+        console.log(`Connecting to SSE stream for chat ${numericId}...`);
+        eventSource = new EventSource(`/api/chat/${numericId}/stream`, { withCredentials: true });
         
-        if (retryCount < maxRetries) {
-          console.log(`Attempting to reconnect... (${retryCount + 1}/${maxRetries})`);
-          window.sseRetryCount = retryCount + 1;
-          
-          // Exponential backoff
-          const timeout = Math.min(1000 * Math.pow(2, retryCount), 10000);
-          
-          setTimeout(() => {
-            if (isAuthenticated) {
-              setSseError(null); // Clear previous error if any
-              
-              if (retryCount > 0) {
-                 setSseError("Reconnecting...");
-              }
-              
-              setRetryTrigger(prev => prev + 1);
+        eventSource.onopen = () => {
+          console.log("SSE Connected");
+          setSseError(null);
+          retryCount = 0; // Reset retry count on successful connection
+        };
+
+        // Set up event handlers
+        eventSource.addEventListener('render_update', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log("Render Update:", data);
+            useNetworkStore.getState().setNetworkData(data);
+            useChatStore.getState().setIsLoading(false);
+            useChatStore.getState().setThinkingMessage(null);
+          } catch (e) {
+            console.error("Error parsing render_update:", e);
+          }
+        });
+
+        eventSource.addEventListener('thinking_stream', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            useChatStore.getState().setThinkingMessage(data.content || data);
+            useChatStore.getState().setIsLoading(true);
+          } catch(e) {
+            useChatStore.getState().setThinkingMessage(event.data);
+            useChatStore.getState().setIsLoading(true);
+          }
+        });
+
+        eventSource.addEventListener('tool_execution', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log("Tool execution:", data);
+            
+            if (data.status === 'started') {
+              useChatStore.getState().setThinkingMessage(`Executing ${data.tool}...`);
+              useChatStore.getState().setIsLoading(true);
+            } else if (data.status === 'completed') {
+              useChatStore.getState().setThinkingMessage(`${data.tool} completed`);
+            } else if (data.status === 'failed') {
+              console.error(`Tool ${data.tool} failed:`, data.error);
+              useChatStore.getState().setThinkingMessage(null);
+              useChatStore.getState().setIsLoading(false);
             }
-          }, timeout);
-        } else {
-          window.sseRetryCount = 0; // Reset for next time
-          setSseError("Connection lost. Please refresh the page or try logging in again.");
-        }
+          } catch (e) {
+            console.error("Error parsing tool_execution event:", e);
+          }
+        });
+
+        eventSource.addEventListener('message', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            useChatStore.getState().addMessage(data);
+          } catch (e) {
+            console.error("Error parsing message event:", e);
+          }
+        });
+
+        eventSource.addEventListener('message_chunk', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            useChatStore.getState().appendMessageChunk(data.content);
+          } catch (e) {
+            console.error("Error parsing message_chunk event:", e);
+          }
+        });
+        
+        eventSource.addEventListener('message_complete', (event) => {
+          try {
+             const data = JSON.parse(event.data);
+             useChatStore.getState().finalizeStreamingMessage(data.id);
+          } catch (e) {
+             console.error("Error parsing message_complete:", e);
+          }
+        });
+        
+        eventSource.addEventListener('system_message', (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            console.log("System:", data);
+          } catch (e) {
+            console.error("Error parsing system_message:", e);
+          }
+        });
+        
+        // Enhanced error handling for SSE with retry logic
+        eventSource.onerror = (err) => {
+          console.error("SSE Error:", err);
+          eventSource.close();
+
+          if (retryCount < maxRetries) {
+            retryCount++;
+            const timeout = Math.min(1000 * Math.pow(2, retryCount), 10000);
+            console.log(`Attempting to reconnect... (${retryCount}/${maxRetries}) in ${timeout}ms`);
+            setSseError(`Connection lost. Reconnecting... (${retryCount}/${maxRetries})`);
+            
+            retryTimeoutId = setTimeout(() => {
+              if (isAuthenticated) {
+                connectSSE();
+              }
+            }, timeout);
+          } else {
+            setSseError("Connection lost. Please refresh the page or try logging in again.");
+          }
+        };
       };
+
+      connectSSE();
       
       return () => {
-        eventSource.close();
+        if (eventSource) {
+          eventSource.close();
+        }
+        if (retryTimeoutId) {
+          clearTimeout(retryTimeoutId);
+        }
       };
     }
-  }, [id, setChatId, isAuthenticated, retryTrigger]);
+  }, [id, setChatId, isAuthenticated]);
 
   const [selectedNode, setSelectedNode] = useState(null);
   const [nodeDetailsPanelOpen, setNodeDetailsPanelOpen] = useState(false);
