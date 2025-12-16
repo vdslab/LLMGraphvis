@@ -84,6 +84,28 @@ def get_node_attributes(network_id: int) -> str:
     finally:
         db.close()
 
+@mcp.resource("network://{network_id}/attributes/nodes/{attribute_name}")
+def get_node_attribute_details(network_id: int, attribute_name: str) -> str:
+    """Returns details and stats for a specific node attribute."""
+    db = get_db_session()
+    try:
+        stats = attributes.get_specific_attribute_stats(
+            network_id,
+            attribute_name,
+            models.NodeAttribute,
+            models.NodeAttributeValue,
+            models.NodeFloatAttributeValue,
+            models.NodeTextAttributeValue,
+            db
+        )
+        if not stats:
+            return json.dumps({"error": f"Attribute '{attribute_name}' not found."})
+        return json.dumps(stats)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+    finally:
+        db.close()
+
 @mcp.resource("network://{network_id}/attributes/edges")
 def get_edge_attributes(network_id: int) -> str:
     """Lists available edge attributes with metadata."""
@@ -102,6 +124,29 @@ def get_edge_attributes(network_id: int) -> str:
         return json.dumps({"error": str(e)})
     finally:
         db.close()
+
+@mcp.resource("network://{network_id}/attributes/edges/{attribute_name}")
+def get_edge_attribute_details(network_id: int, attribute_name: str) -> str:
+    """Returns details and stats for a specific edge attribute."""
+    db = get_db_session()
+    try:
+        stats = attributes.get_specific_attribute_stats(
+            network_id,
+            attribute_name,
+            models.EdgeAttribute,
+            models.EdgeAttributeValue,
+            models.EdgeFloatAttributeValue,
+            models.EdgeTextAttributeValue,
+            db
+        )
+        if not stats:
+            return json.dumps({"error": f"Attribute '{attribute_name}' not found."})
+        return json.dumps(stats)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+    finally:
+        db.close()
+
 
 @mcp.resource("network://{network_id}/subgraphs")
 def get_subgraphs_resource(network_id: int) -> str:
