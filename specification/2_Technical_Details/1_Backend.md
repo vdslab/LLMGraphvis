@@ -162,6 +162,27 @@ graph TD
 
 
 
+### 1.3.1. Context Injection Mechanism
+
+LLMが「現在のネットワーク状態」を正確に把握し、効率的にツールを選択できるよう、Backendは独自の**コンテキスト注入メカニズム**を実装しています。
+
+- **概要**: ユーザーの各メッセージの直前に、現在のネットワークのメタ情報（ID, ノード数, エッジ数, 利用可能な属性リスト）を自動的に挿入します。
+- **目的**:
+  1.  **Verification Firstの高速化**: 属性リストが既に提示されているため、単純な可視化指示であれば `read_resource` による確認ステップをスキップ可能にします。
+  2.  **ハルシネーション防止**: 存在しない属性を使用しようとするLLMのミスを防ぎます。
+  3.  **状態追従**: サブグラフへのコンテキスト切り替えが発生した場合でも、次のターンで最新のサブグラフ情報が注入されるため、LLMは常に正しい対象を分析できます。
+
+**注入される情報の例:**
+
+```text
+[Current Network Context]
+Network ID: 5
+Stats: 150 Nodes, 300 Edges
+Available Node Attributes:
+- department (string)
+- tenure (integer)
+```
+
 ## 1.4. 主要なデータモデル (Pydantic Schemas)
 
 APIで送受信される主要なデータ構造です。

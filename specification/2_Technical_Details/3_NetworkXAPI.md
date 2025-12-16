@@ -167,6 +167,20 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 **Node Coloring Examples:**
 - **Categorical with map**: `node_color_config={"scale_type": "CATEGORICAL", "attribute": "Country", "color_map": {"USA": "blue", "Japan": "red"}}` (Others will be auto-colored)
 - **Categorical with map and fallback**: `node_color_config={"scale_type": "CATEGORICAL", "attribute": "Country", "color_map": {"USA": "blue"}, "default_color": "gray"}` (Others will be gray)
+### `search_nodes`
+- **Description**: ノード名（ID、ラベル）または特定の属性値でノードを検索する。部分一致検索をサポートする。
+- **Arguments**:
+  - `network_id`: int
+  - `query`: str (検索キーワード)
+  - `attribute`: str (Optional, 指定した属性のカラムのみを検索対象とする)
+- **Returns**: `List[{"id": str, "label": str, ...}]` (JSON string)
+
+### `read_node_details`
+- **Description**: 特定のノードの全属性と詳細情報（description含む）を取得する。
+- **Arguments**:
+  - `network_id`: int
+  - `node_id`: str
+- **Returns**: `dict` (属性キーと値のペア)
 
 ## 3.6. REST API エンドポイント (MCP Feature Parity)
 

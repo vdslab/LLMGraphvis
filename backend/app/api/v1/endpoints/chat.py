@@ -223,28 +223,8 @@ async def handle_process_background(chat_id: int, user_message: str):
     db = database.SessionLocal()
     try:
         # Process chat and get response
-        response_content = await llm_service.process_chat(chat_id, user_message, db)
-        
-        # Save assistant message
-        db_response = models.ChatMessage(
-            chat_id=chat_id,
-            role="assistant",
-            content=response_content
-        )
-        db.add(db_response)
-        db.commit()
-        
-        # Send final message via SSE
-        queue = await llm_service.get_event_queue(chat_id)
-        await queue.put({
-            "event": "message",
-            "data": json.dumps({
-                "role": "assistant",
-                "content": response_content,
-                "id": db_response.id,
-                "created_at": db_response.created_at.isoformat()
-            })
-        })
+        # Note: process_chat handles database persistence and SSE streaming internally via engine.py
+        await llm_service.process_chat(chat_id, user_message, db)
         
     except Exception as e:
         logger.error(f"Error in process background task: {e}")

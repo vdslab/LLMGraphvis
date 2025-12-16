@@ -186,3 +186,19 @@ async def execute_tool(tool_name: str, arguments: dict):
         logger.error(f"Error executing tool {tool_name} with args {arguments}: {e}")
         traceback.print_exc()
         raise
+
+async def get_resource(uri: str) -> dict:
+    """
+    Directly reads a resource from the MCP server.
+    Useful for internal context validation.
+    """
+    try:
+        async with sse_client(SSE_ENDPOINT) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.read_resource(uri)
+                parsed_result = json.loads(result.contents[0].text)
+                return parsed_result
+    except Exception as e:
+        logger.error(f"Error reading resource {uri}: {e}")
+        return {}

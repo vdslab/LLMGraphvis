@@ -64,6 +64,14 @@ def generate_visualization_data(
     global_node_attr_map, global_node_values = _fetch_node_data(db, network_id, global_node_attrs)
     edge_attr_map, edge_values = _fetch_edge_data(db, network_id, required_edge_attrs)
     
+    # --- 2.5 Auto-Calculate Layout if Missing ---
+    if layout_x_attr not in global_node_attr_map or layout_y_attr not in global_node_attr_map:
+        from app.logic import layout
+        # Calculate layout
+        layout.calculate_layout(network_id, layout_name, db)
+        # Re-fetch node data to get new attributes
+        global_node_attr_map, global_node_values = _fetch_node_data(db, network_id, global_node_attrs)
+    
     focus_node_attr_map = {}
     focus_node_values = {}
     focus_node_map = {}

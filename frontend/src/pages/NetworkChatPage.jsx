@@ -140,6 +140,24 @@ const NetworkChatPage = () => {
           console.error("Error parsing message event:", e);
         }
       });
+
+      eventSource.addEventListener('message_chunk', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          useChatStore.getState().appendMessageChunk(data.content);
+        } catch (e) {
+          console.error("Error parsing message_chunk event:", e);
+        }
+      });
+      
+      eventSource.addEventListener('message_complete', (event) => {
+        try {
+           const data = JSON.parse(event.data);
+           useChatStore.getState().finalizeStreamingMessage(data.id);
+        } catch (e) {
+           console.error("Error parsing message_complete:", e);
+        }
+      });
       
       eventSource.addEventListener('system_message', (event) => {
         try {
