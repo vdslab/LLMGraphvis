@@ -87,8 +87,11 @@ class StyleService:
         if node_color_config and node_color_config.get("scale_type") == "CATEGORICAL":
             attr_name = node_color_config.get("attribute")
             provided_map = node_color_config.get("color_map")
-            if not provided_map:
+            
+            # Defensive check: ensure provided_map is a dict
+            if provided_map is None or not isinstance(provided_map, dict):
                 provided_map = {}
+                
             categorical_color_map = provided_map.copy()
 
             if attr_name in global_node_attr_map:
