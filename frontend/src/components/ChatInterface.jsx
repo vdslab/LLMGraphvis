@@ -71,20 +71,59 @@ const ChatInterface = ({ selectedNode }) => {
       )}
       
       <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {messages.map((msg, idx) => (
-          <div key={idx} style={{ 
-            alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-            backgroundColor: msg.role === 'user' ? 'var(--primary-color)' : 'var(--border-color)',
-            color: msg.role === 'user' ? 'white' : 'var(--text-primary)',
-            padding: '0.5rem 1rem',
-            borderRadius: '1rem',
-            maxWidth: '80%'
-          }}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {msg.content}
-            </ReactMarkdown>
-          </div>
-        ))}
+        {messages.map((msg, idx) => {
+          // Parse <thought> tags (handle both complete and streaming/incomplete tags)
+          const parts = msg.content.split(/(<thought>[\s\S]*?(?:<\/thought>|$))/g);
+          
+          return (
+            <div key={idx} style={{ 
+              alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+              backgroundColor: msg.role === 'user' ? 'var(--primary-color)' : 'var(--border-color)',
+              color: msg.role === 'user' ? 'white' : 'var(--text-primary)',
+              padding: '0.5rem 1rem',
+              borderRadius: '1rem',
+              maxWidth: '80%'
+            }}>
+              {parts.map((part, partIdx) => {
+                if (part.startsWith('<thought>')) {
+                  const thoughtContent = part.replace(/<\/?thought>/g, '').trim();
+                  if (!thoughtContent) return null;
+                  
+                  return (
+                    <details key={partIdx} open={part.includes('</thought>') ? false : true} style={{ marginBottom: '0.5rem', opacity: 0.8 }}>
+                      <summary style={{ 
+                        cursor: 'pointer', 
+                        fontSize: '0.8rem', 
+                        color: msg.role === 'user' ? 'rgba(255,255,255,0.7)' : '#666',
+                        userSelect: 'none'
+                      }}>
+                        Thinking Process {part.includes('</thought>') ? '' : '(Thinking...)'}
+                      </summary>
+                      <div style={{ 
+                        fontSize: '0.85rem', 
+                        fontStyle: 'italic', 
+                        marginTop: '0.25rem',
+                        paddingLeft: '0.5rem',
+                        borderLeft: msg.role === 'user' ? '2px solid rgba(255,255,255,0.3)' : '2px solid #ccc',
+                        whiteSpace: 'pre-wrap'
+                      }}>
+                        {thoughtContent}
+                      </div>
+                    </details>
+                  );
+                }
+                
+                if (!part.trim()) return null;
+                
+                return (
+                  <ReactMarkdown key={partIdx} remarkPlugins={[remarkGfm]}>
+                    {part}
+                  </ReactMarkdown>
+                );
+              })}
+            </div>
+          );
+        })}
         {isLoading && (
           <div style={{ alignSelf: 'flex-start', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
             {thinkingMessage || "Thinking..."}
