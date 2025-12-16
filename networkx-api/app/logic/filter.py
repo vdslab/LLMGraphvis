@@ -8,13 +8,13 @@ from app.logic.subgraph import create_subgraph_from_nodes
 
 logger = get_logger(__name__)
 
-def create_subgraph_by_filter(network_id: int, conditions: List[AttributeCondition], suffix: str, db: Session):
+def create_subgraph_by_filter(network_id: int, conditions: List[AttributeCondition], suffix: str, db: Session, preserve_layout: bool = False):
     """
     Creates a subgraph based on a list of attribute conditions.
     Conditions are combined with AND logic.
     Within a condition, ranges and categories are combined with OR logic.
     """
-    logger.info(f"Filtering nodes in network {network_id} with {len(conditions)} conditions")
+    logger.info(f"Filtering nodes in network {network_id} with {len(conditions)} conditions (preserve_layout={preserve_layout})")
     
     # Start with all node IDs in the network
     all_query = db.query(models.Node.node_id).filter(models.Node.network_id == network_id)
@@ -36,7 +36,7 @@ def create_subgraph_by_filter(network_id: int, conditions: List[AttributeConditi
     if not candidate_node_ids:
         raise ValueError("No nodes match the specified filter criteria.")
         
-    return create_subgraph_from_nodes(network_id, list(candidate_node_ids), db, suffix=suffix)
+    return create_subgraph_from_nodes(network_id, list(candidate_node_ids), db, suffix=suffix, preserve_layout=preserve_layout)
 
 def _get_nodes_matching_condition(network_id: int, condition: AttributeCondition, db: Session) -> Set[str]:
     """

@@ -9,11 +9,27 @@ from .utils.node_utils import resolve_node_id
 
 logger = get_logger(__name__)
 
-def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str], db: Session, suffix: str = "Subgraph") -> Dict[str, Any]:
+# Standard set of topological attributes to exclude by default 
+# These depend on the graph structure, so they become "stale" in a subgraph.
+TOPOLOGICAL_ATTRIBUTES = [
+    "degree", "in_degree", "out_degree",
+    "betweenness", "closeness", "eigenvector", "pagerank",
+    "modularity_class", 
+    "x", "y" # Layout depends on topology too
+]
+
+def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str], db: Session, suffix: str = "Subgraph", preserve_layout: bool = False) -> Dict[str, Any]:
     """
     Creates a new network as a subgraph containing the specified nodes.
+    
+    Args:
+        preserve_layout (bool): 
+            If True, copies 'x' and 'y' attributes to keep node positions ("Cutout View").
+            If False, excludes 'x' and 'y', forcing a new layout calculation ("Fresh View").
+            
+            NOTE: Topological metrics (degree, centrality, etc.) are ALWAYS excluded to ensure correctness.
     """
-    logger.info(f"Creating subgraph from network {source_network_id} with {len(node_ids)} nodes (suffix='{suffix}')")
+    logger.info(f"Creating subgraph from network {source_network_id} with {len(node_ids)} nodes (suffix='{suffix}', preserve_layout={preserve_layout})")
     
     # 1. Get Source Network
     source_network = db.query(models.Network).filter(models.Network.id == source_network_id).first()
@@ -52,12 +68,23 @@ def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str], db: 
     logger.debug(f"Copied {len(edge_map)} edges")
 
     # 6. Copy Attributes Schema & Values
+    # Define exclusion list based on whether layout should be preserved
+    excluded_attrs = list(TOPOLOGICAL_ATTRIBUTES)
+    
+    if preserve_layout:
+        # If preserving layout, we DO want x and y, so remove them from exclusion list
+        if "x" in excluded_attrs: excluded_attrs.remove("x")
+        if "y" in excluded_attrs: excluded_attrs.remove("y")
+        
     copier = AttributeCopier(db)
-    copier.copy_attributes(source_network_id, new_network_id, node_map, edge_map)
+    copier.copy_attributes(source_network_id, new_network_id, node_map, edge_map, excluded_attributes=excluded_attrs)
 
-    # 7. Calculate Initial Layout
-    logger.info("Calculating initial layout (spring)...")
-    calculate_layout(new_network_id, "spring", db)
+    # 7. Calculate Initial Layout (only if NOT preserved)
+    if not preserve_layout:
+        logger.info("Calculating initial layout (spring)...")
+        calculate_layout(new_network_id, "spring", db)
+    else:
+        logger.info("Preserving existing layout (x, y copied).")
 
     return {"new_network_id": new_network_id, "name": new_network.name}
 
@@ -145,7 +172,7 @@ def _copy_edges(db: Session, source_network_id: int, new_network_id: int, node_m
 
 # --- Other Subgraph Generators ---
 
-def create_ego_network(source_network_id: int, center_node_id: str, radius: int, db: Session) -> Dict[str, Any]:
+def create_ego_network(source_network_id: int, center_node_id: str, radius: int, db: Session, preserve_layout: bool = False) -> Dict[str, Any]:
     logger.info(f"Creating ego network for {center_node_id} (r={radius})")
     # Reconstruct graph structure to run ego_graph
     G = nx.Graph()
@@ -173,9 +200,9 @@ def create_ego_network(source_network_id: int, center_node_id: str, radius: int,
     ego_G = nx.ego_graph(G, center_node_id, radius=radius)
     node_ids = list(ego_G.nodes())
     
-    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix=f"Ego {center_node_id} (r={radius})")
+    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix=f"Ego {center_node_id} (r={radius})", preserve_layout=preserve_layout)
 
-def create_path_subgraph(source_network_id: int, source_node_id: str, target_node_id: str, db: Session) -> Dict[str, Any]:
+def create_path_subgraph(source_network_id: int, source_node_id: str, target_node_id: str, db: Session, preserve_layout: bool = False) -> Dict[str, Any]:
     logger.info(f"Creating path subgraph: {source_node_id} -> {target_node_id}")
     G = nx.Graph()
     edges = db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
@@ -199,9 +226,9 @@ def create_path_subgraph(source_network_id: int, source_node_id: str, target_nod
         logger.warning(f"No path found between {source_node_id} and {target_node_id}")
         raise ValueError(f"No path between {source_node_id} and {target_node_id}")
         
-    return create_subgraph_from_nodes(source_network_id, path_nodes, db, suffix=f"Path {source_node_id}->{target_node_id}")
+    return create_subgraph_from_nodes(source_network_id, path_nodes, db, suffix=f"Path {source_node_id}->{target_node_id}", preserve_layout=preserve_layout)
 
-def create_k_core_subgraph(source_network_id: int, k: int, db: Session) -> Dict[str, Any]:
+def create_k_core_subgraph(source_network_id: int, k: int, db: Session, preserve_layout: bool = False) -> Dict[str, Any]:
     logger.info(f"Creating k-core subgraph (k={k})")
     G = nx.Graph()
     edges = db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
@@ -225,9 +252,9 @@ def create_k_core_subgraph(source_network_id: int, k: int, db: Session) -> Dict[
         logger.warning(f"No k-core found for k={k}")
         raise ValueError(f"No k-core found for k={k}")
         
-    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix=f"K-Core (k={k})")
+    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix=f"K-Core (k={k})", preserve_layout=preserve_layout)
 
-def create_largest_component_subgraph(source_network_id: int, db: Session) -> Dict[str, Any]:
+def create_largest_component_subgraph(source_network_id: int, db: Session, preserve_layout: bool = False) -> Dict[str, Any]:
     logger.info("Creating largest component subgraph")
     G = nx.Graph()
     edges = db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
@@ -248,10 +275,10 @@ def create_largest_component_subgraph(source_network_id: int, db: Session) -> Di
     largest_component = max(components, key=len)
     node_ids = list(largest_component)
     
-    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix="Largest Component")
+    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix="Largest Component", preserve_layout=preserve_layout)
 
 
-def create_component_containing_node(source_network_id: int, node_id: str, db: Session) -> Dict[str, Any]:
+def create_component_containing_node(source_network_id: int, node_id: str, db: Session, preserve_layout: bool = False) -> Dict[str, Any]:
     logger.info(f"Creating component subgraph containing node {node_id}")
     G = nx.Graph()
     edges = db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
@@ -275,4 +302,4 @@ def create_component_containing_node(source_network_id: int, node_id: str, db: S
     component_nodes = nx.node_connected_component(G, node_id)
     node_ids = list(component_nodes)
     
-    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix=f"Component ({node_id})")
+    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix=f"Component ({node_id})", preserve_layout=preserve_layout)
