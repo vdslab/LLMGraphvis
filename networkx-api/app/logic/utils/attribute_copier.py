@@ -12,17 +12,25 @@ class AttributeCopier:
     def __init__(self, db: Session):
         self.db = db
 
-    def copy_attributes(self, source_network_id: int, new_network_id: int, node_map: Dict[int, int], edge_map: Dict[int, int]):
+    def copy_attributes(self, source_network_id: int, new_network_id: int, node_map: Dict[int, int], edge_map: Dict[int, int], excluded_attributes: List[str] = None):
         """
         Copies both node and edge attributes definitions and values.
+        
+        Args:
+            source_network_id: ID of source network
+            new_network_id: ID of target network
+            node_map: Mapping of old_node_pk -> new_node_pk
+            edge_map: Mapping of old_edge_pk -> new_edge_pk
+            excluded_attributes: List of attribute names to EXCLUDE from copying.
         """
-        logger.info(f"Copying attributes from {source_network_id} to {new_network_id}")
+        excluded_attributes = excluded_attributes or []
+        logger.info(f"Copying attributes from {source_network_id} to {new_network_id} (excluding: {excluded_attributes})")
         
         # Copy Node Attribute Definitions
-        node_attr_id_map = self._copy_attribute_definitions(source_network_id, new_network_id, models.NodeAttribute)
+        node_attr_id_map = self._copy_attribute_definitions(source_network_id, new_network_id, models.NodeAttribute, excluded_attributes)
         
         # Copy Edge Attribute Definitions
-        edge_attr_id_map = self._copy_attribute_definitions(source_network_id, new_network_id, models.EdgeAttribute)
+        edge_attr_id_map = self._copy_attribute_definitions(source_network_id, new_network_id, models.EdgeAttribute, excluded_attributes)
         
         # Copy Node Attribute Values
         self._copy_values(models.NodeAttributeValue, models.NodeFloatAttributeValue, models.NodeTextAttributeValue, 
@@ -34,7 +42,7 @@ class AttributeCopier:
         
         logger.info("Attribute copying complete.")
 
-    def _copy_attribute_definitions(self, source_network_id: int, new_network_id: int, model_class) -> Dict[int, int]:
+    def _copy_attribute_definitions(self, source_network_id: int, new_network_id: int, model_class, excluded_attributes: List[str]) -> Dict[int, int]:
         """
         Copies attribute definitions for a given model (NodeAttribute or EdgeAttribute).
         Returns map of old_attr_id -> new_attr_id.
@@ -44,6 +52,9 @@ class AttributeCopier:
         
         new_attrs_data = []
         for attr in source_attrs:
+            if attr.attribute_name in excluded_attributes:
+                continue
+                
             new_attrs_data.append({
                 "network_id": new_network_id,
                 "attribute_name": attr.attribute_name,

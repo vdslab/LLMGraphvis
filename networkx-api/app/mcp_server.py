@@ -392,86 +392,128 @@ def generate_visualization(
 
 
 @mcp.tool()
-def create_ego_network(source_network_id: int, center_node_id: str, radius: int) -> dict:
-    """Creates an Ego Network subgraph (nodes within radius hops from center)."""
+def create_ego_network(source_network_id: int, center_node_id: str, radius: int, preserve_layout: bool = False) -> dict:
+    """
+    Creates an Ego Network subgraph (nodes within radius hops from center).
+    
+    Args:
+        preserve_layout: 
+            - True ("Cutout View"): Keeps nodes in their original positions. Use for "zooming in" to see context.
+            - False ("Fresh View"): Recalculates layout. Use for analyzing the local structure of the neighborhood.
+    """
     db = get_db_session()
     try:
-        result = subgraph.create_ego_network(source_network_id, center_node_id, radius, db)
+        result = subgraph.create_ego_network(source_network_id, center_node_id, radius, db, preserve_layout=preserve_layout)
         if "new_network_id" in result:
              result["network_id"] = result["new_network_id"]
         return result
     except Exception as e:
-        return f"Error: {str(e)}"
+        return log_and_return_error("create_ego_network", e)
     finally:
         db.close()
 
 @mcp.tool()
-def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str]) -> dict:
-    """Creates a subgraph containing the specified nodes."""
+def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str], preserve_layout: bool = False) -> dict:
+    """
+    Creates a subgraph containing the specified nodes.
+    
+    Args:
+        preserve_layout:
+            - True ("Cutout View"): Keeps original positions.
+            - False ("Fresh View"): Recalculates layout.
+    """
     db = get_db_session()
     try:
-        result = subgraph.create_subgraph_from_nodes(source_network_id, node_ids, db)
+        result = subgraph.create_subgraph_from_nodes(source_network_id, node_ids, db, preserve_layout=preserve_layout)
         if "new_network_id" in result:
              result["network_id"] = result["new_network_id"]
         return result
     except Exception as e:
-        return f"Error: {str(e)}"
+        return log_and_return_error("create_subgraph_from_nodes", e)
     finally:
         db.close()
 
 @mcp.tool()
-def create_path_subgraph(source_network_id: int, source_node_id: str, target_node_id: str) -> dict:
-    """Creates a subgraph consisting of the shortest path between two nodes."""
+def create_path_subgraph(source_network_id: int, source_node_id: str, target_node_id: str, preserve_layout: bool = False) -> dict:
+    """
+    Creates a subgraph consisting of the shortest path between two nodes.
+    
+    Args:
+        preserve_layout:
+            - True ("Cutout View"): Keeps original positions.
+            - False ("Fresh View"): Recalculates layout.
+    """
     db = get_db_session()
     try:
-        result = subgraph.create_path_subgraph(source_network_id, source_node_id, target_node_id, db)
+        result = subgraph.create_path_subgraph(source_network_id, source_node_id, target_node_id, db, preserve_layout=preserve_layout)
         if "new_network_id" in result:
              result["network_id"] = result["new_network_id"]
         return result
     except Exception as e:
-        return f"Error: {str(e)}"
+        return log_and_return_error("create_path_subgraph", e)
     finally:
         db.close()
 
 @mcp.tool()
-def create_k_core_subgraph(source_network_id: int, k: int) -> dict:
-    """Creates a k-Core subgraph (maximal subgraph where every node has degree >= k)."""
+def create_k_core_subgraph(source_network_id: int, k: int, preserve_layout: bool = False) -> dict:
+    """
+    Creates a k-Core subgraph (maximal subgraph where every node has degree >= k).
+    
+    Args:
+        preserve_layout:
+            - True ("Cutout View"): Keeps original positions.
+            - False ("Fresh View"): Recalculates layout.
+    """
     db = get_db_session()
     try:
-        result = subgraph.create_k_core_subgraph(source_network_id, k, db)
+        result = subgraph.create_k_core_subgraph(source_network_id, k, db, preserve_layout=preserve_layout)
         if "new_network_id" in result:
              result["network_id"] = result["new_network_id"]
         return result
     except Exception as e:
-        return f"Error: {str(e)}"
+        return log_and_return_error("create_k_core_subgraph", e)
     finally:
         db.close()
 
 @mcp.tool()
-def create_largest_component_subgraph(network_id: int) -> dict:
-    """Creates a subgraph from the largest connected component of the network."""
+def create_largest_component_subgraph(network_id: int, preserve_layout: bool = False) -> dict:
+    """
+    Creates a subgraph from the largest connected component of the network.
+    
+    Args:
+        preserve_layout:
+            - True ("Cutout View"): Keeps original positions.
+            - False ("Fresh View"): Recalculates layout.
+    """
     db = get_db_session()
     try:
-        result = subgraph.create_largest_component_subgraph(network_id, db)
+        result = subgraph.create_largest_component_subgraph(network_id, db, preserve_layout=preserve_layout)
         if "new_network_id" in result:
              result["network_id"] = result["new_network_id"]
         return result
     except Exception as e:
-        return f"Error: {str(e)}"
+        return log_and_return_error("create_largest_component_subgraph", e)
     finally:
         db.close()
 
 @mcp.tool()
-def create_component_containing_node(source_network_id: int, node_id: str) -> dict:
-    """Creates a subgraph from the connected component containing a specific node."""
+def create_component_containing_node(source_network_id: int, node_id: str, preserve_layout: bool = False) -> dict:
+    """
+    Creates a subgraph from the connected component containing a specific node.
+    
+    Args:
+        preserve_layout:
+            - True ("Cutout View"): Keeps original positions.
+            - False ("Fresh View"): Recalculates layout.
+    """
     db = get_db_session()
     try:
-        result = subgraph.create_component_containing_node(source_network_id, node_id, db)
+        result = subgraph.create_component_containing_node(source_network_id, node_id, db, preserve_layout=preserve_layout)
         if "new_network_id" in result:
              result["network_id"] = result["new_network_id"]
         return result
     except Exception as e:
-        return f"Error: {str(e)}"
+        return log_and_return_error("create_component_containing_node", e)
     finally:
         db.close()
 
@@ -519,7 +561,7 @@ def read_node_details(network_id: int, node_id: str) -> dict:
 from app.schemas.filter import AttributeCondition, Range
 
 @mcp.tool()
-def create_subgraph_by_attribute_filter(network_id: int, conditions: List[AttributeCondition], suffix: str = "Filtered") -> dict:
+def create_subgraph_by_attribute_filter(network_id: int, conditions: List[AttributeCondition], suffix: str = "Filtered", preserve_layout: bool = False) -> dict:
     """
     Creates a new subgraph by filtering nodes from an existing network based on attribute conditions.
     
@@ -528,14 +570,16 @@ def create_subgraph_by_attribute_filter(network_id: int, conditions: List[Attrib
         conditions: List of attribute conditions. 
           Different conditions in the list are combined with **AND**.
           Inside a condition, `ranges` and `categories` are combined with **OR**.
-          
         suffix: Suffix to append to the new network's name (default: "Filtered").
+        preserve_layout:
+            - True ("Cutout View"): Keeps original positions.
+            - False ("Fresh View"): Recalculates layout.
     """
     db = get_db_session()
     try:
         from app.logic import filter
         # Conditions are already validated Pydantic models (AttributeCondition)
-        result = filter.create_subgraph_by_filter(network_id, conditions, suffix, db)
+        result = filter.create_subgraph_by_filter(network_id, conditions, suffix, db, preserve_layout=preserve_layout)
         if "new_network_id" in result:
              result["network_id"] = result["new_network_id"]
         return result
