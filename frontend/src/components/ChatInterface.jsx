@@ -70,63 +70,84 @@ const ChatInterface = ({ selectedNode }) => {
         </div>
       )}
       
-      <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+    <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {messages.map((msg, idx) => {
-          // Parse <thought> tags (handle both complete and streaming/incomplete tags)
+          // Parse <thought> tags
           const parts = msg.content.split(/(<thought>[\s\S]*?(?:<\/thought>|$))/g);
           
           return (
             <div key={idx} style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start',
+              maxWidth: '85%',
               alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-              backgroundColor: msg.role === 'user' ? 'var(--primary-color)' : 'var(--border-color)',
-              color: msg.role === 'user' ? 'white' : 'var(--text-primary)',
-              padding: '0.5rem 1rem',
-              borderRadius: '1rem',
-              maxWidth: '80%'
             }}>
               {parts.map((part, partIdx) => {
-                if (part.startsWith('<thought>')) {
-                  const thoughtContent = part.replace(/<\/?thought>/g, '').trim();
-                  if (!thoughtContent) return null;
-                  
+                const isThought = part.startsWith('<thought>');
+                const cleanPart = isThought ? part.replace(/<\/?thought>/g, '').trim() : part.trim();
+                
+                if (!cleanPart) return null;
+
+                if (isThought) {
                   return (
-                    <details key={partIdx} open={part.includes('</thought>') ? false : true} style={{ marginBottom: '0.5rem', opacity: 0.8 }}>
+                    <details 
+                      key={partIdx} 
+                      open={false}
+                      style={{ 
+                        marginBottom: '0.5rem', 
+                        maxWidth: '100%',
+                        width: '100%' 
+                      }}
+                    >
                       <summary style={{ 
                         cursor: 'pointer', 
-                        fontSize: '0.8rem', 
-                        color: msg.role === 'user' ? 'rgba(255,255,255,0.7)' : '#666',
-                        userSelect: 'none'
+                        fontSize: '0.75rem', 
+                        color: '#888',
+                        userSelect: 'none',
+                        fontStyle: 'italic'
                       }}>
                         Thinking Process {part.includes('</thought>') ? '' : '(Thinking...)'}
                       </summary>
                       <div style={{ 
-                        fontSize: '0.85rem', 
-                        fontStyle: 'italic', 
+                        fontSize: '0.8rem', 
+                        color: '#666',
                         marginTop: '0.25rem',
-                        paddingLeft: '0.5rem',
-                        borderLeft: msg.role === 'user' ? '2px solid rgba(255,255,255,0.3)' : '2px solid #ccc',
-                        whiteSpace: 'pre-wrap'
+                        padding: '0.5rem',
+                        backgroundColor: '#f5f5f5',
+                        borderRadius: '4px',
+                        whiteSpace: 'pre-wrap',
+                        borderLeft: '3px solid #ddd'
                       }}>
-                        {thoughtContent}
+                        {cleanPart}
                       </div>
                     </details>
                   );
                 }
                 
-                if (!part.trim()) return null;
-                
+                // Regular message bubble
                 return (
-                  <ReactMarkdown key={partIdx} remarkPlugins={[remarkGfm]}>
-                    {part}
-                  </ReactMarkdown>
+                  <div key={partIdx} style={{ 
+                    backgroundColor: msg.role === 'user' ? 'var(--primary-color)' : 'var(--border-color)',
+                    color: msg.role === 'user' ? 'white' : 'var(--text-primary)',
+                    padding: '0.75rem 1rem',
+                    borderRadius: '1rem',
+                    borderTopLeftRadius: msg.role === 'user' ? '1rem' : '0',
+                    borderTopRightRadius: msg.role === 'user' ? '0' : '1rem',
+                    boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                  }}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {cleanPart}
+                    </ReactMarkdown>
+                  </div>
                 );
               })}
             </div>
           );
         })}
         {isLoading && (
-          <div style={{ alignSelf: 'flex-start', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-            {thinkingMessage || "Thinking..."}
+          <div style={{ alignSelf: 'flex-start', color: 'var(--text-secondary)', fontSize: '0.8rem', fontStyle: 'italic', marginLeft: '1rem' }}>
+             {thinkingMessage || "Thinking..."}
           </div>
         )}
       </div>
