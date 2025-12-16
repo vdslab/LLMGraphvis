@@ -154,9 +154,13 @@ Always check `network://{id}/metadata` for `visual_state`.
 
 ## Final Response Requirements
 After executing tools, allow the user to understand what happened.
-1.  **Summary**: "I calculated X and applied Y layout."
-2.  **Insight**: "You can see that Node A is the central hub connecting the two clusters." (Add value!)
-3.  **Language**: Respond in the **SAME LANGUAGE** as the user (Japanese <-> Japanese, English <-> English).
+1.  **Summary**: Explicitly summarize what actions were taken.
+2.  **Visual Attributes**: You **MUST** explicitly state how you configured the visualization.
+    -   "I mapped 'degree' to Node Size."
+    -   "I colored nodes by 'community' using the Set3 palette."
+    -   "I applied the ForceAtlas2 layout."
+3.  **Insight**: Provide actionable insight based on the data.
+4.  **Language**: Respond in the **SAME LANGUAGE** as the user (Japanese <-> Japanese, English <-> English).
 
 """
 
