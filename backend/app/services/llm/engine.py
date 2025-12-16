@@ -263,6 +263,17 @@ async def execute_tool_loop(initial_response, network_id, history, queue, tool_c
                     
                     if vis_data and isinstance(vis_data, dict) and "nodes" in vis_data and "links" in vis_data:
                         logger.info(f"Emitting render_update for {function_name}")
+                        
+                        # Save visualization state to DB
+                        try:
+                             chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
+                             if chat:
+                                 chat.visualization_state = vis_data
+                                 db.commit()
+                                 logger.info(f"Saved visualization state for chat_id={chat_id}")
+                        except Exception as e:
+                             logger.error(f"Failed to save visualization state: {e}")
+
                         await queue.put({
                             "event": "render_update",
                             "data": json.dumps(vis_data)

@@ -57,16 +57,20 @@ async def get_chat(
     chat = verify_chat_ownership(chat_id, current_user.id, db)
     
     try:
-
-        # Generate default visualization data
-        # Generate default visualization data
-        vis_data = await mcp_client.execute_tool(
-            "generate_visualization",
-            {
-                "network_id": chat.network_id,
-                "layout_name": "forceatlas2"
-            }
-        )
+        # Try to get saved visualization state first
+        if chat.visualization_state:
+             logger.info(f"Returning saved visualization state for chat {chat_id}")
+             vis_data = chat.visualization_state
+        else:
+             logger.info(f"No saved visualization for chat {chat_id}, generating default.")
+             # Generate default visualization data
+             vis_data = await mcp_client.execute_tool(
+                "generate_visualization",
+                {
+                    "network_id": chat.network_id,
+                    "layout_name": "forceatlas2"
+                }
+             )
         
         return {
             "id": chat.id,
@@ -223,8 +227,18 @@ async def handle_process_background(chat_id: int, user_message: str):
     db = database.SessionLocal()
     try:
         # Process chat and get response
-        # Note: process_chat handles database persistence and SSE streaming internally via engine.py
-        await llm_service.process_chat(chat_id, user_message, db)
+        final_response = await llm_service.process_chat(chat_id, user_message, db)
+        
+        # Save Assistant Message
+        if final_response:
+             db_msg = models.ChatMessage(
+                 chat_id=chat_id,
+                 role="model",
+                 content=final_response
+             )
+             db.add(db_msg)
+             db.commit()
+             logger.info(f"Saved assistant message for chat_id={chat_id}")
         
     except Exception as e:
         logger.error(f"Error in process background task: {e}")
