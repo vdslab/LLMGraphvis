@@ -267,3 +267,13 @@ APIは、エラー発生時にHTTPステータスコードと、詳細情報を�
 | `403 Forbidden`             | 認証済みだが、リソースへのアクセス権限がない場合。                     |
 | `404 Not Found`             | 指定されたリソースが存在しない場合。                                   |
 | `500 Internal Server Error` | サーバー内部で予期せぬエラーが発生した場合。                           |
+
+## 1.7. 内部実装構造 (Refactoring Notes)
+
+### 1.7.1. LLM Engine (`app.services.llm.engine`)
+- **目的**: 複雑化していたツール実行ループとストリーミング処理を整理するため、`execute_tool_loop` 関数を機能単位で分割しました。
+- **構成**:
+  - `_consume_stream`: LLMからのストリーミングレスポンスを消費し、テキストチャンクの送信と関数呼び出しの集約を行う。
+  - `_handle_tool_execution`: ツール（Local/MCP）の実行とエラーハンドリングを行う。
+  - `_handle_visualization_update`: ツール実行結果に基づくコンテキスト切り替え、可視化データの保存、フロントエンドへの更新通知を行う。
+  - `execute_tool_loop`: 上記関数をオーケストレーションするメインループ。

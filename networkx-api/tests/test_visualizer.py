@@ -57,3 +57,23 @@ def test_missing_attribute_raises_error(db):
         )
     assert "Missing required attributes" in str(excinfo.value)
     assert "non_existent_centrality" in str(excinfo.value)
+
+def test_generate_with_none_config(db):
+    """Test robustness when configs are None."""
+    network_id = create_test_network(db)
+    
+    # Should not raise exception
+    result = visualizer.generate_visualization_data(
+        network_id, 
+        db,
+        node_size_config=None,
+        node_color_config=None,
+        edge_width_config=None,
+        edge_color_config=None
+    )
+    
+    assert "nodes" in result
+    assert len(result["nodes"]) == 2
+    # Verify default colors applied without error
+    for node in result["nodes"]:
+        assert node["color"] is not None

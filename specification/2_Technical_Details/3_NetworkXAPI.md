@@ -216,3 +216,23 @@ MCPツールと同等の機能をREST API経由でも利用可能にするため
 | `POST` | `/component-containing-node` | 指定ノードを含む連結成分サブグラフを作成する。 |
 | `POST` | `/filter` | 属性条件に基づいてノードをフィルタリングし、サブグラフを作成する。 |
 
+
+## 3.7. 内部実装構造 (Refactoring Notes)
+
+コードの保守性と可読性を向上させるため、以下のリファクタリングを実施しました。
+
+### 3.7.1. VisualizationBuilder (`app.logic.visualization_builder`)
+- **目的**: 以前は `visualizer.py` に存在した400行を超える巨大な可視化生成ロジックをクラス化し、責務を分離しました。
+- **機能**:
+  - `validate_and_prepare`: 設定の検証と初期化
+  - `fetch_data`: 必要なノード・エッジデータの取得
+  - `calculate_statistics`: 統計情報の計算とカラーマップの生成
+  - `build`: 最終的なJSON構造の構築
+
+### 3.7.2. StyleService (`app.logic.style_service`)
+- **目的**: 色やサイズの計算ロジックを集約しました。
+- **改善点**:
+  - `prepare_categorical_map`: カテゴリカルカラーの自動割り当てロジックを改善。`default_color` が明示的に指定された場合は、自動割り当て（Autofill）を無効化し、指定されたマップ以外を全てデフォルト色にする「Strict Mode」として動作するように変更しました。
+
+### 3.7.3. NetworkService (`app.logic.network_service`)
+- **目的**: `mcp_server.py` に記述されていたビジネスロジック（メタデータ更新、構造取得、サブグラフ一覧取得など）を専用のサービス層に移動しました。これにより、MCPサーバーコードはルーティングとツール定義に集中できるようになりました。
