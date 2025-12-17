@@ -7,6 +7,8 @@ from fastapi.testclient import TestClient
 
 from app.core.database import Base, get_db
 from app.main import app
+# Import models to ensure they are registered with Base.metadata
+from app import models
 
 # In-memory SQLite for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
@@ -18,7 +20,7 @@ engine = create_engine(
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="function")
 def setup_db_schema():
     # Create tables
     Base.metadata.create_all(bind=engine)

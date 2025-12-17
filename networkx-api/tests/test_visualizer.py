@@ -24,7 +24,7 @@ def create_test_network(db):
     db.add(lay_x)
     db.add(lay_y)
     
-    db.commit()
+    db.flush()
     return network.id
 
 def test_basic_generation(db):
