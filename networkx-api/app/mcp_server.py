@@ -2,7 +2,7 @@ from mcp.server.fastmcp import FastMCP
 from app.core import database
 from app.logic import (
     importer, layout, centrality, visualizer, attributes, 
-    subgraph, exporter, search, prompts, pipeline
+    subgraph, exporter, search, prompts, pipeline, network_service
 )
 from app import models
 import json
@@ -20,19 +20,9 @@ def update_network_metadata(network_id: int, description: str = None, name: str 
     """Updates the network's name or description."""
     db = get_db_session()
     try:
-        network = db.query(models.Network).filter(models.Network.id == network_id).first()
-        if not network:
-            return f"Error: Network {network_id} not found."
-        
-        if description is not None:
-            network.description = description
-        if name is not None:
-            network.name = name
-            
-        db.commit()
-        return f"Network {network_id} metadata updated."
+        msg = network_service.update_network_metadata(db, network_id, description, name)
+        return msg
     except Exception as e:
-        db.rollback()
         return f"Error: {str(e)}"
     finally:
         db.close()
@@ -42,24 +32,10 @@ def get_network_metadata(network_id: int) -> str:
     """Returns network metadata (name, description, created_at) as JSON."""
     db = get_db_session()
     try:
-        network = db.query(models.Network).filter(models.Network.id == network_id).first()
-        if not network:
-            return json.dumps({"error": "Network not found"})
-            
-        return json.dumps({
-            "id": network.id,
-            "name": network.name,
-            "description": network.description,
-            "created_at": str(network.created_at),
-            "visual_state": {
-                "last_layout_name": network.last_layout_name,
-                "last_node_size_config": network.last_node_size_config,
-                "last_node_color_config": network.last_node_color_config,
-                "last_edge_width_config": network.last_edge_width_config,
-                "last_edge_color_config": network.last_edge_color_config,
-                "last_node_label_config": network.last_node_label_config
-            }
-        })
+        metadata = network_service.get_network_metadata(db, network_id)
+        return json.dumps(metadata)
+    except Exception as e:
+        return json.dumps({"error": str(e)})
     finally:
         db.close()
 
@@ -153,8 +129,8 @@ def get_subgraphs_resource(network_id: int) -> str:
     """List all subgraphs created from the given parent network."""
     db = get_db_session()
     try:
-        subgraphs = db.query(models.Network).filter(models.Network.parent_network_id == network_id).all()
-        return json.dumps([{"id": s.id, "name": s.name, "created_at": str(s.created_at)} for s in subgraphs])
+        subgraphs = network_service.get_subgraphs(db, network_id)
+        return json.dumps(subgraphs)
     except Exception as e:
         return json.dumps({"error": str(e)})
     finally:
@@ -178,22 +154,8 @@ def get_structure_resource(network_id: int) -> str:
     """Returns basic structural statistics of the network."""
     db = get_db_session()
     try:
-        # Simple stats calculation (could be moved to logic later)
-        node_count = db.query(models.Node).filter(models.Node.network_id == network_id).count()
-        edge_count = db.query(models.Edge).filter(models.Edge.network_id == network_id).count()
-        
-        # Calculate density (approximate for undirected)
-        density = 0
-        if node_count > 1:
-            possible_edges = node_count * (node_count - 1) / 2
-            density = edge_count / possible_edges if possible_edges > 0 else 0
-
-        return json.dumps({
-            "node_count": node_count,
-            "edge_count": edge_count,
-            "density": density,
-            "is_directed": False # Simplified assumption for now
-        })
+        stats = network_service.get_network_structure(db, network_id)
+        return json.dumps(stats)
     except Exception as e:
          return json.dumps({"error": str(e)})
     finally:

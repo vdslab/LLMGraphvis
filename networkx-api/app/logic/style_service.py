@@ -114,7 +114,8 @@ class StyleService:
                 # Strategy: We fill up to 10 distinct colors. 
                 # Anything else falls back to default_color, which we set to Gray if not set.
                 
-                should_autofill = True # We always try to fill missing holes for the top values
+                # If default_color IS provided, we assume the user wants strict mapping + default for everything else.
+                should_autofill = "default_color" not in node_color_config
                 
                 if should_autofill and needed_values:
                     # We only support 10 distinct colors + Gray
