@@ -118,8 +118,8 @@ class StyleService:
                 should_autofill = "default_color" not in node_color_config
                 
                 if should_autofill and needed_values:
-                    # We only support 10 distinct colors + Gray
-                    limit = 10
+                    # We only support 20 distinct colors + Gray
+                    limit = 20
                     # Check how many colors already used in provided_map to avoid collisions? 
                     # Simplicity: Just assign from palette to the top N needed values.
                     

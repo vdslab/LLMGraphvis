@@ -136,6 +136,23 @@ def test_repro():
             else:
                  print("SUCCESS: All values copied.")
 
+        # 5. Verify Smart Inference (Regression Test for "Single Color" default)
+        print("\nChecking Smart Inference...")
+        vb_auto = VisualizationBuilder(
+            network_id=net_id,
+            db=db,
+            node_color_config={"attribute": "nationality"} # Missing scale_type!
+        )
+        vb_auto.validate_and_prepare()
+        vb_auto.fetch_data()
+        vb_auto.calculate_statistics()
+        
+        if vb_auto.node_color_config.get("scale_type") == "CATEGORICAL":
+             print("SUCCESS: Inference inferred CATEGORICAL from string attribute.")
+             print(f"Auto Map Size: {len(vb_auto.categorical_color_map)}")
+        else:
+             print(f"FAIL: Inference failed. Scale Type: {vb_auto.node_color_config.get('scale_type')}")
+
     finally:
         db.close()
         # Clean up
