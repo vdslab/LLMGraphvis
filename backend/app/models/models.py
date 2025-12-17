@@ -60,7 +60,31 @@ class ChatMessage(Base):
     content = Column(Text, nullable=False)
     meta_data = Column(JSON, nullable=True)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
     chat = relationship("Chat", back_populates="messages")
+
+class NodeAttribute(Base):
+    __tablename__ = "node_attributes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    network_id = Column(Integer, ForeignKey("networks.id"), nullable=False)
+    attribute_name = Column(String, nullable=False)
+    data_type = Column(String) 
+    description = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # network = relationship("Network", back_populates="node_attributes")
+
+class EdgeAttribute(Base):
+    __tablename__ = "edge_attributes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    network_id = Column(Integer, ForeignKey("networks.id"), nullable=False)
+    attribute_name = Column(String, nullable=False)
+    data_type = Column(String)
+    description = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    # network = relationship("Network", back_populates="edge_attributes")
 
