@@ -58,7 +58,8 @@ class AttributeCopier:
             new_attrs_data.append({
                 "network_id": new_network_id,
                 "attribute_name": attr.attribute_name,
-                "data_type": attr.data_type
+                "data_type": attr.data_type,
+                "description": attr.description
             })
             
         if new_attrs_data:
