@@ -305,6 +305,7 @@ def get_attribute_stats(
 
         result.append(attr_data)
         
+    return result
 
 def get_specific_attribute_stats(
     network_id: int, 
