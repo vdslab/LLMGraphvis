@@ -143,7 +143,13 @@ async def execute_tool(tool_name: str, arguments: dict):
     """
     Executes a tool on the NetworkXAPI MCP Server.
     """
-    logger.info(f"Executing tool: {tool_name} with arguments: {arguments}")
+    # Sanitize arguments for logging (truncate large strings)
+    log_args = arguments.copy()
+    for k, v in log_args.items():
+        if isinstance(v, str) and len(v) > 100:
+            log_args[k] = v[:100] + "..."
+    
+    logger.info(f"Executing tool: {tool_name} with arguments: {log_args}")
     try:
         async with sse_client(SSE_ENDPOINT) as (read, write):
             async with ClientSession(read, write) as session:

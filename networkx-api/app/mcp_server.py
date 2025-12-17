@@ -197,6 +197,10 @@ def initialize_network(network_id: int, graphml_data: str) -> dict:
         A dictionary containing the initial visualization data and the finalized network ID.
     """
     db = get_db_session()
+    # Log the action with truncated data
+    truncated_data = graphml_data[:100] + "..." if len(graphml_data) > 100 else graphml_data
+    print(f"Executing initialize_network for ID {network_id} with data: {truncated_data}")
+    
     try:
         return pipeline.initialize_network_pipeline(network_id, graphml_data, db)
     except Exception as e:
