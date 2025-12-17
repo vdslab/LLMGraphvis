@@ -115,9 +115,7 @@ class StyleService:
                 # Anything else falls back to default_color, which we set to Gray if not set.
                 
                 # If default_color IS provided, we assume the user wants strict mapping + default for everything else.
-                should_autofill = "default_color" not in node_color_config
-                
-                if should_autofill and needed_values:
+                if needed_values:
                     # We only support 20 distinct colors + Gray
                     limit = 20
                     # Check how many colors already used in provided_map to avoid collisions? 

@@ -50,10 +50,12 @@ def test_prepare_categorical_map_respects_default():
     # A should be red
     assert result["A"] == "red"
     
-    # B and C should NOT be in the map (should fall through to default in resolve_node_color)
-    # THIS ASSERTION WILL FAIL BEFORE THE FIX
-    assert "B" not in result
-    assert "C" not in result
+    
+    # B and C should be in the map (auto-filled because we now support hybrid mode)
+    assert "B" in result
+    assert "C" in result
+    assert result["B"] is not None
+    assert result["C"] is not None
 
 def test_resolve_node_color_fallback():
     """Test that resolve_node_color falls back to default_color if value not in map."""
