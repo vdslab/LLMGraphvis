@@ -9,7 +9,7 @@ class VisualizationBuilder:
         self,
         network_id: int,
         db: Session,
-        layout_name: str = "forceatlas2",
+        layout_name: Optional[str] = None,
         node_size_config: Optional[Dict] = None,
         node_color_config: Optional[Dict] = None,
         edge_width_config: Optional[Dict] = None,
