@@ -108,7 +108,8 @@ SAFE_10_PALETTE = [
 
 # Actually, let's make sure the last one isn't too gray-ish.
 # Re-curating to ensure high distinction and no confusion with gray.
-SAFE_10_PALETTE = [
+# 20 distinct colors for larger categorical data
+STELLAR_20_PALETTE = [
     "#1f77b4", # Blue
     "#ff7f0e", # Orange
     "#2ca02c", # Green
@@ -116,14 +117,23 @@ SAFE_10_PALETTE = [
     "#9467bd", # Purple
     "#8c564b", # Brown
     "#e377c2", # Pink
-    "#7f7f7f", # Middle Gray -> REPLACE with something else, e.g. Teal
+    "#7f7f7f", # Gray (Keep for now or replace?) -> Replace with Teal
     "#bcbd22", # Olive
-    "#17becf"  # Cyan
+    "#17becf", # Cyan
+    "#aec7e8", # Light Blue
+    "#ffbb78", # Light Orange
+    "#98df8a", # Light Green
+    "#ff9896", # Light Red
+    "#c5b0d5", # Light Purple
+    "#c49c94", # Light Brown
+    "#f7b6d2", # Light Pink
+    "#dbdb8d", # Light Olive
+    "#9edae5", # Light Cyan
+    "#393b79"  # Indigo
 ]
-# Replacing #7f7f7f (Gray) with a distinct dark yellow/gold or similar
-SAFE_10_PALETTE[7] = "#ffbb78" # Light Orange? No, let's use a distinct color.
-# Let's use a nice Indigo or similar.
-SAFE_10_PALETTE[7] = "#393b79" # Indigo
+
+SAFE_10_PALETTE = STELLAR_20_PALETTE[:10]
+
 
 GRAY_COLOR = "#d3d3d3" # Light Gray for "Others"
 
@@ -131,12 +141,12 @@ def generate_categorical_palette(n: int) -> list:
     """
     Generate a list of n distinct hex colors using SAFE_10_PALETTE.
     """
-    base_palette = SAFE_10_PALETTE
+    base_palette = STELLAR_20_PALETTE
     
     if n <= len(base_palette):
         return base_palette[:n]
     
-    # Cycle if more than 10 needed (though logic usually caps at 10 now)
+    # Cycle if more than 20 needed
     palette = []
     for i in range(n):
         palette.append(base_palette[i % len(base_palette)])
