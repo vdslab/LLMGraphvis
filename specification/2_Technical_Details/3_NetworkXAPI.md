@@ -166,7 +166,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 **Node Coloring Examples:**
 - **Categorical with map**: `node_color_config={"scale_type": "CATEGORICAL", "attribute": "Country", "color_map": {"USA": "blue", "Japan": "red"}}` (Others will be auto-colored)
-- **Categorical with map and fallback**: `node_color_config={"scale_type": "CATEGORICAL", "attribute": "Country", "color_map": {"USA": "blue"}, "default_color": "gray"}` (Others will be gray)
+- **Categorical with map and fallback**: `node_color_config={"scale_type": "CATEGORICAL", "attribute": "Country", "color_map": {"USA": "blue"}, "default_color": "gray"}` (USA is blue, other top frequent values are auto-colored, remaining are gray)
 ### `search_nodes`
 - **Description**: ノード名（ID、ラベル）または特定の属性値でノードを検索する。部分一致検索をサポートする。
 - **Arguments**:
@@ -232,7 +232,7 @@ MCPツールと同等の機能をREST API経由でも利用可能にするため
 ### 3.7.2. StyleService (`app.logic.style_service`)
 - **目的**: 色やサイズの計算ロジックを集約しました。
 - **改善点**:
-  - `prepare_categorical_map`: カテゴリカルカラーの自動割り当てロジックを改善。`default_color` が明示的に指定された場合は、自動割り当て（Autofill）を無効化し、指定されたマップ以外を全てデフォルト色にする「Strict Mode」として動作するように変更しました。
+  - `prepare_categorical_map`: カテゴリカルカラーの自動割り当てロジックを改善。`default_color` が指定された場合でも自動割り当て（Autofill）を行い、上位の頻出値にはパレット色を、それ以外にはデフォルト色を適用する「Hybrid Mode」として動作するように変更しました。これにより、明示的なマッピングがない頻出カテゴリも区別可能になります。
 
 ### 3.7.3. NetworkService (`app.logic.network_service`)
 - **目的**: `mcp_server.py` に記述されていたビジネスロジック（メタデータ更新、構造取得、サブグラフ一覧取得など）を専用のサービス層に移動しました。これにより、MCPサーバーコードはルーティングとツール定義に集中できるようになりました。
