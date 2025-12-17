@@ -126,6 +126,13 @@ class VisualizationBuilder:
             self.focus_node_size_stats = StyleService.calculate_stats(self.focus_config.get("node_size_config"), self.focus_node_attr_map, self.focus_node_values)
             self.focus_node_color_stats = StyleService.calculate_stats(self.focus_config.get("node_color_config"), self.focus_node_attr_map, self.focus_node_values)
 
+        # Smart Inference: If Node Color stats (linear) failed but attribute exists, assume CATEGORICAL
+        if self.node_color_config and self.node_color_config.get("attribute"):
+            if not self.node_color_stats[0] and self.node_color_config["attribute"] in self.global_node_attr_map:
+                current_scale = self.node_color_config.get("scale_type", "LINEAR")
+                if current_scale == "LINEAR":
+                    self.node_color_config["scale_type"] = "CATEGORICAL"
+
         self.ranking_color_map = StyleService.prepare_ranking_map(self.node_color_config, self.global_node_attr_map, self.global_node_values)
         self.categorical_color_map = StyleService.prepare_categorical_map(self.node_color_config, self.global_node_attr_map, self.global_node_values)
 
