@@ -141,7 +141,7 @@ def verify_graphml_desc_import():
         
         # 1. Verify get_node_attributes via MCP helper logic or mock
         from app.logic import attributes
-        from app import models
+        # from app import models
         stats = attributes.get_attribute_stats(
             final_network_id,
             models.NodeAttribute,

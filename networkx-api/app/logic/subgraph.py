@@ -18,7 +18,7 @@ TOPOLOGICAL_ATTRIBUTES = [
     "x", "y" # Layout depends on topology too
 ]
 
-def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str], db: Session, suffix: str = "Subgraph", preserve_layout: bool = False) -> Dict[str, Any]:
+def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str], db: Session, suffix: str = "Subgraph", preserve_layout: bool = False, description: str = None) -> Dict[str, Any]:
     """
     Creates a new network as a subgraph containing the specified nodes.
     
@@ -51,7 +51,8 @@ def create_subgraph_from_nodes(source_network_id: int, node_ids: List[str], db: 
     # 3. Create New Network
     new_network = models.Network(
         name=target_name, 
-        parent_network_id=source_network_id
+        parent_network_id=source_network_id,
+        description=description
     )
     db.add(new_network)
     db.commit()
@@ -200,7 +201,8 @@ def create_ego_network(source_network_id: int, center_node_id: str, radius: int,
     ego_G = nx.ego_graph(G, center_node_id, radius=radius)
     node_ids = list(ego_G.nodes())
     
-    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix=f"Ego {center_node_id} (r={radius})", preserve_layout=preserve_layout)
+    description = f"Ego Network of node '{center_node_id}' with radius {radius}."
+    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix=f"Ego {center_node_id} (r={radius})", preserve_layout=preserve_layout, description=description)
 
 def create_path_subgraph(source_network_id: int, source_node_id: str, target_node_id: str, db: Session, preserve_layout: bool = False) -> Dict[str, Any]:
     logger.info(f"Creating path subgraph: {source_node_id} -> {target_node_id}")
@@ -226,7 +228,8 @@ def create_path_subgraph(source_network_id: int, source_node_id: str, target_nod
         logger.warning(f"No path found between {source_node_id} and {target_node_id}")
         raise ValueError(f"No path between {source_node_id} and {target_node_id}")
         
-    return create_subgraph_from_nodes(source_network_id, path_nodes, db, suffix=f"Path {source_node_id}->{target_node_id}", preserve_layout=preserve_layout)
+    description = f"Shortest path from '{source_node_id}' to '{target_node_id}'."
+    return create_subgraph_from_nodes(source_network_id, path_nodes, db, suffix=f"Path {source_node_id}->{target_node_id}", preserve_layout=preserve_layout, description=description)
 
 def create_k_core_subgraph(source_network_id: int, k: int, db: Session, preserve_layout: bool = False) -> Dict[str, Any]:
     logger.info(f"Creating k-core subgraph (k={k})")
@@ -252,7 +255,8 @@ def create_k_core_subgraph(source_network_id: int, k: int, db: Session, preserve
         logger.warning(f"No k-core found for k={k}")
         raise ValueError(f"No k-core found for k={k}")
         
-    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix=f"K-Core (k={k})", preserve_layout=preserve_layout)
+    description = f"k-Core subgraph with k={k}."
+    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix=f"K-Core (k={k})", preserve_layout=preserve_layout, description=description)
 
 def create_largest_component_subgraph(source_network_id: int, db: Session, preserve_layout: bool = False) -> Dict[str, Any]:
     logger.info("Creating largest component subgraph")
@@ -275,7 +279,8 @@ def create_largest_component_subgraph(source_network_id: int, db: Session, prese
     largest_component = max(components, key=len)
     node_ids = list(largest_component)
     
-    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix="Largest Component", preserve_layout=preserve_layout)
+    description = "Largest connected component of the network."
+    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix="Largest Component", preserve_layout=preserve_layout, description=description)
 
 
 def create_component_containing_node(source_network_id: int, node_id: str, db: Session, preserve_layout: bool = False) -> Dict[str, Any]:
@@ -302,4 +307,5 @@ def create_component_containing_node(source_network_id: int, node_id: str, db: S
     component_nodes = nx.node_connected_component(G, node_id)
     node_ids = list(component_nodes)
     
-    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix=f"Component ({node_id})", preserve_layout=preserve_layout)
+    description = f"Connected component containing node '{node_id}'."
+    return create_subgraph_from_nodes(source_network_id, node_ids, db, suffix=f"Component ({node_id})", preserve_layout=preserve_layout, description=description)

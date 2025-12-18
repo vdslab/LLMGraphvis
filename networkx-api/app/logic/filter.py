@@ -36,7 +36,31 @@ def create_subgraph_by_filter(network_id: int, conditions: List[AttributeConditi
     if not candidate_node_ids:
         raise ValueError("No nodes match the specified filter criteria.")
         
-    return create_subgraph_from_nodes(network_id, list(candidate_node_ids), db, suffix=suffix, preserve_layout=preserve_layout)
+    description = _generate_filter_description(conditions)
+    return create_subgraph_from_nodes(network_id, list(candidate_node_ids), db, suffix=suffix, preserve_layout=preserve_layout, description=description)
+
+def _generate_filter_description(conditions: List[AttributeCondition]) -> str:
+    """Generates a human-readable description from filter conditions."""
+    desc_parts = []
+    for cond in conditions:
+        cond_parts = []
+        if cond.categories:
+             cats = ", ".join([f"'{c}'" for c in cond.categories])
+             cond_parts.append(f"IN [{cats}]")
+        
+        if cond.ranges:
+            for rng in cond.ranges:
+                if rng.min is not None and rng.max is not None:
+                    cond_parts.append(f"{rng.min} <= x <= {rng.max}")
+                elif rng.min is not None:
+                     cond_parts.append(f"x >= {rng.min}")
+                elif rng.max is not None:
+                     cond_parts.append(f"x <= {rng.max}")
+        
+        cond_str = " OR ".join(cond_parts)
+        desc_parts.append(f"attribute '{cond.attribute_name}' ({cond_str})")
+        
+    return "Filtered by: " + " AND ".join(desc_parts)
 
 def _get_nodes_matching_condition(network_id: int, condition: AttributeCondition, db: Session) -> Set[str]:
     """
