@@ -11,7 +11,6 @@ class Network(Base):
     name = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-    description = Column(Text, nullable=True)
 
     # Visual State Tracking
     last_layout_name = Column(String, nullable=True) # Set explicitly during initialization
