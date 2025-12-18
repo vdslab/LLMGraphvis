@@ -179,6 +179,13 @@ CREATE TABLE networks (
 | `name` | `VARCHAR` | `NOT NULL` | ネットワーク名 |
 | `description` | `TEXT` | `NULLABLE` | ネットワークの説明・メタデータ |
 | `parent_network_id` | `INTEGER` | `FOREIGN KEY` | 親ネットワークのID（サブグラフの場合） |
+| `last_layout_name` | `VARCHAR` | `NULLABLE` | 最後に適用されたレイアウト名 |
+| `last_node_size_config` | `JSON` | `NULLABLE` | ノードサイズの視覚設定 |
+| `last_node_color_config` | `JSON` | `NULLABLE` | ノード色の視覚設定 |
+| `last_edge_width_config` | `JSON` | `NULLABLE` | エッジ幅の視覚設定 |
+| `last_edge_color_config` | `JSON` | `NULLABLE` | エッジ色の視覚設定 |
+| `last_node_label_config` | `JSON` | `NULLABLE` | ノードラベルの視覚設定 |
+| `graphml_content` | `TEXT` | `NULLABLE` | アップロードされたGraphMLの生データ（未使用） |
 
 
 - **説明**: グラフデータ全体を管理するテーブルです。
