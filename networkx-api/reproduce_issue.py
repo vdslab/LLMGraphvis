@@ -1,11 +1,12 @@
+import json
+import logging
+
+from app import models
+from app.core.database import Base
+from app.logic import attributes, subgraph
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from app.core.database import Base
-from app import models
-from app.logic import attributes, subgraph
-import json
-import logging
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -20,9 +21,11 @@ engine = create_engine(
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
 def setup_db():
     Base.metadata.create_all(bind=engine)
     return SessionLocal()
+
 
 def reproduce_subgraph_description_issue(db):
     print("\n--- Reproducing Subgraph Description Issue ---")
@@ -35,13 +38,13 @@ def reproduce_subgraph_description_issue(db):
 
     # 2. Add Attribute with Description
     attr = models.NodeAttribute(
-        network_id=net_id, 
-        attribute_name="role", 
-        data_type="string", 
-        description="The role of the node in the organization"
+        network_id=net_id,
+        attribute_name="role",
+        data_type="string",
+        description="The role of the node in the organization",
     )
     db.add(attr)
-    
+
     # 3. Add Nodes and Values
     n1 = models.Node(network_id=net_id, node_id="A", label="Alice")
     n2 = models.Node(network_id=net_id, node_id="B", label="Bob")
@@ -54,20 +57,28 @@ def reproduce_subgraph_description_issue(db):
     val1 = models.NodeAttributeValue(node_id=n1.id, attribute_id=attr.id)
     db.add(val1)
     db.commit()
-    val1_text = models.NodeTextAttributeValue(node_attribute_value_id=val1.id, text_value="Manager")
+    val1_text = models.NodeTextAttributeValue(
+        node_attribute_value_id=val1.id, text_value="Manager"
+    )
     db.add(val1_text)
     db.commit()
 
     # 4. Create Subgraph
     print("Creating subgraph...")
-    result = subgraph.create_subgraph_from_nodes(net_id, ["A"], db, suffix="Test Subgraph")
+    result = subgraph.create_subgraph_from_nodes(
+        net_id, ["A"], db, suffix="Test Subgraph"
+    )
     new_net_id = result["new_network_id"]
 
     # 5. Check New Attribute Description
-    new_attr = db.query(models.NodeAttribute).filter(
-        models.NodeAttribute.network_id == new_net_id,
-        models.NodeAttribute.attribute_name == "role"
-    ).first()
+    new_attr = (
+        db.query(models.NodeAttribute)
+        .filter(
+            models.NodeAttribute.network_id == new_net_id,
+            models.NodeAttribute.attribute_name == "role",
+        )
+        .first()
+    )
 
     if new_attr:
         print(f"Original Description: '{attr.description}'")
@@ -78,6 +89,7 @@ def reproduce_subgraph_description_issue(db):
             print("SUCCESS: Description was copied.")
     else:
         print("FAILURE: Attribute not found in subgraph!")
+
 
 def reproduce_get_node_attributes_issue(db):
     print("\n--- Reproducing get_node_attributes Issue ---")
@@ -90,10 +102,10 @@ def reproduce_get_node_attributes_issue(db):
 
     # 2. Add Attribute WITHOUT Values initially
     attr = models.NodeAttribute(
-        network_id=net_id, 
-        attribute_name="age", 
-        data_type="float", 
-        description="Age of the person"
+        network_id=net_id,
+        attribute_name="age",
+        data_type="float",
+        description="Age of the person",
     )
     db.add(attr)
     db.commit()
@@ -107,12 +119,13 @@ def reproduce_get_node_attributes_issue(db):
             models.NodeAttributeValue,
             models.NodeFloatAttributeValue,
             models.NodeTextAttributeValue,
-            db
+            db,
         )
         print("Stats Result:", json.dumps(stats, indent=2))
     except Exception as e:
         print(f"FAILURE: get_attribute_stats raised exception: {e}")
         import traceback
+
         traceback.print_exc()
 
     # 4. Add Value and Call Again
@@ -122,7 +135,9 @@ def reproduce_get_node_attributes_issue(db):
     val1 = models.NodeAttributeValue(node_id=n1.id, attribute_id=attr.id)
     db.add(val1)
     db.commit()
-    val1_float = models.NodeFloatAttributeValue(node_attribute_value_id=val1.id, float_value=30.0)
+    val1_float = models.NodeFloatAttributeValue(
+        node_attribute_value_id=val1.id, float_value=30.0
+    )
     db.add(val1_float)
     db.commit()
 
@@ -134,13 +149,15 @@ def reproduce_get_node_attributes_issue(db):
             models.NodeAttributeValue,
             models.NodeFloatAttributeValue,
             models.NodeTextAttributeValue,
-            db
+            db,
         )
         print("Stats Result:", json.dumps(stats, indent=2))
     except Exception as e:
         print(f"FAILURE: get_attribute_stats raised exception: {e}")
         import traceback
+
         traceback.print_exc()
+
 
 if __name__ == "__main__":
     db = setup_db()

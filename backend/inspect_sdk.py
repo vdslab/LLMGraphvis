@@ -1,5 +1,5 @@
 import inspect
-from google import genai
+
 from google.genai import types
 
 print("types.GenerateContentConfig signature:")

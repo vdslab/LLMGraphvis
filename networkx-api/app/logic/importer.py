@@ -1,12 +1,13 @@
-import networkx as nx
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-from app import models
 import datetime
 import itertools
-from typing import Dict, List, Any, Generator
-from .attributes import ensure_attributes
+
+from sqlalchemy.orm import Session
+
+from app import models
 from app.logic.parsing.graphml_parser import GraphMLParser
+
+from .attributes import ensure_attributes
+
 
 def chunked_iterable(iterable, size):
     """Yield chunks of size from iterable."""
@@ -17,9 +18,10 @@ def chunked_iterable(iterable, size):
             break
         yield chunk
 
+
 def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
     from sqlalchemy.dialects.postgresql import insert
-    
+
     # 1. Parse using dedicated parser
     parser = GraphMLParser()
     try:
@@ -42,22 +44,24 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
 
     node_attr_types = {}
     edge_attr_types = {}
-    
+
     # Pre-register description attribute as string if we found any
     if node_descs:
-        node_attr_types['description'] = 'string'
+        node_attr_types["description"] = "string"
     if edge_descs:
-        edge_attr_types['description'] = 'string'
+        edge_attr_types["description"] = "string"
 
     # Wrap writes in a single transaction to reduce commit overhead
     # Check if transaction is already active (e.g. during tests)
     ctx = db.begin_nested() if db.in_transaction() else db.begin()
     with ctx:
         # Ensure Network exists in DB
-        network = db.query(models.Network).filter(models.Network.id == network_id).first()
-        
+        network = (
+            db.query(models.Network).filter(models.Network.id == network_id).first()
+        )
+
         final_network_id = network_id
-        
+
         if not network:
             # Should typically exist if called from Backend, but if not, create it
             network = models.Network(id=network_id, name=f"Network {network_id}")
@@ -65,7 +69,11 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
             db.flush()
         else:
             # Check if network already has data (nodes)
-            existing_node_count = db.query(models.Node).filter(models.Node.network_id == network_id).count()
+            existing_node_count = (
+                db.query(models.Node)
+                .filter(models.Node.network_id == network_id)
+                .count()
+            )
             if existing_node_count > 0:
                 # COLLISION: Network exists and has data.
                 # Create a NEW network instead of overwriting.
@@ -75,25 +83,31 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
                 db.add(new_network)
                 db.flush()
                 final_network_id = new_network.id
-                
+
                 # Note: We do NOT delete the old data. We just switch to a new ID.
             else:
                 # Network exists but is empty (e.g. created by Backend chat initialization).
                 # No content update needed for Network table anymore.
                 pass
-                
+
         # Update Network Description if found
-        network_for_update = db.query(models.Network).filter(models.Network.id == final_network_id).first()
+        network_for_update = (
+            db.query(models.Network)
+            .filter(models.Network.id == final_network_id)
+            .first()
+        )
         if network_desc and network_for_update:
             network_for_update.description = network_desc
 
-        network_id = final_network_id # Use the confirmed ID for all subsequent operations
+        network_id = (
+            final_network_id  # Use the confirmed ID for all subsequent operations
+        )
 
         # --- 1. Bulk Insert Nodes with ID Return ---
         # We use chunks to avoid massive SQL statements
         CHUNK_SIZE = 5000
-        node_map = {} # node_id_str -> db_id
-        
+        node_map = {}  # node_id_str -> db_id
+
         # 1st Pass: Nodes
         for chunk in chunked_iterable(G.nodes(data=True), CHUNK_SIZE):
             nodes_data = []
@@ -101,190 +115,254 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
                 # Inject Description
                 n_id_str = str(node_id)
                 if n_id_str in node_descs:
-                    data['description'] = node_descs[n_id_str]
-                
-                nodes_data.append({
-                    "network_id": network_id,
-                    "node_id": n_id_str,
-                    "label": data.get('label', n_id_str)
-                })
+                    data["description"] = node_descs[n_id_str]
+
+                nodes_data.append(
+                    {
+                        "network_id": network_id,
+                        "node_id": n_id_str,
+                        "label": data.get("label", n_id_str),
+                    }
+                )
 
                 # Track attribute type inference during the first pass to avoid extra scans
                 for key, val in data.items():
-                    if key == 'label':
+                    if key == "label":
                         continue
                     if key not in node_attr_types:
                         node_attr_types[key] = "float"
                     if node_attr_types[key] == "float":
                         if not isinstance(val, (int, float)) or isinstance(val, bool):
                             node_attr_types[key] = "string"
-            
+
             if nodes_data:
-                stmt = insert(models.Node).values(nodes_data).returning(models.Node.node_id, models.Node.id)
+                stmt = (
+                    insert(models.Node)
+                    .values(nodes_data)
+                    .returning(models.Node.node_id, models.Node.id)
+                )
                 # No on_conflict needed as we are inserting into a fresh (or verified empty) network ID space
                 result = db.execute(stmt)
                 for row in result:
                     node_map[row.node_id] = row.id
 
         # --- 2. Bulk Insert Edges with ID Return ---
-        edge_map = {} # edge_id_str -> db_id
-        
+        edge_map = {}  # edge_id_str -> db_id
+
         for chunk in chunked_iterable(G.edges(data=True), CHUNK_SIZE):
             edges_data = []
             for u, v, data in chunk:
                 u_str, v_str = str(u), str(v)
-                
+
                 # Inject Description
-                # Try (u, v) and also (v, u) if undirected? 
+                # Try (u, v) and also (v, u) if undirected?
                 # NX read_graphml preserves direction if graph is directed.
                 # If undirected, the XML source/target might match u/v or v/u.
                 desc = edge_descs.get((u_str, v_str))
                 if not desc and not G.is_directed():
-                     desc = edge_descs.get((v_str, u_str))
-                
+                    desc = edge_descs.get((v_str, u_str))
+
                 if desc:
-                    data['description'] = desc
+                    data["description"] = desc
 
                 if u_str in node_map and v_str in node_map:
-                    edges_data.append({
-                        "network_id": network_id,
-                        "edge_id": f"{u}-{v}",
-                        "source_node_id": node_map[u_str],
-                        "target_node_id": node_map[v_str],
-                        "weight": float(data.get('weight', 1.0))
-                    })
+                    edges_data.append(
+                        {
+                            "network_id": network_id,
+                            "edge_id": f"{u}-{v}",
+                            "source_node_id": node_map[u_str],
+                            "target_node_id": node_map[v_str],
+                            "weight": float(data.get("weight", 1.0)),
+                        }
+                    )
 
                     for key, val in data.items():
-                        if key == 'weight':
+                        if key == "weight":
                             continue
                         if key not in edge_attr_types:
                             edge_attr_types[key] = "float"
                         if edge_attr_types[key] == "float":
-                            if not isinstance(val, (int, float)) or isinstance(val, bool):
+                            if not isinstance(val, (int, float)) or isinstance(
+                                val, bool
+                            ):
                                 edge_attr_types[key] = "string"
-            
+
             if edges_data:
-                stmt = insert(models.Edge).values(edges_data).returning(models.Edge.edge_id, models.Edge.id)
+                stmt = (
+                    insert(models.Edge)
+                    .values(edges_data)
+                    .returning(models.Edge.edge_id, models.Edge.id)
+                )
                 result = db.execute(stmt)
                 for row in result:
                     edge_map[row.edge_id] = row.id
 
         # --- 3. Process Attributes ---
         node_attr_map = ensure_attributes(
-            network_id, 
-            node_attr_types, 
-            models.NodeAttribute, 
-            db, 
+            network_id,
+            node_attr_types,
+            models.NodeAttribute,
+            db,
             commit=False,
-            descriptions=node_attr_descs
+            descriptions=node_attr_descs,
         )
         edge_attr_map = ensure_attributes(
-            network_id, 
-            edge_attr_types, 
-            models.EdgeAttribute, 
-            db, 
+            network_id,
+            edge_attr_types,
+            models.EdgeAttribute,
+            db,
             commit=False,
-            descriptions=edge_attr_descs
+            descriptions=edge_attr_descs,
         )
 
         # --- 3b. Bulk Insert Attribute Values ---
-        
+
         # Prepare data for NodeAttributeValue
         # We iterate nodes again.
-        
+
         # Chunks for Attributes
         for chunk in chunked_iterable(G.nodes(data=True), CHUNK_SIZE):
-            
-            nav_data = [] # (node_id_str, attr_name, value) for processing
-            
+            nav_data = []  # (node_id_str, attr_name, value) for processing
+
             # Prepare Batch 1: NodeAttributeValue parents
             batch_nav_inserts = []
-            
+
             for node_id, data in chunk:
                 db_node_id = node_map.get(str(node_id))
-                if not db_node_id: continue # Should not happen
+                if not db_node_id:
+                    continue  # Should not happen
 
                 for key, value in data.items():
-                    if key == 'label': continue
+                    if key == "label":
+                        continue
                     if key in node_attr_map:
-                        batch_nav_inserts.append({
-                            "node_id": db_node_id,
-                            "attribute_id": node_attr_map[key]
-                        })
+                        batch_nav_inserts.append(
+                            {"node_id": db_node_id, "attribute_id": node_attr_map[key]}
+                        )
                         nav_data.append((db_node_id, key, value))
-            
+
             if batch_nav_inserts:
-                 # Insert Parents and get IDs
-                stmt = insert(models.NodeAttributeValue).values(batch_nav_inserts).returning(models.NodeAttributeValue.id, models.NodeAttributeValue.node_id, models.NodeAttributeValue.attribute_id)
+                # Insert Parents and get IDs
+                stmt = (
+                    insert(models.NodeAttributeValue)
+                    .values(batch_nav_inserts)
+                    .returning(
+                        models.NodeAttributeValue.id,
+                        models.NodeAttributeValue.node_id,
+                        models.NodeAttributeValue.attribute_id,
+                    )
+                )
                 result = db.execute(stmt)
-                
+
                 # Map (node_id, attr_id) -> nav_id
                 local_nav_map = {}
                 for row in result:
                     local_nav_map[(row.node_id, row.attribute_id)] = row.id
-                
+
                 # Prepare Batch 2: Children (Float/Text)
                 node_float_vals = []
                 node_text_vals = []
-                
+
                 for db_node_id, key, value in nav_data:
                     attr_id = node_attr_map[key]
                     nav_id = local_nav_map.get((db_node_id, attr_id))
-                    
+
                     if nav_id:
-                         if isinstance(value, (int, float)) and not isinstance(value, bool):
-                             node_float_vals.append({"node_attribute_value_id": nav_id, "float_value": float(value)})
-                         else:
-                             node_text_vals.append({"node_attribute_value_id": nav_id, "text_value": str(value)})
-                
+                        if isinstance(value, (int, float)) and not isinstance(
+                            value, bool
+                        ):
+                            node_float_vals.append(
+                                {
+                                    "node_attribute_value_id": nav_id,
+                                    "float_value": float(value),
+                                }
+                            )
+                        else:
+                            node_text_vals.append(
+                                {
+                                    "node_attribute_value_id": nav_id,
+                                    "text_value": str(value),
+                                }
+                            )
+
                 if node_float_vals:
-                    db.execute(insert(models.NodeFloatAttributeValue).values(node_float_vals))
+                    db.execute(
+                        insert(models.NodeFloatAttributeValue).values(node_float_vals)
+                    )
                 if node_text_vals:
-                    db.execute(insert(models.NodeTextAttributeValue).values(node_text_vals))
+                    db.execute(
+                        insert(models.NodeTextAttributeValue).values(node_text_vals)
+                    )
 
         # Edge Attributes
         for chunk in chunked_iterable(G.edges(data=True), CHUNK_SIZE):
-            
             eav_data = []
             batch_eav_inserts = []
-            
+
             for u, v, data in chunk:
                 edge_id_str = f"{u}-{v}"
                 if edge_id_str in edge_map:
                     db_edge_id = edge_map[edge_id_str]
                     for key, value in data.items():
-                        if key == 'weight': continue
+                        if key == "weight":
+                            continue
                         if key in edge_attr_map:
-                            batch_eav_inserts.append({
-                                "edge_id": db_edge_id,
-                                "attribute_id": edge_attr_map[key]
-                            })
+                            batch_eav_inserts.append(
+                                {
+                                    "edge_id": db_edge_id,
+                                    "attribute_id": edge_attr_map[key],
+                                }
+                            )
                             eav_data.append((db_edge_id, key, value))
-            
+
             if batch_eav_inserts:
-                stmt = insert(models.EdgeAttributeValue).values(batch_eav_inserts).returning(models.EdgeAttributeValue.id, models.EdgeAttributeValue.edge_id, models.EdgeAttributeValue.attribute_id)
+                stmt = (
+                    insert(models.EdgeAttributeValue)
+                    .values(batch_eav_inserts)
+                    .returning(
+                        models.EdgeAttributeValue.id,
+                        models.EdgeAttributeValue.edge_id,
+                        models.EdgeAttributeValue.attribute_id,
+                    )
+                )
                 result = db.execute(stmt)
-                
+
                 local_eav_map = {}
                 for row in result:
                     local_eav_map[(row.edge_id, row.attribute_id)] = row.id
-                    
+
                 edge_float_vals = []
                 edge_text_vals = []
-                
+
                 for db_edge_id, key, value in eav_data:
-                     attr_id = edge_attr_map[key]
-                     eav_id = local_eav_map.get((db_edge_id, attr_id))
-                     
-                     if eav_id:
-                         if isinstance(value, (int, float)) and not isinstance(value, bool):
-                             edge_float_vals.append({"edge_attribute_value_id": eav_id, "float_value": float(value)})
-                         else:
-                             edge_text_vals.append({"edge_attribute_value_id": eav_id, "text_value": str(value)})
+                    attr_id = edge_attr_map[key]
+                    eav_id = local_eav_map.get((db_edge_id, attr_id))
+
+                    if eav_id:
+                        if isinstance(value, (int, float)) and not isinstance(
+                            value, bool
+                        ):
+                            edge_float_vals.append(
+                                {
+                                    "edge_attribute_value_id": eav_id,
+                                    "float_value": float(value),
+                                }
+                            )
+                        else:
+                            edge_text_vals.append(
+                                {
+                                    "edge_attribute_value_id": eav_id,
+                                    "text_value": str(value),
+                                }
+                            )
 
                 if edge_float_vals:
-                     db.execute(insert(models.EdgeFloatAttributeValue).values(edge_float_vals))
+                    db.execute(
+                        insert(models.EdgeFloatAttributeValue).values(edge_float_vals)
+                    )
                 if edge_text_vals:
-                     db.execute(insert(models.EdgeTextAttributeValue).values(edge_text_vals))
-    
+                    db.execute(
+                        insert(models.EdgeTextAttributeValue).values(edge_text_vals)
+                    )
+
     return final_network_id

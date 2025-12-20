@@ -1,18 +1,20 @@
-import sys
-import os
-import json
 import logging
-from unittest.mock import patch, MagicMock
+import os
+import sys
+from unittest.mock import patch
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 # Setup path to import app
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
+from app import (
+    mcp_server,  # Import the module to test
+    models,
+)
 from app.core.database import Base
-from app import models
-from app import mcp_server # Import the module to test
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)
@@ -27,15 +29,17 @@ engine = create_engine(
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
+
 def setup_db():
     Base.metadata.create_all(bind=engine)
     return SessionLocal()
 
+
 def verify_all_tools():
     session = setup_db()
-    
+
     # Patch get_db_session to return our test session
-    with patch('app.mcp_server.get_db_session', return_value=session):
+    with patch("app.mcp_server.get_db_session", return_value=session):
         print("\n=== Verifying All MCP Tools & Resources ===\n")
 
         # 1. initialize_network
@@ -53,7 +57,7 @@ def verify_all_tools():
             </graph>
         </graphml>
         """
-        # Create a network record first as initialize_network expects existing ID usually? 
+        # Create a network record first as initialize_network expects existing ID usually?
         # Actually pipeline.initialize_network_pipeline might expect the ID to exist or creation?
         # Looking at pipeline.py (not shown but inferred), usually we pass an ID.
         # Let's create a placeholder network.
@@ -62,12 +66,12 @@ def verify_all_tools():
         session.commit()
         session.refresh(net)
         net_id = net.id
-        
+
         res = mcp_server.initialize_network(net_id, graphml)
         if "error" in str(res).lower() and "Error" in str(res):
-             print(f"FAILURE: initialize_network returned error: {res}")
+            print(f"FAILURE: initialize_network returned error: {res}")
         else:
-             print("SUCCESS: initialize_network")
+            print("SUCCESS: initialize_network")
 
         # 2. get_network_metadata
         print("\n2. Testing get_network_metadata...")
@@ -81,102 +85,108 @@ def verify_all_tools():
         print("\n3. Testing get_node_attributes...")
         res = mcp_server.get_node_attributes(net_id)
         if "color" in res and "red" in res:
-             print("SUCCESS: get_node_attributes")
+            print("SUCCESS: get_node_attributes")
         else:
-             print(f"FAILURE: get_node_attributes: {res}")
+            print(f"FAILURE: get_node_attributes: {res}")
 
         # 4. get_edge_attributes
         print("\n4. Testing get_edge_attributes...")
         res = mcp_server.get_edge_attributes(net_id)
         if "weight" in res:
-             print("SUCCESS: get_edge_attributes")
+            print("SUCCESS: get_edge_attributes")
         else:
-             print(f"FAILURE: get_edge_attributes: {res}")
+            print(f"FAILURE: get_edge_attributes: {res}")
 
         # 5. search_nodes
         print("\n5. Testing search_nodes...")
         res = mcp_server.search_nodes(net_id, "red")
         if "n0" in res:
-             print("SUCCESS: search_nodes")
+            print("SUCCESS: search_nodes")
         else:
-             print(f"FAILURE: search_nodes: {res}")
+            print(f"FAILURE: search_nodes: {res}")
 
         # 6. calculate_centrality
         print("\n6. Testing calculate_centrality...")
         res = mcp_server.calculate_centrality(net_id, "degree")
         if "calculated" in res:
-             print("SUCCESS: calculate_centrality")
+            print("SUCCESS: calculate_centrality")
         else:
-             print(f"FAILURE: calculate_centrality: {res}")
+            print(f"FAILURE: calculate_centrality: {res}")
 
         # 7. calculate_layout
         print("\n7. Testing calculate_layout...")
         res = mcp_server.calculate_layout(net_id, "spring")
         if "calculated" in res:
-             print("SUCCESS: calculate_layout")
+            print("SUCCESS: calculate_layout")
         else:
-             print(f"FAILURE: calculate_layout: {res}")
+            print(f"FAILURE: calculate_layout: {res}")
 
         # 8. create_subgraph_from_nodes (Verified description copy here too)
         print("\n8. Testing create_subgraph_from_nodes...")
-        res = mcp_server.create_subgraph_from_nodes(net_id, ["n0", "n1"], preserve_layout=False)
+        res = mcp_server.create_subgraph_from_nodes(
+            net_id, ["n0", "n1"], preserve_layout=False
+        )
         if isinstance(res, dict) and "new_network_id" in res:
-             sub_id = res["new_network_id"]
-             print(f"SUCCESS: create_subgraph_from_nodes (New ID: {sub_id})")
-             
-             # Verify Description Copying in Subgraph
-             # We need to check if 'color' attribute in sub_id has description if source had it.
-             # In graphml above, we didn't explicitly set description in DB, but let's check basic copy.
-             attr = session.query(models.NodeAttribute).filter(
-                 models.NodeAttribute.network_id == sub_id,
-                 models.NodeAttribute.attribute_name == "color"
-             ).first()
-             if attr:
-                 print("SUCCESS: Attribute 'color' copied to subgraph.")
-             else:
-                 print("FAILURE: Attribute 'color' NOT copied to subgraph.")
+            sub_id = res["new_network_id"]
+            print(f"SUCCESS: create_subgraph_from_nodes (New ID: {sub_id})")
+
+            # Verify Description Copying in Subgraph
+            # We need to check if 'color' attribute in sub_id has description if source had it.
+            # In graphml above, we didn't explicitly set description in DB, but let's check basic copy.
+            attr = (
+                session.query(models.NodeAttribute)
+                .filter(
+                    models.NodeAttribute.network_id == sub_id,
+                    models.NodeAttribute.attribute_name == "color",
+                )
+                .first()
+            )
+            if attr:
+                print("SUCCESS: Attribute 'color' copied to subgraph.")
+            else:
+                print("FAILURE: Attribute 'color' NOT copied to subgraph.")
         else:
-             print(f"FAILURE: create_subgraph_from_nodes: {res}")
+            print(f"FAILURE: create_subgraph_from_nodes: {res}")
 
         # 9. get_subgraphs_resource
         print("\n9. Testing get_subgraphs_resource...")
         res = mcp_server.get_subgraphs_resource(net_id)
         if "Subgraph" in res:
-             print("SUCCESS: get_subgraphs_resource")
+            print("SUCCESS: get_subgraphs_resource")
         else:
-             print(f"FAILURE: get_subgraphs_resource: {res}")
+            print(f"FAILURE: get_subgraphs_resource: {res}")
 
         # 10. create_ego_network
         print("\n10. Testing create_ego_network...")
         res = mcp_server.create_ego_network(net_id, "n1", 1)
         if isinstance(res, dict) and "new_network_id" in res:
-             print("SUCCESS: create_ego_network")
+            print("SUCCESS: create_ego_network")
         else:
-             print(f"FAILURE: create_ego_network: {res}")
+            print(f"FAILURE: create_ego_network: {res}")
 
         # 11. create_path_subgraph
         print("\n11. Testing create_path_subgraph...")
         res = mcp_server.create_path_subgraph(net_id, "n0", "n2")
         if isinstance(res, dict) and "new_network_id" in res:
-             print("SUCCESS: create_path_subgraph")
+            print("SUCCESS: create_path_subgraph")
         else:
-             print(f"FAILURE: create_path_subgraph: {res}")
+            print(f"FAILURE: create_path_subgraph: {res}")
 
         # 12. create_largest_component_subgraph
         print("\n12. Testing create_largest_component_subgraph...")
         res = mcp_server.create_largest_component_subgraph(net_id)
         if isinstance(res, dict) and "new_network_id" in res:
-             print("SUCCESS: create_largest_component_subgraph")
+            print("SUCCESS: create_largest_component_subgraph")
         else:
-             print(f"FAILURE: create_largest_component_subgraph: {res}")
-             
+            print(f"FAILURE: create_largest_component_subgraph: {res}")
+
         # 13. get_structure_resource
         print("\n13. Testing get_structure_resource...")
         res = mcp_server.get_structure_resource(net_id)
         if "node_count" in res:
-             print("SUCCESS: get_structure_resource")
+            print("SUCCESS: get_structure_resource")
         else:
-             print(f"FAILURE: get_structure_resource: {res}")
+            print(f"FAILURE: get_structure_resource: {res}")
 
         # 14. Prompts (Just checking they run without error)
         print("\n14. Testing Prompts...")
@@ -193,6 +203,7 @@ def verify_all_tools():
             print(f"FAILURE: Prompt raised exception: {e}")
 
     session.close()
+
 
 if __name__ == "__main__":
     verify_all_tools()

@@ -1,7 +1,9 @@
 import time
+
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+
 
 class LoggingMiddleware:
     def __init__(self, app):
@@ -13,10 +15,10 @@ class LoggingMiddleware:
             return
 
         start_time = time.time()
-        
+
         # Wrapper to capture status code
-        status_code = [500] # Default to 500 if start no called
-        
+        status_code = [500]  # Default to 500 if start no called
+
         async def send_wrapper(message):
             if message["type"] == "http.response.start":
                 status_code[0] = message["status"]
@@ -35,4 +37,3 @@ class LoggingMiddleware:
                 f"Incoming request: method={scope['method']} path={scope['path']} "
                 f"status_code={status_code[0]} processing_time={process_time:.4f}s"
             )
-
