@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 logger.info("Starting table creation...")
 try:
     logger.info(f"Registered tables: {list(Base.metadata.tables.keys())}")
-    Base.metadata.create_all(bind=engine)
+    # Base.metadata.create_all(bind=engine)
     logger.info("Table creation completed.")
 except Exception as e:
     logger.error(f"Table creation FAILED: {e}")
