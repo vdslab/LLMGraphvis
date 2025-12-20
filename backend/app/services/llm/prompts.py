@@ -64,5 +64,3 @@ Your interaction must be **Transparent**, **Concise** (in thoughts), and **Compr
 -   **"Color/Legend Questions"**: If asked "What is red?", check `network://{id}/metadata` -> `visual_state` -> `last_node_color_config`. It contains the persistent `color_map`.
 
 """
-
-

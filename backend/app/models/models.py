@@ -1,7 +1,17 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Text, Float, JSON, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+
 from app.core.database import Base
+
 
 class User(Base):
     __tablename__ = "users"
@@ -10,9 +20,12 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     chats = relationship("Chat", back_populates="user")
+
 
 class Network(Base):
     __tablename__ = "networks"
@@ -20,14 +33,18 @@ class Network(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
     description = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
 
     parent_network_id = Column(Integer, ForeignKey("networks.id"), nullable=True)
 
     subgraphs = relationship("Network", back_populates="parent_network")
-    parent_network = relationship("Network", remote_side=[id], back_populates="subgraphs")
+    parent_network = relationship(
+        "Network", remote_side=[id], back_populates="subgraphs"
+    )
 
     chat = relationship("Chat", back_populates="network", uselist=False)
     # Nodes and Edges are managed by NetworkXAPI
@@ -35,6 +52,7 @@ class Network(Base):
     # edges = relationship("Edge", back_populates="network")
     # node_attributes = relationship("NodeAttribute", back_populates="network")
     # edge_attributes = relationship("EdgeAttribute", back_populates="network")
+
 
 class Chat(Base):
     __tablename__ = "chats"
@@ -44,12 +62,15 @@ class Chat(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     network_id = Column(Integer, ForeignKey("networks.id"), nullable=False, unique=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
     visualization_state = Column(JSON, nullable=True)
 
     user = relationship("User", back_populates="chats")
     network = relationship("Network", back_populates="chat")
     messages = relationship("ChatMessage", back_populates="chat")
+
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
@@ -60,9 +81,12 @@ class ChatMessage(Base):
     content = Column(Text, nullable=False)
     meta_data = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     chat = relationship("Chat", back_populates="messages")
+
 
 class NodeAttribute(Base):
     __tablename__ = "node_attributes"
@@ -70,12 +94,15 @@ class NodeAttribute(Base):
     id = Column(Integer, primary_key=True, index=True)
     network_id = Column(Integer, ForeignKey("networks.id"), nullable=False)
     attribute_name = Column(String, nullable=False)
-    data_type = Column(String) 
+    data_type = Column(String)
     description = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     # network = relationship("Network", back_populates="node_attributes")
+
 
 class EdgeAttribute(Base):
     __tablename__ = "edge_attributes"
@@ -86,7 +113,8 @@ class EdgeAttribute(Base):
     data_type = Column(String)
     description = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     # network = relationship("Network", back_populates="edge_attributes")
-

@@ -1,9 +1,10 @@
 import time
-import logging
-from starlette.types import ASGIApp, Scope, Receive, Send
+
 from app.core.logging import get_logger
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 logger = get_logger(__name__)
+
 
 class LoggingMiddleware:
     def __init__(self, app: ASGIApp):
@@ -17,11 +18,11 @@ class LoggingMiddleware:
         start_time = time.time()
         method = scope["method"]
         path = scope["path"]
-        
-        # We need to capture the status code. 
+
+        # We need to capture the status code.
         # But for streaming responses, the status is sent early.
         # This wrapper captures the initial response start message.
-        status_code = [500] 
+        status_code = [500]
 
         async def send_wrapper(message):
             if message["type"] == "http.response.start":
@@ -36,4 +37,3 @@ class LoggingMiddleware:
                 f"Incoming request: method={method} path={path} "
                 f"status_code={status_code[0]} processing_time={process_time:.4f}s"
             )
-

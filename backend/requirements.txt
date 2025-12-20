@@ -11,3 +11,5 @@ google-genai
 python-dotenv
 sse-starlette
 mcp
+pytest
+pytest-asyncio
