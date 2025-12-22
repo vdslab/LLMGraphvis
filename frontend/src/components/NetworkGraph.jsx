@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
-const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick }) => {
+const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick, onBackgroundClick }) => {
   const svgRef = useRef();
 
   useEffect(() => {
@@ -12,6 +12,13 @@ const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick }) => {
     const height = svgRef.current.clientHeight;
 
     svg.selectAll("*").remove(); // Clear previous
+
+    // 0. Bind background click
+    svg.on("click", (event) => {
+        if (onBackgroundClick) {
+            onBackgroundClick(event);
+        }
+    });
 
     // 1. Create a map for quick node lookup
     const nodeMap = new Map(nodes.map(n => [n.id, n]));
@@ -83,8 +90,9 @@ const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick }) => {
       .attr("transform", d => `translate(${xScale(d.x)},${yScale(d.y)})`)
       .style("cursor", "pointer") // Indicate clickable
       .on("click", (event, d) => {
+        // Prevent background click
+        event.stopPropagation();
         if (onNodeClick) {
-          event.stopPropagation(); // Prevent zoom click-through if necessary
           onNodeClick(d);
         }
       });
@@ -122,8 +130,10 @@ const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick }) => {
       });
 
     svg.call(zoom);
+    // Be careful with d3.zoom consuming clicks.
+    // However, SVG click listener should typically fire if not stopped.
 
-  }, [nodes, links, showLabels, onNodeClick]);
+  }, [nodes, links, showLabels, onNodeClick, onBackgroundClick]);
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
@@ -131,5 +141,4 @@ const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick }) => {
     </div>
   );
 };
-
 export default NetworkGraph;
