@@ -1,10 +1,13 @@
-from typing import Optional
-from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel
+
 
 class UpdateNetworkMetadataRequest(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+
 
 class NetworkMetadataResponse(BaseModel):
     id: int
@@ -14,7 +17,7 @@ class NetworkMetadataResponse(BaseModel):
     updated_at: datetime
     is_subgraph: bool
     parent_network_id: Optional[int] = None
-    
+
     # Visual State Excerpt
     last_layout_name: Optional[str] = None
     last_node_size_config: Optional[dict] = None

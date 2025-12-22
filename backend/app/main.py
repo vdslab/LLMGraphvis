@@ -1,13 +1,13 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+
 from app.api.v1.endpoints import auth, chat, networks
-from app.core.database import engine, Base
-from app.core import logging
+from app.core.database import Base, engine
 from app.middleware.logging import LoggingMiddleware
 
 # Create database tables
-Base.metadata.create_all(bind=engine)
+# Base.metadata.create_all(bind=engine)
 
 # Create FastAPI app with Swagger UI configuration
 app = FastAPI(
@@ -15,22 +15,25 @@ app = FastAPI(
     description="API with authentication support for both browser clients (cookies) and API clients (Bearer tokens).",
     version="1.0.0",
     swagger_ui_parameters={
-        "persistAuthorization": True,   # Remember authorization between refreshes
-        "tryItOutEnabled": True,        # Enable testing endpoints directly from Swagger
-        "docExpansion": "none",         # Collapse all endpoints by default
-        "defaultModelsExpandDepth": 1   # Limit models display depth
-    }
+        "persistAuthorization": True,  # Remember authorization between refreshes
+        "tryItOutEnabled": True,  # Enable testing endpoints directly from Swagger
+        "docExpansion": "none",  # Collapse all endpoints by default
+        "defaultModelsExpandDepth": 1,  # Limit models display depth
+    },
 )
 
 # Add logging middleware
 app.add_middleware(LoggingMiddleware)
 
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     print(f"Global exception handler caught: {exc}")
     import traceback
+
     traceback.print_exc()
     return {"detail": "Internal Server Error"}
+
 
 # Public endpoints that don't require authentication
 PUBLIC_ENDPOINTS = [
@@ -39,34 +42,30 @@ PUBLIC_ENDPOINTS = [
     {"path": "/auth/token", "method": "POST"},
     {"path": "/openapi.json", "method": "GET"},
     {"path": "/docs", "method": "GET"},
-    {"path": "/redoc", "method": "GET"}
+    {"path": "/redoc", "method": "GET"},
 ]
+
 
 # Custom OpenAPI schema to include security scheme and exclude public endpoints
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
-    
+
     openapi_schema = get_openapi(
         title=app.title,
         version=app.version,
         description=app.description,
         routes=app.routes,
     )
-    
+
     # Add OAuth2 password flow security scheme
     openapi_schema["components"]["securitySchemes"] = {
         "OAuth2PasswordBearer": {
             "type": "oauth2",
-            "flows": {
-                "password": {
-                    "tokenUrl": "/auth/token",
-                    "scopes": {}
-                }
-            }
+            "flows": {"password": {"tokenUrl": "/auth/token", "scopes": {}}},
         }
     }
-    
+
     # Configure security for all paths
     if "paths" in openapi_schema:
         for path, path_item in openapi_schema["paths"].items():
@@ -74,16 +73,20 @@ def custom_openapi():
                 # Skip security for public endpoints
                 is_public = False
                 for endpoint in PUBLIC_ENDPOINTS:
-                    if path == endpoint["path"] and method.upper() == endpoint["method"]:
+                    if (
+                        path == endpoint["path"]
+                        and method.upper() == endpoint["method"]
+                    ):
                         is_public = True
                         break
-                
+
                 # Add security requirement for protected endpoints only
                 if not is_public:
                     operation["security"] = [{"OAuth2PasswordBearer": []}]
-    
+
     app.openapi_schema = openapi_schema
     return app.openapi_schema
+
 
 app.openapi = custom_openapi
 
@@ -106,9 +109,11 @@ app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(networks.router)
 
+
 @app.get("/")
 def read_root():
     return {"message": "Welcome to GraphVisAgent API"}
+
 
 @app.get("/health")
 def health_check():

@@ -1,9 +1,7 @@
-
-import pytest
-import io
-from app.logic.importer import parse_and_save_graphml
-from app.logic.attributes import clear_network_data
 from app import models
+from app.logic.attributes import clear_network_data
+from app.logic.importer import parse_and_save_graphml
+
 # Removed custom db_session fixture
 
 
@@ -31,84 +29,129 @@ def test_graphml_desc_import(db):
   </key>
 </graphml>
 """
-    
+
     # Use a random network ID to avoid collision
     network_id = 9999
-    
+
     # Clean up before test - Not strictly needed with SQLite function scope but good for safety
     existing = db.query(models.Network).filter(models.Network.id == network_id).first()
     if existing:
-         clear_network_data(network_id, db)
-         db.query(models.Network).filter(models.Network.id == network_id).delete()
-         db.commit()
-    
+        clear_network_data(network_id, db)
+        db.query(models.Network).filter(models.Network.id == network_id).delete()
+        db.commit()
+
     final_network_id = parse_and_save_graphml(network_id, graphml_content, db)
-    
+
     # Verify Network Description
-    network = db.query(models.Network).filter(models.Network.id == final_network_id).first()
+    network = (
+        db.query(models.Network).filter(models.Network.id == final_network_id).first()
+    )
     assert network.description == "This is a test network description"
-    
+
     # Verify Attribute Description (Key Desc)
-    color_attr = db.query(models.NodeAttribute).filter(
-        models.NodeAttribute.network_id == final_network_id,
-        models.NodeAttribute.attribute_name == "color"
-    ).first()
+    color_attr = (
+        db.query(models.NodeAttribute)
+        .filter(
+            models.NodeAttribute.network_id == final_network_id,
+            models.NodeAttribute.attribute_name == "color",
+        )
+        .first()
+    )
     assert color_attr is not None
     assert color_attr.description == "Color of the node"
-    
+
     # Verify Node Attribute Definition (Implicit description attr)
-    desc_attr = db.query(models.NodeAttribute).filter(
-        models.NodeAttribute.network_id == final_network_id,
-        models.NodeAttribute.attribute_name == "description"
-    ).first()
+    desc_attr = (
+        db.query(models.NodeAttribute)
+        .filter(
+            models.NodeAttribute.network_id == final_network_id,
+            models.NodeAttribute.attribute_name == "description",
+        )
+        .first()
+    )
     assert desc_attr is not None
     assert desc_attr.data_type == "string"
-    
+
     # Verify Node Descriptions (values)
     # n0
-    n0 = db.query(models.Node).filter(models.Node.network_id == final_network_id, models.Node.node_id == "n0").first()
+    n0 = (
+        db.query(models.Node)
+        .filter(models.Node.network_id == final_network_id, models.Node.node_id == "n0")
+        .first()
+    )
     assert n0 is not None
-    n0_desc_val = db.query(models.NodeTextAttributeValue).join(models.NodeAttributeValue).filter(
-        models.NodeAttributeValue.node_id == n0.id,
-        models.NodeAttributeValue.attribute_id == desc_attr.id
-    ).first()
+    n0_desc_val = (
+        db.query(models.NodeTextAttributeValue)
+        .join(models.NodeAttributeValue)
+        .filter(
+            models.NodeAttributeValue.node_id == n0.id,
+            models.NodeAttributeValue.attribute_id == desc_attr.id,
+        )
+        .first()
+    )
     assert n0_desc_val is not None
     assert n0_desc_val.text_value == "Description for Node 0"
 
     # n1
-    n1 = db.query(models.Node).filter(models.Node.network_id == final_network_id, models.Node.node_id == "n1").first()
-    n1_desc_val = db.query(models.NodeTextAttributeValue).join(models.NodeAttributeValue).filter(
-        models.NodeAttributeValue.node_id == n1.id,
-        models.NodeAttributeValue.attribute_id == desc_attr.id
-    ).first()
+    n1 = (
+        db.query(models.Node)
+        .filter(models.Node.network_id == final_network_id, models.Node.node_id == "n1")
+        .first()
+    )
+    n1_desc_val = (
+        db.query(models.NodeTextAttributeValue)
+        .join(models.NodeAttributeValue)
+        .filter(
+            models.NodeAttributeValue.node_id == n1.id,
+            models.NodeAttributeValue.attribute_id == desc_attr.id,
+        )
+        .first()
+    )
     assert n1_desc_val is not None
     assert n1_desc_val.text_value == "Description for Node 1"
 
     # Verify Edge Descriptions
-    edge_desc_attr = db.query(models.EdgeAttribute).filter(
-        models.EdgeAttribute.network_id == final_network_id,
-        models.EdgeAttribute.attribute_name == "description"
-    ).first()
+    edge_desc_attr = (
+        db.query(models.EdgeAttribute)
+        .filter(
+            models.EdgeAttribute.network_id == final_network_id,
+            models.EdgeAttribute.attribute_name == "description",
+        )
+        .first()
+    )
     assert edge_desc_attr is not None
-    
+
     # Edge e0 (n0-n1)
-    edge = db.query(models.Edge).filter(
-        models.Edge.network_id == final_network_id,
-        models.Edge.source_node_id == n0.id,
-        models.Edge.target_node_id == n1.id
-    ).first()
-    if not edge:
-         edge = db.query(models.Edge).filter(
+    edge = (
+        db.query(models.Edge)
+        .filter(
             models.Edge.network_id == final_network_id,
-            models.Edge.source_node_id == n1.id,
-            models.Edge.target_node_id == n0.id
-        ).first()
+            models.Edge.source_node_id == n0.id,
+            models.Edge.target_node_id == n1.id,
+        )
+        .first()
+    )
+    if not edge:
+        edge = (
+            db.query(models.Edge)
+            .filter(
+                models.Edge.network_id == final_network_id,
+                models.Edge.source_node_id == n1.id,
+                models.Edge.target_node_id == n0.id,
+            )
+            .first()
+        )
     assert edge is not None
-    
-    edge_val = db.query(models.EdgeTextAttributeValue).join(models.EdgeAttributeValue).filter(
-        models.EdgeAttributeValue.edge_id == edge.id,
-        models.EdgeAttributeValue.attribute_id == edge_desc_attr.id
-    ).first()
+
+    edge_val = (
+        db.query(models.EdgeTextAttributeValue)
+        .join(models.EdgeAttributeValue)
+        .filter(
+            models.EdgeAttributeValue.edge_id == edge.id,
+            models.EdgeAttributeValue.attribute_id == edge_desc_attr.id,
+        )
+        .first()
+    )
     assert edge_val is not None
     assert edge_val.text_value == "Description for Edge 0-1"
 

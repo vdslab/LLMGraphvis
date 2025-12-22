@@ -1,9 +1,10 @@
-import os
 import json
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.sse import sse_client
-from mcp.client.stdio import stdio_client
+import os
+
 from google.genai import types
+from mcp import ClientSession
+from mcp.client.sse import sse_client
+
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -12,66 +13,73 @@ logger = get_logger(__name__)
 NETWORKX_API_URL = os.getenv("NETWORKX_API_URL", "http://networkx-api:8000")
 SSE_ENDPOINT = f"{NETWORKX_API_URL}/mcp/sse"
 
+
 async def get_tools_as_gemini_functions() -> list[types.Tool]:
     """
-    Connects to the NetworkXAPI MCP Server, discovers tools, 
+    Connects to the NetworkXAPI MCP Server, discovers tools,
     Converts MCP tools to Gemini function declarations.
     """
     # Note: We use sse_client for HTTP/SSE connection
     async with sse_client(SSE_ENDPOINT) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
-            
+
             # List tools from the MCP server
             result = await session.list_tools()
             tools = result.tools
-            
+
             gemini_tools_list = []
             for tool in tools:
                 fd = _convert_to_gemini(tool)
                 gemini_tools_list.append(types.Tool(function_declarations=[fd]))
 
             # Add read_resource client-side tool
-            gemini_tools_list.append(types.Tool(function_declarations=[
-                types.FunctionDeclaration(
-                    name="read_resource",
-                    description="Reads a resource from the MCP server using its URI.",
-                    parameters={
-                        "type": "OBJECT",
-                        "properties": {
-                            "uri": {
-                                "type": "STRING",
-                                "description": "The URI of the resource to read (e.g., network://1/attributes/nodes)"
-                            }
-                        },
-                        "required": ["uri"]
-                    }
+            gemini_tools_list.append(
+                types.Tool(
+                    function_declarations=[
+                        types.FunctionDeclaration(
+                            name="read_resource",
+                            description="Reads a resource from the MCP server using its URI.",
+                            parameters={
+                                "type": "OBJECT",
+                                "properties": {
+                                    "uri": {
+                                        "type": "STRING",
+                                        "description": "The URI of the resource to read (e.g., network://1/attributes/nodes)",
+                                    }
+                                },
+                                "required": ["uri"],
+                            },
+                        )
+                    ]
                 )
-            ]))
-                
+            )
+
             return gemini_tools_list
+
 
 def _convert_to_gemini(mcp_tool) -> types.FunctionDeclaration:
     """
     Converts an MCP Tool definition to a Gemini FunctionDeclaration.
     """
     tool_name = str(getattr(mcp_tool, "name", None) or mcp_tool.get("name"))
-    tool_desc = str(getattr(mcp_tool, "description", None) or mcp_tool.get("description"))
+    tool_desc = str(
+        getattr(mcp_tool, "description", None) or mcp_tool.get("description")
+    )
     tool_schema = getattr(mcp_tool, "inputSchema", None) or mcp_tool.get("inputSchema")
-    
+
     # Sanitize schema: remove 'title' which can confuse some parsers
     if tool_schema:
         # First resolve references ($ref) using $defs if present
         if "$defs" in tool_schema or "definitions" in tool_schema:
             tool_schema = _resolve_schema_refs(tool_schema, tool_schema)
-            
+
         tool_schema = _sanitize_schema(tool_schema)
 
     return types.FunctionDeclaration(
-        name=tool_name,
-        description=tool_desc,
-        parameters=tool_schema
+        name=tool_name, description=tool_desc, parameters=tool_schema
     )
+
 
 def _resolve_schema_refs(schema: dict, root: dict) -> dict:
     """
@@ -93,11 +101,11 @@ def _resolve_schema_refs(schema: dict, root: dict) -> dict:
                 definition = definition.get(part)
                 if definition is None:
                     break
-            
+
             if definition:
                 # Recursively resolve the found definition
                 return _resolve_schema_refs(definition, root)
-        
+
         # If we can't resolve it, return as is (or handle error)
         return schema
 
@@ -106,49 +114,60 @@ def _resolve_schema_refs(schema: dict, root: dict) -> dict:
         # Skip definitions in the output as they are resolved inline
         if key in ["$defs", "definitions"]:
             continue
-            
+
         if isinstance(value, dict):
             new_schema[key] = _resolve_schema_refs(value, root)
         elif isinstance(value, list):
             new_schema[key] = [
-                _resolve_schema_refs(item, root) if isinstance(item, dict) else item 
+                _resolve_schema_refs(item, root) if isinstance(item, dict) else item
                 for item in value
             ]
         else:
             new_schema[key] = value
-            
+
     return new_schema
+
 
 def _sanitize_schema(schema: dict) -> dict:
     """Recursively remove 'title' from JSON schema."""
     if not isinstance(schema, dict):
         return schema
-    
+
     new_schema = schema.copy()
     if "title" in new_schema:
         del new_schema["title"]
     # Double check for residual $defs if they weren't caught before (though _resolve handles them)
     if "$defs" in new_schema:
         del new_schema["$defs"]
-        
+
     for key, value in new_schema.items():
         if isinstance(value, dict):
             new_schema[key] = _sanitize_schema(value)
         elif isinstance(value, list):
-            new_schema[key] = [_sanitize_schema(item) if isinstance(item, dict) else item for item in value]
-            
+            new_schema[key] = [
+                _sanitize_schema(item) if isinstance(item, dict) else item
+                for item in value
+            ]
+
     return new_schema
+
 
 async def execute_tool(tool_name: str, arguments: dict):
     """
     Executes a tool on the NetworkXAPI MCP Server.
     """
-    logger.info(f"Executing tool: {tool_name} with arguments: {arguments}")
+    # Sanitize arguments for logging (truncate large strings)
+    log_args = arguments.copy()
+    for k, v in log_args.items():
+        if isinstance(v, str) and len(v) > 100:
+            log_args[k] = v[:100] + "..."
+
+    logger.info(f"Executing tool: {tool_name} with arguments: {log_args}")
     try:
         async with sse_client(SSE_ENDPOINT) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
-                
+
                 # Handle client-side tools
                 if tool_name == "read_resource":
                     uri = arguments.get("uri")
@@ -161,10 +180,10 @@ async def execute_tool(tool_name: str, arguments: dict):
                     return parsed_result
 
                 result = await session.call_tool(tool_name, arguments)
-                
+
                 if result.isError:
                     raise RuntimeError(f"Tool execution failed: {result.content}")
-                
+
                 # MCP returns a list of content (TextContent, ImageContent, etc.)
                 # For our use case, we mostly expect simplified text/JSON back.
                 # We'll join text content.
@@ -172,7 +191,7 @@ async def execute_tool(tool_name: str, arguments: dict):
                 for content in result.content:
                     if content.type == "text":
                         output_text += content.text
-                
+
                 # Try parsing as JSON if possible, otherwise return string
                 try:
                     parsed_result = json.loads(output_text)
@@ -183,6 +202,24 @@ async def execute_tool(tool_name: str, arguments: dict):
                     return {"content": output_text}
     except Exception as e:
         import traceback
+
         logger.error(f"Error executing tool {tool_name} with args {arguments}: {e}")
         traceback.print_exc()
         raise
+
+
+async def get_resource(uri: str) -> dict:
+    """
+    Directly reads a resource from the MCP server.
+    Useful for internal context validation.
+    """
+    try:
+        async with sse_client(SSE_ENDPOINT) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.read_resource(uri)
+                parsed_result = json.loads(result.contents[0].text)
+                return parsed_result
+    except Exception as e:
+        logger.error(f"Error reading resource {uri}: {e}")
+        return {}

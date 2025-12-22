@@ -1,8 +1,11 @@
 from typing import Optional
+
 from .base import BaseSchema
 
+
 class CentralityRequest(BaseSchema):
-    centrality_type: str # degree, betweenness, closeness, eigenvector, pagerank
+    centrality_type: str  # degree, betweenness, closeness, eigenvector, pagerank
+
 
 class TopNodesRequest(BaseSchema):
     metric: str

@@ -1,12 +1,13 @@
+
 import pytest
-import os
+
+# Import models to ensure they are registered with Base.metadata
+from app.core.database import Base, get_db
+from app.main import app
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from fastapi.testclient import TestClient
-
-from app.core.database import Base, get_db
-from app.main import app
 
 # In-memory SQLite for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
@@ -18,12 +19,14 @@ engine = create_engine(
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-@pytest.fixture(scope="session")
+
+@pytest.fixture(scope="function")
 def setup_db_schema():
     # Create tables
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
+
 
 @pytest.fixture(scope="function")
 def db(setup_db_schema):
@@ -34,23 +37,25 @@ def db(setup_db_schema):
     connection = engine.connect()
     transaction = connection.begin()
     session = TestingSessionLocal(bind=connection)
-    
+
     yield session
-    
+
     session.close()
     transaction.rollback()
     connection.close()
+
 
 @pytest.fixture(scope="function")
 def client(db):
     """
     FastAPI TestClient with overridden get_db dependency.
     """
+
     def override_get_db():
         try:
             yield db
         finally:
-            pass # Session lifecycle managed by db fixture
+            pass  # Session lifecycle managed by db fixture
 
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:

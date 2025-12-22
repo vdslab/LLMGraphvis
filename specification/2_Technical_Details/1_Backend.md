@@ -162,6 +162,27 @@ graph TD
 
 
 
+### 1.3.1. Context Injection Mechanism
+
+LLMが「現在のネットワーク状態」を正確に把握し、効率的にツールを選択できるよう、Backendは独自の**コンテキスト注入メカニズム**を実装しています。
+
+- **概要**: ユーザーの各メッセージの直前に、現在のネットワークのメタ情報（ID, ノード数, エッジ数, 利用可能な属性リスト）を自動的に挿入します。
+- **目的**:
+  1.  **Verification Firstの高速化**: 属性リストが既に提示されているため、単純な可視化指示であれば `read_resource` による確認ステップをスキップ可能にします。
+  2.  **ハルシネーション防止**: 存在しない属性を使用しようとするLLMのミスを防ぎます。
+  3.  **状態追従**: サブグラフへのコンテキスト切り替えが発生した場合でも、次のターンで最新のサブグラフ情報が注入されるため、LLMは常に正しい対象を分析できます。
+
+**注入される情報の例:**
+
+```text
+[Current Network Context]
+Network ID: 5
+Stats: 150 Nodes, 300 Edges
+Available Node Attributes:
+- department (string)
+- tenure (integer)
+```
+
 ## 1.4. 主要なデータモデル (Pydantic Schemas)
 
 APIで送受信される主要なデータ構造です。
@@ -246,3 +267,13 @@ APIは、エラー発生時にHTTPステータスコードと、詳細情報を�
 | `403 Forbidden`             | 認証済みだが、リソースへのアクセス権限がない場合。                     |
 | `404 Not Found`             | 指定されたリソースが存在しない場合。                                   |
 | `500 Internal Server Error` | サーバー内部で予期せぬエラーが発生した場合。                           |
+
+## 1.7. 内部実装構造 (Refactoring Notes)
+
+### 1.7.1. LLM Engine (`app.services.llm.engine`)
+- **目的**: 複雑化していたツール実行ループとストリーミング処理を整理するため、`execute_tool_loop` 関数を機能単位で分割しました。
+- **構成**:
+  - `_consume_stream`: LLMからのストリーミングレスポンスを消費し、テキストチャンクの送信と関数呼び出しの集約を行う。
+  - `_handle_tool_execution`: ツール（Local/MCP）の実行とエラーハンドリングを行う。
+  - `_handle_visualization_update`: ツール実行結果に基づくコンテキスト切り替え、可視化データの保存、フロントエンドへの更新通知を行う。
+  - `execute_tool_loop`: 上記関数をオーケストレーションするメインループ。

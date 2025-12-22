@@ -166,7 +166,21 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 **Node Coloring Examples:**
 - **Categorical with map**: `node_color_config={"scale_type": "CATEGORICAL", "attribute": "Country", "color_map": {"USA": "blue", "Japan": "red"}}` (Others will be auto-colored)
-- **Categorical with map and fallback**: `node_color_config={"scale_type": "CATEGORICAL", "attribute": "Country", "color_map": {"USA": "blue"}, "default_color": "gray"}` (Others will be gray)
+- **Categorical with map and fallback**: `node_color_config={"scale_type": "CATEGORICAL", "attribute": "Country", "color_map": {"USA": "blue"}, "default_color": "gray"}` (USA is blue, other top frequent values are auto-colored, remaining are gray)
+### `search_nodes`
+- **Description**: ノード名（ID、ラベル）または特定の属性値でノードを検索する。部分一致検索をサポートする。
+- **Arguments**:
+  - `network_id`: int
+  - `query`: str (検索キーワード)
+  - `attribute`: str (Optional, 指定した属性のカラムのみを検索対象とする)
+- **Returns**: `List[{"id": str, "label": str, ...}]` (JSON string)
+
+### `read_node_details`
+- **Description**: 特定のノードの全属性と詳細情報（description含む）を取得する。
+- **Arguments**:
+  - `network_id`: int
+  - `node_id`: str
+- **Returns**: `dict` (属性キーと値のペア)
 
 ## 3.6. REST API エンドポイント (MCP Feature Parity)
 
@@ -202,3 +216,23 @@ MCPツールと同等の機能をREST API経由でも利用可能にするため
 | `POST` | `/component-containing-node` | 指定ノードを含む連結成分サブグラフを作成する。 |
 | `POST` | `/filter` | 属性条件に基づいてノードをフィルタリングし、サブグラフを作成する。 |
 
+
+## 3.7. 内部実装構造 (Refactoring Notes)
+
+コードの保守性と可読性を向上させるため、以下のリファクタリングを実施しました。
+
+### 3.7.1. VisualizationBuilder (`app.logic.visualization_builder`)
+- **目的**: 以前は `visualizer.py` に存在した400行を超える巨大な可視化生成ロジックをクラス化し、責務を分離しました。
+- **機能**:
+  - `validate_and_prepare`: 設定の検証と初期化
+  - `fetch_data`: 必要なノード・エッジデータの取得
+  - `calculate_statistics`: 統計情報の計算とカラーマップの生成
+  - `build`: 最終的なJSON構造の構築
+
+### 3.7.2. StyleService (`app.logic.style_service`)
+- **目的**: 色やサイズの計算ロジックを集約しました。
+- **改善点**:
+  - `prepare_categorical_map`: カテゴリカルカラーの自動割り当てロジックを改善。`default_color` が指定された場合でも自動割り当て（Autofill）を行い、上位の頻出値にはパレット色を、それ以外にはデフォルト色を適用する「Hybrid Mode」として動作するように変更しました。これにより、明示的なマッピングがない頻出カテゴリも区別可能になります。
+
+### 3.7.3. NetworkService (`app.logic.network_service`)
+- **目的**: `mcp_server.py` に記述されていたビジネスロジック（メタデータ更新、構造取得、サブグラフ一覧取得など）を専用のサービス層に移動しました。これにより、MCPサーバーコードはルーティングとツール定義に集中できるようになりました。

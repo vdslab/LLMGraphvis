@@ -1,13 +1,10 @@
-from fastapi.testclient import TestClient
-from app.main import app
-import pytest
 
-client = TestClient(app)
 
 # Assuming network ID 1 exists from previous tests or seed data
 # If not, we might need to create one, but let's try with 1 first or use the logic from other tests
 
-def test_get_node_details_success():
+
+def test_get_node_details_success(client):
     # 1. Create a network with sparse attributes
     graphml_data = """<?xml version="1.0" encoding="UTF-8"?>
 <graphml xmlns="http://graphml.graphdrawing.org/xmlns">
@@ -24,8 +21,11 @@ def test_get_node_details_success():
         </node>
     </graph>
 </graphml>"""
-    
-    response = client.post("/api/v1/networks/initialize", json={"network_id": 998, "graphml_data": graphml_data})
+
+    response = client.post(
+        "/api/v1/networks/initialize",
+        json={"network_id": 998, "graphml_data": graphml_data},
+    )
     assert response.status_code == 200
     network_id = response.json()["network_id"]
 
@@ -33,7 +33,7 @@ def test_get_node_details_success():
     response = client.get(f"/api/v1/networks/{network_id}/nodes/n0")
     assert response.status_code == 200
     data = response.json()
-    
+
     assert data["id"] == "n0"
     # Verify 'full_attr' is present and correct
     assert data["attributes"]["full_attr"] == "present"
@@ -41,7 +41,8 @@ def test_get_node_details_success():
     assert "sparse_attr" in data["attributes"]
     assert data["attributes"]["sparse_attr"] is None
 
-def test_get_node_details_not_found():
+
+def test_get_node_details_not_found(client):
     # Use a likely non-existent network ID or node ID
     response = client.get("/api/v1/networks/999/nodes/non_existent_node")
     assert response.status_code == 404

@@ -101,15 +101,15 @@ sequenceDiagram
     B->>LLM: ユーザー指示、チャット履歴、ツールリストを送信
     B-->>F: SSEイベント (event: thinking_stream, data: "ユーザーの意図を解釈中...")
     note right of LLM: ユーザー指示を解釈し、<br/>可視化の全体計画を立てる。
-    LLM-->>B: ツール呼び出し要求 (1. list_node_attributes)
+    LLM-->>B: ツール呼び出し要求 (1. read_resource)
 
     %% Step 2: Backend executes tools and streams status
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_node_attributes", status: "started" })
-    B->>N: Call MCP Tool: list_node_attributes (network_id)
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "read_resource", status: "started" })
+    B->>N: Call MCP Tool: read_resource (uri: "network://.../attributes/nodes")
     N->>DB: 属性テーブル群から属性名一覧をクエリ
     DB-->>N: 属性リスト
-    N-->>B: 属性リスト（例: ['weight', 'community_id']）
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_node_attributes", status: "completed" })
+    N-->>B: 属性リスト（例: [{name: 'weight'}, {name: 'community_id'}]）
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "read_resource", status: "completed" })
 
     %% Step 3: Backend continues planning with LLM
     B->>LLM: 属性リストをツール実行結果として送信
@@ -122,13 +122,13 @@ sequenceDiagram
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "completed" })
     
     B->>LLM: ツール実行結果（成功）を送信
-    LLM-->>B: ツール呼び出し要求 (3. list_node_attributes)
+    LLM-->>B: ツール呼び出し要求 (3. read_resource)
 
-    %% Step 5: Backend executes list_node_attributes (Verification)
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_node_attributes", status: "started" })
-    B->>N: Call MCP Tool: list_node_attributes
+    %% Step 5: Backend executes read_resource (Verification)
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "read_resource", status: "started" })
+    B->>N: Call MCP Tool: read_resource
     N-->>B: 更新された属性リスト
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "list_node_attributes", status: "completed" })
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "read_resource", status: "completed" })
 
     B->>LLM: ツール実行結果（成功）を送信
     LLM-->>B: ツール呼び出し要求 (4. generate_visualization)
@@ -161,9 +161,8 @@ sequenceDiagram
     - Backendは`POST /chat/{id}/process`のリクエストを受け取ると、メッセージをDBに保存し、即座に`202 Accepted`を返す。これにより、フロントエンドはブロックされない。
 
 2.  **LLMによるプランニングとツールの実行**:
-    - BackendはバックグラウンドでLLMとの対話を開始する。
-    - LLMの思考プロセスや、`list_node_attributes`、`calculate_centrality`、`calculate_layout`、`generate_visualization`といったツールの実行状況は、`thinking_stream`や`tool_execution`といった専用のSSEイベントを通じて逐一フロントエンドに通知される。
-    - **重要**: LLMは計算を実行した後、必ず再度`list_node_attributes`を呼び出して、新しい属性が利用可能になったことを確認してから`generate_visualization`を呼び出す。また、**「name」や「label」などの属性が存在する場合、それを識別可能なラベルとして自動的に選択する。**
+    - LLMの思考プロセスや、`read_resource`、`calculate_centrality`、`calculate_layout`、`generate_visualization`といったツールの実行状況は、`thinking_stream`や`tool_execution`といった専用のSSEイベントを通じて逐一フロントエンドに通知される。
+    - **重要**: LLMは計算を実行した後、必ず再度`read_resource`を呼び出して、新しい属性が利用可能になったことを確認してから`generate_visualization`を呼び出す。また、**「name」や「label」などの属性が存在する場合、それを識別可能なラベルとして自動的に選択する。**
 
 3.  **最終的な結果の通知**:
     - `generate_visualization`が完了すると、Backendは2つの重要な情報をSSEで送信する。
@@ -438,8 +437,8 @@ sequenceDiagram
     User->>LLM: "20代の女性のサブグラフを作って"
     
     note right of LLM: 1. 属性を確認
-    LLM->>Backend: list_node_attributes(network_id)
-    Backend->>NetworkXAPI: Call MCP Tool: list_node_attributes
+    LLM->>Backend: read_resource(uri="network://.../attributes/nodes")
+    Backend->>NetworkXAPI: Call MCP Tool: read_resource
     NetworkXAPI-->>Backend: [Age (float), Gender (string)]
     
     note right of LLM: 2. 条件を構築して実行
@@ -455,6 +454,38 @@ sequenceDiagram
     Backend-->>LLM: Success
     LLM->>Backend: generate_visualization(network_id={new_network_id})
     Backend-->>User: Render Update
+```
+
+## 6.12. Verification First Workflow (安全な可視化フロー)
+
+**目的:** LLMが「存在しない属性」を使用してエラーやハルシネーション（幻覚）を起こすのを防ぐため、計算や可視化の前に必ずデータの存在確認を行うフローです。LLMはシステムプロンプトにより、この手順を遵守するよう強制されています。
+
+```mermaid
+sequenceDiagram
+    participant LLM
+    participant Backend
+    participant NetworkXAPI
+    
+    Note right of LLM: ユーザー: "PageRankで色付けして"
+    
+    critical Phase 1: Verification (確認)
+        LLM->>Backend: read_resource("network://{id}/attributes/nodes")
+        Backend->>NetworkXAPI: Call MCP Tool: read_resource
+        NetworkXAPI-->>Backend: { attributes: [{name: "degree", ...}] }
+        note right of LLM: "pagerank" がリストにないことを確認
+    end
+    
+    critical Phase 2: Action (計算)
+        LLM->>Backend: calculate_centrality(type="pagerank")
+        Backend->>NetworkXAPI: Call MCP Tool: calculate_centrality
+        NetworkXAPI-->>Backend: Success
+    end
+    
+    critical Phase 3: Finalization (可視化)
+        LLM->>Backend: generate_visualization(node_color_config={attribute: "pagerank"})
+        Backend->>NetworkXAPI: Call MCP Tool: generate_visualization
+        NetworkXAPI-->>Backend: Render Data
+    end
 ```
 
 ## 6.13. LLMツール実行ループとコンテキスト管理詳細 (Engine Architecture)
