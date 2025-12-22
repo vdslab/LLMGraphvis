@@ -1,6 +1,6 @@
 import React from 'react';
 
-const NodeDetailsPanel = ({ selectedNode, onClose, onAskAI }) => {
+const NodeDetailsPanel = ({ selectedNode, onClose }) => {
   if (!selectedNode) return null;
 
   const { id, label, details } = selectedNode;
@@ -65,26 +65,6 @@ const NodeDetailsPanel = ({ selectedNode, onClose, onAskAI }) => {
       )}
 
       {/* Visual Properties removed as per user request */ }
-
-      <button
-        onClick={() => onAskAI(selectedNode)}
-        style={{
-          width: '100%',
-          padding: '10px',
-          backgroundColor: '#2196F3',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: 'pointer',
-          marginTop: '10px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '8px'
-        }}
-      >
-        <span>🤖</span> Ask AI about this node
-      </button>
     </div>
   );
 };

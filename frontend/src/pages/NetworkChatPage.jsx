@@ -247,11 +247,11 @@ const NetworkChatPage = () => {
       setNodeDetailsPanelOpen(false);
       setSelectedNode(null);
   };
-   
-  const handleAskAI = (node) => {
-      // Just ensure the panel stays open or whatever logic we need.
-      // The context passing happens via props to ChatInterface
-      console.log("Asking AI about:", node);
+  
+  const handleBackgroundClick = () => {
+      if (selectedNode) {
+          handleCloseNodeDetails();
+      }
   };
 
   const handleFileUpload = async (event) => {
@@ -382,8 +382,7 @@ const NetworkChatPage = () => {
           {nodeDetailsPanelOpen && selectedNode && (
             <NodeDetailsPanel 
               selectedNode={selectedNode} 
-              onClose={handleCloseNodeDetails} 
-              onAskAI={handleAskAI}
+              onClose={handleCloseNodeDetails}
             />
           )}
 
@@ -392,6 +391,7 @@ const NetworkChatPage = () => {
             links={links} 
             showLabels={showLabels} 
             onNodeClick={handleNodeClick}
+            onBackgroundClick={handleBackgroundClick}
           />
           {nodes.length === 0 && (
             <div style={{
