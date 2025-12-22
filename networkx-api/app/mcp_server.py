@@ -656,3 +656,109 @@ def create_subgraph_by_attribute_filter(
         return log_and_return_error("create_subgraph_by_attribute_filter", e)
     finally:
         db.close()
+@mcp.tool()
+def get_node_attributes(network_id: int) -> str:
+    """
+    Lists available node attributes with metadata (type, min/max, distinct values).
+    Use this to see what data is available on the nodes before deciding on a visualization.
+    """
+    db = get_db_session()
+    try:
+        stats = attributes.get_attribute_stats(
+            network_id,
+            models.NodeAttribute,
+            models.NodeAttributeValue,
+            models.NodeFloatAttributeValue,
+            models.NodeTextAttributeValue,
+            db,
+        )
+        return json.dumps(stats)
+    except Exception as e:
+        return f"Error: {str(e)}"
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def get_edge_attributes(network_id: int) -> str:
+    """
+    Lists available edge attributes with metadata.
+    Use this to see what data is available on the edges.
+    """
+    db = get_db_session()
+    try:
+        stats = attributes.get_attribute_stats(
+            network_id,
+            models.EdgeAttribute,
+            models.EdgeAttributeValue,
+            models.EdgeFloatAttributeValue,
+            models.EdgeTextAttributeValue,
+            db,
+        )
+        return json.dumps(stats)
+    except Exception as e:
+        return f"Error: {str(e)}"
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def get_network_structure(network_id: int) -> str:
+    """
+    Returns basic structural statistics of the network (node count, edge count, density).
+    Use this to get an overview of the network size and density.
+    """
+    db = get_db_session()
+    try:
+        stats = network_service.get_network_structure(db, network_id)
+        return json.dumps(stats)
+    except Exception as e:
+        return f"Error: {str(e)}"
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def get_top_centrality_nodes(network_id: int, metric: str, k: int = 10) -> str:
+    """
+    Returns the top k nodes based on a centrality metric.
+    
+    Args:
+        network_id: The ID of the network.
+        metric: One of "degree", "betweenness", "closeness", "eigenvector", "pagerank".
+        k: Number of top nodes to return (default: 10).
+    """
+    db = get_db_session()
+    try:
+        nodes = centrality.get_top_nodes(network_id, metric, k, db)
+        return json.dumps(nodes)
+    except Exception as e:
+        return f"Error: {str(e)}"
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def get_node_attribute_details(network_id: int, attribute_name: str) -> str:
+    """
+    Returns details and statistics for a specific node attribute.
+    Use this when you need to know the distribution or top values of a specific attribute.
+    """
+    db = get_db_session()
+    try:
+        stats = attributes.get_specific_attribute_stats(
+            network_id,
+            attribute_name,
+            models.NodeAttribute,
+            models.NodeAttributeValue,
+            models.NodeFloatAttributeValue,
+            models.NodeTextAttributeValue,
+            db,
+        )
+        if not stats:
+            return f"Attribute '{attribute_name}' not found."
+        return json.dumps(stats)
+    except Exception as e:
+        return f"Error: {str(e)}"
+    finally:
+        db.close()
