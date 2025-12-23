@@ -90,7 +90,7 @@ flowchart TD
     LLM([LLM]):::llm
 
     %% 3. Agentシステム（大きな枠）
-    subgraph AgentScope [ ]
+    subgraph AgentScope
         direction TB
         
         %% Agent本体
@@ -109,8 +109,8 @@ flowchart TD
     UI --> |Message| Agent
 
     %% Agent <-> LLM
-    Agent -- "Promt <br/> Function define" --> LLM
-    LLM -- "Function Name <br/>& argment" --> Agent
+    Agent -- "Prompt <br/> Function define" --> LLM
+    LLM -- "Function Name <br/>& argument" --> Agent
 
     %% Agent <-> Tool
     Agent -- "Call" --> Tool
@@ -121,9 +121,6 @@ flowchart TD
 
     %% Agent全体 -> UI (左側の大きな矢印)
     Agent -->|Message/Visualization| UI
-
-    %% 配置調整用の不可視リンク（レイアウトを整えるため）
-    LLM ~~~ AgentScope
 
 ```
 
