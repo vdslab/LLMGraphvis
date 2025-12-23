@@ -11,9 +11,10 @@ WORKDIR /app
 # Minimal check
 # RUN apt-get update && apt-get install -y libpq-dev && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY networkx-api/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY common common
+COPY networkx-api .
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload", "--timeout-keep-alive", "60"]

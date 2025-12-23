@@ -10,13 +10,15 @@ from alembic import context
 
 # Add backend directory to path so we can import app
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Add common directory to path
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "common"))
 
 # Load .env from project root
 dotenv_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env")
 load_dotenv(dotenv_path)
 
 # Import Base from models
-from app.models.models import Base
+from common.models import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

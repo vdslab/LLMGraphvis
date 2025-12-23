@@ -10,11 +10,9 @@ from sqlalchemy.pool import StaticPool
 # Setup path to import app
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from app import (
-    mcp_server,  # Import the module to test
-    models,
-)
-from app.core.database import Base
+from app import mcp_server  # Import the module to test
+from common import models
+from common.models import Base
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO)

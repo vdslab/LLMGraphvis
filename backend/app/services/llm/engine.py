@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
-from app import models
+from common import models
 from app.core.logging import get_logger
 
 from . import local_tools, mcp_client

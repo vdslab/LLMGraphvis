@@ -3,7 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
 from app.api.v1.endpoints import auth, chat, networks
-from app.core.database import Base, engine
+from common.models import Base
+from app.core.database import engine
 from app.middleware.logging import LoggingMiddleware
 
 # Create database tables

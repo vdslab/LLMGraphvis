@@ -2,7 +2,7 @@
 import networkx as nx
 from sqlalchemy.orm import Session
 
-from app import models
+from common import models
 
 
 def export_network_to_graphml(network_id: int, db: Session) -> str:

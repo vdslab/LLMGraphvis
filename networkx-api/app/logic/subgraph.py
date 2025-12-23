@@ -3,7 +3,7 @@ from typing import Any, Dict, List
 import networkx as nx
 from sqlalchemy.orm import Session
 
-from app import models
+from common import models
 from app.core.logging import get_logger
 
 from .layout import calculate_layout

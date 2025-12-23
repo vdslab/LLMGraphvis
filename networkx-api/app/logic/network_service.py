@@ -2,7 +2,7 @@ from typing import Any, Dict, List
 
 from sqlalchemy.orm import Session
 
-from app import models
+from common import models
 
 
 def update_network_metadata(

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app import models
+from common import models
 from app.core.logging import get_logger
 from app.logic import attributes, exporter, importer, search
 

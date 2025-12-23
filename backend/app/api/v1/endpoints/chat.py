@@ -14,7 +14,8 @@ from fastapi import (
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
-from app import models, schemas
+from common import models
+from app import schemas
 from app.api.v1.endpoints.auth import get_current_user
 from app.core import database
 from app.core.logging import get_logger

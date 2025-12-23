@@ -18,7 +18,9 @@ services:
     restart: always
 
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: graphvis-backend
     ports:
       - "8000:8000"
@@ -44,10 +46,13 @@ services:
     restart: always
     volumes:
       - ./backend:/app
+      - ./common:/app/common
       - ${GOOGLE_APPLICATION_CREDENTIALS}:/app/application_default_credentials.json
 
   networkx-api:
-    build: ./networkx-api
+    build:
+      context: .
+      dockerfile: networkx-api/Dockerfile
     container_name: graphvis-networkx-api
     ports:
       - "8001:8001"
@@ -63,6 +68,7 @@ services:
     restart: always
     volumes:
       - ./networkx-api:/app
+      - ./common:/app/common
 
   frontend:
     build: ./frontend

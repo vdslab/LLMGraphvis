@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 
-from app import models
+from common import models
 
 
 class NetworkService:
