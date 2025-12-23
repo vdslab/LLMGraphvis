@@ -69,6 +69,64 @@ graph TD
     style database fill:#f9e2af,stroke:#333,stroke-width:2px
 ```
 
+### 0.1.3. エージェントコンセプトモデル (Agent Concept Model)
+
+ユーザー（UI）、LLM、Agent、およびツール間の相互作用の概念モデルを示します。
+AgentはLLMを頭脳として利用し、ツールを通じて外部世界（DB等）と作用しながらユーザーの要求に応えます。
+
+```mermaid
+flowchart TD
+    %% クラス定義（スタイル調整）
+    classDef ui fill:#fff,stroke:#333,stroke-width:2px;
+    classDef agent fill:#f4f4f4,stroke:#333,stroke-width:2px,rx:10,ry:10;
+    classDef llm fill:#fff,stroke:#333,stroke-width:1px;
+    classDef tool fill:#fff,stroke:#333,stroke-width:1px,shape:rect;
+
+    %% 1. 上部の画像（UI画面）
+    %% HTMLラベルを使用して画像を埋め込みます。srcをご自身の画像URLに変更してください。
+    UI("<img src='../images/agent_ui_concept.png' width='600' /><br/>Application/UI"):::ui
+
+    %% 2. LLM（楕円）
+    LLM([LLM]):::llm
+
+    %% 3. Agentシステム（大きな枠）
+    subgraph AgentScope [ ]
+        direction TB
+        
+        %% Agent本体
+        Agent(Agent):::agent
+        
+        %% Tool（四角）
+        Tool[tool]:::tool
+    end
+
+    %% 4. データベース（円柱）
+    DB[(Database)]:::tool
+
+    %% --- 矢印と接続 ---
+    
+    %% UI -> Agent
+    UI --> |Message| Agent
+
+    %% Agent <-> LLM
+    Agent -- "Promt <br/> Function define" --> LLM
+    LLM -- "Function Name <br/>& argment" --> Agent
+
+    %% Agent <-> Tool
+    Agent -- "Call" --> Tool
+    Tool -- "Response" --> Agent
+
+    %% Tool <-> DB
+    Tool <--"save/load"--> DB
+
+    %% Agent全体 -> UI (左側の大きな矢印)
+    Agent -->|Message/Visualization| UI
+
+    %% 配置調整用の不可視リンク（レイアウトを整えるため）
+    LLM ~~~ AgentScope
+
+```
+
 ## 0.2. データ永続化
 
 本システムにおけるデータの永続化は、目的の異なる2つの仕組みによって実現されています。
