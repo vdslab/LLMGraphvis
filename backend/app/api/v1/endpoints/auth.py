@@ -5,7 +5,8 @@ from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from app import models, schemas
+from common import models
+from app import schemas
 from app.core import database
 from app.core import security as auth
 

@@ -1,8 +1,8 @@
 import json
 import logging
 
-from app import models
-from app.core.database import Base
+from common import models
+from common.models import Base
 from app.logic import attributes, subgraph
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

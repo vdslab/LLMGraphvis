@@ -3,7 +3,7 @@ from typing import List, Set
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from app import models
+from common import models
 from app.core.logging import get_logger
 from app.logic.subgraph import create_subgraph_from_nodes
 from app.schemas.filter import AttributeCondition

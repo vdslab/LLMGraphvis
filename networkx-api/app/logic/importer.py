@@ -3,7 +3,7 @@ import itertools
 
 from sqlalchemy.orm import Session
 
-from app import models
+from common import models
 from app.logic.parsing.graphml_parser import GraphMLParser
 
 from .attributes import ensure_attributes

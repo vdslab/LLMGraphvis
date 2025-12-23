@@ -3,7 +3,7 @@ from typing import List
 from google.genai import types
 from sqlalchemy.orm import Session
 
-from app import models
+from common import models
 
 
 def build_history(chat_id: int, user_message: str, db: Session) -> List[types.Content]:

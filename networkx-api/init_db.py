@@ -1,6 +1,7 @@
 import logging
 
-from app.core.database import Base, engine
+from app.core.database import engine
+from common.models import Base
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

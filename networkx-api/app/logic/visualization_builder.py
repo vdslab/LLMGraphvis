@@ -2,7 +2,7 @@ from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from app import models
+from common import models
 from app.logic.common_utils import calculate_smart_edge_width, calculate_smart_node_size
 from app.logic.style_service import StyleService
 

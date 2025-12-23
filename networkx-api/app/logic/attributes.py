@@ -4,7 +4,7 @@ from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app import models
+from common import models
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)

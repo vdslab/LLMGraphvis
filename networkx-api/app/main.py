@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
-from app.core.database import Base, engine
+from common.models import Base
+from app.core.database import engine
 from app.core.logging import get_logger
 from app.middleware.logging import LoggingMiddleware
 
