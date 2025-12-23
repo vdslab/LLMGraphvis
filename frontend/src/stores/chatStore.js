@@ -25,6 +25,10 @@ export const useChatStore = create((set, get) => ({
   // Get chat details
   fetchChat: async (chatId) => {
     const res = await getChat(chatId);
+    
+    // Race condition guard: ensure we are still on the requested chat
+    if (get().chatId !== chatId) return;
+
     if (res.data.network) {
       useNetworkStore.getState().setNetworkData(res.data.network);
     } else {
@@ -39,6 +43,10 @@ export const useChatStore = create((set, get) => ({
     if (!id) return;
     
     const res = await getChatMessages(id);
+    
+    // Race condition guard
+    if (get().chatId !== id) return;
+
     set({ messages: res.data });
     return res.data;
   },
