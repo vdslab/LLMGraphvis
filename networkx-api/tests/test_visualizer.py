@@ -1,5 +1,5 @@
 import pytest
-from app import models
+from common import models
 from app.logic import visualizer
 
 

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.logging import get_logger
 from app.logic import visualizer
 from app.schemas.visualization import VisualizationRequest
+from common import models
 
 router = APIRouter()
 logger = get_logger(__name__)
