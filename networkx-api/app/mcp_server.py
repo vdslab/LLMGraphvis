@@ -762,3 +762,29 @@ def get_node_attribute_details(network_id: int, attribute_name: str) -> str:
         return f"Error: {str(e)}"
     finally:
         db.close()
+
+
+@mcp.tool()
+def get_edge_attribute_details(network_id: int, attribute_name: str) -> str:
+    """
+    Returns details and statistics for a specific edge attribute.
+    Use this when you need to know the distribution or top values of a specific attribute.
+    """
+    db = get_db_session()
+    try:
+        stats = attributes.get_specific_attribute_stats(
+            network_id,
+            attribute_name,
+            models.EdgeAttribute,
+            models.EdgeAttributeValue,
+            models.EdgeFloatAttributeValue,
+            models.EdgeTextAttributeValue,
+            db,
+        )
+        if not stats:
+            return f"Attribute '{attribute_name}' not found."
+        return json.dumps(stats)
+    except Exception as e:
+        return f"Error: {str(e)}"
+    finally:
+        db.close()
