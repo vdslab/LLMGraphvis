@@ -68,6 +68,7 @@ erDiagram
         VARCHAR name
         INTEGER user_id FK
         INTEGER network_id FK, UK
+        JSON visualization_state
     }
     chat_messages {
         INTEGER id PK
@@ -80,6 +81,12 @@ erDiagram
         INTEGER id PK
         VARCHAR name
         INTEGER parent_network_id FK
+        VARCHAR last_layout_name
+        JSON last_node_size_config
+        JSON last_node_color_config
+        JSON last_edge_width_config
+        JSON last_edge_color_config
+        JSON last_node_label_config
     }
     nodes {
         INTEGER id PK
@@ -164,6 +171,13 @@ CREATE TABLE networks (
     name VARCHAR(255) NOT NULL,
     description TEXT,
     parent_network_id INTEGER,
+    
+    last_layout_name VARCHAR(255),
+    last_node_size_config JSON,
+    last_node_color_config JSON,
+    last_edge_width_config JSON,
+    last_edge_color_config JSON,
+    last_node_label_config JSON,
 
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -201,6 +215,7 @@ CREATE TABLE chats (
     name VARCHAR(255) NOT NULL,
     user_id INTEGER NOT NULL,
     network_id INTEGER NOT NULL UNIQUE,
+    visualization_state JSON,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     FOREIGN KEY (user_id) REFERENCES users(id),
@@ -208,7 +223,17 @@ CREATE TABLE chats (
 );
 ```
 
-### 4.3.4. `chat_messages`
+### 4.3.5. chats (チャット)
+
+| カラム名 | データ型 | 制約 | 説明 |
+| :--- | :--- | :--- | :--- |
+| `id` | `INTEGER` | `PRIMARY KEY` | チャット引用ID |
+| `name` | `VARCHAR` | `NOT NULL` | チャット名 |
+| `user_id` | `INTEGER` | `FOREIGN KEY` | 所有ユーザーID |
+| `network_id` | `INTEGER` | `FOREIGN KEY` | 関連するネットワークID |
+| `visualization_state` | `JSON` | `NULLABLE` | フロントエンドの最後の可視化状態（位置、色など）のキャッシュ |
+
+### 4.3.6. `chat_messages`
 ```sql
 CREATE TABLE chat_messages (
     id INTEGER PRIMARY KEY,
@@ -221,7 +246,7 @@ CREATE TABLE chat_messages (
 );
 ```
 
-### 4.3.5. `nodes`
+### 4.3.7. `nodes`
 ```sql
 CREATE TABLE nodes (
     id INTEGER PRIMARY KEY,
@@ -235,7 +260,7 @@ CREATE TABLE nodes (
 );
 ```
 
-### 4.3.6. `edges`
+### 4.3.8. `edges`
 ```sql
 CREATE TABLE edges (
     id INTEGER PRIMARY KEY,
