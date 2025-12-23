@@ -410,6 +410,7 @@ def create_ego_network(
     center_node_id: str,
     radius: int,
     preserve_layout: bool = False,
+    description: str = None,
 ) -> dict:
     """
     Creates an Ego Network subgraph (nodes within radius hops from center).
@@ -427,6 +428,7 @@ def create_ego_network(
             radius,
             db,
             preserve_layout=preserve_layout,
+            description=description,
         )
         if "new_network_id" in result:
             result["network_id"] = result["new_network_id"]
@@ -439,7 +441,10 @@ def create_ego_network(
 
 @mcp.tool()
 def create_subgraph_from_nodes(
-    source_network_id: int, node_ids: List[str], preserve_layout: bool = False
+    source_network_id: int,
+    node_ids: List[str],
+    preserve_layout: bool = False,
+    description: str = None,
 ) -> dict:
     """
     Creates a subgraph containing the specified nodes.
@@ -452,7 +457,11 @@ def create_subgraph_from_nodes(
     db = get_db_session()
     try:
         result = subgraph.create_subgraph_from_nodes(
-            source_network_id, node_ids, db, preserve_layout=preserve_layout
+            source_network_id,
+            node_ids,
+            db,
+            preserve_layout=preserve_layout,
+            description=description,
         )
         if "new_network_id" in result:
             result["network_id"] = result["new_network_id"]
@@ -469,6 +478,7 @@ def create_path_subgraph(
     source_node_id: str,
     target_node_id: str,
     preserve_layout: bool = False,
+    description: str = None,
 ) -> dict:
     """
     Creates a subgraph consisting of the shortest path between two nodes.
@@ -486,6 +496,7 @@ def create_path_subgraph(
             target_node_id,
             db,
             preserve_layout=preserve_layout,
+            description=description,
         )
         if "new_network_id" in result:
             result["network_id"] = result["new_network_id"]
@@ -498,7 +509,7 @@ def create_path_subgraph(
 
 @mcp.tool()
 def create_k_core_subgraph(
-    source_network_id: int, k: int, preserve_layout: bool = False
+    source_network_id: int, k: int, preserve_layout: bool = False, description: str = None
 ) -> dict:
     """
     Creates a k-Core subgraph (maximal subgraph where every node has degree >= k).
@@ -511,7 +522,7 @@ def create_k_core_subgraph(
     db = get_db_session()
     try:
         result = subgraph.create_k_core_subgraph(
-            source_network_id, k, db, preserve_layout=preserve_layout
+            source_network_id, k, db, preserve_layout=preserve_layout, description=description
         )
         if "new_network_id" in result:
             result["network_id"] = result["new_network_id"]
@@ -524,7 +535,7 @@ def create_k_core_subgraph(
 
 @mcp.tool()
 def create_largest_component_subgraph(
-    network_id: int, preserve_layout: bool = False
+    network_id: int, preserve_layout: bool = False, description: str = None
 ) -> dict:
     """
     Creates a subgraph from the largest connected component of the network.
@@ -537,7 +548,7 @@ def create_largest_component_subgraph(
     db = get_db_session()
     try:
         result = subgraph.create_largest_component_subgraph(
-            network_id, db, preserve_layout=preserve_layout
+            network_id, db, preserve_layout=preserve_layout, description=description
         )
         if "new_network_id" in result:
             result["network_id"] = result["new_network_id"]
@@ -550,7 +561,10 @@ def create_largest_component_subgraph(
 
 @mcp.tool()
 def create_component_containing_node(
-    source_network_id: int, node_id: str, preserve_layout: bool = False
+    source_network_id: int,
+    node_id: str,
+    preserve_layout: bool = False,
+    description: str = None,
 ) -> dict:
     """
     Creates a subgraph from the connected component containing a specific node.
@@ -563,7 +577,11 @@ def create_component_containing_node(
     db = get_db_session()
     try:
         result = subgraph.create_component_containing_node(
-            source_network_id, node_id, db, preserve_layout=preserve_layout
+            source_network_id,
+            node_id,
+            db,
+            preserve_layout=preserve_layout,
+            description=description,
         )
         if "new_network_id" in result:
             result["network_id"] = result["new_network_id"]
@@ -627,6 +645,7 @@ def create_subgraph_by_attribute_filter(
     conditions: List[AttributeCondition],
     suffix: str = "Filtered",
     preserve_layout: bool = False,
+    description: str = None,
 ) -> dict:
     """
     Creates a new subgraph by filtering nodes from an existing network based on attribute conditions.
@@ -647,7 +666,12 @@ def create_subgraph_by_attribute_filter(
 
         # Conditions are already validated Pydantic models (AttributeCondition)
         result = filter.create_subgraph_by_filter(
-            network_id, conditions, suffix, db, preserve_layout=preserve_layout
+            network_id,
+            conditions,
+            suffix,
+            db,
+            preserve_layout=preserve_layout,
+            description=description,
         )
         if "new_network_id" in result:
             result["network_id"] = result["new_network_id"]

@@ -232,6 +232,7 @@ def create_ego_network(
     radius: int,
     db: Session,
     preserve_layout: bool = False,
+    description: str = None,
 ) -> Dict[str, Any]:
     logger.info(f"Creating ego network for {center_node_id} (r={radius})")
     # Reconstruct graph structure to run ego_graph
@@ -264,7 +265,8 @@ def create_ego_network(
     ego_G = nx.ego_graph(G, center_node_id, radius=radius)
     node_ids = list(ego_G.nodes())
 
-    description = f"Ego Network of node '{center_node_id}' with radius {radius}."
+    if description is None:
+        description = f"Ego Network of node '{center_node_id}' with radius {radius}."
     return create_subgraph_from_nodes(
         source_network_id,
         node_ids,
@@ -281,6 +283,7 @@ def create_path_subgraph(
     target_node_id: str,
     db: Session,
     preserve_layout: bool = False,
+    description: str = None,
 ) -> Dict[str, Any]:
     logger.info(f"Creating path subgraph: {source_node_id} -> {target_node_id}")
     G = nx.Graph()
@@ -309,7 +312,8 @@ def create_path_subgraph(
         logger.warning(f"No path found between {source_node_id} and {target_node_id}")
         raise ValueError(f"No path between {source_node_id} and {target_node_id}")
 
-    description = f"Shortest path from '{source_node_id}' to '{target_node_id}'."
+    if description is None:
+        description = f"Shortest path from '{source_node_id}' to '{target_node_id}'."
     return create_subgraph_from_nodes(
         source_network_id,
         path_nodes,
@@ -321,7 +325,11 @@ def create_path_subgraph(
 
 
 def create_k_core_subgraph(
-    source_network_id: int, k: int, db: Session, preserve_layout: bool = False
+    source_network_id: int,
+    k: int,
+    db: Session,
+    preserve_layout: bool = False,
+    description: str = None,
 ) -> Dict[str, Any]:
     logger.info(f"Creating k-core subgraph (k={k})")
     G = nx.Graph()
@@ -350,7 +358,8 @@ def create_k_core_subgraph(
         logger.warning(f"No k-core found for k={k}")
         raise ValueError(f"No k-core found for k={k}")
 
-    description = f"k-Core subgraph with k={k}."
+    if description is None:
+        description = f"k-Core subgraph with k={k}."
     return create_subgraph_from_nodes(
         source_network_id,
         node_ids,
@@ -362,7 +371,10 @@ def create_k_core_subgraph(
 
 
 def create_largest_component_subgraph(
-    source_network_id: int, db: Session, preserve_layout: bool = False
+    source_network_id: int,
+    db: Session,
+    preserve_layout: bool = False,
+    description: str = None,
 ) -> Dict[str, Any]:
     logger.info("Creating largest component subgraph")
     G = nx.Graph()
@@ -388,7 +400,8 @@ def create_largest_component_subgraph(
     largest_component = max(components, key=len)
     node_ids = list(largest_component)
 
-    description = "Largest connected component of the network."
+    if description is None:
+        description = "Largest connected component of the network."
     return create_subgraph_from_nodes(
         source_network_id,
         node_ids,
@@ -400,7 +413,11 @@ def create_largest_component_subgraph(
 
 
 def create_component_containing_node(
-    source_network_id: int, node_id: str, db: Session, preserve_layout: bool = False
+    source_network_id: int,
+    node_id: str,
+    db: Session,
+    preserve_layout: bool = False,
+    description: str = None,
 ) -> Dict[str, Any]:
     logger.info(f"Creating component subgraph containing node {node_id}")
     G = nx.Graph()
@@ -429,7 +446,8 @@ def create_component_containing_node(
     component_nodes = nx.node_connected_component(G, node_id)
     node_ids = list(component_nodes)
 
-    description = f"Connected component containing node '{node_id}'."
+    if description is None:
+        description = f"Connected component containing node '{node_id}'."
     return create_subgraph_from_nodes(
         source_network_id,
         node_ids,
