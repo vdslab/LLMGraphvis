@@ -6,6 +6,7 @@ import { useAuthStore } from '../stores/authStore';
 import NetworkGraph from '../components/NetworkGraph';
 import ChatInterface from '../components/ChatInterface';
 import NodeDetailsPanel from '../components/NodeDetailsPanel';
+import ChatList from '../components/ChatList';
 
 const NetworkChatPage = () => {
   const { id } = useParams();
@@ -23,6 +24,9 @@ const NetworkChatPage = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [sseError, setSseError] = useState(null);
   const [retryTrigger, setRetryTrigger] = useState(0);
+
+  // Sidebar Logic
+  const [showChatList, setShowChatList] = useState(false);
 
   // Check authentication
   useEffect(() => {
@@ -54,15 +58,21 @@ const NetworkChatPage = () => {
   // Load chat messages and details when component mounts
   useEffect(() => {
     if (id && id !== 'new' && isAuthenticated) {
+      const numericId = parseInt(id);
+      if (isNaN(numericId)) return;
+
+      // Set current chat ID immediately to support race condition guards
+      setChatId(numericId);
+
       const loadData = async () => {
         try {
           // Reset network store immediately to avoid showing previous graph
           useNetworkStore.getState().reset();
 
           // Fetch chat details (includes network visualization)
-          await useChatStore.getState().fetchChat(parseInt(id));
+          await useChatStore.getState().fetchChat(numericId);
           // Fetch messages
-          await fetchMessages(parseInt(id));
+          await fetchMessages(numericId);
         } catch (error) {
           console.error("Failed to load chat data:", error);
           if (error.response && error.response.status === 404) {
@@ -74,7 +84,7 @@ const NetworkChatPage = () => {
       
       loadData();
     }
-  }, [id, fetchMessages, isAuthenticated, navigate]);
+  }, [id, fetchMessages, isAuthenticated, navigate, setChatId]);
   
   // Initialize SSE connection with error handling
   useEffect(() => {
@@ -82,7 +92,7 @@ const NetworkChatPage = () => {
       const numericId = parseInt(id);
       if (isNaN(numericId)) return;
 
-      setChatId(numericId);
+      // setChatId(numericId); // Moved to loading effect
       setSseError(null);
       
       let eventSource = null;
@@ -230,8 +240,6 @@ const NetworkChatPage = () => {
         setSelectedNode({ id: nodeData.id, label: nodeData.label });
         setNodeDetailsPanelOpen(true);
 
-        // Dynamically import API to avoid potential circular dependencies if any, 
-        // though standard import would work too. Using dynamic for consistency with previous thought process.
         const api = await import('../services/api');
         const response = await api.getNodeDetails(chatId, nodeData.id);
         
@@ -317,7 +325,6 @@ const NetworkChatPage = () => {
 
   const [showLabels, setShowLabels] = useState(false);
 
-  // Don't render anything if not authenticated
   if (!isAuthenticated) {
     return null;  // Redirecting to login via useEffect
   }
@@ -353,13 +360,55 @@ const NetworkChatPage = () => {
       
       {/* Main content */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+        
+        {/* Left Side: Navigation Sidebar (Collapsible) */}
+        {showChatList && (
+            <div style={{ 
+                width: '250px', 
+                borderRight: '1px solid var(--border-color)',
+                display: 'flex',
+                flexDirection: 'column'
+            }}>
+                <div style={{ padding: '0.5rem', textAlign: 'right', borderBottom: '1px solid #eee' }}>
+                    <button onClick={() => setShowChatList(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
+                </div>
+                <ChatList currentChatId={parseInt(id)} onClose={() => {/* Optional: close on click? */}} />
+            </div>
+        )}
+
+        {/* Center: Graph */}
         <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+          
+           {/* Sidebar Toggle Button (if closed) */}
+           {!showChatList && (
+            <div style={{ 
+                position: 'absolute', 
+                top: 10, 
+                left: 10, 
+                zIndex: 6,
+            }}>
+               <button 
+                onClick={() => setShowChatList(true)}
+                className="btn"
+                style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)', 
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                    padding: '8px 12px',
+                    borderRadius: '5px'
+                }}
+               >
+                   ☰ Chats
+               </button>
+            </div>
+           )}
+
           {/* Graph Controls */}
           {nodes.length > 0 && (
             <div style={{ 
               position: 'absolute', 
               top: 10, 
-              left: 10, 
+              // Move right if sidebar button is there
+              left: !showChatList ? 100 : 10, 
               zIndex: 5,
               backgroundColor: 'rgba(255, 255, 255, 0.8)',
               padding: '8px',
@@ -441,6 +490,7 @@ const NetworkChatPage = () => {
           }}
         />
 
+        {/* Right Side: Chat Interface */}
         <div style={{ width: sidebarWidth, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderLeft: '1px solid var(--border-color)' }}>
           <ChatInterface selectedNode={selectedNode} />
         </div>
