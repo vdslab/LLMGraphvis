@@ -17,6 +17,7 @@ def create_subgraph_by_filter(
     suffix: str,
     db: Session,
     preserve_layout: bool = False,
+    description: str = None,
 ):
     """
     Creates a subgraph based on a list of attribute conditions.
@@ -49,7 +50,9 @@ def create_subgraph_by_filter(
     if not candidate_node_ids:
         raise ValueError("No nodes match the specified filter criteria.")
 
-    description = _generate_filter_description(conditions)
+    if description is None:
+        description = _generate_filter_description(conditions)
+
     return create_subgraph_from_nodes(
         network_id,
         list(candidate_node_ids),
