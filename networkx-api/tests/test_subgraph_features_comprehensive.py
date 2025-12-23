@@ -1,7 +1,7 @@
 
 import pytest
 from sqlalchemy.orm import Session
-from app import models
+from common import models
 from app.logic import subgraph, filter
 from app.schemas.filter import AttributeCondition, Range
 

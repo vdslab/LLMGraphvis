@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from mcp.server.fastmcp import FastMCP
 
-from app import models
+from common import models
 from app.core import database
 from app.logic import (
     attributes,

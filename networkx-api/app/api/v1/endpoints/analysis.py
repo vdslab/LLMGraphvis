@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from common import models
 
 from app.logic import centrality
 from app.schemas.analysis import CentralityRequest

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app import models
+from common import models
 from app.logic import subgraph
 from app.schemas.subgraph import (
     ComponentContainingNodeRequest,

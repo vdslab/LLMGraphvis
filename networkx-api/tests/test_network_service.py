@@ -1,4 +1,4 @@
-from app import models
+from common import models
 from app.logic import network_service
 
 

@@ -1,5 +1,5 @@
 import pytest
-from app import models
+from common import models
 from app.logic import filter, subgraph
 from app.schemas.filter import AttributeCondition, Range
 from sqlalchemy import create_engine
