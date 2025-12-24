@@ -5,13 +5,13 @@ const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick, onBackgro
   const svgRef = useRef();
 
   useEffect(() => {
+    const svg = d3.select(svgRef.current);
+    svg.selectAll("*").remove(); // Clear previous
+
     if (!nodes.length) return;
 
-    const svg = d3.select(svgRef.current);
     const width = svgRef.current.clientWidth;
     const height = svgRef.current.clientHeight;
-
-    svg.selectAll("*").remove(); // Clear previous
 
     // 0. Bind background click
     svg.on("click", (event) => {
