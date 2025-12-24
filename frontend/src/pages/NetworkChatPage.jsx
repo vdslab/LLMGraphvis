@@ -330,7 +330,7 @@ const NetworkChatPage = () => {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100vh', flexDirection: 'column' }}>
+    <div style={{ display: 'flex', height: '100%', flexDirection: 'column' }}>
       {/* Error notification bar */}
       {sseError && (
         <div style={{
