@@ -258,7 +258,7 @@ def calculate_centrality(network_id: int, centrality_type: str) -> str:
     db = get_db_session()
     try:
         centrality.calculate_centrality(network_id, centrality_type, db)
-        return f"{centrality_type} centrality calculated."
+        return f"{centrality_type} centrality calculated. Saved as node attribute '{centrality_type}_centrality'."
     except Exception as e:
         return f"Error: {str(e)}"
     finally:
