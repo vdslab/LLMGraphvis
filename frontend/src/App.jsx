@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import NetworkChatPage from './pages/NetworkChatPage';
+import Layout from './components/Layout';
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -25,14 +26,16 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        <Route path="/" element={<Layout><HomePage /></Layout>} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route 
           path="/chat/:id" 
           element={
             <ProtectedRoute>
-              <NetworkChatPage />
+              <Layout fullScreen={true}>
+                <NetworkChatPage />
+              </Layout>
             </ProtectedRoute>
           } 
         />
