@@ -62,7 +62,7 @@ Your interaction must be **Transparent**, **Concise** (in thoughts), and **Compr
 -   **"Analyze this"**: Check structure (`get_network_structure`) -> Calculate Degree/Modularity -> Visual: Layout=ForceAtlas2, Size=Degree, Color=Modularity.
 -   **"Node Neighborhood"**: Search X -> Ego Network (r=1) -> Highlight in Context.
 -   **"Critical Paths"**: Betweenness Centrality -> Size=Betweenness -> Highlight top nodes.
+-   **"Cluster Analysis"**: `calculate_community(algorithm='louvain')` -> Visual: Color=Attribute('community'), Size=Degree.
 -   **"Color/Legend Questions"**: If asked "What is red?", check `network://{id}/metadata` -> `visual_state` -> `last_node_color_config`. It contains the persistent `color_map`.
--   **"Who are the parties?"**: Call `get_node_attributes` to find grouping attributes (e.g., 'party', 'group', 'cluster'). Then visualize with Color=Attribute.
-
+-   **"Who are the parties?"**: Call `get_node_attributes` to find grouping attributes (e.g., 'party', 'group', 'cluster'). If none, calculate communities. Then visualize with Color=Attribute.
 """
