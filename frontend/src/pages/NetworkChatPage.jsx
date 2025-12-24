@@ -19,7 +19,7 @@ const NetworkChatPage = () => {
     uploadNetwork,
     createChat
   } = useChatStore();
-  const { nodes, links } = useNetworkStore();
+  const { nodes, links, networkId } = useNetworkStore();
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
   const [sseError, setSseError] = useState(null);
@@ -241,7 +241,12 @@ const NetworkChatPage = () => {
         setNodeDetailsPanelOpen(true);
 
         const api = await import('../services/api');
-        const response = await api.getNodeDetails(chatId, nodeData.id);
+        // Use networkId for node details, NOT chatId
+        if (!networkId) {
+             console.error("No network ID found, cannot fetch details");
+             return;
+        }
+        const response = await api.getNodeDetails(networkId, nodeData.id);
         
         if (response && response.data) {
              setSelectedNode(prev => ({ ...prev, details: response.data }));

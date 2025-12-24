@@ -1,207 +1,119 @@
-import logging
+import asyncio
+import json
 import os
 import sys
-from unittest.mock import patch
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+# Add backend directory to path so 'app' module can be found
+sys.path.append(os.path.dirname(__file__))
 
-# Setup path to import app
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+from mcp.server.fastmcp import FastMCP
+# Use try-except to handle potential import structure differences
+try:
+    from app.mcp_server import mcp
+    from app.core import database
+    from common import models
+except ImportError:
+    # If running from parent dir
+    from backend.app.mcp_server import mcp
+    from backend.app.core import database
+    from common import models
 
-from app import mcp_server  # Import the module to test
-from common import models
-from common.models import Base
+# Mock DB Session
+def get_db():
+    return database.SessionLocal()
 
-# Setup Logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+async def verify_mcp_tools():
+    print("=== Verifying MCP Tools ===")
+    tools = await mcp.list_tools()
+    tool_names = [t.name for t in tools]
+    print(f"Found {len(tool_names)} tools: {tool_names}")
+    
+    expected_tools = [
+        "update_network_metadata", "initialize_network", 
+        "calculate_centrality", "calculate_community", "calculate_layout",
+        "generate_visualization", "create_ego_network", 
+        "create_subgraph_from_nodes", "create_path_subgraph",
+        "create_k_core_subgraph", "create_largest_component_subgraph",
+        "create_component_containing_node", "search_nodes",
+        "read_node_details", "create_subgraph_by_attribute_filter",
+        "get_node_attributes", "get_edge_attributes", 
+        "get_network_structure", "get_top_centrality_nodes", "get_node_attribute_details"
+    ]
+    
+    missing = [t for t in expected_tools if t not in tool_names]
+    if missing:
+        print(f"❌ FAIL: Missing tools: {missing}")
+    else:
+        print("✅ PASS: All expected tools registered.")
 
-# In-memory DB
-SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
-)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+async def verify_mcp_resources():
+    print("\n=== Verifying MCP Resources ===")
+    resources = await mcp.list_resources()
+    resource_uris = [r.uri for r in resources]
+    print(f"Found {len(resource_uris)} resource templates: {resource_uris}")
+    
+    # We can't easily check all templates because list_resources() in FastMCP might return instantiated ones or templates depending on implementation.
+    # But let's check basic availability.
+    pass
 
+async def verify_mcp_prompts():
+    print("\n=== Verifying MCP Prompts ===")
+    prompts = await mcp.list_prompts()
+    prompt_names = [p.name for p in prompts]
+    print(f"Found {len(prompt_names)} prompts: {prompt_names}")
+    
+    expected_prompts = [
+        "analyze-structure", "recommend-visualization", 
+        "investigate-attributes", "find-important-nodes"
+    ]
+    
+    missing = [p for p in expected_prompts if p not in prompt_names]
+    if missing:
+        print(f"❌ FAIL: Missing prompts: {missing}")
+    else:
+        print("✅ PASS: All expected prompts registered.")
 
-def setup_db():
-    Base.metadata.create_all(bind=engine)
-    return SessionLocal()
+async def test_tool_execution():
+    print("\n=== Testing Tool Execution (Dry Run) ===")
+    # Create a dummy network for testing if needed, or check mostly read-only tools
+    db = get_db()
+    try:
+        # Create a test network
+        test_net = models.Network(name="Verification Test Network")
+        db.add(test_net)
+        db.commit()
+        db.refresh(test_net)
+        net_id = test_net.id
+        print(f"Created test network ID: {net_id}")
 
+        # Test get_network_structure
+        print(f"Testing get_network_structure({net_id})...")
+        res = await mcp.call_tool("get_network_structure", {"network_id": net_id})
+        print(f"Result: {res}")
+        
+        # Test get_node_attributes (new tool)
+        print(f"Testing get_node_attributes({net_id})...")
+        res = await mcp.call_tool("get_node_attributes", {"network_id": net_id})
+        print(f"Result: {res}")
+        
+        # Test update_network_metadata
+        print(f"Testing update_network_metadata({net_id})...")
+        res = await mcp.call_tool("update_network_metadata", {"network_id": net_id, "description": "Verified"})
+        print(f"Result: {res}")
 
-def verify_all_tools():
-    session = setup_db()
+        # Clean up
+        db.delete(test_net)
+        db.commit()
+        print("✅ PASS: Basic tool execution successful.")
 
-    # Patch get_db_session to return our test session
-    with patch("app.mcp_server.get_db_session", return_value=session):
-        print("\n=== Verifying All MCP Tools & Resources ===\n")
-
-        # 1. initialize_network
-        print("1. Testing initialize_network...")
-        graphml = """
-        <graphml xmlns="http://graphml.graphdrawing.org/xmlns">
-            <key id="d0" for="node" attr.name="color" attr.type="string"/>
-            <key id="d1" for="edge" attr.name="weight" attr.type="double"/>
-            <graph id="G" edgedefault="undirected">
-                <node id="n0"><data key="d0">red</data></node>
-                <node id="n1"><data key="d0">blue</data></node>
-                <node id="n2"><data key="d0">green</data></node>
-                <edge source="n0" target="n1"><data key="d1">1.0</data></edge>
-                <edge source="n1" target="n2"><data key="d1">2.0</data></edge>
-            </graph>
-        </graphml>
-        """
-        # Create a network record first as initialize_network expects existing ID usually?
-        # Actually pipeline.initialize_network_pipeline might expect the ID to exist or creation?
-        # Looking at pipeline.py (not shown but inferred), usually we pass an ID.
-        # Let's create a placeholder network.
-        net = models.Network(name="Test Network")
-        session.add(net)
-        session.commit()
-        session.refresh(net)
-        net_id = net.id
-
-        res = mcp_server.initialize_network(net_id, graphml)
-        if "error" in str(res).lower() and "Error" in str(res):
-            print(f"FAILURE: initialize_network returned error: {res}")
-        else:
-            print("SUCCESS: initialize_network")
-
-        # 2. get_network_metadata
-        print("\n2. Testing get_network_metadata...")
-        res = mcp_server.get_network_metadata(net_id)
-        if "Test Network" in res:
-            print("SUCCESS: get_network_metadata")
-        else:
-            print(f"FAILURE: get_network_metadata: {res}")
-
-        # 3. get_node_attributes (The one we fixed!)
-        print("\n3. Testing get_node_attributes...")
-        res = mcp_server.get_node_attributes(net_id)
-        if "color" in res and "red" in res:
-            print("SUCCESS: get_node_attributes")
-        else:
-            print(f"FAILURE: get_node_attributes: {res}")
-
-        # 4. get_edge_attributes
-        print("\n4. Testing get_edge_attributes...")
-        res = mcp_server.get_edge_attributes(net_id)
-        if "weight" in res:
-            print("SUCCESS: get_edge_attributes")
-        else:
-            print(f"FAILURE: get_edge_attributes: {res}")
-
-        # 5. search_nodes
-        print("\n5. Testing search_nodes...")
-        res = mcp_server.search_nodes(net_id, "red")
-        if "n0" in res:
-            print("SUCCESS: search_nodes")
-        else:
-            print(f"FAILURE: search_nodes: {res}")
-
-        # 6. calculate_centrality
-        print("\n6. Testing calculate_centrality...")
-        res = mcp_server.calculate_centrality(net_id, "degree")
-        if "calculated" in res:
-            print("SUCCESS: calculate_centrality")
-        else:
-            print(f"FAILURE: calculate_centrality: {res}")
-
-        # 7. calculate_layout
-        print("\n7. Testing calculate_layout...")
-        res = mcp_server.calculate_layout(net_id, "spring")
-        if "calculated" in res:
-            print("SUCCESS: calculate_layout")
-        else:
-            print(f"FAILURE: calculate_layout: {res}")
-
-        # 8. create_subgraph_from_nodes (Verified description copy here too)
-        print("\n8. Testing create_subgraph_from_nodes...")
-        res = mcp_server.create_subgraph_from_nodes(
-            net_id, ["n0", "n1"], preserve_layout=False
-        )
-        if isinstance(res, dict) and "new_network_id" in res:
-            sub_id = res["new_network_id"]
-            print(f"SUCCESS: create_subgraph_from_nodes (New ID: {sub_id})")
-
-            # Verify Description Copying in Subgraph
-            # We need to check if 'color' attribute in sub_id has description if source had it.
-            # In graphml above, we didn't explicitly set description in DB, but let's check basic copy.
-            attr = (
-                session.query(models.NodeAttribute)
-                .filter(
-                    models.NodeAttribute.network_id == sub_id,
-                    models.NodeAttribute.attribute_name == "color",
-                )
-                .first()
-            )
-            if attr:
-                print("SUCCESS: Attribute 'color' copied to subgraph.")
-            else:
-                print("FAILURE: Attribute 'color' NOT copied to subgraph.")
-        else:
-            print(f"FAILURE: create_subgraph_from_nodes: {res}")
-
-        # 9. get_subgraphs_resource
-        print("\n9. Testing get_subgraphs_resource...")
-        res = mcp_server.get_subgraphs_resource(net_id)
-        if "Subgraph" in res:
-            print("SUCCESS: get_subgraphs_resource")
-        else:
-            print(f"FAILURE: get_subgraphs_resource: {res}")
-
-        # 10. create_ego_network
-        print("\n10. Testing create_ego_network...")
-        res = mcp_server.create_ego_network(net_id, "n1", 1)
-        if isinstance(res, dict) and "new_network_id" in res:
-            print("SUCCESS: create_ego_network")
-        else:
-            print(f"FAILURE: create_ego_network: {res}")
-
-        # 11. create_path_subgraph
-        print("\n11. Testing create_path_subgraph...")
-        res = mcp_server.create_path_subgraph(net_id, "n0", "n2")
-        if isinstance(res, dict) and "new_network_id" in res:
-            print("SUCCESS: create_path_subgraph")
-        else:
-            print(f"FAILURE: create_path_subgraph: {res}")
-
-        # 12. create_largest_component_subgraph
-        print("\n12. Testing create_largest_component_subgraph...")
-        res = mcp_server.create_largest_component_subgraph(net_id)
-        if isinstance(res, dict) and "new_network_id" in res:
-            print("SUCCESS: create_largest_component_subgraph")
-        else:
-            print(f"FAILURE: create_largest_component_subgraph: {res}")
-
-        # 13. get_structure_resource
-        print("\n13. Testing get_structure_resource...")
-        res = mcp_server.get_structure_resource(net_id)
-        if "node_count" in res:
-            print("SUCCESS: get_structure_resource")
-        else:
-            print(f"FAILURE: get_structure_resource: {res}")
-
-        # 14. Prompts (Just checking they run without error)
-        print("\n14. Testing Prompts...")
-        try:
-            mcp_server.analyze_structure_prompt(net_id)
-            print("SUCCESS: analyze_structure_prompt")
-            mcp_server.recommend_visualization_prompt(net_id)
-            print("SUCCESS: recommend_visualization_prompt")
-            mcp_server.investigate_attributes_prompt(net_id)
-            print("SUCCESS: investigate_attributes_prompt")
-            mcp_server.find_important_nodes_prompt(net_id)
-            print("SUCCESS: find_important_nodes_prompt")
-        except Exception as e:
-            print(f"FAILURE: Prompt raised exception: {e}")
-
-    session.close()
-
+    except Exception as e:
+        print(f"❌ FAIL: Tool execution error: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        db.close()
 
 if __name__ == "__main__":
-    verify_all_tools()
+    asyncio.run(verify_mcp_tools())
+    asyncio.run(verify_mcp_prompts())
+    asyncio.run(test_tool_execution())

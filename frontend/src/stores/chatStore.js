@@ -34,6 +34,12 @@ export const useChatStore = create((set, get) => ({
     } else {
       useNetworkStore.getState().reset();
     }
+    
+    // Sync network ID if present
+    if (res.data.network_id) {
+       useNetworkStore.getState().setNetworkId(res.data.network_id);
+    }
+
     return res.data;
   },
   
