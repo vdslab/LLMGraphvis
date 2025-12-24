@@ -8,6 +8,7 @@ from app.core import database
 from app.logic import (
     attributes,
     centrality,
+    community,
     layout,
     network_service,
     pipeline,
@@ -259,6 +260,30 @@ def calculate_centrality(network_id: int, centrality_type: str) -> str:
     try:
         centrality.calculate_centrality(network_id, centrality_type, db)
         return f"{centrality_type} centrality calculated. Saved as node attribute '{centrality_type}_centrality'."
+    except Exception as e:
+        return f"Error: {str(e)}"
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def calculate_community(network_id: int, algorithm: str = "louvain") -> str:
+    """
+    Detects communities in the network and saves them as a categorical node attribute 'community'.
+
+    Args:
+        network_id: The ID of the network.
+        algorithm:
+            - "louvain" (Default, best for modularity optimization)
+            - "greedy_modularity" (Faster for very large graphs)
+            - "label_propagation" (Fast, detects structure without modularity optimization)
+    Returns:
+        Confirmation message.
+    """
+    db = get_db_session()
+    try:
+        attr_name = community.calculate_community(network_id, algorithm, db)
+        return f"Community detection ({algorithm}) completed. Saved as node attribute '{attr_name}'. Use this attribute in node_color_config with scale_type='CATEGORICAL'."
     except Exception as e:
         return f"Error: {str(e)}"
     finally:
