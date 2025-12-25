@@ -106,3 +106,8 @@ class GraphMLParser:
                     data.edge_messages[(u, v)] = d
 
         return data
+
+def parse_graphml_content(content: str) -> ParsedGraphData:
+    """Helper to parse content string using GraphMLParser."""
+    parser = GraphMLParser()
+    return parser.parse(content)
