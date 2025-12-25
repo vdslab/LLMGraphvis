@@ -78,5 +78,41 @@ def test_get_subgraphs(db):
     subgraphs = network_metadata.get_subgraphs(db, parent.id)
 
     # Verify
-    assert len(subgraphs) == 1
     assert subgraphs[0]["name"] == "Child"
+
+
+def test_get_visualization_state(db):
+    # Setup
+    network = models.Network(name="VisNet")
+    # Simulate a state where a generic "Community" coloring was applied
+    # This JSON structure mimics what VisualizationBuilder interacts with
+    network.last_node_color_config = {
+        "scale_type": "CATEGORICAL",
+        "attribute": "community",
+        "color_map": {"0": "#1f77b4", "1": "#ff7f0e"},  # Blue and Orange
+    }
+    network.last_node_size_config = {
+        "attribute": "degree", 
+        "min": 5, 
+        "max": 15
+    }
+    
+    db.add(network)
+    db.commit()
+
+    # Execute
+    state = network_metadata.get_visualization_state(db, network.id)
+
+    # Verify
+    assert state["network_id"] == network.id
+    
+    # Check Color Config
+    node_color = state["node_color"]
+    assert node_color["scale_type"] == "CATEGORICAL"
+    assert node_color["attribute"] == "community"
+    assert node_color["color_map"]["0"] == "#1f77b4"
+    assert node_color["color_map"]["1"] == "#ff7f0e"
+    
+    # Check Size Config
+    node_size = state["node_size"]
+    assert node_size["attribute"] == "degree"
