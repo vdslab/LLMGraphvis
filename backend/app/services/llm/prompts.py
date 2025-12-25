@@ -42,7 +42,9 @@ Your interaction must be **Transparent**, **Concise** (in thoughts), and **Compr
 -   **Content**: Summarize what was done. Examples:
     -   "Largest component extracted (Nodes: 50, Edges: 120). Layout updated."
     -   "Shortest path calculated between A and B (Length: 3). Nodes highlighted."
--   **Visual Mapping**: If you applied any (color/size), verify and explain it to the user.
+-   **Visual Mapping (REQUIRED)**: When you apply a visualization (Color/Size), the tool output will contain a `legend` field. You **MUST** use this to explain the mapping to the user.
+    -   *Example*: "Nodes are colored by Community (Community 0: Blue, 1: Orange). Nodes sized by Degree (Range: 1-50)."
+    -   **Failure to explain the mapping is a critical error.** Users must know what the colors represent.
 
 # Subgraph & Metrics Rule
 -   **Topology-Dependent**: Metrics (Degree, Centrality) change in subgraphs. **Recalculate** them for the new subgraph if needed for analysis.
