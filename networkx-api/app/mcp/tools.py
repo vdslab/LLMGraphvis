@@ -10,6 +10,7 @@ from app.logic import (
     search,
     subgraph,
     visualization_builder,
+    importer
 )
 from app.schemas.visualization import (
     EdgeColorConfig,
@@ -18,7 +19,6 @@ from app.schemas.visualization import (
     NodeLabelConfig,
     NodeSizeConfig,
 )
-from app.logic.parsing.graphml_parser import parse_graphml_content
 
 # --- Tools ---
 
@@ -33,21 +33,9 @@ def initialize_network(network_id: int, graphml_data: str) -> dict:
     """
     db = database.SessionLocal()
     try:
-        # 1. Parsing
         try:
-            graph = parse_graphml_content(graphml_data)
-        except Exception as e:
-            return {"content": f"Failed to parse GraphML: {str(e)}"}
-
-        # Check if network exists and has nodes
-        if network_metadata.network_has_nodes(db, network_id):
-            pass
-
-        # Import data
-        from app.logic import importer
-        
-        try:
-            final_network_id = importer.import_network(db, network_id, graph)
+            # Importer handles parsing and collision logic
+            final_network_id = importer.parse_and_save_graphml(network_id, graphml_data, db)
             
             # 3. Calculate Default Layout
             layout.calculate_layout(db, final_network_id, "forceatlas2")

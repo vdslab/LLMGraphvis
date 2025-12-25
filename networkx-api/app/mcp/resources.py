@@ -9,7 +9,9 @@ def get_network_metadata(network_id: int) -> str:
     """Returns network metadata (name, description, created_at) as JSON."""
     db = database.SessionLocal()
     try:
-        return network_metadata.get_metadata(db, network_id)
+        return network_metadata.get_network_metadata(db, network_id)
+    except Exception as e:
+        return {"error": str(e)}
     finally:
         db.close()
 
@@ -20,6 +22,8 @@ def get_node_attributes_resource(network_id: int) -> str:
     db = database.SessionLocal()
     try:
         return attributes.get_node_attributes_overview(db, network_id)
+    except Exception as e:
+        return {"error": str(e)}
     finally:
         db.close()
 
@@ -29,6 +33,8 @@ def get_node_attribute_details_resource(network_id: int, attribute_name: str) ->
     db = database.SessionLocal()
     try:
         return attributes.get_node_attribute_details(db, network_id, attribute_name)
+    except Exception as e:
+        return {"error": str(e)}
     finally:
         db.close()
 
@@ -39,6 +45,8 @@ def get_edge_attributes_resource(network_id: int) -> str:
     db = database.SessionLocal()
     try:
         return attributes.get_edge_attributes_overview(db, network_id)
+    except Exception as e:
+        return {"error": str(e)}
     finally:
         db.close()
 
@@ -49,6 +57,8 @@ def get_edge_attribute_details_resource(network_id: int, attribute_name: str) ->
     db = database.SessionLocal()
     try:
         return attributes.get_edge_attribute_details(db, network_id, attribute_name)
+    except Exception as e:
+        return {"error": str(e)}
     finally:
         db.close()
 
@@ -58,7 +68,10 @@ def get_subgraphs_resource(network_id: int) -> str:
     """List all subgraphs created from the given parent network."""
     db = database.SessionLocal()
     try:
-        return subgraph.list_subgraphs(db, network_id)
+        # Use network_metadata logic for listing
+        return network_metadata.get_subgraphs(db, network_id)
+    except Exception as e:
+        return {"error": str(e)}
     finally:
         db.close()
 
@@ -69,6 +82,8 @@ def get_top_nodes_resource(network_id: int, metric: str) -> str:
     db = database.SessionLocal()
     try:
         return centrality.get_top_nodes(db, network_id, metric)
+    except Exception as e:
+        return {"error": str(e)}
     finally:
         db.close()
 
@@ -78,7 +93,10 @@ def get_structure_resource(network_id: int) -> str:
     """Returns basic structural statistics of the network."""
     db = database.SessionLocal()
     try:
-        from app.logic import structure 
-        return structure.get_structure_stats(db, network_id)
+        # Using network_metadata for structural stats if available, or structure module?
+        # Checked network_metadata.py, it HAS get_network_structure!
+        return network_metadata.get_network_structure(db, network_id)
+    except Exception as e:
+        return {"error": str(e)}
     finally:
         db.close()

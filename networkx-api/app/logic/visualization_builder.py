@@ -570,3 +570,43 @@ class VisualizationBuilder:
         return fetch_attribute_values(
             self.db, model_val, model_float, model_text, attr_ids
         )
+
+
+def build_visualization(
+    db: Session,
+    network_id: int,
+    node_color_config: Optional[Any] = None,
+    node_size_config: Optional[Any] = None,
+    edge_width_config: Optional[Any] = None,
+    edge_color_config: Optional[Any] = None,
+    context_config: Optional[dict] = None,
+    focus_config: Optional[dict] = None,
+    node_label_config: Optional[Any] = None,
+    custom_node_colors: Optional[list] = None,
+) -> Dict[str, Any]:
+    """
+    Helper function to instantiate and run VisualizationBuilder.
+    """
+    # Convert Pydantic models to dicts if needed
+    nc_conf = node_color_config.model_dump() if hasattr(node_color_config, "model_dump") else node_color_config
+    ns_conf = node_size_config.model_dump() if hasattr(node_size_config, "model_dump") else node_size_config
+    ew_conf = edge_width_config.model_dump() if hasattr(edge_width_config, "model_dump") else edge_width_config
+    ec_conf = edge_color_config.model_dump() if hasattr(edge_color_config, "model_dump") else edge_color_config
+    nl_conf = node_label_config.model_dump() if hasattr(node_label_config, "model_dump") else node_label_config
+    
+    builder = VisualizationBuilder(
+        network_id=network_id,
+        db=db,
+        node_color_config=nc_conf,
+        node_size_config=ns_conf,
+        edge_width_config=ew_conf,
+        edge_color_config=ec_conf,
+        context_config=context_config,
+        focus_config=focus_config,
+        node_label_config=nl_conf,
+        custom_node_colors=custom_node_colors
+    )
+    builder.validate_and_prepare()
+    builder.fetch_data()
+    builder.calculate_statistics()
+    return builder.build()
