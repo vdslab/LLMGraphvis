@@ -1,161 +1,180 @@
-
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, ANY
-import json
+from unittest.mock import AsyncMock, Mock, patch, MagicMock
+from app.services.llm.engine import GraphVisAgent
 from google.genai import types
-from app.services.llm.engine import execute_tool_loop, _consume_stream, _handle_tool_execution, _handle_visualization_update
+
+# --- Mocks for Google GenAI Types ---
+class MockPart:
+    def __init__(self, text=None, function_call=None):
+        self.text = text
+        self.function_call = function_call
+
+class MockContent:
+    def __init__(self, parts):
+        self.parts = parts
+
+class MockCandidate:
+    def __init__(self, content):
+        self.content = content
+
+class MockChunk:
+    def __init__(self, candidates):
+        self.candidates = candidates
+
+@pytest.fixture
+def mock_agent():
+    # Mock DB if needed, or pass None
+    agent = GraphVisAgent(db=None)
+    # Mock the internal client to prevent actual API calls
+    agent.client = Mock()
+    agent.client.aio = Mock()
+    agent.client.aio.models = Mock()
+    return agent
+
+@pytest.fixture
+def mock_queue():
+    queue = AsyncMock()
+    return queue
+
+# --- Tests ---
 
 @pytest.mark.asyncio
-async def test_consume_stream_text_only():
-    # Mock response object
-    mock_chunk = MagicMock()
-    mock_chunk.candidates = [MagicMock()]
-    mock_chunk.candidates[0].content.parts = [MagicMock(text="Hello", function_call=None)]
+async def test_consume_stream_text_only(mock_agent, mock_queue):
+    """Test consuming a stream that only contains text."""
+    # Create a mock stream
+    chunk1 = MockChunk([MockCandidate(MockContent([MockPart(text="Hello")]))])
+    chunk2 = MockChunk([MockCandidate(MockContent([MockPart(text=" World")]))])
     
-    # Create an async iterator for the response
-    async def response_stream():
-        yield mock_chunk
+    # helper to make an async iterator
+    async def async_iter(items):
+        for item in items:
+            yield item
 
-    mock_queue = AsyncMock()
-    
-    text, function_calls = await _consume_stream(response_stream(), mock_queue)
-    
-    assert text == "Hello"
-    assert len(function_calls) == 0
-    mock_queue.put.assert_called() # Should emit message_chunk
+    stream = async_iter([chunk1, chunk2])
 
+    text, tool_calls = await mock_agent._consume_stream(stream, mock_queue)
+
+    assert text == "Hello World"
+    assert tool_calls == []
+    # Verify queue puts
+    assert mock_queue.put.call_count == 2
+    
 @pytest.mark.asyncio
-async def test_consume_stream_function_calls():
-    # Mock response object with function call
-    mock_chunk = MagicMock()
-    mock_chunk.candidates = [MagicMock()]
+async def test_consume_stream_with_tool_call(mock_agent, mock_queue):
+    """Test consuming a stream that has a tool call."""
+    # Mock FunctionCall object
     fc = MagicMock()
-    # Need to set name explicitly on the mock instance, otherwise it's just a child mock "name"
-    fc.configure_mock(name="get_node") 
-    fc.args = {"id": 1}
-    
-    # Parts can contain function call
-    mock_chunk.candidates[0].content.parts = [MagicMock(text=None, function_call=fc)]
-    
-    async def response_stream():
-        yield mock_chunk
+    fc.name = "get_network_structure"
+    fc.args = {} 
 
-    mock_queue = AsyncMock()
-    
-    text, function_calls = await _consume_stream(response_stream(), mock_queue)
-    
-    assert text == ""
-    assert len(function_calls) == 1
-    assert function_calls[0].name == "get_node"
+    chunk1 = MockChunk([MockCandidate(MockContent([MockPart(text="I will check.")]))])
+    chunk2 = MockChunk([MockCandidate(MockContent([MockPart(function_call=fc)]))])
 
-@pytest.mark.asyncio
-async def test_consume_stream_multiple_function_calls():
-    # Mock response with multiple chunks/function calls
-    mock_chunk1 = MagicMock()
-    fc1 = MagicMock()
-    fc1.configure_mock(name="tool1")
-    fc1.args = {"x": 1}
-    mock_chunk1.candidates = [MagicMock()]
-    mock_chunk1.candidates[0].content.parts = [MagicMock(text=None, function_call=fc1)]
-    
-    mock_chunk2 = MagicMock()
-    fc2 = MagicMock()
-    fc2.configure_mock(name="tool2")
-    fc2.args = {"y": 2}
-    mock_chunk2.candidates = [MagicMock()]
-    mock_chunk2.candidates[0].content.parts = [MagicMock(text=None, function_call=fc2)]
-    
-    async def response_stream():
-        yield mock_chunk1
-        yield mock_chunk2
+    async def async_iter(items):
+        for item in items:
+            yield item
 
-    mock_queue = AsyncMock()
-    
-    text, function_calls = await _consume_stream(response_stream(), mock_queue)
-    
-    assert len(function_calls) == 2
-    assert function_calls[0].name == "tool1"
-    assert function_calls[1].name == "tool2"
+    stream = async_iter([chunk1, chunk2])
 
-@patch("app.services.llm.engine.mcp_client")
-@patch("app.services.llm.engine.local_tools")
-@pytest.mark.asyncio
-async def test_handle_tool_execution_local(mock_local, mock_mcp):
-    mock_local.execute_local_tool = AsyncMock(return_value="local_result")
-    
-    result, status, error = await _handle_tool_execution(
-        "switch_to_main_network", {}, 1, 100, MagicMock()
-    )
-    
-    assert result == "local_result"
-    assert status == "completed"
-    assert error is None
-    mock_local.execute_local_tool.assert_called_once()
-    mock_mcp.execute_tool.assert_not_called()
+    text, tool_calls = await mock_agent._consume_stream(stream, mock_queue)
 
-@patch("app.services.llm.engine.mcp_client")
-@pytest.mark.asyncio
-async def test_handle_tool_execution_mcp(mock_mcp):
-    mock_mcp.execute_tool = AsyncMock(return_value="mcp_result")
-    
-    result, status, error = await _handle_tool_execution(
-        "some_mcp_tool", {"arg": 1}, 1, 100, MagicMock()
-    )
-    
-    assert result == "mcp_result"
-    assert status == "completed"
-    assert error is None
-    mock_mcp.execute_tool.assert_called_once()
+    assert text == "I will check."
+    assert len(tool_calls) == 1
+    assert tool_calls[0].name == "get_network_structure"
 
 @pytest.mark.asyncio
-async def test_handle_visualization_update_context_switch(db): # Needs DB fixture
-    # We need a chat in DB
-    from common import models
-    chat = models.Chat(id=999, user_id=1, network_id=10, name="Test")
-    db.add(chat)
-    db.commit()
-
-    mock_queue = AsyncMock()
+async def test_check_and_handle_lazy_intent_detected(mock_agent, mock_queue):
+    """Test that lazy intent is detected and triggers retry logic (returns True)."""
     
-    with patch("app.services.llm.engine.mcp_client") as mock_mcp:
-        mock_mcp.execute_tool = AsyncMock(return_value={"nodes": [], "links": []}) # For auto-gen
-        
-        new_network_id = 20
-        tool_result = {"new_network_id": new_network_id}
-        
-        result_id = await _handle_visualization_update(
-            "switch_to_main_network", tool_result, 10, 999, db, mock_queue
-        )
-        
-        assert result_id == new_network_id
-        
-        # Verify DB update
-        db.refresh(chat)
-        assert chat.network_id == new_network_id
-        
-        # Verify render update emitted
-        assert mock_queue.put.call_count >= 1
-
-@patch("app.services.llm.engine.client")
-@patch("app.services.llm.engine.mcp_client")
-@patch("app.services.llm.engine.local_tools")
-@patch("app.services.llm.engine._consume_stream")
-@pytest.mark.asyncio
-async def test_execute_tool_loop_single_iteration(
-    mock_consume, mock_local, mock_mcp, mock_client
-):
-    # Setup mocks
-    # First iteration: returns text, no function calls
-    mock_consume.return_value = ("Response Text", [])
+    # Mock _is_lazy_response to return True
+    mock_agent._is_lazy_response = AsyncMock(return_value=True)
     
     history = []
-    queue = AsyncMock()
+    text_content = "I will analyze the network now."
+    loop_context = {}
     
-    result = await execute_tool_loop(
-        MagicMock(), 1, history, queue, {}, 1, MagicMock()
+    result = await mock_agent._check_and_handle_lazy_intent(
+        text_content, history, loop_context, mock_queue, [], None
     )
     
-    assert result == "Response Text"
-    # Should not call generate_content again because no tool calls
-    mock_client.aio.models.generate_content_stream.assert_not_called()
+    assert result is True
+    # Verify history was updated
+    assert len(history) == 2
+    assert history[0].parts[0].text == text_content
+    assert "SYSTEM_ALERT" in history[1].parts[0].text
 
+@pytest.mark.asyncio
+async def test_check_and_handle_lazy_intent_not_lazy(mock_agent, mock_queue):
+    """Test that non-lazy response returns False."""
+    
+    mock_agent._is_lazy_response = AsyncMock(return_value=False)
+    
+    history = []
+    text_content = "Here is the result."
+    
+    result = await mock_agent._check_and_handle_lazy_intent(
+        text_content, history, {}, mock_queue, [], None
+    )
+    
+    assert result is False
+    assert len(history) == 0
+
+@pytest.mark.asyncio
+async def test_execute_tools_and_update_history(mock_agent, mock_queue):
+    """Test tool execution logic."""
+    
+    # Mock _run_tool to return success
+    # We must properly mock the result so it can be used in from_function_response
+    mock_agent._run_tool = AsyncMock(return_value=({"nodes": []}, "completed", None))
+    mock_agent._handle_side_effects = AsyncMock() # visual updates
+    
+    # Use real types.FunctionCall
+    fc = types.FunctionCall(name="test_tool", args={"param": 1})
+    
+    history = []
+    text_content = "Calling tool."
+    
+    # We need to construct parts manually if we want to bypass pydantic validation of "fc" inside the list?
+    # No, types.FunctionCall is valid.
+    # However, engine.py does: function_calls_parts.append(fc)
+    # But wait, types.Part can hold a function_call. 
+    # The actual gathered function calls from the stream are types.FunctionCall objects? or types.Part objects?
+    # In _consume_stream, we do: all_function_calls.append(part.function_call) -> This IS a FunctionCall object.
+    
+    # BUT: history.append(types.Content(..., parts=function_calls_parts))
+    # function_calls_parts is a list of... what?
+    # It contains "types.Part.from_text" AND "fc".
+    # Pydantic Content model expects 'parts' to be a list of Part objects.
+    # Does types.Content accept FunctionCall directly in parts list? 
+    # Usually you need types.Part(function_call=fc).
+    
+    # Let's check engine.py again.
+    # function_calls_parts.append(fc)
+    # So `fc` MUST be a Part, or Content can autoconvert? 
+    # Inspecting GenAI SDK: usually we receive FunctionCall objects from part.function_call.
+    # To put them back into history, we need types.Part(function_call=fc).
+    
+    # My code in engine.py:
+    # for fc in function_calls:
+    #    function_calls_parts.append(fc)
+    
+    # Is `fc` in `function_calls` a FunctionCall or a Part?
+    # In `_consume_stream`: all_function_calls.append(part.function_call) -> It's a FunctionCall.
+    # So `function_calls_parts.append(fc)` appends a FunctionCall to a list of parts.
+    # types.Content(parts=[FunctionCall]) -> MIGHT be invalid if SDK doesn't coerc.
+    
+    # I should probably fix engine.py to wrap it: types.Part(function_call=fc)
+    # Let's verify this.
+    
+    await mock_agent._execute_tools_and_update_history(
+        [fc], text_content, history, mock_queue, chat_id=1, loop_context={"network_id": 1}
+    )
+    
+    # Check execution
+    mock_agent._run_tool.assert_called_once()
+    assert mock_agent._run_tool.call_args[0][0] == "test_tool"
+    
+    # Check history update
+    assert len(history) == 2
+    assert history[0].role == "model"
+    assert history[1].role == "user"

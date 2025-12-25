@@ -17,6 +17,7 @@ from app.logic import (
     subgraph,
     visualizer,
 )
+from app.core.logging import get_logger
 from contextlib import contextmanager
 
 from app.schemas.filter import AttributeCondition
@@ -222,10 +223,11 @@ def initialize_network(network_id: int, graphml_data: str) -> dict:
         network_id: The ID of the network record in the database.
         graphml_data: The **raw XML string content** of the GraphML file (not a file path).
     """
+    logger = get_logger(__name__)
     truncated_data = (
         graphml_data[:100] + "..." if len(graphml_data) > 100 else graphml_data
     )
-    print(
+    logger.info(
         f"Executing initialize_network for ID {network_id} with data: {truncated_data}"
     )
 

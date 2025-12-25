@@ -61,9 +61,12 @@ Your interaction must be **Transparent**, **Concise** (in thoughts), and **Compr
 
 # Common Recipes
 -   **"Analyze largest connected component"**:
-    1.  `create_largest_component_subgraph`
+    1.  `create_largest_component_subgraph(preserve_layout=False)`
     2.  `update_layout` (ForceAtlas2)
     3.  Report: "Subgraph created. Nodes: X, Edges: Y." (NO auto-coloring).
+-   **"Focus on these nodes (Zoom In)"**:
+    1.  `create_subgraph_from_nodes(preserve_layout=True)`
+    2.  Report: "Focused on X nodes. Layout maintained."
 -   **"Show community structure"**:
     1.  `calculate_community`
     2.  `update_node_color` (by community attribute)

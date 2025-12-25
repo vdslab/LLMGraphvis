@@ -7,7 +7,6 @@ from common import models
 from app.core.logging import get_logger
 
 from . import engine, events, history, local_tools, mcp_client
-from .engine import client
 from .prompts import SYSTEM_INSTRUCTION
 
 logger = get_logger(__name__)
@@ -50,59 +49,23 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
             }
         )
 
-        # 2. Initial LLM Call
-        # tool_definitions = tools.get_definitions()
-        mcp_tools = await mcp_client.get_tools_as_gemini_functions()
-        local_tool_defs = local_tools.get_local_tools()
-        all_tools = mcp_tools + local_tool_defs
-
+        # 2. Delegate to GraphVisAgent
+        # The agent handles tool retrieval, initial generation, and the tool loop.
+        agent = engine.GraphVisAgent(db)
+        
+        # We can still pass a custom tool_config if needed, but default is usually fine.
         tool_config = types.ToolConfig(
             function_calling_config=types.FunctionCallingConfig(mode="AUTO")
         )
 
-        logger.info("Calling Gemini API...")
-
-        # Log Request Details
-        logger.info("--- Gemini API Request ---")
-        logger.info("Model: gemini-2.5-flash")
-
-        # Truncate system instruction for logging
-        sys_instruction_log = (
-            SYSTEM_INSTRUCTION[:100] + "..."
-            if len(SYSTEM_INSTRUCTION) > 100
-            else SYSTEM_INSTRUCTION
+        final_response_text = await agent.process_turn(
+            history=chat_history,
+            queue=queue,
+            chat_id=chat_id,
+            network_id=network_id,
+            tool_config=tool_config
         )
-        logger.info(f"System Instruction: {sys_instruction_log}")
-
-        tool_names = [
-            fn.name for t in all_tools for fn in (t.function_declarations or [])
-        ]
-        logger.info(f"Tools: {tool_names}")
-
-        # Log limited history
-        history_log = chat_history[-2:] if len(chat_history) > 1 else chat_history
-        # logger.info(f"History (Last 2): {history_log}") # Can be verbose, maybe omit or summarize
-
-        # Use generate_content_stream for streaming response
-        response = await client.aio.models.generate_content_stream(
-            model="gemini-2.5-flash",
-            contents=chat_history,
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_INSTRUCTION,
-                tools=all_tools,
-                tool_config=tool_config,
-                temperature=0.1,
-            ),
-        )
-
-        # Log Response Details (Streaming start)
-        logger.info("--- Gemini API Response (Streaming Started) ---")
-
-        # 3. Tool Execution Loop
-        # Now passing the streaming response directly to the engine
-        final_response_text = await engine.execute_tool_loop(
-            response, network_id, chat_history, queue, tool_config, chat_id, db
-        )
+        
         return final_response_text
 
     except Exception as e:
