@@ -1,3 +1,5 @@
+import colorsys
+
 def normalize(value, min_val, max_val, target_min, target_max):
     """
     Normalize a value to a target range.
@@ -60,12 +62,82 @@ def interpolate_color(
     s_rgb = hex_to_rgb(resolve_color(start_color))
     e_rgb = hex_to_rgb(resolve_color(end_color))
 
-    # Interpolate
-    r = int(s_rgb[0] + (e_rgb[0] - s_rgb[0]) * ratio)
-    g = int(s_rgb[1] + (e_rgb[1] - s_rgb[1]) * ratio)
-    b = int(s_rgb[2] + (e_rgb[2] - s_rgb[2]) * ratio)
+    # Convert to HSL (0..1 range)
+    s_hls = colorsys.rgb_to_hls(s_rgb[0] / 255.0, s_rgb[1] / 255.0, s_rgb[2] / 255.0)
+    e_hls = colorsys.rgb_to_hls(e_rgb[0] / 255.0, e_rgb[1] / 255.0, e_rgb[2] / 255.0)
+
+    # Interpolate in HSL space with Shortest Path Hue logic
+    h1, l1, s1 = s_hls
+    h2, l2, s2 = e_hls
+
+    # Calculate hue difference
+    mh = h2 - h1
+    
+    # Shortest path logic for Hue (circular 0..1)
+    if mh > 0.5:
+        mh -= 1.0
+    elif mh < -0.5:
+        mh += 1.0
+        
+    h = h1 + mh * ratio
+    # Normalize back to 0..1
+    h = h % 1.0
+    
+    l = l1 + (l2 - l1) * ratio
+    s = s1 + (s2 - s1) * ratio
+    
+    # Back to RGB
+    r_float, g_float, b_float = colorsys.hls_to_rgb(h, l, s)
+    
+    r = int(r_float * 255)
+    g = int(g_float * 255)
+    b = int(b_float * 255)
 
     return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def interpolate_gradient(
+    value: float, min_val: float, max_val: float, colors: list[str]
+) -> str:
+    """
+    Interpolate color from a list of colors (gradient stops).
+    Distributes stops evenly across the range [min_val, max_val].
+    """
+    if not colors:
+        return "#000000"
+    if len(colors) == 1:
+        return colors[0]
+    
+    if max_val == min_val:
+        return colors[0]
+
+    # Normalize value to 0..1
+    t = (value - min_val) / (max_val - min_val)
+    t = max(0.0, min(1.0, t))
+
+    # Determine which segment of the gradient we are in
+    # If n colors, we have n-1 segments.
+    # segment index i corresponds to t in [i/(n-1), (i+1)/(n-1)]
+    
+    n_colors = len(colors)
+    segment_length = 1.0 / (n_colors - 1)
+    
+    segment_idx = int(t / segment_length)
+    # Handle the exact 1.0 case
+    if segment_idx >= n_colors - 1:
+        segment_idx = n_colors - 2
+        
+    # Local ratio within the segment
+    # local_t goes from 0 to 1 as we move from colors[i] to colors[i+1]
+    segment_start_t = segment_idx * segment_length
+    local_t = (t - segment_start_t) / segment_length
+    
+    c1 = colors[segment_idx]
+    c2 = colors[segment_idx + 1]
+    
+    # Use existing single-step interpolation, mapping local_t back to range logic
+    # We can cheat and just recurse interpolate_color with min=0, max=1, val=local_t
+    return interpolate_color(local_t, 0.0, 1.0, c1, c2)
 
 
 def calculate_smart_node_size(num_nodes: int) -> dict:

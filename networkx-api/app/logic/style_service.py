@@ -241,9 +241,9 @@ class StyleService:
             if scale_type == "LINEAR":
                 val = cls.get_val(db_id, config.get("attribute"), attr_map, values_map)
                 if isinstance(val, (int, float)) and stats[0]:
-                    gradient = config.get("gradient", ["#d1e0ff", "#003399"])
-                    return utils.interpolate_color(
-                        val, stats[1], stats[2], gradient[0], gradient[1]
+                    gradient = config.get("gradient", ["#C6DBEF", "#6BAED6", "#08306B"])
+                    return utils.interpolate_gradient(
+                        val, stats[1], stats[2], gradient
                     )
 
             elif scale_type == "CATEGORICAL":
@@ -291,9 +291,9 @@ class StyleService:
             val = cls.get_val(db_id, config["attribute"], attr_map, values_map)
             scale_type = config.get("scale_type", "LINEAR")
             if scale_type == "LINEAR" and isinstance(val, (int, float)):
-                gradient = config.get("gradient", ["#eeeeee", "#000000"])
-                color = utils.interpolate_color(
-                    val, stats[1], stats[2], gradient[0], gradient[1]
+                gradient = config.get("gradient", ["#CCCCCC", "#000000"])
+                color = utils.interpolate_gradient(
+                    val, stats[1], stats[2], gradient
                 )
             elif scale_type == "CATEGORICAL":
                 color_map = config.get("color_map")
