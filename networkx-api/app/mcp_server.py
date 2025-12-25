@@ -433,7 +433,7 @@ def create_k_core_subgraph(
 
 @mcp.tool()
 def create_largest_component_subgraph(
-    network_id: int, preserve_layout: bool = False, description: str = None
+    source_network_id: int, preserve_layout: bool = False, description: str = None
 ) -> dict:
     """Creates a subgraph from the largest connected component."""
 
@@ -445,7 +445,7 @@ def create_largest_component_subgraph(
 
     return execute_with_db(
         _logic,
-        network_id=network_id,
+        source_network_id=source_network_id,
         preserve_layout=preserve_layout,
         description=description,
     )
