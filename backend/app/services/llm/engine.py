@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import traceback
 from typing import Any, Dict, Optional, Tuple
 
@@ -220,7 +221,49 @@ async def execute_tool_loop(
             final_text_content += chunk_text
 
         if not function_calls:
-            # Done - no tool call
+            # Check for "Lazy Intent" (stating action without calling tool)
+            # Pattern catches: "I will analyze", "I'm going to check", "Let's visualize", etc.
+            lazy_pattern = r"(?i)\b(i will|i'm going to|let's|now i will|proceeding to)\s+(?:\w+\s+){0,3}(?:analyze|check|calculate|get|retrieve|visualize|examine|update|create)"
+            
+            # Prevent infinite retry loops - check history for recent system alerts
+            retry_count_in_turn = sum(1 for part in history[-2:] if "SYSTEM_ALERT" in str(part)) if hasattr(history, '__iter__') else 0
+            
+            if re.search(lazy_pattern, final_text_content) and retry_count_in_turn < 2:
+                logger.warning(f"Lazy response detected: '{final_text_content[:100]}...' - RETRYING")
+                
+                # Add the lazy text to history as usual (so the model sees what it wrote)
+                history.append(types.Content(role="model", parts=[types.Part.from_text(text=final_text_content)]))
+                
+                # Add a strong system prompt as a "user" message to force correction
+                alert_msg = (
+                    "SYSTEM_ALERT: You stated an intent to act (e.g., 'I will...'), but issued NO tool calls. "
+                    "Do not plan. EXECUTE the tool call immediately. "
+                    "If you need to analyze the network, call 'get_network_structure_tool' or 'list_node_attributes' NOW."
+                )
+                history.append(types.Content(role="user", parts=[types.Part.from_text(text=alert_msg)]))
+                
+                # Reset response text for next attempt (optional, but cleaner if we don't return double text)
+                # Actually, we should probably keep the text? No, usually we want it to replace its "I will" with the action.
+                # But here we appended it to history, so the model knows. 
+                # Let's continue, effectively doing a new generation step.
+                # Fetch tools for the retry
+                mcp_tools = await mcp_client.get_tools_as_gemini_functions()
+                local_tool_defs = local_tools.get_local_tools()
+                all_tools = mcp_tools + local_tool_defs
+
+                current_response = await client.aio.models.generate_content_stream(
+                    model="gemini-2.5-flash",
+                    contents=history,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_INSTRUCTION,
+                        tools=all_tools,
+                        tool_config=tool_config,
+                        temperature=0.1,
+                    ),
+                )
+                continue
+
+            # Done - no tool call and no retry needed
             if not final_text_content:
                 # Fallback if model yields nothing (rare)
                 return "I have processed your request."
