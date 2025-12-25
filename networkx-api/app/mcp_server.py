@@ -285,7 +285,10 @@ def generate_visualization(
     node_label_config: Optional[NodeLabelConfig] = None,
     custom_node_colors: Optional[list] = None,
 ) -> dict:
-    """Generates the final visualization data."""
+    """
+    Generates AND UPDATES the visualization state.
+    Call this ONLY when you want to CHANGE how the network looks (e.g., apply new colors, change layout).
+    """
 
     def _logic(db, **kwargs):
         # Convert Pydantic models to dict if necessary, or pass them as is if service handles it.
@@ -579,8 +582,9 @@ def get_node_attribute_details_tool(network_id: int, attribute_name: str) -> str
 @mcp.tool()
 def get_visualization_state(network_id: int) -> str:
     """
-    Returns the current visualization configuration and color/size mappings.
-    Use this to answer questions about what the user sees (e.g., "What color is Community 0?", "Which is larger?").
+    Returns the CURRENT visualization configuration (color/size mappings) without modifying it.
+    Use this to answer questions about what the user sees (e.g., "What color is Community 0?").
+    DO NOT use this if you need to CHANGE the visualization.
     """
     def _logic(db, network_id):
         state = network_metadata.get_visualization_state(db, network_id)
