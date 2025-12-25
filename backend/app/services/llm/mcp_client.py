@@ -14,11 +14,18 @@ NETWORKX_API_URL = os.getenv("NETWORKX_API_URL", "http://networkx-api:8000")
 SSE_ENDPOINT = f"{NETWORKX_API_URL}/mcp/sse"
 
 
+# Cache for tools
+_tools_cache = None
+
 async def get_tools_as_gemini_functions() -> list[types.Tool]:
     """
     Connects to the NetworkXAPI MCP Server, discovers tools,
     Converts MCP tools to Gemini function declarations.
     """
+    global _tools_cache
+    if _tools_cache is not None:
+        return _tools_cache
+
     # Note: We use sse_client for HTTP/SSE connection
     async with sse_client(SSE_ENDPOINT) as (read, write):
         async with ClientSession(read, write) as session:
@@ -54,7 +61,8 @@ async def get_tools_as_gemini_functions() -> list[types.Tool]:
                     ]
                 )
             )
-
+            
+            _tools_cache = gemini_tools_list
             return gemini_tools_list
 
 
