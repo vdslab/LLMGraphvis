@@ -153,16 +153,29 @@ const ChatInterface = ({ selectedNode }) => {
       </div>
       
       <form onSubmit={handleSend} style={{ padding: '1rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '0.5rem' }}>
-        <input
-          type="text"
+        <textarea
           className="input"
-          style={{ flex: 1 }}
+          style={{ 
+            flex: 1, 
+            resize: 'none', 
+            minHeight: '42px', 
+            maxHeight: '150px',
+            fontFamily: 'inherit',
+            lineHeight: '1.5'
+          }}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Type a message..."
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleSend(e);
+            }
+          }}
+          placeholder="Type a message... (Shift+Enter for new line)"
           disabled={isLoading}
+          rows={1}
         />
-        <button type="submit" className="btn btn-primary" disabled={isLoading}>
+        <button type="submit" className="btn btn-primary" disabled={isLoading} style={{ height: 'fit-content' }}>
           Send
         </button>
       </form>
