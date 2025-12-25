@@ -4,12 +4,22 @@ import { useNetworkStore } from '../stores/networkStore';
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 
 const ChatInterface = ({ selectedNode }) => {
   const { messages, sendMessage, isLoading, thinkingMessage, uploadNetwork, chatId } = useChatStore();
   const { nodes } = useNetworkStore();
   const [input, setInput] = useState('');
   const fileInputRef = React.useRef(null);
+  const textareaRef = React.useRef(null);
+
+  // Auto-resize textarea
+  React.useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+    }
+  }, [input]);
 
   const handleSend = async (e) => {
     e.preventDefault();
@@ -136,7 +146,7 @@ const ChatInterface = ({ selectedNode }) => {
                     borderTopRightRadius: msg.role === 'user' ? '0' : '1rem',
                     boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
                   }}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
                       {cleanPart}
                     </ReactMarkdown>
                   </div>
@@ -152,8 +162,9 @@ const ChatInterface = ({ selectedNode }) => {
         )}
       </div>
       
-      <form onSubmit={handleSend} style={{ padding: '1rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '0.5rem' }}>
+      <form onSubmit={handleSend} style={{ padding: '1rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
         <textarea
+          ref={textareaRef}
           className="input"
           style={{ 
             flex: 1, 
@@ -161,7 +172,9 @@ const ChatInterface = ({ selectedNode }) => {
             minHeight: '42px', 
             maxHeight: '150px',
             fontFamily: 'inherit',
-            lineHeight: '1.5'
+            lineHeight: '1.5',
+            paddingTop: '10px',
+            paddingBottom: '10px'
           }}
           value={input}
           onChange={(e) => setInput(e.target.value)}

@@ -93,8 +93,8 @@ app.openapi = custom_openapi
 
 # CORS configuration
 origins = [
-    "http://localhost:5173",  # Frontend
-    "http://localhost:3000",
+    "http://localhost",
+    "http://localhost:5173",
 ]
 
 app.add_middleware(
