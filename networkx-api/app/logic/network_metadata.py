@@ -77,3 +77,33 @@ def get_subgraphs(db: Session, network_id: int) -> List[Dict[str, Any]]:
     return [
         {"id": s.id, "name": s.name, "created_at": str(s.created_at)} for s in subgraphs
     ]
+
+
+def get_visualization_state(db: Session, network_id: int) -> Dict[str, Any]:
+    """
+    Returns the current visualization state including color maps.
+    This is crucial for understanding what the user sees (e.g. "Community 0 is Blue").
+    """
+    network = db.query(models.Network).filter(models.Network.id == network_id).first()
+    if not network:
+        raise ValueError(f"Network {network_id} not found")
+
+    # Extract relevant configs
+    node_color_config = network.last_node_color_config
+    node_size_config = network.last_node_size_config
+
+    return {
+        "network_id": network.id,
+        "current_layout": network.last_layout_name,
+        "node_color": {
+            "config": node_color_config,
+            # If there's a pre-calculated map (from Categorical/Ranking), return it
+            "color_map": node_color_config.get("color_map") if node_color_config else None,
+            "attribute": node_color_config.get("attribute") if node_color_config else None,
+            "scale_type": node_color_config.get("scale_type") if node_color_config else None,
+        },
+        "node_size": {
+            "config": node_size_config,
+            "attribute": node_size_config.get("attribute") if node_size_config else None,
+        }
+    }

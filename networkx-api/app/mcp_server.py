@@ -574,3 +574,16 @@ def get_top_centrality_nodes(network_id: int, metric: str, k: int = 10) -> str:
 def get_node_attribute_details_tool(network_id: int, attribute_name: str) -> str:
     """Returns details and statistics for a specific node attribute."""
     return get_node_attribute_details_resource(network_id, attribute_name)
+
+
+@mcp.tool()
+def get_visualization_state(network_id: int) -> str:
+    """
+    Returns the current visualization configuration and color/size mappings.
+    Use this to answer questions about what the user sees (e.g., "What color is Community 0?", "Which is larger?").
+    """
+    def _logic(db, network_id):
+        state = network_metadata.get_visualization_state(db, network_id)
+        return json.dumps(state, indent=2)
+
+    return execute_with_db(_logic, network_id=network_id)
