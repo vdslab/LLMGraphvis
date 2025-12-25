@@ -71,6 +71,22 @@ class VisualizationBuilder:
         if not self.network:
             raise ValueError(f"Network {self.network_id} not found.")
 
+        # Load previous state for missing configs (Preserve State)
+        if self.node_size_config is None and self.network.last_node_size_config:
+            self.node_size_config = self.network.last_node_size_config
+
+        if self.node_color_config is None and self.network.last_node_color_config:
+            self.node_color_config = self.network.last_node_color_config
+
+        if self.edge_width_config is None and self.network.last_edge_width_config:
+            self.edge_width_config = self.network.last_edge_width_config
+
+        if self.edge_color_config is None and self.network.last_edge_color_config:
+            self.edge_color_config = self.network.last_edge_color_config
+
+        if self.node_label_config is None and self.network.last_node_label_config:
+            self.node_label_config = self.network.last_node_label_config
+
         # Resolve Layout Name from DB if not provided
         if self.layout_name is None:
             self.layout_name = (

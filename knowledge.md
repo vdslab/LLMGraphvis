@@ -22,6 +22,8 @@ The graph visualization system consists of three main components:
 3.  **User Agency**:
     -   Propose visual mappings before applying them.
     -   Respect `visual_state` (don't override user's view without reason).
+        -   **Check State First**: Before modifying visuals, always use `get_visualization_state` to know what the user is seeing.
+        -   **Partial Updates**: The `generate_visualization` tool preserves existing visual settings (color, size, etc.) if parameters are omitted. To change one aspect (e.g. layout) while keeping others (colors), simply omit the other parameters.
 
 4.  **Verification**:
     -   Agent is encouraged to run intermediate tools (e.g., `get_node_attributes`) to verify data existence before operations.
