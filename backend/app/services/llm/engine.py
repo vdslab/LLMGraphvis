@@ -27,7 +27,7 @@ class GraphVisAgent:
     def __init__(self, db: Any = None):
         self.db = db
         self.client = self._initialize_client()
-        self.model_name = "gemini-2.5-flash"
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     def _initialize_client(self) -> genai.Client:
         project_id = os.getenv("VERTEX_PROJECT_ID")
@@ -284,7 +284,7 @@ class GraphVisAgent:
             """
             
             response = await self.client.aio.models.generate_content(
-                model="gemini-2.5-flash",
+                model=self.model_name,
                 contents=prompt,
                 config=types.GenerateContentConfig(temperature=0.0)
             )
