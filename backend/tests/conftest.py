@@ -6,6 +6,7 @@ from sqlalchemy.pool import StaticPool
 from common.models import Base
 from app.core.database import get_db
 from app.main import app
+from httpx import AsyncClient, ASGITransport
 
 # In-memory SQLite for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
@@ -23,6 +24,27 @@ def setup_db_schema():
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
+
+@pytest.fixture(scope="function")
+async def async_client(db):
+    """
+    Async client for testing async endpoints.
+    """
+    def override_get_db():
+        try:
+            yield db
+        finally:
+            pass  # Session lifecycle managed by db fixture
+
+    app.dependency_overrides[get_db] = override_get_db
+    
+    # Create transport for the app
+    transport = ASGITransport(app=app)
+    
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+        
+    app.dependency_overrides.clear()
 
 @pytest.fixture(scope="function")
 def db(setup_db_schema):
