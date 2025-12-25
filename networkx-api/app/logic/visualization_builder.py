@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from common import models
 from app.logic.common_utils import calculate_smart_edge_width, calculate_smart_node_size
 from app.logic.style_service import StyleService
+from app.logic.attributes import fetch_attribute_values
 
 
 class VisualizationBuilder:
@@ -566,54 +567,6 @@ class VisualizationBuilder:
         return {n.node_id: n.id for n in nodes}
 
     def _fetch_attribute_values(self, model_val, model_float, model_text, attr_ids):
-        # Same logic as original
-        if not attr_ids:
-            return {}
-
-        q_float = (
-            self.db.query(
-                model_val.node_id
-                if model_val == models.NodeAttributeValue
-                else model_val.edge_id,
-                model_val.attribute_id,
-                model_float.float_value,
-            )
-            .join(
-                model_float,
-                model_val.id == model_float.node_attribute_value_id
-                if model_val == models.NodeAttributeValue
-                else model_val.id == model_float.edge_attribute_value_id,
-            )
-            .filter(model_val.attribute_id.in_(attr_ids))
-            .all()
+        return fetch_attribute_values(
+            self.db, model_val, model_float, model_text, attr_ids
         )
-
-        q_text = (
-            self.db.query(
-                model_val.node_id
-                if model_val == models.NodeAttributeValue
-                else model_val.edge_id,
-                model_val.attribute_id,
-                model_text.text_value,
-            )
-            .join(
-                model_text,
-                model_val.id == model_text.node_attribute_value_id
-                if model_val == models.NodeAttributeValue
-                else model_val.id == model_text.edge_attribute_value_id,
-            )
-            .filter(model_val.attribute_id.in_(attr_ids))
-            .all()
-        )
-
-        result = {}
-        for entity_id, attr_id, val in q_float:
-            if entity_id not in result:
-                result[entity_id] = {}
-            result[entity_id][attr_id] = val
-
-        for entity_id, attr_id, val in q_text:
-            if entity_id not in result:
-                result[entity_id] = {}
-            result[entity_id][attr_id] = val
-        return result

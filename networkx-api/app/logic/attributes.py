@@ -430,3 +430,73 @@ def get_specific_attribute_stats(
         pass
 
     return attr_data
+
+
+def fetch_attribute_values(
+    db: Session,
+    model_val: Type[models.Base],
+    model_float: Type[models.Base],
+    model_text: Type[models.Base],
+    attr_ids: List[int],
+) -> Dict[int, Dict[int, Any]]:
+    """
+    Fetch values for specified attributes.
+
+    Args:
+        db: Database session.
+        model_val: The attribute value model (NodeAttributeValue or EdgeAttributeValue).
+        model_float: The float value model (NodeFloatAttributeValue or EdgeFloatAttributeValue).
+        model_text: The text value model (NodeTextAttributeValue or EdgeTextAttributeValue).
+        attr_ids: List of attribute IDs to fetch values for.
+
+    Returns:
+        A dictionary mapping entity_id (node_id or edge_id) to a dictionary of {attribute_id: value}.
+        Example: {1: {10: 0.5, 11: "label"}}
+    """
+    if not attr_ids:
+        return {}
+
+    # Determine entity_id column based on model type
+    if model_val == models.NodeAttributeValue:
+        entity_id_col = model_val.node_id
+        join_cond_float = model_val.id == model_float.node_attribute_value_id
+        join_cond_text = model_val.id == model_text.node_attribute_value_id
+    else:
+        entity_id_col = model_val.edge_id
+        join_cond_float = model_val.id == model_float.edge_attribute_value_id
+        join_cond_text = model_val.id == model_text.edge_attribute_value_id
+
+    q_float = (
+        db.query(
+            entity_id_col,
+            model_val.attribute_id,
+            model_float.float_value,
+        )
+        .join(model_float, join_cond_float)
+        .filter(model_val.attribute_id.in_(attr_ids))
+        .all()
+    )
+
+    q_text = (
+        db.query(
+            entity_id_col,
+            model_val.attribute_id,
+            model_text.text_value,
+        )
+        .join(model_text, join_cond_text)
+        .filter(model_val.attribute_id.in_(attr_ids))
+        .all()
+    )
+
+    result = {}
+    for entity_id, attr_id, val in q_float:
+        if entity_id not in result:
+            result[entity_id] = {}
+        result[entity_id][attr_id] = val
+
+    for entity_id, attr_id, val in q_text:
+        if entity_id not in result:
+            result[entity_id] = {}
+        result[entity_id][attr_id] = val
+
+    return result

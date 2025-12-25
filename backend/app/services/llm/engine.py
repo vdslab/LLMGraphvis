@@ -457,12 +457,14 @@ async def execute_tool_loop(
     
     all_tools = await agent._get_all_tools()
     
-    return await agent._execute_tool_loop(
-        initial_response=initial_response,
-        history=history,
-        all_tools=all_tools,
-        tool_config=tool_config,
-        queue=queue,
-        chat_id=chat_id,
-        network_id=network_id
-    )
+    async with mcp_client.session_scope() as session:
+        return await agent._execute_tool_loop(
+            initial_response=initial_response,
+            history=history,
+            all_tools=all_tools,
+            tool_config=tool_config,
+            queue=queue,
+            chat_id=chat_id,
+            network_id=network_id,
+            session=session
+        )

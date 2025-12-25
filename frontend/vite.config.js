@@ -29,5 +29,10 @@ export default defineConfig(({ mode }) => {
     server: {
       proxy: proxyConfig,
     },
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: './src/setupTests.js',
+    },
   }
 })
