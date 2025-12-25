@@ -193,6 +193,13 @@ const NetworkChatPage = () => {
             console.error("Error parsing system_message:", e);
           }
         });
+
+        eventSource.addEventListener('error', (event) => {
+             console.error("Backend reported error:", event.data);
+             useChatStore.getState().setThinkingMessage(null);
+             useChatStore.getState().setIsLoading(false);
+             setSseError(`Server Error: ${event.data}`);
+        });
         
         // Enhanced error handling for SSE with retry logic
         eventSource.onerror = (err) => {

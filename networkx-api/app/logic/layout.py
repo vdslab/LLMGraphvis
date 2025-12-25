@@ -6,25 +6,38 @@ from sqlalchemy.orm import Session
 from common import models
 
 from .attributes import delete_attribute_values, get_or_create_attribute
+from app.core.logging import get_logger
+
 
 
 def calculate_layout(network_id: int, layout_name: str, db: Session):
-    # Reconstruct graph from DB
+    logger = get_logger(__name__)
+    
+    # Reconstruct graph from DB - OPTIMIZED: Fetch only needed columns
     G = nx.Graph()
-    nodes = db.query(models.Node).filter(models.Node.network_id == network_id).all()
+    
+    # query(models.Node.id, models.Node.node_id) returns list of Row/Tuple
+    nodes_query = db.query(models.Node.id, models.Node.node_id).filter(models.Node.network_id == network_id).all()
+    
+    id_map = {row.id: row.node_id for row in nodes_query}  # db_id -> str_id
+    node_map = {row.node_id: row.id for row in nodes_query}  # str_id -> db_id
 
-    id_map = {n.id: n.node_id for n in nodes}  # db_id -> str_id
-    node_map = {n.node_id: n.id for n in nodes}  # str_id -> db_id
+    for row in nodes_query:
+        G.add_node(row.node_id)
+        
+    logger.info(f"Layout calculation for Network {network_id}: {len(G.nodes)} nodes loaded.")
 
-    for n in nodes:
-        G.add_node(n.node_id)
-
-    edges = db.query(models.Edge).filter(models.Edge.network_id == network_id).all()
-    for e in edges:
-        u = id_map.get(e.source_node_id)
-        v = id_map.get(e.target_node_id)
+    edges_query = db.query(models.Edge.source_node_id, models.Edge.target_node_id).filter(models.Edge.network_id == network_id).all()
+    
+    edge_count = 0
+    for row in edges_query:
+        u = id_map.get(row.source_node_id)
+        v = id_map.get(row.target_node_id)
         if u and v:
             G.add_edge(u, v)
+            edge_count += 1
+            
+    logger.info(f"Layout calculation for Network {network_id}: {edge_count} edges loaded.")
 
     # Calculate Layout
     # Dynamic parameter adjustment based on network size
