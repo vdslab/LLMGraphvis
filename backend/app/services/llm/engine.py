@@ -77,16 +77,19 @@ class GraphVisAgent:
             logger.error(f"Initial generation failed: {e}")
             raise e
 
-        # 3. Enter Tool Execution Loop
-        return await self._execute_tool_loop(
-            initial_response=current_response,
-            history=history,
-            all_tools=all_tools,
-            tool_config=tool_config,
-            queue=queue,
-            chat_id=chat_id,
-            network_id=network_id,
-        )
+        # 3. Enter Tool Execution Loop within Session Scope
+        # This ensures we reuse the same MCP connection for all tool calls in this turn
+        async with mcp_client.session_scope() as session:
+            return await self._execute_tool_loop(
+                initial_response=current_response,
+                history=history,
+                all_tools=all_tools,
+                tool_config=tool_config,
+                queue=queue,
+                chat_id=chat_id,
+                network_id=network_id,
+                session=session,
+            )
 
     async def _execute_tool_loop(
         self,
@@ -97,6 +100,7 @@ class GraphVisAgent:
         queue: Any,
         chat_id: int,
         network_id: int,
+        session: Any, # ClientSession
     ) -> str:
         """
         Manages the ReAct loop: Consumption -> Execution -> Observation -> Next Generation.
@@ -123,7 +127,7 @@ class GraphVisAgent:
             if not function_calls:
                 # No tools called. Check for "Lazy Intent" (Reflection)
                 if await self._check_and_handle_lazy_intent(
-                    final_text_content, history, loop_context, queue, all_tools, tool_config
+                    final_text_content, history, loop_context, queue, all_tools, tool_config, session
                 ):
                     # Lazy Intent Detected & Alert Added to History.
                     logger.info("Lazy Intent detected. Retrying generation...")
@@ -150,7 +154,7 @@ class GraphVisAgent:
 
             # Step C: Execute Tools (if any)
             await self._execute_tools_and_update_history(
-                function_calls, chunk_text, history, queue, chat_id, loop_context
+                function_calls, chunk_text, history, queue, chat_id, loop_context, session
             )
             
             # Step D: Next Generation
@@ -216,10 +220,10 @@ class GraphVisAgent:
         queue: Any,
         all_tools: List[types.Tool],
         tool_config: Optional[types.ToolConfig],
+        session: Any,
     ) -> bool:
         """
         Uses a lightweight LLM call (Reflection) to detect if the model promised an action but didn't call a tool.
-        Returns True if a system alert was added to history (signaling a need to retry).
         """
         # 1. Quick heuristic check to avoid wasting LLM calls on short/empty texts
         if len(text_content) < 10:
@@ -240,16 +244,11 @@ class GraphVisAgent:
             return False
 
         # 3. Reflection: Is this lazy?
+        # Note: _is_lazy_response does not need session as it uses Gemini API directly, not MCP.
         is_lazy = await self._is_lazy_response(text_content)
         
         if is_lazy:
             logger.warning(f"Lazy Intent Detected via Reflection: '{text_content[:50]}...'")
-            
-            # The model's last turn (text_content) is not yet in history?
-            # 'history' passed here matches what was sent to the model for the *previous* generation.
-            # The *current* response (text_content) is what we just consumed.
-            # Use standard convention: Append Model's Text -> Append User's Alert.
-            
             history.append(types.Content(role="model", parts=[types.Part.from_text(text=text_content)]))
             
             alert_msg = (
@@ -258,11 +257,6 @@ class GraphVisAgent:
                 "Call the appropriate tool definition NOW."
             )
             history.append(types.Content(role="user", parts=[types.Part.from_text(text=alert_msg)]))
-            
-            # Since we manually added the model's text response to history here to "save" it,
-            # we don't want the outer loop to add it again. 
-            # However, the outer loop logic (in _execute_tools_and_update_history) usually adds it.
-            # But we are RETURNING True here, and the caller handles the retry loop.
             return True
 
         return False
@@ -272,7 +266,6 @@ class GraphVisAgent:
         Ask the model (self-reflection) if the text indicates a missed action.
         """
         try:
-            # Using a simplified prompt for speed/cost
             prompt = f"""
             Analyze the following AI response. 
             Does it promise to perform an action (e.g., 'I will now calculate', 'Checking...', 'Let's visualize') WITHOUT actually providing a result?
@@ -303,6 +296,7 @@ class GraphVisAgent:
         queue: Any,
         chat_id: int,
         loop_context: Dict[str, Any],
+        session: Any,
     ):
         """Executes tools in parallel/sequence and updates history."""
         function_calls_parts = []
@@ -324,14 +318,14 @@ class GraphVisAgent:
 
             # Execute
             result, status, error_msg = await self._run_tool(
-                feature_name, args, chat_id, loop_context["network_id"]
+                feature_name, args, chat_id, loop_context["network_id"], session
             )
 
             # Handle Side Effects (Visualization, Context Switch)
             if status == "completed":
                 # Updates network_id in loop_context if changed
                 await self._handle_side_effects(
-                    feature_name, result, chat_id, queue, loop_context
+                    feature_name, result, chat_id, queue, loop_context, session
                 )
 
             # Emit "Completed" event
@@ -347,7 +341,7 @@ class GraphVisAgent:
         history.append(types.Content(role="user", parts=function_responses_parts))
 
     async def _run_tool(
-        self, function_name: str, args: Dict[str, Any], chat_id: int, network_id: int
+        self, function_name: str, args: Dict[str, Any], chat_id: int, network_id: int, session: Any
     ) -> Tuple[Any, str, Optional[str]]:
         """Actual execution wrapper."""
         try:
@@ -359,7 +353,8 @@ class GraphVisAgent:
                 # MCP Tool
                 if "network_id" not in args and network_id:
                     args["network_id"] = network_id
-                result = await mcp_client.execute_tool(function_name, args)
+                # Pass session!
+                result = await mcp_client.execute_tool(function_name, args, session=session)
             
             return result, "completed", None
         except Exception as e:
@@ -374,6 +369,7 @@ class GraphVisAgent:
         chat_id: int,
         queue: Any,
         loop_context: Dict[str, Any],
+        session: Any,
     ):
         """Handles Visualization updates and Network ID switching."""
         if not isinstance(result, dict):
@@ -397,7 +393,7 @@ class GraphVisAgent:
             loop_context["network_id"] = new_id
             
             # Auto-Visualize
-            await self._auto_generate_visualization(new_id, queue)
+            await self._auto_generate_visualization(new_id, queue, session)
             return
 
         # 2. Visualization Updates
@@ -416,11 +412,11 @@ class GraphVisAgent:
                     chat.visualization_state = vis_data
                     self.db.commit()
 
-    async def _auto_generate_visualization(self, network_id: int, queue: Any):
+    async def _auto_generate_visualization(self, network_id: int, queue: Any, session: Any):
         """Triggers visualization generation for a new network context."""
         try:
             vis_data = await mcp_client.execute_tool(
-                "generate_visualization", {"network_id": network_id}
+                "generate_visualization", {"network_id": network_id}, session=session
             )
             if isinstance(vis_data, dict) and "nodes" in vis_data:
                 await self._emit_render_update(queue, vis_data)

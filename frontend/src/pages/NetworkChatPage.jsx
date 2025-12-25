@@ -108,10 +108,19 @@ const NetworkChatPage = () => {
         console.log(`Connecting to SSE stream for chat ${numericId}...`);
         eventSource = new EventSource(`/api/chat/${numericId}/stream`, { withCredentials: true });
         
-        eventSource.onopen = () => {
+        eventSource.onopen = async () => {
           console.log("SSE Connected");
           setSseError(null);
           retryCount = 0; // Reset retry count on successful connection
+          
+          // Re-sync state on connection/reconnection to catch missed events
+          try {
+              console.log("Syncing state after connection...");
+              await fetchMessages(numericId);
+              await useChatStore.getState().fetchChat(numericId);
+          } catch (e) {
+              console.error("Failed to sync state after connection:", e);
+          }
         };
 
         // Set up event handlers

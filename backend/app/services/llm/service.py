@@ -80,14 +80,17 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
 async def _build_context_summary(network_id: int) -> str:
     """Fetches network stats and attributes to build a context summary string."""
     try:
-        # Fetch resources concurrently could be better, but sequential is safer for now
-        structure = await mcp_client.get_resource(f"network://{network_id}/structure")
-        node_attrs = await mcp_client.get_resource(
-            f"network://{network_id}/attributes/nodes"
-        )
-        edge_attrs = await mcp_client.get_resource(
-            f"network://{network_id}/attributes/edges"
-        )
+        # Fetch resources using a single session to reduce overhead
+        async with mcp_client.session_scope() as session:
+            structure = await mcp_client.get_resource(
+                f"network://{network_id}/structure", session=session
+            )
+            node_attrs = await mcp_client.get_resource(
+                f"network://{network_id}/attributes/nodes", session=session
+            )
+            edge_attrs = await mcp_client.get_resource(
+                f"network://{network_id}/attributes/edges", session=session
+            )
 
         summary_lines = ["[Current Network Context]"]
         summary_lines.append(f"Network ID: {network_id}")
