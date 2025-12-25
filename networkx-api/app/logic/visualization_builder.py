@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -200,7 +200,58 @@ class VisualizationBuilder:
 
         self._save_state()
 
-        return {"nodes": vis_nodes, "links": vis_edges}
+        legend = self._build_summary()
+
+        return {"nodes": vis_nodes, "links": vis_edges, "legend": legend}
+
+    def _build_summary(self) -> Dict[str, Any]:
+        """Constructs a summary of the applied visual mappings."""
+        summary = {}
+
+        # 1. Node Color
+        if self.node_color_config:
+            nc = self.node_color_config
+            attr = nc.get("attribute")
+            scale = nc.get("scale_type", "LINEAR")  # Default to linear if valid
+            
+            # Refine scale based on stats similar to resolve logic
+            if not self.node_color_stats[0] and scale == "LINEAR":
+                 # If stats failed, it might be effectively nothing or categorical fallback
+                 pass
+
+            info = {"attribute": attr}
+            if scale == "CATEGORICAL":
+                info["type"] = "categorical"
+                info["mapping"] = self.categorical_color_map
+            elif scale == "RANKING":
+                info["type"] = "ranking"
+                # Ranking map is ID based, maybe too large to show. Show rules instead.
+                info["rules"] = nc.get("ranking_rules")
+            elif scale == "LINEAR":
+                info["type"] = "linear"
+                info["min"] = self.node_color_stats[1]
+                info["max"] = self.node_color_stats[2]
+                info["gradient"] = nc.get("gradient")
+            
+            summary["node_color"] = info
+
+        # 2. Node Size
+        if self.node_size_config:
+            ns = self.node_size_config
+            attr = ns.get("attribute")
+            info = {"attribute": attr, "type": "linear"} # Size is usually linear
+            if self.node_size_stats[0]:
+                info["data_min"] = self.node_size_stats[1]
+                info["data_max"] = self.node_size_stats[2]
+                info["size_min"] = ns.get("min")
+                info["size_max"] = ns.get("max")
+            summary["node_size"] = info
+            
+        # 3. Layout
+        if self.layout_name:
+            summary["layout"] = self.layout_name
+
+        return summary
 
     def _build_vis_nodes(self) -> List[Dict]:
         nodes = (
