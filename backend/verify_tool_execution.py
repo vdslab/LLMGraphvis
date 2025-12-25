@@ -8,7 +8,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "app"))
 sys.path.append(os.path.dirname(__file__))
 
 # Set API URL
-os.environ["NETWORKX_API_URL"] = "http://localhost:8000"
+os.environ["NETWORKX_API_URL"] = "http://localhost:8001"
 
 from app.services.llm import mcp_client
 
