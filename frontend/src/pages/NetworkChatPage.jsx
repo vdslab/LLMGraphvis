@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useChatStore } from '../stores/chatStore';
 import { useNetworkStore } from '../stores/networkStore';
 import { useAuthStore } from '../stores/authStore';
+import { useNetworkRealtime } from '../hooks/useNetworkRealtime';
 import NetworkGraph from '../components/NetworkGraph';
 import ChatInterface from '../components/ChatInterface';
 import NodeDetailsPanel from '../components/NodeDetailsPanel';
@@ -21,9 +22,7 @@ const NetworkChatPage = () => {
   const { nodes, links, networkId } = useNetworkStore();
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [sseError, setSseError] = useState(null);
-
-
+  
   // Sidebar Logic
   const [showChatList, setShowChatList] = useState(false);
 
@@ -47,7 +46,7 @@ const NetworkChatPage = () => {
         } catch (error) {
           console.error("Failed to create new chat:", error);
           navigate('/');
-          creationAttempted.current = false; // Reset on failure to allow retry if needed
+          creationAttempted.current = false;
         }
       };
       initNewChat();
@@ -60,22 +59,16 @@ const NetworkChatPage = () => {
       const numericId = parseInt(id);
       if (isNaN(numericId)) return;
 
-      // Set current chat ID immediately to support race condition guards
       setChatId(numericId);
 
       const loadData = async () => {
         try {
-          // Reset network store immediately to avoid showing previous graph
           useNetworkStore.getState().reset();
-
-          // Fetch chat details (includes network visualization)
           await useChatStore.getState().fetchChat(numericId);
-          // Fetch messages
           await fetchMessages(numericId);
         } catch (error) {
           console.error("Failed to load chat data:", error);
           if (error.response && error.response.status === 404) {
-            // Chat not found or not owned by user
             navigate('/');
           }
         }
@@ -84,185 +77,80 @@ const NetworkChatPage = () => {
       loadData();
     }
   }, [id, fetchMessages, isAuthenticated, navigate, setChatId]);
+
+  // --- Real-time Connection Logic (Refactored) ---
   
-  // Initialize SSE connection with error handling
-  useEffect(() => {
-    if (id && id !== 'new' && isAuthenticated) {
-      const numericId = parseInt(id);
-      if (isNaN(numericId)) return;
-
-      // setChatId(numericId); // Moved to loading effect
-      setSseError(null);
-      
-      let eventSource = null;
-      let retryCount = 0;
-      const maxRetries = 3;
-      let retryTimeoutId = null;
-
-      const connectSSE = () => {
-        // Close existing connection if any
-        if (eventSource) {
-          eventSource.close();
-        }
-
-        console.log(`Connecting to SSE stream for chat ${numericId}...`);
-        eventSource = new EventSource(`/api/chat/${numericId}/stream`, { withCredentials: true });
-        
-        eventSource.onopen = async () => {
-          console.log("SSE Connected");
-          setSseError(null);
-          retryCount = 0; // Reset retry count on successful connection
-          
-          // Re-sync state on connection/reconnection to catch missed events
-          try {
-              console.log("Syncing state after connection...");
-              await fetchMessages(numericId);
-              await useChatStore.getState().fetchChat(numericId);
-          } catch (e) {
-              console.error("Failed to sync state after connection:", e);
-          }
-        };
-
-        // Set up event handlers
-        eventSource.addEventListener('render_update', (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            console.log("Render Update:", data);
-            useNetworkStore.getState().setNetworkData(data);
-            useChatStore.getState().setIsLoading(false);
-            useChatStore.getState().setThinkingMessage(null);
-          } catch (e) {
-            console.error("Error parsing render_update:", e);
-          }
-        });
-
-        eventSource.addEventListener('thinking_stream', (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            useChatStore.getState().setThinkingMessage(data.content || data);
-            useChatStore.getState().setIsLoading(true);
-          } catch(e) {
-            useChatStore.getState().setThinkingMessage(event.data);
-            useChatStore.getState().setIsLoading(true);
-          }
-        });
-
-        eventSource.addEventListener('tool_execution', (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            console.log("Tool execution:", data);
-            
-            if (data.status === 'started') {
-              useChatStore.getState().setThinkingMessage(`Executing ${data.tool}...`);
-              useChatStore.getState().setIsLoading(true);
-            } else if (data.status === 'completed') {
-              useChatStore.getState().setThinkingMessage(`${data.tool} completed`);
-            } else if (data.status === 'failed') {
-              console.error(`Tool ${data.tool} failed:`, data.error);
-              useChatStore.getState().setThinkingMessage(null);
-              useChatStore.getState().setIsLoading(false);
-            }
-          } catch (e) {
-            console.error("Error parsing tool_execution event:", e);
-          }
-        });
-
-        eventSource.addEventListener('message', (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            useChatStore.getState().addMessage(data);
-          } catch (e) {
-            console.error("Error parsing message event:", e);
-          }
-        });
-
-        eventSource.addEventListener('message_chunk', (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            useChatStore.getState().appendMessageChunk(data.content);
-          } catch (e) {
-            console.error("Error parsing message_chunk event:", e);
-          }
-        });
-        
-        eventSource.addEventListener('message_complete', (event) => {
-          try {
-             const data = JSON.parse(event.data);
-             useChatStore.getState().finalizeStreamingMessage(data.id);
-          } catch (e) {
-             console.error("Error parsing message_complete:", e);
-          }
-        });
-        
-        eventSource.addEventListener('system_message', (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            console.log("System:", data);
-          } catch (e) {
-            console.error("Error parsing system_message:", e);
-          }
-        });
-
-        eventSource.addEventListener('error', (event) => {
-             console.error("Backend reported error:", event.data);
-             useChatStore.getState().setThinkingMessage(null);
-             useChatStore.getState().setIsLoading(false);
-             setSseError(`Server Error: ${event.data}`);
-        });
-        
-        // Enhanced error handling for SSE with retry logic
-        eventSource.onerror = (err) => {
-          console.error("SSE Error:", err);
-          eventSource.close();
-
-          if (retryCount < maxRetries) {
-            retryCount++;
-            const timeout = Math.min(1000 * Math.pow(2, retryCount), 10000);
-            console.log(`Attempting to reconnect... (${retryCount}/${maxRetries}) in ${timeout}ms`);
-            setSseError(`Connection lost. Reconnecting... (${retryCount}/${maxRetries})`);
-            
-            retryTimeoutId = setTimeout(() => {
-              if (isAuthenticated) {
-                connectSSE();
-              }
-            }, timeout);
-          } else {
-            setSseError("Connection lost. Please refresh the page or try logging in again.");
-          }
-        };
-      };
-
-      connectSSE();
-      
-      return () => {
-        if (eventSource) {
-          eventSource.close();
-        }
-        if (retryTimeoutId) {
-          clearTimeout(retryTimeoutId);
-        }
-      };
+  // Define Event Handlers (Memoized to prevent hook re-renders)
+  const eventHandlers = useMemo(() => ({
+    render_update: (data) => {
+      console.log("Render Update:", data);
+      useNetworkStore.getState().setNetworkData(data);
+      useChatStore.getState().setIsLoading(false);
+      useChatStore.getState().setThinkingMessage(null);
+    },
+    thinking_stream: (data) => {
+       const content = data.content || data;
+       useChatStore.getState().setThinkingMessage(content);
+       useChatStore.getState().setIsLoading(true);
+    },
+    tool_execution: (data) => {
+      console.log("Tool execution:", data);
+      if (data.status === 'started') {
+        useChatStore.getState().setThinkingMessage(`Executing ${data.tool}...`);
+        useChatStore.getState().setIsLoading(true);
+      } else if (data.status === 'completed') {
+        useChatStore.getState().setThinkingMessage(`${data.tool} completed`);
+      } else if (data.status === 'failed') {
+        console.error(`Tool ${data.tool} failed:`, data.error);
+        useChatStore.getState().setThinkingMessage(null);
+        useChatStore.getState().setIsLoading(false);
+      }
+    },
+    message: (data) => {
+      useChatStore.getState().addMessage(data);
+    },
+    message_chunk: (data) => {
+      useChatStore.getState().appendMessageChunk(data.content);
+    },
+    message_complete: (data) => {
+       useChatStore.getState().finalizeStreamingMessage(data.id);
+    },
+    system_message: (data) => {
+      console.log("System:", data);
+    },
+    error: (data) => {
+       console.error("Backend reported error:", data);
+       useChatStore.getState().setThinkingMessage(null);
+       useChatStore.getState().setIsLoading(false);
+       // We can choose to show this in the error banner via state update if we want
+       // But the hook manages general connection errors. Backend errors are application level.
     }
-  }, [id, setChatId, isAuthenticated]);
+  }), []);
 
+  // Use the Custom Hook
+  const numericId = parseInt(id);
+  const shouldConnect = id && id !== 'new' && isAuthenticated && !isNaN(numericId);
+  const sseUrl = shouldConnect ? `/api/chat/${numericId}/stream` : null;
+  
+  const { isConnected, error: sseError } = useNetworkRealtime(sseUrl, {
+    eventHandlers,
+    onError: (e) => console.log("SSE Connect Error (Hook):", e)
+  });
+
+
+  // --- Node Interaction ---
   const [selectedNode, setSelectedNode] = useState(null);
   const [nodeDetailsPanelOpen, setNodeDetailsPanelOpen] = useState(false);
 
-  // Function to handle node clicks from the graph
   const handleNodeClick = async (nodeData) => {
     try {
-        // Optimistically set selected node with basic info
         setSelectedNode({ id: nodeData.id, label: nodeData.label });
         setNodeDetailsPanelOpen(true);
 
         const api = await import('../services/api');
-        // Use networkId for node details, NOT chatId
-        if (!networkId) {
-             console.error("No network ID found, cannot fetch details");
-             return;
-        }
-        const response = await api.getNodeDetails(networkId, nodeData.id);
+        if (!networkId) return;
         
+        const response = await api.getNodeDetails(networkId, nodeData.id);
         if (response && response.data) {
              setSelectedNode(prev => ({ ...prev, details: response.data }));
         }
@@ -289,18 +177,9 @@ const NetworkChatPage = () => {
     setIsUploading(true);
     try {
       await uploadNetwork(id, file);
-      // Success handling if needed, but SSE will trigger updates
       console.log("Upload successful");
     } catch (error) {
       console.error("Upload failed:", error);
-      
-      // Check if it's an authentication error
-      if (error.response && error.response.status === 401) {
-        setSseError("Authentication required. Please log in again.");
-        // The axios interceptor will handle the redirect
-      } else {
-        setSseError("Failed to upload file. Please try again.");
-      }
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -309,30 +188,21 @@ const NetworkChatPage = () => {
     }
   };
 
-  // Resizing logic
+  // --- Resize Logic ---
   const [sidebarWidth, setSidebarWidth] = useState(window.innerWidth / 4);
   const [isResizing, setIsResizing] = useState(false);
 
-
-  const startResizing = useCallback(() => {
-    setIsResizing(true);
-  }, []);
-
-  const stopResizing = useCallback(() => {
-    setIsResizing(false);
-  }, []);
-
-  const resize = useCallback(
-    (mouseMoveEvent) => {
+  const startResizing = useCallback(() => setIsResizing(true), []);
+  const stopResizing = useCallback(() => setIsResizing(false), []);
+  
+  const resize = useCallback((mouseMoveEvent) => {
       if (isResizing) {
         const newWidth = window.innerWidth - mouseMoveEvent.clientX;
         if (newWidth > 200 && newWidth < window.innerWidth * 0.8) {
           setSidebarWidth(newWidth);
         }
       }
-    },
-    [isResizing]
-  );
+    },[isResizing]);
 
   useEffect(() => {
     window.addEventListener("mousemove", resize);
@@ -345,36 +215,20 @@ const NetworkChatPage = () => {
 
   const [showLabels, setShowLabels] = useState(false);
 
-  if (!isAuthenticated) {
-    return null;  // Redirecting to login via useEffect
-  }
+  if (!isAuthenticated) return null;
 
   return (
     <div style={{ display: 'flex', height: '100%', flexDirection: 'column' }}>
-      {/* Error notification bar */}
+      {/* Error notification */}
       {sseError && (
         <div style={{
           padding: '10px',
           backgroundColor: '#f44336',
           color: 'white',
           textAlign: 'center',
-          width: '100%',
-          position: 'relative'
+          width: '100%'
         }}>
           {sseError}
-          <button
-            style={{
-              position: 'absolute',
-              right: '10px',
-              background: 'transparent',
-              border: 'none',
-              color: 'white',
-              cursor: 'pointer'
-            }}
-            onClick={() => setSseError(null)}
-          >
-            ×
-          </button>
         </div>
       )}
       
@@ -392,7 +246,7 @@ const NetworkChatPage = () => {
                 <div style={{ padding: '0.5rem', textAlign: 'right', borderBottom: '1px solid #eee' }}>
                     <button onClick={() => setShowChatList(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
                 </div>
-                <ChatList currentChatId={parseInt(id)} onClose={() => {/* Optional: close on click? */}} />
+                <ChatList currentChatId={parseInt(id)} onClose={() => {}} />
             </div>
         )}
 
@@ -401,12 +255,7 @@ const NetworkChatPage = () => {
           
            {/* Sidebar Toggle Button (if closed) */}
            {!showChatList && (
-            <div style={{ 
-                position: 'absolute', 
-                top: 10, 
-                left: 10, 
-                zIndex: 6,
-            }}>
+            <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 6 }}>
                <button 
                 onClick={() => setShowChatList(true)}
                 className="btn"
@@ -427,7 +276,6 @@ const NetworkChatPage = () => {
             <div style={{ 
               position: 'absolute', 
               top: 10, 
-              // Move right if sidebar button is there
               left: !showChatList ? 100 : 10, 
               zIndex: 5,
               backgroundColor: 'rgba(255, 255, 255, 0.8)',
@@ -447,12 +295,8 @@ const NetworkChatPage = () => {
             </div>
           )}
 
-
           {nodeDetailsPanelOpen && selectedNode && (
-            <NodeDetailsPanel 
-              selectedNode={selectedNode} 
-              onClose={handleCloseNodeDetails}
-            />
+            <NodeDetailsPanel selectedNode={selectedNode} onClose={handleCloseNodeDetails} />
           )}
 
           <NetworkGraph 
