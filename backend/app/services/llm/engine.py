@@ -32,13 +32,14 @@ else:
     client = genai.Client(api_key=GOOGLE_API_KEY)
 
 
-async def _consume_stream(response: Any, queue: any) -> Tuple[str, Any]:
+async def _consume_stream(response: Any, queue: any) -> Tuple[str, list[Any]]:
     """
     Consumes the response stream (or static response), emits chunks, and aggregates content.
-    Returns (aggregated_text, function_call_object).
+    Returns (aggregated_text, list_of_function_call_objects).
     """
     final_text = ""
-    full_function_call = None
+    # We now collect a LIST of function calls
+    all_function_calls = []
 
     if hasattr(response, "__aiter__"):  # Stream
         logger.info("Stream detected. Starting to consume response stream...")
@@ -57,13 +58,7 @@ async def _consume_stream(response: Any, queue: any) -> Tuple[str, Any]:
                                 }
                             )
                         if part.function_call:
-                            if full_function_call is None:
-                                full_function_call = part.function_call
-                            else:
-                                # Assuming simple aggregation or complete call per chunk/final chunk
-                                # For robustness with partials, we might need more logic,
-                                # but SDK typically handles this or provides enough in one chunk.
-                                pass
+                            all_function_calls.append(part.function_call)
         except Exception as e:
             logger.error(f"Error while consuming stream: {e}")
             logger.error(traceback.format_exc())
@@ -82,9 +77,9 @@ async def _consume_stream(response: Any, queue: any) -> Tuple[str, Any]:
                         }
                     )
                 if part.function_call:
-                    full_function_call = part.function_call
+                    all_function_calls.append(part.function_call)
 
-    return final_text, full_function_call
+    return final_text, all_function_calls
 
 
 async def _handle_tool_execution(
@@ -218,76 +213,87 @@ async def execute_tool_loop(
         iteration += 1
 
         # 1. Consume Response (Stream or Static)
-        chunk_text, full_function_call = await _consume_stream(current_response, queue)
+        # Returns all accumulated text and A LIST of function calls
+        chunk_text, function_calls = await _consume_stream(current_response, queue)
+        
         if chunk_text:
             final_text_content += chunk_text
 
-        if not full_function_call:
+        if not function_calls:
             # Done - no tool call
             if not final_text_content:
+                # Fallback if model yields nothing (rare)
                 return "I have processed your request."
             return final_text_content
 
-        # 2. Prepare Tool Execution
-        function_name = full_function_call.name
-        function_args = dict(full_function_call.args)
-
-        logger.info(f"Executing tool: {function_name} with args: {function_args}")
-        await queue.put(
-            {
-                "event": "tool_execution",
-                "data": json.dumps(
-                    {"tool": function_name, "status": "started", "args": function_args}
-                ),
-            }
-        )
-
-        # 3. Execute Tool
-        result, status, error_msg = await _handle_tool_execution(
-            function_name, function_args, network_id, chat_id, db
-        )
-
-        # 4. Handle Visualizations / Side Effects
-        if status == "completed":
-            network_id = await _handle_visualization_update(
-                function_name, result, network_id, chat_id, db, queue
-            )
-
-        # Notify Tool End
-        await queue.put(
-            {
-                "event": "tool_execution",
-                "data": json.dumps(
-                    {"tool": function_name, "status": status, "error": error_msg}
-                ),
-            }
-        )
-
-        # 5. Update History
-        # Reconstruct Content for history (User/Model parts)
-        model_parts = []
+        # 2. Iterate through all function calls in this turn
+        function_responses_parts = []
+        function_calls_parts = []
+        
+        # We need to construct the history parts carefully.
+        # The 'model' turn must contain the text (if any) and ALL function calls.
         if chunk_text:
-            model_parts.append(types.Part.from_text(text=chunk_text))
-        # Ensure name and args are set for history reconstruction
-        model_parts.append(
-            types.Part.from_function_call(
-                name=function_name, args=full_function_call.args
+            function_calls_parts.append(types.Part.from_text(text=chunk_text))
+        
+        for fc in function_calls:
+            function_calls_parts.append(
+                types.Part.from_function_call(name=fc.name, args=fc.args)
             )
-        )
 
-        history.append(types.Content(role="model", parts=model_parts))
-        history.append(
-            types.Content(
-                role="user",
-                parts=[
-                    types.Part.from_function_response(
-                        name=function_name, response=result
-                    )
-                ],
+            # Execute the tool
+            function_name = fc.name
+            function_args = dict(fc.args)
+
+            logger.info(f"Executing tool: {function_name} with args: {function_args}")
+            await queue.put(
+                {
+                    "event": "tool_execution",
+                    "data": json.dumps(
+                        {"tool": function_name, "status": "started", "args": function_args}
+                    ),
+                }
             )
-        )
 
-        # 6. Next Iteration
+            result, status, error_msg = await _handle_tool_execution(
+                function_name, function_args, network_id, chat_id, db
+            )
+
+            if status == "completed":
+                # Handle side-effects (visualization, context switch)
+                # Note: network_id might change here. We update it for the NEXT loop iteration.
+                # For sequential tools in the same turn, we use the updated one if possible,
+                # but 'function_args' was already fixed by the LLM. 
+                # If a tool relies on the NEW ID, it might fail if the LLM didn't predict it. 
+                # But for parallel unconnected tools, it's fine.
+                network_id = await _handle_visualization_update(
+                    function_name, result, network_id, chat_id, db, queue
+                )
+
+            # Notify Tool End
+            await queue.put(
+                {
+                    "event": "tool_execution",
+                    "data": json.dumps(
+                        {"tool": function_name, "status": status, "error": error_msg}
+                    ),
+                }
+            )
+
+            # Collect response part
+            function_responses_parts.append(
+                types.Part.from_function_response(
+                    name=function_name, response=result
+                )
+            )
+
+        # 3. Update History
+        # Add the full MODEL turn (Text + All Function Calls)
+        history.append(types.Content(role="model", parts=function_calls_parts))
+        
+        # Add the full USER turn (All Function Responses)
+        history.append(types.Content(role="user", parts=function_responses_parts))
+
+        # 4. Next Iteration
         logger.info("--- Gemini API Request (Tool Loop) ---")
         try:
             mcp_tools = await mcp_client.get_tools_as_gemini_functions()
