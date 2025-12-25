@@ -295,8 +295,33 @@ async def handle_process_background(chat_id: int, user_message: str):
         import traceback
 
         traceback.print_exc()
-        queue = await llm_service.get_event_queue(chat_id)
-        await queue.put({"event": "error", "data": str(e)})
+
+        # Persist error message to DB so user sees it in history/on reload
+        try:
+            # Re-open session if needed (it might be closed or rollback needed)
+            # The 'db' session from local scope might be in invalid state due to exception
+            db_error = database.SessionLocal()
+            error_content = f"I encountered an internal error while processing your request: {str(e)}"
+            db_err_msg = models.ChatMessage(
+                chat_id=chat_id, role="model", content=error_content
+            )
+            db_error.add(db_err_msg)
+            db_error.commit()
+            
+            # Notify frontend of completion (even though it's an error state) so it stops thinking
+            queue = await llm_service.get_event_queue(chat_id)
+            await queue.put(
+                {"event": "message_complete", "data": json.dumps({"id": db_err_msg.id})}
+            )
+            # Also emit the error event for immediate toast/notification
+            await queue.put({"event": "error", "data": str(e)})
+            
+            db_error.close()
+        except Exception as inner_e:
+            logger.error(f"Failed to save error message to DB: {inner_e}")
+            queue = await llm_service.get_event_queue(chat_id)
+            await queue.put({"event": "error", "data": str(e)})
+
     finally:
         db.close()
 

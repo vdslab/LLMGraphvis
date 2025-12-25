@@ -160,9 +160,30 @@ def _sanitize_schema(schema: dict) -> dict:
     return new_schema
 
 
-async def execute_tool(tool_name: str, arguments: dict):
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def session_scope():
+    """
+    Context manager that yields a connected ClientSession.
+    Usage:
+        async with session_scope() as session:
+             await session.call_tool(...)
+    """
+    try:
+        async with sse_client(SSE_ENDPOINT) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                yield session
+    except Exception as e:
+        logger.error(f"MCP Session connection failed: {e}")
+        raise
+
+async def execute_tool(tool_name: str, arguments: dict, session: ClientSession = None):
     """
     Executes a tool on the NetworkXAPI MCP Server.
+    If 'session' is provided, it uses the existing session.
+    Otherwise, it creates a transient session (old behavior).
     """
     # Sanitize arguments for logging (truncate large strings)
     log_args = arguments.copy()
@@ -171,43 +192,49 @@ async def execute_tool(tool_name: str, arguments: dict):
             log_args[k] = v[:100] + "..."
 
     logger.info(f"Executing tool: {tool_name} with arguments: {log_args}")
+
+    if session:
+        return await _execute_internal(session, tool_name, arguments)
+    
+    # Transient session
+    async with session_scope() as new_session:
+        return await _execute_internal(new_session, tool_name, arguments)
+
+async def _execute_internal(session: ClientSession, tool_name: str, arguments: dict):
     try:
-        async with sse_client(SSE_ENDPOINT) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
+        # Handle client-side tools
+        if tool_name == "read_resource":
+            uri = arguments.get("uri")
+            result = await session.read_resource(uri)
+            # Resource content is a list of ReadResourceResult
+            # We assume text content for now
+            parsed_result = json.loads(result.contents[0].text)
+            if isinstance(parsed_result, list):
+                return {"result": parsed_result}
+            return parsed_result
 
-                # Handle client-side tools
-                if tool_name == "read_resource":
-                    uri = arguments.get("uri")
-                    result = await session.read_resource(uri)
-                    # Resource content is a list of ReadResourceResult
-                    # We assume text content for now
-                    parsed_result = json.loads(result.contents[0].text)
-                    if isinstance(parsed_result, list):
-                        return {"result": parsed_result}
-                    return parsed_result
+        result = await session.call_tool(tool_name, arguments)
 
-                result = await session.call_tool(tool_name, arguments)
+        if result.isError:
+            raise RuntimeError(f"Tool execution failed: {result.content}")
 
-                if result.isError:
-                    raise RuntimeError(f"Tool execution failed: {result.content}")
+        # MCP returns a list of content (TextContent, ImageContent, etc.)
+        # For our use case, we mostly expect simplified text/JSON back.
+        # We'll join text content.
+        output_text = ""
+        for content in result.content:
+            if content.type == "text":
+                output_text += content.text
 
-                # MCP returns a list of content (TextContent, ImageContent, etc.)
-                # For our use case, we mostly expect simplified text/JSON back.
-                # We'll join text content.
-                output_text = ""
-                for content in result.content:
-                    if content.type == "text":
-                        output_text += content.text
+        # Try parsing as JSON if possible, otherwise return string
+        try:
+            parsed_result = json.loads(output_text)
+            if isinstance(parsed_result, list):
+                return {"result": parsed_result}
+            return parsed_result
+        except:
+            return {"content": output_text}
 
-                # Try parsing as JSON if possible, otherwise return string
-                try:
-                    parsed_result = json.loads(output_text)
-                    if isinstance(parsed_result, list):
-                        return {"result": parsed_result}
-                    return parsed_result
-                except:
-                    return {"content": output_text}
     except Exception as e:
         import traceback
 
@@ -216,18 +243,24 @@ async def execute_tool(tool_name: str, arguments: dict):
         raise
 
 
-async def get_resource(uri: str) -> dict:
+async def get_resource(uri: str, session: ClientSession = None) -> dict:
     """
     Directly reads a resource from the MCP server.
     Useful for internal context validation.
     """
     try:
-        async with sse_client(SSE_ENDPOINT) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                result = await session.read_resource(uri)
-                parsed_result = json.loads(result.contents[0].text)
-                return parsed_result
+        if session:
+             return await _read_resource_internal(session, uri)
+
+        async with session_scope() as session:
+             return await _read_resource_internal(session, uri)
     except Exception as e:
         logger.error(f"Error reading resource {uri}: {e}")
         return {}
+
+async def _read_resource_internal(session: ClientSession, uri: str) -> dict:
+    result = await session.read_resource(uri)
+    # Resource content is a list of ReadResourceResult
+    # We assume text content for now
+    parsed_result = json.loads(result.contents[0].text)
+    return parsed_result
