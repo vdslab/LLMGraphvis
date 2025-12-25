@@ -4,6 +4,15 @@ import * as d3 from 'd3';
 const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick, onBackgroundClick }) => {
   const svgRef = useRef();
 
+  // Keep refs for callbacks to avoid re-triggering the effect
+  const onNodeClickRef = useRef(onNodeClick);
+  const onBackgroundClickRef = useRef(onBackgroundClick);
+
+  useEffect(() => {
+    onNodeClickRef.current = onNodeClick;
+    onBackgroundClickRef.current = onBackgroundClick;
+  }, [onNodeClick, onBackgroundClick]);
+
   useEffect(() => {
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove(); // Clear previous
@@ -15,8 +24,8 @@ const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick, onBackgro
 
     // 0. Bind background click
     svg.on("click", (event) => {
-        if (onBackgroundClick) {
-            onBackgroundClick(event);
+        if (onBackgroundClickRef.current) {
+            onBackgroundClickRef.current(event);
         }
     });
 
@@ -92,8 +101,8 @@ const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick, onBackgro
       .on("click", (event, d) => {
         // Prevent background click
         event.stopPropagation();
-        if (onNodeClick) {
-          onNodeClick(d);
+        if (onNodeClickRef.current) {
+          onNodeClickRef.current(d);
         }
       });
 
@@ -133,7 +142,7 @@ const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick, onBackgro
     // Be careful with d3.zoom consuming clicks.
     // However, SVG click listener should typically fire if not stopped.
 
-  }, [nodes, links, showLabels, onNodeClick, onBackgroundClick]);
+  }, [nodes, links, showLabels]); // Dependencies updated to exclude callbacks
 
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
