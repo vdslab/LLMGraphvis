@@ -107,7 +107,7 @@ class GraphVisAgent:
         final_text_content = ""
 
         # Using a context object to track state across the loop (e.g. network_id updates)
-        loop_context = {"network_id": network_id}
+        loop_context = {"network_id": network_id, "tools_executed": False}
 
         while iteration < max_iterations:
             iteration += 1
@@ -126,12 +126,21 @@ class GraphVisAgent:
                     final_text_content, history, loop_context, queue, all_tools, tool_config
                 ):
                     # Lazy Intent Detected & Alert Added to History.
-                    # We must trigger a NEW generation to "retry".
                     logger.info("Lazy Intent detected. Retrying generation...")
                     current_response = await self._gemini_generate(history, all_tools, tool_config)
-                    # Reset text because we want the *correct* response now? 
-                    # Usually we keep the "I will..." text as the model's "Thought" and force it to Act.
-                    # So we just loop again with the new response stream.
+                    continue
+
+                # NEW: If tools were executed but we have no meaningful response text, force a summary.
+                # We check loop_context to see if we did anything.
+                if loop_context.get("tools_executed", False) and not final_text_content.strip():
+                    logger.info("Tools executed but no final text. Forcing summary generation.")
+                    # We inject a user prompt to force the model to summarize.
+                    # Note: history already has the tool outputs appended in previous iterations.
+                    summary_request = "The actions have been completed. Please provide a concise final report summarizing what was done (e.g., 'Layout updated', 'Metrics calculated') and any relevant findings."
+                    history.append(types.Content(role="user", parts=[types.Part.from_text(text=summary_request)]))
+                    
+                    # Generate again
+                    current_response = await self._gemini_generate(history, all_tools, tool_config)
                     continue
                 
                 # If we are truly done (no tools, no lazy intent), exit.
@@ -301,6 +310,9 @@ class GraphVisAgent:
         
         if text_content:
             function_calls_parts.append(types.Part.from_text(text=text_content))
+
+        if function_calls:
+            loop_context["tools_executed"] = True
 
         for fc in function_calls:
             function_calls_parts.append(types.Part(function_call=fc))
