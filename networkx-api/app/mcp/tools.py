@@ -33,9 +33,15 @@ def initialize_network(network_id: int, graphml_data: str) -> dict:
     """
     db = database.SessionLocal()
     try:
+        import logging
+        logger = logging.getLogger("app.mcp.tools")
+        logger.info(f"DEBUG: initialize_network args types: network_id={type(network_id)}, graphml_data={type(graphml_data)}, db={type(db)}")
+        
         try:
             # Importer handles parsing and collision logic
+            logger.info("Calling importer.parse_and_save_graphml...")
             final_network_id = importer.parse_and_save_graphml(network_id, graphml_data, db)
+            logger.info(f"Importer returned: {final_network_id}")
             
             # 3. Calculate Default Layout
             layout.calculate_layout(db, final_network_id, "forceatlas2")
