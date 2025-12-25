@@ -36,7 +36,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 | `update_network_metadata` | ネットワークの名前や説明（description）を更新する。LLMがネットワークのコンテキスト（例：「これは空手クラブの相関図です」）を理解・保持するために使用する。 |
 | `calculate_centrality` | 中心性指標を計算して永続化する。具体的には、まず属性の**定義**（例: 'degree_centrality'）が`node_attributes`に存在するか確認し、なければ`network_id`に紐付けて作成する。次に、各ノードの計算**値**を、定義のIDを参照して`node_attribute_values`に保存する。レスポンスは計算完了のステータスのみを返す。 |
 | `calculate_layout` | レイアウト座標を計算して永続化する。`layout_name`（例: 'forceatlas2', 'spiral'）を受け取り、`{layout_name}_x`, `{layout_name}_y` という属性として保存する。レスポンスは計算完了のステータスのみを返す。 |
-| `generate_visualization` | レイアウト、ノードサイズ、ノードカラー等の視覚的割り当てに関するすべてのパラメータを受け取り、最終的なレンダリングデータを動的に生成して返す。**レイアウト計算は行わず、計算済みの座標データを使用する。新しいレイアウトを適用する場合や、中心性指標などを利用する場合は、事前に`calculate_layout`や`calculate_centrality`を呼び出す必要がある。** 指定された属性やレイアウトが存在しない場合はエラーを返す。サブグラフのオーバーレイ表示もサポートする。 |
+| `generate_visualization` | レイアウト、ノードサイズ、ノードカラー等の視覚的割り当てに関するすべてのパラメータを受け取り、最終的なレンダリングデータを動的に生成して返す。**パラメータが省略（None）された場合は、以前に適用された設定が維持される（Partial Update）。** **レイアウト計算は行わず、計算済みの座標データを使用する。新しいレイアウトを適用する場合や、中心性指標などを利用する場合は、事前に`calculate_layout`や`calculate_centrality`を呼び出す必要がある。** 指定された属性やレイアウトが存在しない場合はエラーを返す。サブグラフのオーバーレイ表示もサポートする。 |
 | `create_ego_network` | 指定されたノードを中心としたEgo Graph（指定ホップ数以内のノード群）を新しいネットワークとして作成する。**同じ条件（中心ノード、半径）で作成されたサブグラフが既に存在する場合は、新規作成せずに既存のネットワークを再利用する。レスポンスは辞書形式で、`network_id`を含む。** |
 | `create_subgraph_from_nodes` | 指定されたノードIDのリストからサブグラフを新しいネットワークとして作成する。**ノードリストに基づいて一意な名前（`Subgraph (A,B,...)`）を生成し、同名のサブグラフが存在する場合は再利用する。レスポンスは辞書形式で、`network_id`を含む。** |
 | `create_path_subgraph` | 指定された2ノード間の最短経路をサブグラフとして新しいネットワークとして作成する。**既存のパスサブグラフがある場合は再利用する。レスポンスは辞書形式で、`network_id`を含む。** |
@@ -161,6 +161,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
   - `focus_config`: dict (Optional)
   - `node_label_config`: dict (Optional)
   - `custom_node_colors`: list[dict] (Optional)
+  - **Note**: 各設定（Config）引数が省略（None）された場合、その設定項目については**以前の状態が維持**されます（Partial Update）。設定をリセットしたい場合は、空の辞書 `{}` を渡してください。
 
 **Config Pattern:** Keys correspond to the API implementation. Use `generate_visualization` carefully to create rich, meaningful visualizations.
 
