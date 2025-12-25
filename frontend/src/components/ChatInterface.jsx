@@ -162,7 +162,7 @@ const ChatInterface = ({ selectedNode }) => {
         )}
       </div>
       
-      <form onSubmit={handleSend} style={{ padding: '1rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '0.5rem', alignItems: 'flex-end' }}>
+      <form onSubmit={handleSend} style={{ padding: '1rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '0.5rem' }}>
         <textarea
           ref={textareaRef}
           className="input"
@@ -184,11 +184,11 @@ const ChatInterface = ({ selectedNode }) => {
               handleSend(e);
             }
           }}
-          placeholder="Type a message... (Shift+Enter for new line)"
+          placeholder="Type a message..."
           disabled={isLoading}
           rows={1}
         />
-        <button type="submit" className="btn btn-primary" disabled={isLoading} style={{ height: 'fit-content' }}>
+        <button type="submit" className="btn btn-primary" disabled={isLoading}>
           Send
         </button>
       </form>
