@@ -23,7 +23,7 @@ def recommend_visualization_prompt(network_id: int) -> list[dict]:
                 "type": "text",
                 "text": f"""I need a recommendation for visualizing network {network_id}.
 1. **MANDATORY**: Check available attributes first: `read_resource("network://{network_id}/attributes/nodes")`. 
-2. If distinct attributes exist (like 'country', 'type'), propose a `generate_visualization` call using them for `node_color_config` or `node_size_config`.
+2. If distinct attributes exist (like 'country', 'type'), propose a `generate_visualization` call using them for `node_color_config` and/or `node_size_config`.
 3. If NO interesting attributes exist, use a structural metric like 'degree' (calculate it first if needed) or just use the default blue color.
 4. **Layout**: Default to 'forceatlas2' unless the user asks for a specific structure (like 'circle').
 5. **Output**: providing the specific tool call arguments.""",

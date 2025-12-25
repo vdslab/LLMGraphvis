@@ -34,8 +34,8 @@ class NodeSizeConfig(BaseModel):
     attribute: str = Field(
         ..., description="Name of the node attribute to map to size."
     )
-    min: float = Field(..., description="Minimum node radius.")
-    max: float = Field(..., description="Maximum node radius.")
+    min: Optional[float] = Field(None, description="Minimum node radius (default: 5).")
+    max: Optional[float] = Field(None, description="Maximum node radius (default: 20).")
     default: Optional[float] = Field(
         None, description="Default radius if attribute is missing."
     )
@@ -45,8 +45,8 @@ class EdgeWidthConfig(BaseModel):
     attribute: str = Field(
         ..., description="Name of the edge attribute to map to width."
     )
-    min: float = Field(..., description="Minimum edge width.")
-    max: float = Field(..., description="Maximum edge width.")
+    min: Optional[float] = Field(None, description="Minimum edge width (default: 1).")
+    max: Optional[float] = Field(None, description="Maximum edge width (default: 10).")
     default: Optional[float] = Field(
         None, description="Default width if attribute is missing."
     )
