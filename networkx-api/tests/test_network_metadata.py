@@ -1,5 +1,5 @@
 from common import models
-from app.logic import network_service
+from app.logic import network_metadata
 
 
 def test_get_network_metadata(db):
@@ -9,7 +9,7 @@ def test_get_network_metadata(db):
     db.commit()
 
     # Execute
-    metadata = network_service.get_network_metadata(db, network.id)
+    metadata = network_metadata.get_network_metadata(db, network.id)
 
     # Verify
     assert metadata["id"] == network.id
@@ -25,7 +25,7 @@ def test_update_network_metadata(db):
     db.commit()
 
     # Execute
-    msg = network_service.update_network_metadata(
+    msg = network_metadata.update_network_metadata(
         db, network.id, name="NewName", description="NewDesc"
     )
 
@@ -55,7 +55,7 @@ def test_get_network_structure(db):
     db.commit()
 
     # Execute
-    structure = network_service.get_network_structure(db, network.id)
+    structure = network_metadata.get_network_structure(db, network.id)
 
     # Verify
     assert structure["node_count"] == 2
@@ -75,7 +75,7 @@ def test_get_subgraphs(db):
     db.commit()
 
     # Execute
-    subgraphs = network_service.get_subgraphs(db, parent.id)
+    subgraphs = network_metadata.get_subgraphs(db, parent.id)
 
     # Verify
     assert len(subgraphs) == 1

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
 const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick, onBackgroundClick }) => {

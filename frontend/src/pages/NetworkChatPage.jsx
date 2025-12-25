@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useChatStore } from '../stores/chatStore';
 import { useNetworkStore } from '../stores/networkStore';
@@ -14,7 +14,6 @@ const NetworkChatPage = () => {
   const { isAuthenticated } = useAuthStore();
   const {
     setChatId,
-    chatId,
     fetchMessages,
     uploadNetwork,
     createChat
@@ -23,7 +22,7 @@ const NetworkChatPage = () => {
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
   const [sseError, setSseError] = useState(null);
-  const [retryTrigger, setRetryTrigger] = useState(0);
+
 
   // Sidebar Logic
   const [showChatList, setShowChatList] = useState(false);
@@ -297,17 +296,17 @@ const NetworkChatPage = () => {
   // Resizing logic
   const [sidebarWidth, setSidebarWidth] = useState(window.innerWidth / 4);
   const [isResizing, setIsResizing] = useState(false);
-  const sidebarRef = useRef(null);
 
-  const startResizing = React.useCallback((mouseDownEvent) => {
+
+  const startResizing = useCallback(() => {
     setIsResizing(true);
   }, []);
 
-  const stopResizing = React.useCallback(() => {
+  const stopResizing = useCallback(() => {
     setIsResizing(false);
   }, []);
 
-  const resize = React.useCallback(
+  const resize = useCallback(
     (mouseMoveEvent) => {
       if (isResizing) {
         const newWidth = window.innerWidth - mouseMoveEvent.clientX;

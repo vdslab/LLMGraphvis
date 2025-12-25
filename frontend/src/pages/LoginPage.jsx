@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 
@@ -13,7 +13,7 @@ const LoginPage = () => {
   
   const { isAuthenticated } = useAuthStore();
   
-  React.useEffect(() => {
+  useEffect(() => {
     if (isAuthenticated) {
       navigate('/');
     }
@@ -63,7 +63,7 @@ const LoginPage = () => {
           </button>
         </form>
         <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-          Don't have an account? <a href="/register" className="link">Sign up</a>
+          Don&apos;t have an account? <a href="/register" className="link">Sign up</a>
         </div>
       </div>
     </div>
