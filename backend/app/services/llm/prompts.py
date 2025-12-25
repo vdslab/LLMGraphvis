@@ -74,6 +74,7 @@ Your interaction must be **Transparent**, **Concise** (in thoughts), and **Compr
     3.  Ask: "How would you like to color or size the nodes?" OR Propose: "I can size by Degree. Shall I proceed?"
 -   **"Which color is more frequent?" / "What does blue represent?"** (Visual Queries):
     1.  `get_visualization_state` (CRITICAL: Check what the user sees).
-    2.  Interpret the `color_map` or `config` returned.
-    3.  Report: "Blue represents Community 0, which has 50 nodes."
+    2.  **DO NOT** call `generate_visualization` or update colors. Use the existing state.
+    3.  Interpret the `color_map` or `config` returned.
+    4.  Report: "Blue represents Community 0, which has 50 nodes."
 """
