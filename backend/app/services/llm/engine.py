@@ -382,18 +382,20 @@ class GraphVisAgent:
             new_id = result["new_network_id"]
             logger.info(f"Context switch: {current_network_id} -> {new_id}")
             
-            # Update DB (omitted specific DB logic for brevity, assuming service layer handles it or simple update)
+            # Auto-Visualize
+            vis_data = await self._auto_generate_visualization(new_id, queue, session)
+            
+            # Update DB
             if self.db:
                 chat = self.db.query(models.Chat).filter(models.Chat.id == chat_id).first()
                 if chat:
                     chat.network_id = new_id
+                    if vis_data:
+                        chat.visualization_state = vis_data
                     self.db.commit()
             
             # Update Loop Context
             loop_context["network_id"] = new_id
-            
-            # Auto-Visualize
-            await self._auto_generate_visualization(new_id, queue, session)
             return
 
         # 2. Visualization Updates
@@ -412,7 +414,7 @@ class GraphVisAgent:
                     chat.visualization_state = vis_data
                     self.db.commit()
 
-    async def _auto_generate_visualization(self, network_id: int, queue: Any, session: Any):
+    async def _auto_generate_visualization(self, network_id: int, queue: Any, session: Any) -> Optional[Dict]:
         """Triggers visualization generation for a new network context."""
         try:
             vis_data = await mcp_client.execute_tool(
@@ -420,8 +422,10 @@ class GraphVisAgent:
             )
             if isinstance(vis_data, dict) and "nodes" in vis_data:
                 await self._emit_render_update(queue, vis_data)
+                return vis_data
         except Exception as e:
             logger.error(f"Auto-vis failed for {network_id}: {e}")
+            return None
 
     async def _get_all_tools(self) -> List[types.Tool]:
         mcp_tools = await mcp_client.get_tools_as_gemini_functions()
