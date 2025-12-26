@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from app.core.mcp import mcp
 
 from app.core import database
@@ -67,7 +67,7 @@ def calculate_centrality(network_id: int, centrality_type: str) -> str:
     """Calculates specific centrality for the network."""
     db = database.SessionLocal()
     try:
-        centrality.calculate_centrality(db, network_id, centrality_type)
+        centrality.calculate_centrality(network_id, centrality_type, db)
         return f"{centrality_type} centrality calculated."
     except ValueError as e:
         return f"Error: {str(e)}"
@@ -80,7 +80,7 @@ def calculate_community(network_id: int, algorithm: str = "louvain") -> str:
     """Detects communities in the network."""
     db = database.SessionLocal()
     try:
-        community.detect_communities(db, network_id, algorithm)
+        community.calculate_community(network_id, algorithm, db)
         return f"Communities detected using {algorithm}."
     except ValueError as e:
         return f"Error: {str(e)}"
@@ -326,7 +326,7 @@ def search_nodes(
     """
     db = database.SessionLocal()
     try:
-        nodes = search.search_nodes(db, network_id, query, limit)
+        nodes = search.search_nodes(network_id, query, limit=limit, db=db)
         return f"Found {len(nodes)} nodes: {nodes}"
     finally:
         db.close()
@@ -455,17 +455,26 @@ def update_layout(
 def update_node_color(
     network_id: int,
     attribute: str,
-    scale_type: str = "CATEGORICAL"
+    scale_type: str = "CATEGORICAL",
+    mapping: Optional[Dict[str, str]] = None,
+    default_color: Optional[str] = None,
+    fixed: bool = False
 ) -> dict:
     """
     Updates the node coloring based on an attribute.
     scale_type options: "CATEGORICAL" (text), "LINEAR" (numbers), "RANKING" (top values).
+    mapping: Optional dictionary for converting values to colors (e.g., {"Japanese": "red"}).
+    default_color: Fallback color for nodes not matching the mapping.
+    fixed: If True, only use colors from 'mapping' (plus default_color), do not auto-generate others.
     """
     db = database.SessionLocal()
     try:
         config = NodeColorConfig(
             attribute=attribute,
-            scale_type=scale_type
+            scale_type=scale_type,
+            color_map=mapping,
+            default_color=default_color,
+            fixed_mapping=fixed
         )
         return visualization_builder.build_visualization(
             db, network_id, node_color_config=config

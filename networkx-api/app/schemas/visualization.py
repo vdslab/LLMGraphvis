@@ -28,6 +28,9 @@ class NodeColorConfig(BaseModel):
     default_color: Optional[str] = Field(
         None, description="Fallback color if attribute is missing or no rule matches."
     )
+    fixed_mapping: bool = Field(
+        False, description="If True, do not auto-generate colors for values not in color_map."
+    )
 
 
 class NodeSizeConfig(BaseModel):

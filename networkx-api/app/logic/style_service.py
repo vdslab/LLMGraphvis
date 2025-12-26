@@ -136,26 +136,27 @@ class StyleService:
                 if needed_values:
                     # We only support 20 distinct colors + Gray
                     limit = 20
-                    # Check how many colors already used in provided_map to avoid collisions?
                     # Simplicity: Just assign from palette to the top N needed values.
 
-                    palette = utils.generate_categorical_palette(limit)
+                    is_fixed = node_color_config.get("fixed_mapping", False)
+                    if not is_fixed:
+                        palette = utils.generate_categorical_palette(limit)
 
-                    # Values that are "Top N" get a color.
-                    # Others get nothing in the map -> Fallback to default.
+                        # Values that are "Top N" get a color.
+                        # Others get nothing in the map -> Fallback to default.
 
-                    assigned_count = len(categorical_color_map)
-                    for val in needed_values:
-                        if assigned_count < limit:
-                            # Find next unused color in palette?
-                            # For now, simplistic assignment:
-                            if assigned_count < len(palette):
-                                categorical_color_map[val] = palette[assigned_count]
-                                assigned_count += 1
-                        else:
-                            # Reached limit, stop assigning distinct colors.
-                            # These will use default_color.
-                            break
+                        assigned_count = len(categorical_color_map)
+                        for val in needed_values:
+                            if assigned_count < limit:
+                                # Find next unused color in palette?
+                                # For now, simplistic assignment:
+                                if assigned_count < len(palette):
+                                    categorical_color_map[val] = palette[assigned_count]
+                                    assigned_count += 1
+                            else:
+                                # Reached limit, stop assigning distinct colors.
+                                # These will use default_color.
+                                break
 
             # Update the config in place so it persists
             node_color_config["color_map"] = categorical_color_map

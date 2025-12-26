@@ -82,6 +82,9 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
     elif layout_name == "spiral":
         pos = nx.spiral_layout(G)
 
+    elif layout_name == "random":
+        pos = nx.random_layout(G, seed=42)
+
     else:
         raise ValueError(f"Unknown layout algorithm: {layout_name}")
 

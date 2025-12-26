@@ -564,9 +564,30 @@ class VisualizationBuilder:
         )
 
 
+
+def get_current_visualization(db: Session, network_id: int) -> Dict[str, Any]:
+    """
+    Retrieves the current visualization state (configs) without re-generating it.
+    """
+    network = db.query(models.Network).filter(models.Network.id == network_id).first()
+    if not network:
+        return {}
+    
+    return {
+        "layout_name": network.last_layout_name,
+        "node_size": network.last_node_size_config,
+        "node_color": network.last_node_color_config,
+        "edge_width": network.last_edge_width_config,
+        "edge_color": network.last_edge_color_config,
+        "node_label": network.last_node_label_config
+    }
+
+
+
 def build_visualization(
     db: Session,
     network_id: int,
+    layout_name: Optional[str] = None,
     node_color_config: Optional[Any] = None,
     node_size_config: Optional[Any] = None,
     edge_width_config: Optional[Any] = None,
@@ -589,6 +610,7 @@ def build_visualization(
     builder = VisualizationBuilder(
         network_id=network_id,
         db=db,
+        layout_name=layout_name,
         node_color_config=nc_conf,
         node_size_config=ns_conf,
         edge_width_config=ew_conf,
