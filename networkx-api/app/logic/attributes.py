@@ -198,7 +198,7 @@ def get_or_create_attribute(
 
 
 def delete_attribute_values(
-    network_id: int, attribute_id: int, model_val_class: Type[models.Base], db: Session
+    network_id: int, attribute_id: int, model_val_class: Type[models.Base], db: Session, commit: bool = True
 ) -> None:
     """
     Delete all attribute values for a specific attribute in a network.
@@ -208,6 +208,7 @@ def delete_attribute_values(
         attribute_id: The ID of the attribute definition.
         model_val_class: The model class for values (NodeAttributeValue or EdgeAttributeValue).
         db: Database session.
+        commit: Whether to commit the transaction (default: True).
     """
     # Delete children first (safe approach)
     # Find IDs to delete
@@ -238,7 +239,9 @@ def delete_attribute_values(
     db.query(model_val_class).filter(
         model_val_class.attribute_id == attribute_id
     ).delete(synchronize_session=False)
-    db.commit()
+    
+    if commit:
+        db.commit()
 
 
 def get_attribute_stats(
