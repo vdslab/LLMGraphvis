@@ -14,30 +14,13 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
     logger = get_logger(__name__)
     
     # Reconstruct graph from DB - OPTIMIZED: Fetch only needed columns
-    G = nx.Graph()
-    
-    # query(models.Node.id, models.Node.node_id) returns list of Row/Tuple
+    # Reconstruct graph from DB
+    from .utils.graph_builder import build_graph_from_db
+    G = build_graph_from_db(network_id, db)
+
+    # Need node_map for saving results (str_id -> db_id)
     nodes_query = db.query(models.Node.id, models.Node.node_id).filter(models.Node.network_id == network_id).all()
-    
-    id_map = {row.id: row.node_id for row in nodes_query}  # db_id -> str_id
-    node_map = {row.node_id: row.id for row in nodes_query}  # str_id -> db_id
-
-    for row in nodes_query:
-        G.add_node(row.node_id)
-        
-    logger.info(f"Layout calculation for Network {network_id}: {len(G.nodes)} nodes loaded.")
-
-    edges_query = db.query(models.Edge.source_node_id, models.Edge.target_node_id).filter(models.Edge.network_id == network_id).all()
-    
-    edge_count = 0
-    for row in edges_query:
-        u = id_map.get(row.source_node_id)
-        v = id_map.get(row.target_node_id)
-        if u and v:
-            G.add_edge(u, v)
-            edge_count += 1
-            
-    logger.info(f"Layout calculation for Network {network_id}: {edge_count} edges loaded.")
+    node_map = {row.node_id: row.id for row in nodes_query}
 
     # Calculate Layout
     # Dynamic parameter adjustment based on network size

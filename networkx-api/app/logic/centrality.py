@@ -9,21 +9,15 @@ from .attributes import delete_attribute_values, get_or_create_attribute
 
 
 def calculate_centrality(network_id: int, centrality_type: str, db: Session):
-    # Reconstruct graph (Same as layout)
-    G = nx.Graph()
-    nodes = db.query(models.Node).filter(models.Node.network_id == network_id).all()
-    id_map = {n.id: n.node_id for n in nodes}
+    # Reconstruct graph (Optimized)
+    from .utils.graph_builder import build_graph_from_db
+    G = build_graph_from_db(network_id, db)
+
+    # Need node_map for saving results later (node_id -> db_id)
+    # We can fetch this efficiently or reconstruct it.
+    # Since we need to map back to DB IDs for saving, let's fetch map.
+    nodes = db.query(models.Node.id, models.Node.node_id).filter(models.Node.network_id == network_id).all()
     node_map = {n.node_id: n.id for n in nodes}
-
-    for n in nodes:
-        G.add_node(n.node_id)
-
-    edges = db.query(models.Edge).filter(models.Edge.network_id == network_id).all()
-    for e in edges:
-        u = id_map.get(e.source_node_id)
-        v = id_map.get(e.target_node_id)
-        if u and v:
-            G.add_edge(u, v)
 
     # Calculate Centrality
     if centrality_type == "degree":
