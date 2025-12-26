@@ -17,6 +17,17 @@ export const useNetworkRealtime = (url, { delay = 0, onMessage, onError, eventHa
   const [lastMessage, setLastMessage] = useState(null);
   const eventSourceRef = useRef(null);
 
+  // Use refs for callbacks to avoid re-connecting when they change
+  const onMessageRef = useRef(onMessage);
+  const onErrorRef = useRef(onError);
+  const eventHandlersRef = useRef(eventHandlers);
+
+  useEffect(() => {
+    onMessageRef.current = onMessage;
+    onErrorRef.current = onError;
+    eventHandlersRef.current = eventHandlers;
+  }, [onMessage, onError, eventHandlers]);
+
   const connect = useCallback(() => {
     if (!url) return;
 
@@ -39,27 +50,32 @@ export const useNetworkRealtime = (url, { delay = 0, onMessage, onError, eventHa
       console.error('SSE Connection Error', e);
       setIsConnected(false);
       setError('Connection lost. Retrying...');
-      if (onError) onError(e);
-      // EventSource auto-retries, but we track state here.
+      if (onErrorRef.current) onErrorRef.current(e);
     };
 
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
         setLastMessage(data);
-        if (onMessage) onMessage(data);
+        if (onMessageRef.current) onMessageRef.current(data);
       } catch (err) {
         console.warn('Failed to parse SSE message JSON', event.data);
       }
     };
 
-    // Custom Event Handlers (e.g., 'system_message', 'render_update')
-    if (eventHandlers) {
-      Object.entries(eventHandlers).forEach(([type, handler]) => {
+    // Custom Event Handlers
+    // We bind these once. If handler logic changes, the Ref inside the wrapper will catch it.
+    // However, we need to iterate over the *initial* keys which shouldn't change often.
+    // Ideally eventHandlers keys are static.
+    if (eventHandlersRef.current) {
+      Object.keys(eventHandlersRef.current).forEach((type) => {
         es.addEventListener(type, (event) => {
           try {
             const data = JSON.parse(event.data);
-            handler(data);
+            // Always call the latest handler
+            if (eventHandlersRef.current && eventHandlersRef.current[type]) {
+                eventHandlersRef.current[type](data);
+            }
           } catch (err) {
             console.error(`Error handling event '${type}'`, err);
           }
@@ -67,7 +83,7 @@ export const useNetworkRealtime = (url, { delay = 0, onMessage, onError, eventHa
       });
     }
 
-  }, [url, onMessage, onError, eventHandlers]);
+  }, [url]); // ONLY re-connect if URL changes.
 
   useEffect(() => {
     let timeoutId;
