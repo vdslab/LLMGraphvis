@@ -171,3 +171,42 @@ def _get_nodes_matching_condition(
 
     results = query.all()
     return set([res[0] for res in results])
+
+
+def get_nodes_by_filter(
+    network_id: int, conditions: List[AttributeCondition], db: Session
+) -> List[dict]:
+    """
+    Returns a list of node details (id, label) that match the conditions.
+    Does NOT create a subgraph, just lists them.
+    """
+    # Start with all node IDs in the network
+    all_query = db.query(models.Node).filter(models.Node.network_id == network_id)
+    
+    # Use sets for intersection
+    candidate_node_ids = set([node.node_id for node in all_query.all()])
+    
+    if not candidate_node_ids:
+        return []
+
+    for condition in conditions:
+        matched_ids = _get_nodes_matching_condition(network_id, condition, db)
+        candidate_node_ids &= matched_ids
+        
+        if not candidate_node_ids:
+            return []
+            
+    # Fetch details for the remaining nodes
+    final_nodes = (
+        db.query(models.Node)
+        .filter(
+            models.Node.network_id == network_id,
+            models.Node.node_id.in_(candidate_node_ids)
+        )
+        .all()
+    )
+    
+    return [
+        {"id": node.node_id, "label": node.label}
+        for node in final_nodes
+    ]

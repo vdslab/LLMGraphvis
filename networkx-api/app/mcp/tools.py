@@ -507,5 +507,85 @@ def update_node_size(
         )
     except Exception as e:
         return {"error": str(e)}
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def get_node_details(
+    network_id: int,
+    node_id: str
+) -> dict:
+    """
+    Returns full details for a specific node, including all attributes.
+    """
+    db = database.SessionLocal()
+    try:
+        from app.logic import search
+        details = search.get_node_details(network_id, node_id, db)
+        if not details:
+            return {"error": f"Node '{node_id}' not found in network {network_id}."}
+        return details
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def filter_nodes(
+    network_id: int,
+    attribute_name: str,
+    value: Optional[str] = None,
+    min_value: Optional[float] = None,
+    max_value: Optional[float] = None,
+    limit: int = 100
+) -> dict:
+    """
+    Lists nodes that match a specific attribute condition.
+    Does NOT create a new network, just returns a list of matching nodes (id, label).
+    
+    Args:
+        network_id: ID of the network.
+        attribute_name: Name of the attribute to filter by.
+        value: Exact string match for text attributes OR exact float match for numeric.
+        min_value: Minimum value for numeric range.
+        max_value: Maximum value for numeric range.
+        limit: Max number of nodes to return (default 100).
+    """
+    db = database.SessionLocal()
+    try:
+        from app.logic import filter as filter_logic
+        from app.schemas.filter import AttributeCondition, Range
+
+        # Construct condition
+        condition = AttributeCondition(attribute_name=attribute_name)
+        
+        if value is not None:
+             # Try to parse as float if it looks like a number, otherwise keep as string
+            try:
+                condition.categories = [float(value)]
+            except ValueError:
+                condition.categories = [value]
+        
+        if min_value is not None or max_value is not None:
+            condition.ranges = [Range(min=min_value, max=max_value)]
+            
+        nodes = filter_logic.get_nodes_by_filter(network_id, [condition], db)
+        
+        # Limit results
+        truncated = False
+        if len(nodes) > limit:
+            nodes = nodes[:limit]
+            truncated = True
+            
+        return {
+            "count": len(nodes),
+            "truncated": truncated,
+            "nodes": nodes
+        }
+    except Exception as e:
+        return {"error": str(e)}
     finally:
         db.close()
