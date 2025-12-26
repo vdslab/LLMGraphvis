@@ -44,7 +44,7 @@ def initialize_network(network_id: int, graphml_data: str) -> dict:
             logger.info(f"Importer returned: {final_network_id}")
             
             # 3. Calculate Default Layout
-            layout.calculate_layout(db, final_network_id, "forceatlas2")
+            layout.calculate_layout(final_network_id, "forceatlas2", db)
 
             # 4. Generate Visualization
             vis_data = visualization_builder.build_visualization(db, final_network_id)
@@ -91,7 +91,7 @@ def calculate_layout(network_id: int, layout_name: str) -> str:
     """Calculates a graph layout and saves x, y coordinates as node attributes."""
     db = database.SessionLocal()
     try:
-        layout.calculate_layout(db, network_id, layout_name)
+        layout.calculate_layout(network_id, layout_name, db)
         return f"Layout {layout_name} calculated."
     except ValueError as e:
         return f"Error: {str(e)}"
@@ -120,7 +120,7 @@ def generate_visualization(
     try:
         # 1. Update Layout if requested
         if layout_name:
-            layout.calculate_layout(db, network_id, layout_name)
+            layout.calculate_layout(network_id, layout_name, db)
 
         # 2. Build Visualization
         vis_data = visualization_builder.build_visualization(
