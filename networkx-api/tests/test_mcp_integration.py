@@ -35,7 +35,7 @@ def test_initialize_network_structure(mock_importer, mock_layout, mock_builder):
         
         # Verify
         mock_importer.assert_called_with(100, "<xml></xml>", mock_db)
-        mock_layout.assert_called_with(mock_db, 101, "forceatlas2")
+        mock_layout.assert_called_with(101, "forceatlas2", mock_db)
         mock_builder.assert_called_with(mock_db, 101)
         
         assert result["network_id"] == 101

@@ -519,41 +519,33 @@ class VisualizationBuilder:
             )
 
     def _fetch_node_data(self, net_id, attrs):
-        if not attrs:
-            return {}, {}
-        defs = (
-            self.db.query(models.NodeAttribute)
-            .filter(
-                models.NodeAttribute.network_id == net_id,
-                models.NodeAttribute.attribute_name.in_(attrs),
-            )
-            .all()
+        return self._fetch_element_data(
+            net_id, attrs, models.NodeAttribute,
+            models.NodeAttributeValue, models.NodeFloatAttributeValue, models.NodeTextAttributeValue
         )
-        attr_map = {attr.attribute_name: attr.id for attr in defs}
-        values = self._fetch_attribute_values(
-            models.NodeAttributeValue,
-            models.NodeFloatAttributeValue,
-            models.NodeTextAttributeValue,
-            list(attr_map.values()),
-        )
-        return attr_map, values
 
     def _fetch_edge_data(self, net_id, attrs):
+        return self._fetch_element_data(
+            net_id, attrs, models.EdgeAttribute,
+            models.EdgeAttributeValue, models.EdgeFloatAttributeValue, models.EdgeTextAttributeValue
+        )
+
+    def _fetch_element_data(self, net_id, attrs, attribute_model, val_model, float_val_model, text_val_model):
         if not attrs:
             return {}, {}
         defs = (
-            self.db.query(models.EdgeAttribute)
+            self.db.query(attribute_model)
             .filter(
-                models.EdgeAttribute.network_id == net_id,
-                models.EdgeAttribute.attribute_name.in_(attrs),
+                attribute_model.network_id == net_id,
+                attribute_model.attribute_name.in_(attrs),
             )
             .all()
         )
         attr_map = {attr.attribute_name: attr.id for attr in defs}
         values = self._fetch_attribute_values(
-            models.EdgeAttributeValue,
-            models.EdgeFloatAttributeValue,
-            models.EdgeTextAttributeValue,
+            val_model,
+            float_val_model,
+            text_val_model,
             list(attr_map.values()),
         )
         return attr_map, values

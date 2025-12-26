@@ -8,7 +8,7 @@ from app.core.database import engine
 from app.middleware.logging import LoggingMiddleware
 
 # Create database tables
-# Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)
 
 # Create FastAPI app with Swagger UI configuration
 app = FastAPI(
