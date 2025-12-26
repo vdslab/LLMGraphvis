@@ -141,11 +141,11 @@ def generate_visualization(
 
 
 @mcp.tool()
-def create_subgraph(
+def create_subgraph_from_nodes(
     network_id: int,
-    parent_network_id: int,
     node_ids: List[str],
-    description: str
+    description: str = "Custom subgraph",
+    preserve_layout: bool = False
 ) -> dict:
     """
     Creates a NEW subgraph network from a list of node IDs.
@@ -153,23 +153,33 @@ def create_subgraph(
     """
     db = database.SessionLocal()
     try:
-        new_id = subgraph.create_subgraph_from_nodes(
-            db, parent_network_id, node_ids, description, network_id
+        from app.logic import subgraph
+        # Correct argument mapping:
+        # source_network_id, node_ids, db, suffix, preserve_layout, description
+        result = subgraph.create_subgraph_from_nodes(
+            source_network_id=network_id,
+            node_ids=node_ids,
+            db=db,
+            suffix="Subgraph",
+            preserve_layout=preserve_layout,
+            description=description
         )
         return {
-            "new_network_id": new_id,
-            "content": f"Subgraph created (ID: {new_id}) with {len(node_ids)} nodes."
+            "new_network_id": result["new_network_id"],
+            "content": f"Subgraph created (ID: {result['new_network_id']}) with {len(node_ids)} nodes."
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return {"error": str(e)}
     finally:
         db.close()
 
 
 @mcp.tool()
-def extract_largest_component(
+def create_largest_component_subgraph(
     network_id: int, 
-    parent_network_id: int
+    preserve_layout: bool = False
 ) -> dict:
     """
     Extracts the largest connected component as a new subgraph.
@@ -178,8 +188,125 @@ def extract_largest_component(
     try:
         from app.logic import subgraph 
         
-        result = subgraph.extract_largest_component(db, parent_network_id, network_id)
+        result = subgraph.create_largest_component_subgraph(
+            source_network_id=network_id,
+            db=db,
+            preserve_layout=preserve_layout
+        )
         return result
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def create_ego_network(
+    network_id: int,
+    center_node_id: str,
+    radius: int,
+    preserve_layout: bool = False
+) -> dict:
+    """
+    Creates an Ego Network subgraph (node + neighbors within radius).
+    """
+    db = database.SessionLocal()
+    try:
+        from app.logic import subgraph
+        return subgraph.create_ego_network(
+            source_network_id=network_id,
+            center_node_id=center_node_id,
+            radius=radius,
+            db=db,
+            preserve_layout=preserve_layout
+        )
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def create_path_subgraph(
+    network_id: int,
+    source_node_id: str,
+    target_node_id: str,
+    preserve_layout: bool = False
+) -> dict:
+    """
+    Creates a subgraph containing the shortest path between two nodes.
+    """
+    db = database.SessionLocal()
+    try:
+        from app.logic import subgraph
+        return subgraph.create_path_subgraph(
+            source_network_id=network_id,
+            source_node_id=source_node_id,
+            target_node_id=target_node_id,
+            db=db,
+            preserve_layout=preserve_layout
+        )
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def create_k_core_subgraph(
+    network_id: int,
+    k: int,
+    preserve_layout: bool = False
+) -> dict:
+    """
+    Creates a k-core subgraph (nodes with degree >= k).
+    """
+    db = database.SessionLocal()
+    try:
+        from app.logic import subgraph
+        return subgraph.create_k_core_subgraph(
+            source_network_id=network_id,
+            k=k,
+            db=db,
+            preserve_layout=preserve_layout
+        )
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def get_subgraphs(network_id: int) -> dict:
+    """
+    Lists all subgraphs derived from the given network.
+    """
+    db = database.SessionLocal()
+    try:
+        from app.logic import network_metadata
+        subgraphs = network_metadata.get_subgraphs(db, network_id)
+        return {"subgraphs": subgraphs}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def get_top_nodes(
+    network_id: int, 
+    metric: str, 
+    k: int = 5
+) -> dict:
+    """
+    Returns the top k nodes based on a centrality metric.
+    Metric options: 'degree', 'betweenness', 'closeness', 'eigenvector', 'pagerank'.
+    """
+    db = database.SessionLocal()
+    try:
+        from app.logic import centrality
+        nodes = centrality.get_top_nodes(network_id, metric, k, db)
+        return {"top_nodes": nodes}
     except Exception as e:
         return {"error": str(e)}
     finally:
@@ -224,5 +351,150 @@ def get_visualization_state(network_id: int) -> dict:
     db = database.SessionLocal()
     try:
         return visualization_builder.get_current_visualization(db, network_id)
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def get_network_structure(
+    network_id: int
+) -> dict:
+    """
+    Returns basic structural statistics (node count, edge count, density).
+    """
+    db = database.SessionLocal()
+    try:
+        from app.logic import network_metadata
+        return network_metadata.get_network_structure(db, network_id)
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def list_node_attributes(
+    network_id: int
+) -> dict:
+    """
+    Lists available node attributes with statistics (min/max/top values).
+    """
+    db = database.SessionLocal()
+    try:
+        from app.logic import attributes
+        stats = attributes.get_attribute_stats(
+            network_id,
+            models.NodeAttribute,
+            models.NodeAttributeValue,
+            models.NodeFloatAttributeValue,
+            models.NodeTextAttributeValue,
+            db
+        )
+        return {"attributes": stats}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def list_edge_attributes(
+    network_id: int
+) -> dict:
+    """
+    Lists available edge attributes with statistics.
+    """
+    db = database.SessionLocal()
+    try:
+        from app.logic import attributes
+        stats = attributes.get_attribute_stats(
+            network_id,
+            models.EdgeAttribute,
+            models.EdgeAttributeValue,
+            models.EdgeFloatAttributeValue,
+            models.EdgeTextAttributeValue,
+            db
+        )
+        return {"attributes": stats}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def update_layout(
+    network_id: int,
+    layout_name: str
+) -> dict:
+    """
+    Updates the network layout (e.g., 'forceatlas2', 'circular', 'kamada_kawai').
+    Recalculates positions and refreshes the visualization.
+    """
+    db = database.SessionLocal()
+    try:
+        # Calculate new layout
+        layout.calculate_layout(network_id, layout_name, db)
+        
+        # Build new visualization (updating state)
+        # Note: We don't change color/size configs, just layout
+        return visualization_builder.build_visualization(
+            db, 
+            network_id,
+            layout_name=layout_name # Update the layout preference
+        )
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def update_node_color(
+    network_id: int,
+    attribute: str,
+    scale_type: str = "CATEGORICAL"
+) -> dict:
+    """
+    Updates the node coloring based on an attribute.
+    scale_type options: "CATEGORICAL" (text), "LINEAR" (numbers), "RANKING" (top values).
+    """
+    db = database.SessionLocal()
+    try:
+        config = NodeColorConfig(
+            attribute=attribute,
+            scale_type=scale_type
+        )
+        return visualization_builder.build_visualization(
+            db, network_id, node_color_config=config
+        )
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def update_node_size(
+    network_id: int,
+    attribute: str,
+    min_size: float = 5.0,
+    max_size: float = 20.0
+) -> dict:
+    """
+    Updates the node sizing based on an attribute.
+    """
+    db = database.SessionLocal()
+    try:
+        config = NodeSizeConfig(
+            attribute=attribute,
+            min=min_size,
+            max=max_size
+        )
+        return visualization_builder.build_visualization(
+            db, network_id, node_size_config=config
+        )
+    except Exception as e:
+        return {"error": str(e)}
     finally:
         db.close()
