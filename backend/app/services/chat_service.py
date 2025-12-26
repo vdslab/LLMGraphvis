@@ -13,6 +13,31 @@ from app.services.llm import mcp_client
 logger = get_logger(__name__)
 
 
+async def _handle_background_error(chat_id: int, e: Exception, message: str) -> None:
+    logger.error(f"{message}: {e}")
+    traceback.print_exc()
+    queue = await llm_service.get_event_queue(chat_id)
+    await queue.put({"event": "training_error" if "training" in message else "error", "data": str(e)})
+
+    # If it's a process error, persist to DB
+    if "process" in message:
+        try:
+             # Use a fresh session for error logging
+            db_error = database.SessionLocal()
+            error_content = f"I encountered an internal error while processing your request: {str(e)}"
+            db_err_msg = models.ChatMessage(
+                chat_id=chat_id, role="model", content=error_content
+            )
+            db_error.add(db_err_msg)
+            db_error.commit()
+            
+            await queue.put(
+                {"event": "message_complete", "data": json.dumps({"id": db_err_msg.id})}
+            )
+            db_error.close()
+        except Exception as inner_e:
+            logger.error(f"Failed to save error message to DB: {inner_e}")
+
 async def handle_upload_background(chat_id: int, network_id: int, graphml_data: str) -> None:
     """
     Background task to handle network upload and initialization.
@@ -73,10 +98,7 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
         )
 
     except Exception as e:
-        logger.error(f"Error in upload background task: {e}")
-        traceback.print_exc()
-        queue = await llm_service.get_event_queue(chat_id)
-        await queue.put({"event": "error", "data": str(e)})
+        await _handle_background_error(chat_id, e, "Error in upload background task")
 
 
 async def handle_process_background(chat_id: int, user_message: str) -> None:
@@ -108,34 +130,7 @@ async def handle_process_background(chat_id: int, user_message: str) -> None:
             )
 
     except Exception as e:
-        logger.error(f"Error in process background task: {e}")
-        traceback.print_exc()
-
-        # Persist error message to DB so user sees it in history/on reload
-        try:
-            # Re-open session if needed (it might be closed or rollback needed)
-            # The 'db' session from local scope might be in invalid state due to exception
-            db_error = database.SessionLocal()
-            error_content = f"I encountered an internal error while processing your request: {str(e)}"
-            db_err_msg = models.ChatMessage(
-                chat_id=chat_id, role="model", content=error_content
-            )
-            db_error.add(db_err_msg)
-            db_error.commit()
-            
-            # Notify frontend of completion (even though it's an error state) so it stops thinking
-            queue = await llm_service.get_event_queue(chat_id)
-            await queue.put(
-                {"event": "message_complete", "data": json.dumps({"id": db_err_msg.id})}
-            )
-            # Also emit the error event for immediate toast/notification
-            await queue.put({"event": "error", "data": str(e)})
-            
-            db_error.close()
-        except Exception as inner_e:
-            logger.error(f"Failed to save error message to DB: {inner_e}")
-            queue = await llm_service.get_event_queue(chat_id)
-            await queue.put({"event": "error", "data": str(e)})
+        await _handle_background_error(chat_id, e, "Error in process background task")
 
     finally:
         db.close()
