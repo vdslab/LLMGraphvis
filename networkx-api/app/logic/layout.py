@@ -95,8 +95,8 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
     )
 
     # 2. Delete existing values for these attributes (Clean slate)
-    delete_attribute_values(network_id, attr_x.id, models.NodeAttributeValue, db)
-    delete_attribute_values(network_id, attr_y.id, models.NodeAttributeValue, db)
+    delete_attribute_values(network_id, attr_x.id, models.NodeAttributeValue, db, commit=False)
+    delete_attribute_values(network_id, attr_y.id, models.NodeAttributeValue, db, commit=False)
 
     # 3. Bulk Insert New Values
     nav_data = []

@@ -46,7 +46,7 @@ def calculate_centrality(network_id: int, centrality_type: str, db: Session):
     )
 
     # Delete existing
-    delete_attribute_values(network_id, attr.id, models.NodeAttributeValue, db)
+    delete_attribute_values(network_id, attr.id, models.NodeAttributeValue, db, commit=False)
 
     # Bulk Insert
     nav_data = []
