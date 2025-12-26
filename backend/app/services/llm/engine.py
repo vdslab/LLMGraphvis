@@ -400,12 +400,17 @@ class GraphVisAgent:
 
         # 2. Visualization Updates
         vis_data = None
-        if function_name == "generate_visualization":
-            vis_data = result
-        elif function_name == "initialize_network" and "network" in result:
-            vis_data = result["network"]
+        # 2. Visualization Updates
+        vis_data = None
+        
+        # Check if result looks like visualization data (Duck Typing)
+        if isinstance(result, dict):
+            if "nodes" in result and "links" in result:
+                vis_data = result
+            elif function_name == "initialize_network" and "network" in result:
+                vis_data = result["network"]
 
-        if vis_data and "nodes" in vis_data:
+        if vis_data:
             await self._emit_render_update(queue, vis_data)
             # Save state
             if self.db:
