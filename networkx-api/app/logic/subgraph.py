@@ -11,6 +11,7 @@ from .utils.attribute_copier import AttributeCopier
 from .utils.node_utils import resolve_node_id
 
 logger = get_logger(__name__)
+from .utils.graph_builder import build_graph_from_db
 
 # Standard set of topological attributes to exclude by default
 # These depend on the graph structure, so they become "stale" in a subgraph.
@@ -236,25 +237,7 @@ def create_ego_network(
 ) -> Dict[str, Any]:
     logger.info(f"Creating ego network for {center_node_id} (r={radius})")
     # Reconstruct graph structure to run ego_graph
-    G = nx.Graph()
-
-    edges = (
-        db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
-    )
-    nodes = (
-        db.query(models.Node).filter(models.Node.network_id == source_network_id).all()
-    )
-
-    id_map = {n.id: n.node_id for n in nodes}
-
-    for n in nodes:
-        G.add_node(n.node_id)
-
-    for e in edges:
-        u = id_map.get(e.source_node_id)
-        v = id_map.get(e.target_node_id)
-        if u and v:
-            G.add_edge(u, v)
+    G = build_graph_from_db(source_network_id, db)
 
     # Resolve node ID
     center_node_id = resolve_node_id(G, center_node_id)
@@ -286,21 +269,7 @@ def create_path_subgraph(
     description: str = None,
 ) -> Dict[str, Any]:
     logger.info(f"Creating path subgraph: {source_node_id} -> {target_node_id}")
-    G = nx.Graph()
-    edges = (
-        db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
-    )
-    nodes = (
-        db.query(models.Node).filter(models.Node.network_id == source_network_id).all()
-    )
-    id_map = {n.id: n.node_id for n in nodes}
-    for n in nodes:
-        G.add_node(n.node_id)
-    for e in edges:
-        u = id_map.get(e.source_node_id)
-        v = id_map.get(e.target_node_id)
-        if u and v:
-            G.add_edge(u, v)
+    G = build_graph_from_db(source_network_id, db)
 
     # Resolve node IDs
     source_node_id = resolve_node_id(G, source_node_id)
@@ -332,21 +301,7 @@ def create_k_core_subgraph(
     description: str = None,
 ) -> Dict[str, Any]:
     logger.info(f"Creating k-core subgraph (k={k})")
-    G = nx.Graph()
-    edges = (
-        db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
-    )
-    nodes = (
-        db.query(models.Node).filter(models.Node.network_id == source_network_id).all()
-    )
-    id_map = {n.id: n.node_id for n in nodes}
-    for n in nodes:
-        G.add_node(n.node_id)
-    for e in edges:
-        u = id_map.get(e.source_node_id)
-        v = id_map.get(e.target_node_id)
-        if u and v:
-            G.add_edge(u, v)
+    G = build_graph_from_db(source_network_id, db)
 
     # Remove self-loops as k-core is defined for simple graphs usually
     G.remove_edges_from(nx.selfloop_edges(G))
@@ -377,21 +332,7 @@ def create_largest_component_subgraph(
     description: str = None,
 ) -> Dict[str, Any]:
     logger.info("Creating largest component subgraph")
-    G = nx.Graph()
-    edges = (
-        db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
-    )
-    nodes = (
-        db.query(models.Node).filter(models.Node.network_id == source_network_id).all()
-    )
-    id_map = {n.id: n.node_id for n in nodes}
-    for n in nodes:
-        G.add_node(n.node_id)
-    for e in edges:
-        u = id_map.get(e.source_node_id)
-        v = id_map.get(e.target_node_id)
-        if u and v:
-            G.add_edge(u, v)
+    G = build_graph_from_db(source_network_id, db)
 
     components = list(nx.connected_components(G))
     if not components:
@@ -420,21 +361,7 @@ def create_component_containing_node(
     description: str = None,
 ) -> Dict[str, Any]:
     logger.info(f"Creating component subgraph containing node {node_id}")
-    G = nx.Graph()
-    edges = (
-        db.query(models.Edge).filter(models.Edge.network_id == source_network_id).all()
-    )
-    nodes = (
-        db.query(models.Node).filter(models.Node.network_id == source_network_id).all()
-    )
-    id_map = {n.id: n.node_id for n in nodes}
-    for n in nodes:
-        G.add_node(n.node_id)
-    for e in edges:
-        u = id_map.get(e.source_node_id)
-        v = id_map.get(e.target_node_id)
-        if u and v:
-            G.add_edge(u, v)
+    G = build_graph_from_db(source_network_id, db)
 
     # Resolve node ID
     node_id = resolve_node_id(G, node_id)
