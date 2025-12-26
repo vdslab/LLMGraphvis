@@ -149,13 +149,30 @@ const NetworkChatPage = () => {
     },[isResizing]);
 
   useEffect(() => {
-    window.addEventListener("mousemove", resize);
-    window.addEventListener("mouseup", stopResizing);
-    return () => {
-      window.removeEventListener("mousemove", resize);
-      window.removeEventListener("mouseup", stopResizing);
+    const handleMouseUp = () => {
+        stopResizing();
+        document.body.style.userSelect = '';
+        document.body.style.cursor = '';
     };
-  }, [resize, stopResizing]);
+
+    const handleMouseMove = (e) => {
+        resize(e);
+    };
+
+    if (isResizing) {
+        window.addEventListener("mousemove", handleMouseMove);
+        window.addEventListener("mouseup", handleMouseUp);
+        document.body.style.userSelect = 'none';
+        document.body.style.cursor = 'col-resize';
+    }
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+    };
+  }, [isResizing, resize, stopResizing]);
 
   const [showLabels, setShowLabels] = useState(false);
 
