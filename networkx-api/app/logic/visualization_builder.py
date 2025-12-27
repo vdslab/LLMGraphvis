@@ -532,12 +532,58 @@ class VisualizationBuilder:
         )
 
         attr_map = {attr.attribute_name: attr.id for attr in defs}
+
+        # --- Inject Core Attributes Logic ---
+        core_values = {}
+        
+        # 1. Edge Weight
+        if attribute_model == models.EdgeAttribute and "weight" in attrs:
+            # Use negative ID to avoid collision with real DB IDs
+            WEIGHT_ID = -1
+            attr_map["weight"] = WEIGHT_ID
+            
+            # Fetch directly from Edge table
+            weights = (
+                self.db.query(models.Edge.id, models.Edge.weight)
+                .filter(models.Edge.network_id == net_id)
+                .all()
+            )
+            for eid, w in weights:
+                if eid not in core_values:
+                    core_values[eid] = {}
+                core_values[eid][WEIGHT_ID] = w
+
+        # 2. Node Label
+        if attribute_model == models.NodeAttribute and "label" in attrs:
+            LABEL_ID = -2
+            attr_map["label"] = LABEL_ID
+            
+            # Fetch directly from Node table
+            labels = (
+                self.db.query(models.Node.id, models.Node.label)
+                .filter(models.Node.network_id == net_id)
+                .all()
+            )
+            for nid, l in labels:
+                 if nid not in core_values:
+                    core_values[nid] = {}
+                 core_values[nid][LABEL_ID] = l
+
+        # ------------------------------------
+
         values = self._fetch_attribute_values(
             val_model,
             float_val_model,
             text_val_model,
-            list(attr_map.values()),
+            list(attr_map.values()), # This will include negative IDs but they won't match DB queries, which is fine
         )
+        
+        # Merge core values
+        for entity_id, val_dict in core_values.items():
+            if entity_id not in values:
+                values[entity_id] = {}
+            values[entity_id].update(val_dict)
+
         return attr_map, values
 
     def _get_focus_node_map(self, focus_net_id):

@@ -52,7 +52,7 @@ class Network(Base):
 
     parent_network_id = Column(Integer, ForeignKey("networks.id"), nullable=True)
 
-    subgraphs = relationship("Network", back_populates="parent_network")
+    subgraphs = relationship("Network", back_populates="parent_network", cascade="all, delete-orphan")
     parent_network = relationship(
         "Network", remote_side=[id], back_populates="subgraphs"
     )
@@ -60,10 +60,10 @@ class Network(Base):
     chat = relationship("Chat", back_populates="network", uselist=False)
     
     # Graph Relationships
-    nodes = relationship("Node", back_populates="network")
-    edges = relationship("Edge", back_populates="network")
-    node_attributes = relationship("NodeAttribute", back_populates="network")
-    edge_attributes = relationship("EdgeAttribute", back_populates="network")
+    nodes = relationship("Node", back_populates="network", cascade="all, delete-orphan")
+    edges = relationship("Edge", back_populates="network", cascade="all, delete-orphan")
+    node_attributes = relationship("NodeAttribute", back_populates="network", cascade="all, delete-orphan")
+    edge_attributes = relationship("EdgeAttribute", back_populates="network", cascade="all, delete-orphan")
 
 
 class Chat(Base):
@@ -113,7 +113,7 @@ class Node(Base):
     )
 
     network = relationship("Network", back_populates="nodes")
-    attribute_values = relationship("NodeAttributeValue", back_populates="node")
+    attribute_values = relationship("NodeAttributeValue", back_populates="node", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("network_id", "node_id", name="unique_network_node"),
@@ -135,7 +135,7 @@ class Edge(Base):
     )
 
     network = relationship("Network", back_populates="edges")
-    attribute_values = relationship("EdgeAttributeValue", back_populates="edge")
+    attribute_values = relationship("EdgeAttributeValue", back_populates="edge", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint("network_id", "edge_id", name="unique_network_edge"),
@@ -158,7 +158,7 @@ class NodeAttribute(Base):
     )
 
     network = relationship("Network", back_populates="node_attributes")
-    values = relationship("NodeAttributeValue", back_populates="attribute")
+    values = relationship("NodeAttributeValue", back_populates="attribute", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint(
@@ -182,10 +182,10 @@ class NodeAttributeValue(Base):
     attribute = relationship("NodeAttribute", back_populates="values")
 
     text_value = relationship(
-        "NodeTextAttributeValue", uselist=False, back_populates="parent"
+        "NodeTextAttributeValue", uselist=False, back_populates="parent", cascade="all, delete-orphan"
     )
     float_value = relationship(
-        "NodeFloatAttributeValue", uselist=False, back_populates="parent"
+        "NodeFloatAttributeValue", uselist=False, back_populates="parent", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
@@ -231,7 +231,7 @@ class EdgeAttribute(Base):
     )
 
     network = relationship("Network", back_populates="edge_attributes")
-    values = relationship("EdgeAttributeValue", back_populates="attribute")
+    values = relationship("EdgeAttributeValue", back_populates="attribute", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint(
@@ -255,10 +255,10 @@ class EdgeAttributeValue(Base):
     attribute = relationship("EdgeAttribute", back_populates="values")
 
     text_value = relationship(
-        "EdgeTextAttributeValue", uselist=False, back_populates="parent"
+        "EdgeTextAttributeValue", uselist=False, back_populates="parent", cascade="all, delete-orphan"
     )
     float_value = relationship(
-        "EdgeFloatAttributeValue", uselist=False, back_populates="parent"
+        "EdgeFloatAttributeValue", uselist=False, back_populates="parent", cascade="all, delete-orphan"
     )
 
     __table_args__ = (
