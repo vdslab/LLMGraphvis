@@ -67,7 +67,7 @@ export const useChatStore = create((set, get) => ({
 
   // Upload network file to chat
   uploadNetwork: async (chatId, file) => {
-    set({ isLoading: true, thinkingMessage: "Uploading and initializing network..." });
+    set({ isLoading: true, thinkingMessage: "Uploading..." });
     await uploadGraphML(chatId, file);
     // Response is 202 Accepted.
     // SSE will handle the rest.
