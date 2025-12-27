@@ -343,6 +343,59 @@ def get_attribute_stats(
 
         result.append(attr_data)
 
+    # Inject Core Attributes (that are not in Attribute tables)
+    if model_attr == models.EdgeAttribute:
+        try:
+            # Weight
+            w_stats = (
+                db.query(func.min(models.Edge.weight), func.max(models.Edge.weight))
+                .filter(models.Edge.network_id == network_id)
+                .first()
+            )
+            if w_stats and w_stats[0] is not None:
+                result.append(
+                    {
+                        "name": "weight",
+                        "data_type": "float",
+                        "description": "Edge weight (core attribute)",
+                        "stats": {"min": float(w_stats[0]), "max": float(w_stats[1])},
+                    }
+                )
+        except Exception as e:
+            logger.error(f"Error fetching weight stats: {e}")
+
+    elif model_attr == models.NodeAttribute:
+        try:
+            # Label
+            unique_count = (
+                db.query(func.count(func.distinct(models.Node.label)))
+                .filter(models.Node.network_id == network_id)
+                .scalar()
+            )
+            # Top values
+            top_vals = (
+                db.query(models.Node.label, func.count(models.Node.label))
+                .filter(models.Node.network_id == network_id)
+                .group_by(models.Node.label)
+                .order_by(func.count(models.Node.label).desc())
+                .limit(10)
+                .all()
+            )
+
+            result.append(
+                {
+                    "name": "label",
+                    "data_type": "string",
+                    "description": "Node label (core attribute)",
+                    "stats": {
+                        "unique_count": unique_count,
+                        "top_values": [v[0] for v in top_vals],
+                    },
+                }
+            )
+        except Exception as e:
+             logger.error(f"Error fetching label stats: {e}")
+
     return result
 
 
