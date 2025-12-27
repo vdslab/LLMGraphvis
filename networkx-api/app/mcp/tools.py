@@ -481,7 +481,6 @@ def update_layout(
     layout_name: str
 ) -> dict:
     """
-    """
     Updates the network layout.
     
     Supported Layouts:
@@ -495,7 +494,7 @@ def update_layout(
     
     Recalculates positions and refreshes the visualization.
     """
-    """
+
     db = database.SessionLocal()
     try:
         # Calculate new layout
@@ -592,7 +591,7 @@ def update_node_size(
         )
     except Exception as e:
         return {"error": str(e)}
-        return {"error": str(e)}
+
     finally:
         db.close()
 
