@@ -35,7 +35,7 @@ async def verify_mcp_tools():
         "create_subgraph_from_nodes", "create_path_subgraph",
         "create_k_core_subgraph", "create_largest_component_subgraph",
         "create_component_containing_node", "search_nodes",
-        "read_node_details", "create_subgraph_by_attribute_filter",
+        "get_node_details", "create_subgraph_by_attribute_filter",
         "get_node_attributes", "get_edge_attributes", 
         "get_network_structure", "get_top_centrality_nodes", "get_node_attribute_details"
     ]

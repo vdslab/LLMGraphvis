@@ -176,7 +176,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
   - `attribute`: str (Optional, 指定した属性のカラムのみを検索対象とする)
 - **Returns**: `List[{"id": str, "label": str, ...}]` (JSON string)
 
-### `read_node_details`
+### `get_node_details`
 - **Description**: 特定のノードの全属性と詳細情報（description含む）を取得する。
 - **Arguments**:
   - `network_id`: int
