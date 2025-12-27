@@ -238,7 +238,21 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
     except Exception as e:
         import traceback
 
-        logger.error(f"Error executing tool {tool_name} with args {arguments}: {e}")
+        # Better handling for TaskGroup errors (Python 3.11+)
+        if isinstance(e, BaseException): # BaseException covers all, but we check specifically for ExceptionGroup
+            # In Python 3.11+, TaskGroup raises ExceptionGroup
+            if type(e).__name__ == "ExceptionGroup" or isinstance(e, BaseExceptionGroup):
+                logger.error(f"TaskGroup error in execute_tool '{tool_name}': {e}")
+                for i, sub_exc in enumerate(e.exceptions):
+                    logger.error(f"  Sub-exception {i+1}: {type(sub_exc).__name__}: {sub_exc}")
+                    # If it's a connection error, it might be buried here
+                    if "connection" in str(sub_exc).lower():
+                        logger.error(f"  -> Likely connection issue with tool '{tool_name}'")
+            else:
+                 logger.error(f"Error executing tool {tool_name} with args {arguments}: {e}")
+        else:
+            logger.error(f"Error executing tool {tool_name} with args {arguments}: {e}")
+
         traceback.print_exc()
         raise
 
