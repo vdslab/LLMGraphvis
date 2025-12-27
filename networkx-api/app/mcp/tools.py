@@ -141,8 +141,9 @@ def generate_visualization(
     db = database.SessionLocal()
     try:
         # 1. Update Layout if requested
-        if layout_name:
-            layout.calculate_layout(network_id, layout_name, db)
+        # REMOVED: Implicit calculation. Agent must call calculate_layout explicitly.
+        # if layout_name:
+        #     layout.calculate_layout(network_id, layout_name, db)
 
         # 2. Build Visualization
         vis_data = visualization_builder.build_visualization(
