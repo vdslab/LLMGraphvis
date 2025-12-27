@@ -106,9 +106,10 @@ def calculate_community(network_id: int, algorithm: str = "louvain") -> str:
 
 
 @mcp.tool()
-def calculate_layout(network_id: int, layout_name: str) -> str:
+def calculate_layout(network_id: int, layout_name: str) -> dict:
     """
     Calculates a graph layout and saves x, y coordinates as node attributes.
+    Returns the updated visualization data.
     
     Supported Layouts:
     - "force-directed" (Default): Uses ForceAtlas2 algorithm. Best for most networks.
@@ -124,9 +125,12 @@ def calculate_layout(network_id: int, layout_name: str) -> str:
     db = database.SessionLocal()
     try:
         layout.calculate_layout(network_id, layout_name, db)
-        return f"Layout {layout_name} calculated."
+        # Return visualization to ensure the client updates immediately
+        return visualization_builder.build_visualization(
+            db, network_id, layout_name=layout_name
+        )
     except ValueError as e:
-        return f"Error: {str(e)}"
+        return {"error": str(e)}
     finally:
         db.close()
 
