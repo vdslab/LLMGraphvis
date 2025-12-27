@@ -10,10 +10,74 @@ from app.core.logging import get_logger
 
 
 
+def determine_layout_params(G, layout_name: str):
+    """
+    Dynamically determine layout parameters based on graph size (scale).
+    Prioritizes 'Beautiful' high-quality layouts over speed.
+    """
+    num_nodes = len(G.nodes)
+    params = {}
+    
+    # Scale Categories
+    is_small = num_nodes < 500
+    is_medium = 500 <= num_nodes < 2000
+    is_large = num_nodes >= 2000
+
+    if layout_name == "spring" or layout_name == "fruchterman_reingold":
+        # k: Optimal distance between nodes. 
+        # Increase slightly (2.0/sqrt(N)) to reduce overlap.
+        k = 2.0 / math.sqrt(num_nodes) if num_nodes > 0 else None
+        
+        if is_small:
+            # High iterations, strict threshold for beautiful convergence
+            iterations = 1000
+            threshold = 1e-6
+        elif is_medium:
+            iterations = 500
+            threshold = 1e-5
+        else: # Large
+            iterations = 200
+            threshold = 1e-4
+
+        params = {
+            "k": k,
+            "iterations": iterations,
+            "threshold": threshold,
+            "seed": 42
+        }
+
+    elif layout_name == "forceatlas2":
+        # Native NetworkX ForceAtlas2
+        # Tuning for quality
+        
+        # Iterations
+        if is_small:
+            max_iter = 2000 # Let it settle completely
+        elif is_medium:
+            max_iter = 1000
+        else: # Large
+            max_iter = 500 # Practical limit for interactive response
+
+        # Force Constants
+        # gravity: Attracts to center. Too high = collapse, Too low = drift.
+        # scaling_ratio: Repulsion strength. High = more spread.
+        params = {
+            "max_iter": max_iter,
+            "scaling_ratio": 80.0, # Standard scaling
+            "gravity": 0.03,      # Gentle gravity to keep shape
+            "seed": 42
+        }
+
+    elif layout_name == "kamada_kawai":
+        # O(N^2) but excellent global structure
+        params = {"scale": 1.0} # Standard
+        
+    return params
+
+
 def calculate_layout(network_id: int, layout_name: str, db: Session):
     logger = get_logger(__name__)
     
-    # Reconstruct graph from DB - OPTIMIZED: Fetch only needed columns
     # Reconstruct graph from DB
     from .utils.graph_builder import build_graph_from_db
     G = build_graph_from_db(network_id, db)
@@ -22,39 +86,28 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
     nodes_query = db.query(models.Node.id, models.Node.node_id).filter(models.Node.network_id == network_id).all()
     node_map = {row.node_id: row.id for row in nodes_query}
 
-    # Calculate Layout
-    # Dynamic parameter adjustment based on network size
+    # Normalize layout name
+    if layout_name == "forceatlas2_layout":
+        layout_name = "forceatlas2"
+        
     num_nodes = len(G.nodes)
+    params = determine_layout_params(G, layout_name)
+    
+    pos = None
 
     if layout_name == "spring" or layout_name == "fruchterman_reingold":
-        # Heuristic for k: 1/sqrt(N) is default.
-        # Increasing it to 2.5/sqrt(N) helps spread nodes out more significantly.
-        k = 2.5 / math.sqrt(num_nodes) if num_nodes > 0 else None
-
-        # Dynamic iterations: increased for smaller graphs for better convergence
-        iterations = 100 if num_nodes < 500 else 50
-
-        pos = nx.spring_layout(G, k=k, iterations=iterations, seed=42)
+        pos = nx.spring_layout(G, **params)
 
     elif layout_name == "forceatlas2":
         # Use native NetworkX implementation
-        try:
-            # Parameters tuned for typical visualization needs
-            # iter=500 for good convergence
-            # gravity=0.05 is quite weak, standard is 1.0.
-            # The user complained about previous one being bad.
-            # Let's use defaults but slightly more iterations.
-            pos = nx.forceatlas2_layout(G, max_iter=700, scaling_ratio=100.0, seed=42)
-        except AttributeError:
-            # Fallback if somehow not available (though we verified it is)
-            # or if older version in prod? (Unlikely given verification)
-            pos = nx.spring_layout(G, seed=42)
+        # Note: Checked availability in NetworkX 3.6+
+        pos = nx.forceatlas2_layout(G, **params)
 
     elif layout_name == "circular" or layout_name == "circle":
         pos = nx.circular_layout(G)
 
     elif layout_name == "kamada_kawai":
-        pos = nx.kamada_kawai_layout(G)
+        pos = nx.kamada_kawai_layout(G, **params)
 
     elif layout_name == "shell":
         pos = nx.shell_layout(G)
