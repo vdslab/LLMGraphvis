@@ -87,7 +87,7 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
     node_map = {row.node_id: row.id for row in nodes_query}
 
     # Normalize layout name
-    if layout_name == "forceatlas2_layout":
+    if layout_name in ["forceatlas2_layout", "force-directed", "force_directed"]:
         layout_name = "forceatlas2"
         
     num_nodes = len(G.nodes)

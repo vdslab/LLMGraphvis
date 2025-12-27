@@ -107,7 +107,20 @@ def calculate_community(network_id: int, algorithm: str = "louvain") -> str:
 
 @mcp.tool()
 def calculate_layout(network_id: int, layout_name: str) -> str:
-    """Calculates a graph layout and saves x, y coordinates as node attributes."""
+    """
+    Calculates a graph layout and saves x, y coordinates as node attributes.
+    
+    Supported Layouts:
+    - "force-directed" (Default): Uses ForceAtlas2 algorithm. Best for most networks.
+    - "spring": Uses Fruchterman-Reingold algorithm. Good for small graphs.
+    - "forceatlas2": Explicitly ForceAtlas2. Native NetworkX implementation.
+    - "kamada_kawai": Good global structure but slow O(N^2).
+    - "circular": Position nodes on a circle.
+    - "shell": Position nodes in concentric circles.
+    - "spectral": Position nodes using the eigenvectors of the graph Laplacian.
+    - "spiral": Position nodes in a spiral layout.
+    - "random": Position nodes uniformly at random in the unit square.
+    """
     db = database.SessionLocal()
     try:
         layout.calculate_layout(network_id, layout_name, db)
@@ -468,8 +481,20 @@ def update_layout(
     layout_name: str
 ) -> dict:
     """
-    Updates the network layout (e.g., 'forceatlas2', 'circular', 'kamada_kawai').
+    """
+    Updates the network layout.
+    
+    Supported Layouts:
+    - "force-directed" (Default, ForceAtlas2)
+    - "spring" (Fruchterman-Reingold)
+    - "circular": Position nodes on a circle.
+    - "shell": Position nodes in concentric circles.
+    - "spectral": Eigenvectors of graph Laplacian.
+    - "spiral": Spiral layout.
+    - "kamada_kawai", "random", etc.
+    
     Recalculates positions and refreshes the visualization.
+    """
     """
     db = database.SessionLocal()
     try:
