@@ -38,8 +38,9 @@ def db(setup_db_schema):
     connection = engine.connect()
     transaction = connection.begin()
     session = TestingSessionLocal(bind=connection)
-
+    
     yield session
+
 
     session.close()
     transaction.rollback()

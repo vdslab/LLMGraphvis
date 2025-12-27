@@ -142,18 +142,7 @@ class VisualizationBuilder:
             self.network_id, required_edge_attrs
         )
 
-        # 2.5 Auto-Calculate Layout if Missing
-        if (
-            self.layout_x_attr not in self.global_node_attr_map
-            or self.layout_y_attr not in self.global_node_attr_map
-        ):
-            from app.logic import layout
 
-            layout.calculate_layout(self.network_id, self.layout_name, self.db)
-            # Re-fetch
-            self.global_node_attr_map, self.global_node_values = self._fetch_node_data(
-                self.network_id, global_node_attrs
-            )
 
         # 3. Fetch Focus Data
         if self.focus_network_id:
@@ -537,10 +526,11 @@ class VisualizationBuilder:
             self.db.query(attribute_model)
             .filter(
                 attribute_model.network_id == net_id,
-                attribute_model.attribute_name.in_(attrs),
+                attribute_model.attribute_name.in_(list(attrs)),
             )
             .all()
         )
+
         attr_map = {attr.attribute_name: attr.id for attr in defs}
         values = self._fetch_attribute_values(
             val_model,

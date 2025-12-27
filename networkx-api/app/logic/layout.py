@@ -79,6 +79,8 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
     attr_y = get_or_create_attribute(
         network_id, f"{layout_name}_y", models.NodeAttribute, db, data_type="float"
     )
+    print(f"DEBUG: layout.calculate_layout created attributes {attr_x.id}, {attr_y.id} for network {network_id}")
+
 
     # 2. Delete existing values for these attributes (Clean slate)
     delete_attribute_values(network_id, attr_x.id, models.NodeAttributeValue, db, commit=False)
