@@ -8,6 +8,7 @@ import NetworkGraph from '../components/NetworkGraph';
 import ChatInterface from '../components/ChatInterface';
 import NodeDetailsPanel from '../components/NodeDetailsPanel';
 import ChatList from '../components/ChatList';
+import * as api from '../services/api';
 
 const NetworkChatPage = () => {
   const { id } = useParams();
@@ -85,14 +86,18 @@ const NetworkChatPage = () => {
   // --- Node Interaction ---
   const [selectedNode, setSelectedNode] = useState(null);
   const [nodeDetailsPanelOpen, setNodeDetailsPanelOpen] = useState(false);
+  const [contextNode, setContextNode] = useState(null); // Node selected for chat context
 
   const handleNodeClick = async (nodeData) => {
     try {
         setSelectedNode({ id: nodeData.id, label: nodeData.label });
         setNodeDetailsPanelOpen(true);
-
-        const api = await import('../services/api');
-        if (!networkId) return;
+        // Do not set contextNode automatically
+        
+        if (!networkId) {
+            console.warn("Network ID not available for node details");
+            return;
+        }
         
         const response = await api.getNodeDetails(networkId, nodeData.id);
         if (response && response.data) {
@@ -106,6 +111,18 @@ const NetworkChatPage = () => {
   const handleCloseNodeDetails = () => {
       setNodeDetailsPanelOpen(false);
       setSelectedNode(null);
+  };
+
+  const handleAskAboutNode = () => {
+      if (selectedNode) {
+          setContextNode(selectedNode);
+          // If on mobile/small screen, we might want to close the panel or focus chat?
+          // For now, just set the context.
+      }
+  };
+
+  const handleMessageSent = () => {
+      setContextNode(null);
   };
   
   const handleBackgroundClick = () => {
@@ -257,7 +274,11 @@ const NetworkChatPage = () => {
           )}
 
           {nodeDetailsPanelOpen && selectedNode && (
-            <NodeDetailsPanel selectedNode={selectedNode} onClose={handleCloseNodeDetails} />
+            <NodeDetailsPanel 
+                selectedNode={selectedNode} 
+                onClose={handleCloseNodeDetails}
+                onAskAboutNode={handleAskAboutNode}
+            />
           )}
 
           <NetworkGraph 
@@ -317,7 +338,11 @@ const NetworkChatPage = () => {
 
         {/* Right Side: Chat Interface */}
         <div style={{ width: sidebarWidth, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderLeft: '1px solid var(--border-color)' }}>
-          <ChatInterface selectedNode={selectedNode} />
+          <ChatInterface 
+            contextNode={contextNode} 
+            onMessageSent={handleMessageSent}
+            onCancelContext={() => setContextNode(null)}
+          />
         </div>
       </div>
     </div>
