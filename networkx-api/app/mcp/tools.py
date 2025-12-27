@@ -115,8 +115,28 @@ def generate_visualization(
     custom_node_colors: Optional[list] = None,
 ) -> dict:
     """
-    Generates AND UPDATES the visualization state.
-    Call this ONLY when you want to CHANGE how the network looks.
+    [INITIALIZER / RESET TOOL]
+    Generates the network visualization. Use this tool primarily for:
+    1.  **Initialization**: The first time you visualize a network.
+    2.  **Full Reset**: If you want to change EVERYTHING at once (layout, color, size).
+    
+    **Best Practice**:
+    -   For simple updates (e.g., "Change color to red"), use the specialized tools:
+        -   `update_node_color`
+        -   `update_node_size`
+        -   `update_layout`
+    -   This tool allows complex nested configurations but is harder to get right.
+    
+    **Persisted State**:
+    -   Any config provided here (not None) is saved to the database.
+    -   Any config set to None will PRESERVE the existing state from the database.
+    
+    Args:
+        network_id: The ID of the network.
+        layout_name: "forceatlas2", "circular", "kamada_kawai", etc.
+        node_color_config: Complex object for coloring.
+        node_size_config: Complex object for sizing.
+        # ... other configs
     """
     db = database.SessionLocal()
     try:
@@ -461,11 +481,26 @@ def update_node_color(
     fixed: bool = False
 ) -> dict:
     """
-    Updates the node coloring based on an attribute.
-    scale_type options: "CATEGORICAL" (text), "LINEAR" (numbers), "RANKING" (top values).
-    mapping: Optional dictionary for converting values to colors (e.g., {"Japanese": "red"}).
-    default_color: Fallback color for nodes not matching the mapping.
-    fixed: If True, only use colors from 'mapping' (plus default_color), do not auto-generate others.
+     Updates the node coloring based on an attribute.
+    
+    **Example: Specific Value Mapping**
+    To color "Austria" nodes red and all others gray:
+    >>> update_node_color(
+            network_id=1,
+            attribute="country",          # The attribute to check
+            scale_type="CATEGORICAL",
+            mapping={"Austria": "red"},   # Specific mapping
+            default_color="gray",         # Fallback for others
+            fixed=True                    # Do not auto-generate other colors
+        )
+        
+    Args:
+        network_id: The ID of the network.
+        attribute: The attribute name (e.g., 'country', 'modularity_class').
+        scale_type: "CATEGORICAL" (text), "LINEAR" (numbers), "RANKING" (top k).
+        mapping: Dictionary for explicit value->color pairs (e.g., {"Japanese": "red"}).
+        default_color: Color for nodes that don't match the mapping.
+        fixed: If True, STRICTLY uses the mapping + default. If False, auto-assigns colors to missing values.
     """
     db = database.SessionLocal()
     try:
