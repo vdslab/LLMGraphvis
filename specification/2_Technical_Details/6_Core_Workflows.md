@@ -131,9 +131,19 @@ sequenceDiagram
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "read_resource", status: "completed" })
 
     B->>LLM: ツール実行結果（成功）を送信
-    LLM-->>B: ツール呼び出し要求 (4. generate_visualization)
+    B->>LLM: ツール実行結果（成功）を送信
+    LLM-->>B: ツール呼び出し要求 (4. calculate_layout)
 
-    %% Step 6: Backend executes generate_visualization
+    %% Step 6: Backend executes calculate_layout (Strict Requirement)
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_layout", status: "started" })
+    B->>N: Call MCP Tool: calculate_layout
+    N-->>B: 計算完了
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_layout", status: "completed" })
+
+    B->>LLM: ツール実行結果（成功）を送信
+    LLM-->>B: ツール呼び出し要求 (5. generate_visualization)
+
+    %% Step 7: Backend executes generate_visualization
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "generate_visualization", status: "started" })
     B->>N: Call MCP Tool: generate_visualization
     N-->>B: 最終レンダリングデータ { nodes: [...], links: [...] }
@@ -292,6 +302,9 @@ sequenceDiagram
     NetworkXAPI-->>Backend: Success
     Backend-->>LLM: Success
 
+    Backend-->>LLM: Success
+
+    note right of LLM: Layout calculation must be ensured if not already done
     LLM->>Backend: generate_visualization(node_color_config={scale_type="RANKING", ranking_rules=[{top:3, color:"red"}]})
     Backend->>NetworkXAPI: Call MCP Tool: generate_visualization
     NetworkXAPI->>DB: Fetch Node Values
