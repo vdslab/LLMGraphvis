@@ -41,27 +41,50 @@ async def _handle_background_error(chat_id: int, e: Exception, message: str) -> 
 async def handle_upload_background(chat_id: int, network_id: int, graphml_data: str) -> None:
     """
     Background task to handle network upload and initialization.
-    Executes the 'initialize_network' tool on the MCP server and notifies the frontend.
+    Executes the initialization steps granularly to provide progress updates.
     """
     logger.info(
         f"Background upload started for chat_id={chat_id}, network_id={network_id}"
     )
+    
+    queue = await llm_service.get_event_queue(chat_id)
+    
     try:
-        # Initialize network and get response containing visualization and final_network_id
-        result = await mcp_client.execute_tool(
-            "initialize_network",
+        # Step 1: Import
+        await queue.put({"event": "thinking_stream", "data": {"content": "Importing GraphML data..."}})
+        import_result = await mcp_client.execute_tool(
+            "import_graphml",
             {"network_id": network_id, "graphml_data": graphml_data},
         )
-
-        vis_data = result.get("network")
-        final_network_id = result.get("network_id")
-
+        
+        if "error" in import_result:
+            raise ValueError(f"Import failed: {import_result['error']}")
+            
+        final_network_id = import_result.get("network_id")
         if final_network_id is None:
-            error_msg = result.get(
-                "content", "Unknown error during network initialization"
-            )
-            logger.error(f"Network initialization failed: {error_msg}")
-            raise ValueError(f"Network initialization failed: {error_msg}")
+             raise ValueError("Import tool did not return a valid network_id")
+
+        # Step 2: Layout
+        await queue.put({"event": "thinking_stream", "data": {"content": "Calculating ForceAtlas2 layout..."}})
+        layout_result = await mcp_client.execute_tool(
+            "calculate_layout",
+            {"network_id": final_network_id, "layout_name": "forceatlas2"}
+        )
+        
+        # layout tool returns string message or "Error: ..."
+        if isinstance(layout_result, str) and layout_result.startswith("Error"):
+             raise ValueError(layout_result)
+
+        # Step 3: Visualization
+        await queue.put({"event": "thinking_stream", "data": {"content": "Generating initial visualization..."}})
+        vis_data = await mcp_client.execute_tool(
+            "generate_visualization",
+            {"network_id": final_network_id}
+        )
+        
+        # Check if vis_data is an error dict (though tool raises/returns dict usually)
+        if isinstance(vis_data, dict) and "error" in vis_data:
+             raise ValueError(f"Visualization failed: {vis_data['error']}")
 
         # Update Chat record with new network_id (if changed) and visualization_state
         # Use a fresh session for this background operation
@@ -91,8 +114,10 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
 
         # Broadcast render_update
         logger.info(f"Broadcasting render_update for chat_id={chat_id}")
-        queue = await llm_service.get_event_queue(chat_id)
         await queue.put({"event": "render_update", "data": json.dumps(vis_data)})
+        
+        # Clear the thinking message
+        await queue.put({"event": "thinking_stream", "data": {"content": None}})
 
         # Also notify system message
         await queue.put(
