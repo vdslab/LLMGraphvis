@@ -176,7 +176,7 @@ async def session_scope():
                 await session.initialize()
                 yield session
     except Exception as e:
-        logger.error(f"MCP Session connection failed: {e}")
+        _log_exception_details(e, "MCP Session connection")
         raise
 
 async def execute_tool(tool_name: str, arguments: dict, session: ClientSession = None):
@@ -237,22 +237,7 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
 
     except Exception as e:
         import traceback
-
-        # Better handling for TaskGroup errors (Python 3.11+)
-        if isinstance(e, BaseException): # BaseException covers all, but we check specifically for ExceptionGroup
-            # In Python 3.11+, TaskGroup raises ExceptionGroup
-            if type(e).__name__ == "ExceptionGroup" or isinstance(e, BaseExceptionGroup):
-                logger.error(f"TaskGroup error in execute_tool '{tool_name}': {e}")
-                for i, sub_exc in enumerate(e.exceptions):
-                    logger.error(f"  Sub-exception {i+1}: {type(sub_exc).__name__}: {sub_exc}")
-                    # If it's a connection error, it might be buried here
-                    if "connection" in str(sub_exc).lower():
-                        logger.error(f"  -> Likely connection issue with tool '{tool_name}'")
-            else:
-                 logger.error(f"Error executing tool {tool_name} with args {arguments}: {e}")
-        else:
-            logger.error(f"Error executing tool {tool_name} with args {arguments}: {e}")
-
+        _log_exception_details(e, f"executing tool {tool_name} with args {arguments}")
         traceback.print_exc()
         raise
 
@@ -269,7 +254,7 @@ async def get_resource(uri: str, session: ClientSession = None) -> dict:
         async with session_scope() as session:
              return await _read_resource_internal(session, uri)
     except Exception as e:
-        logger.error(f"Error reading resource {uri}: {e}")
+        _log_exception_details(e, f"reading resource {uri}")
         return {}
 
 async def _read_resource_internal(session: ClientSession, uri: str) -> dict:
@@ -278,3 +263,26 @@ async def _read_resource_internal(session: ClientSession, uri: str) -> dict:
     # We assume text content for now
     parsed_result = json.loads(result.contents[0].text)
     return parsed_result
+
+
+def _log_exception_details(e: BaseException, context: str):
+    """
+    Helper to log exception details, unwrapping ExceptionGroup if present.
+    """
+    # Python 3.11+ ExceptionGroup / BaseExceptionGroup handling
+    is_group = False
+    try:
+        if isinstance(e, BaseExceptionGroup): # Checks for ExceptionGroup too as it inherits
+             is_group = True
+    except NameError:
+        pass # Pre-3.11 environment
+
+    if is_group:
+        logger.error(f"TaskGroup/ExceptionGroup error in {context}: {e}")
+        if hasattr(e, "exceptions"):
+            for i, sub_exc in enumerate(e.exceptions):
+                logger.error(f"  Sub-exception {i+1}: {type(sub_exc).__name__}: {sub_exc}")
+                if "connection" in str(sub_exc).lower():
+                    logger.error(f"  -> Likely connection issue in {context}")
+    else:
+        logger.error(f"Error in {context}: {e}")
