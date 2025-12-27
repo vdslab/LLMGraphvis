@@ -479,7 +479,8 @@ def update_node_color(
     scale_type: str = "CATEGORICAL",
     mapping: Optional[Dict[str, str]] = None,
     default_color: Optional[str] = None,
-    fixed: bool = False
+    fixed: bool = False,
+    gradient: Optional[List[str]] = None
 ) -> dict:
     """
      Updates the node coloring based on an attribute.
@@ -500,17 +501,23 @@ def update_node_color(
         attribute: The attribute name (e.g., 'country', 'modularity_class').
         scale_type: "CATEGORICAL" (text), "LINEAR" (numbers), "RANKING" (top k).
         mapping: Dictionary for explicit value->color pairs (e.g., {"Japanese": "red"}).
-        default_color: Color for nodes that don't match the mapping.
+        default_color: Color for nodes that don't match the mapping or are null. Defaults to Gray (#d3d3d3).
         fixed: If True, STRICTLY uses the mapping + default. If False, auto-assigns colors to missing values.
+        gradient: List of colors for LINEAR scale (e.g. ["#start", "#end"] or ["#start", "#mid", "#end"]).
     """
     db = database.SessionLocal()
     try:
+        # Default to Gray for null/mismatched values if not specified
+        if not default_color:
+            default_color = "#d3d3d3"
+
         config = NodeColorConfig(
             attribute=attribute,
             scale_type=scale_type,
             color_map=mapping,
             default_color=default_color,
-            fixed_mapping=fixed
+            fixed_mapping=fixed,
+            gradient=gradient
         )
         return visualization_builder.build_visualization(
             db, network_id, node_color_config=config
