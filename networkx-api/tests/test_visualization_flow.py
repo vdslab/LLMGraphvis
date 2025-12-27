@@ -158,3 +158,24 @@ def test_color_patterns(db, setup_network):
         nodes = res3["nodes"]
         for n in nodes:
             assert n["color"] == "red"
+
+def test_missing_style_attribute(db, setup_network):
+    network_id = setup_network
+    
+    # Ensure layout exists so we don't fail on layout check
+    tools.calculate_layout(network_id, "forceatlas2")
+    
+    session_proxy = mock.MagicMock(wraps=db)
+    session_proxy.close.return_value = None
+    
+    with mock.patch("app.core.database.SessionLocal", return_value=session_proxy):
+        # Try to use a non-existent attribute for coloring
+        res = tools.update_node_color(
+            network_id=network_id,
+            attribute="non_existent_attr",
+            scale_type="CATEGORICAL"
+        )
+        
+        assert "error" in res
+        assert "Missing required attributes" in res["error"]
+        assert "non_existent_attr" in res["error"]
