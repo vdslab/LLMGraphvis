@@ -1,6 +1,6 @@
 import React from 'react';
 
-const NodeDetailsPanel = ({ selectedNode, onClose }) => {
+const NodeDetailsPanel = ({ selectedNode, onClose, onAskAboutNode }) => {
   if (!selectedNode) return null;
 
   const { id, label, details } = selectedNode;
@@ -41,6 +41,26 @@ const NodeDetailsPanel = ({ selectedNode, onClose }) => {
       <div style={{ marginBottom: '15px' }}>
         <strong>ID:</strong> {id} <br />
         <strong>Label:</strong> {label}
+      </div>
+
+      <div style={{ marginBottom: '15px' }}>
+          <button 
+            onClick={() => {
+                if (onAskAboutNode) onAskAboutNode();
+            }}
+            className="btn"
+            style={{
+                width: '100%',
+                padding: '8px',
+                backgroundColor: 'var(--primary-color)', // Assuming variable exists, or use #2196F3
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+            }}
+          >
+            Ask about this node
+          </button>
       </div>
 
       {description && (

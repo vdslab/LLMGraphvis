@@ -6,7 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 
-const ChatInterface = ({ selectedNode }) => {
+const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
   const { messages, sendMessage, isLoading, thinkingMessage, uploadNetwork, chatId } = useChatStore();
   const { nodes } = useNetworkStore();
   const [input, setInput] = useState('');
@@ -26,12 +26,13 @@ const ChatInterface = ({ selectedNode }) => {
     if (!input.trim()) return;
     
     let content = input;
-    if (selectedNode) {
-      content += `\n\n[Context: User selected node ID: '${selectedNode.id}', Label: '${selectedNode.label}']`;
+    if (contextNode) {
+      content += `\n\n[Context: User selected node ID: '${contextNode.id}', Label: '${contextNode.label}']`;
     }
 
     await sendMessage(content);
     setInput('');
+    if (onMessageSent) onMessageSent();
   };
 
   const handleFileUpload = async (e) => {
@@ -66,7 +67,7 @@ const ChatInterface = ({ selectedNode }) => {
         )}
       </div>
       
-      {selectedNode && (
+      {contextNode && (
         <div style={{ 
           padding: '0.5rem 1rem', 
           backgroundColor: '#e3f2fd', 
@@ -76,7 +77,21 @@ const ChatInterface = ({ selectedNode }) => {
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <span>Context: <strong>{selectedNode.label}</strong> (ID: {selectedNode.id})</span>
+          <span>Context: <strong>{contextNode.label}</strong> (ID: {contextNode.id})</span>
+          <button 
+            onClick={onCancelContext}
+            style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '1.2rem',
+                color: '#666',
+                padding: '0 0.5rem'
+            }}
+            title="Remove context"
+          >
+            ×
+          </button>
         </div>
       )}
       
