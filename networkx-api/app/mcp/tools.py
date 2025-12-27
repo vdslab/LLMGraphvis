@@ -25,6 +25,23 @@ from app.schemas.visualization import (
 # --- Tools ---
 
 @mcp.tool()
+def import_graphml(network_id: int, graphml_data: str) -> dict:
+    """
+    Imports GraphML data into the database.
+    Returns: {"network_id": int}
+    """
+    db = database.SessionLocal()
+    try:
+        from app.logic import importer
+        final_network_id = importer.parse_and_save_graphml(network_id, graphml_data, db)
+        return {"network_id": final_network_id, "content": f"Imported network {final_network_id}"}
+    except Exception as e:
+        return {"error": str(e)}
+    finally:
+        db.close()
+
+
+@mcp.tool()
 def initialize_network(network_id: int, graphml_data: str) -> dict:
     """
     Initializes a network from GraphML data.
