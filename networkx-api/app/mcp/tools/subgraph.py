@@ -12,7 +12,7 @@ def create_subgraph_from_nodes(
     network_id: Annotated[int, Field(description="The ID of the source network.")],
     node_ids: Annotated[List[str], Field(description="List of node IDs (strings) to include in the subgraph.")],
     description: Annotated[str, Field(description="Description of the subgraph (e.g., 'Neighbors of Node A').")] = "Custom subgraph",
-    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = False
+    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = True
 ) -> dict:
     """
     Creates a NEW subgraph network from a list of specific node IDs.
@@ -48,7 +48,7 @@ def create_subgraph_from_nodes(
 @mcp.tool()
 def create_largest_component_subgraph(
     network_id: Annotated[int, Field(description="The ID of the source network.")], 
-    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = False
+    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = True
 ) -> dict:
     """
     Extracts the largest connected component from the network as a new subgraph.
@@ -78,7 +78,7 @@ def create_ego_network(
     network_id: Annotated[int, Field(description="The ID of the source network.")],
     center_node_id: Annotated[str, Field(description="The ID of the central node.")],
     radius: Annotated[int, Field(description="The radius of the ego network (1 = direct neighbors).")],
-    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = False
+    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = True
 ) -> dict:
     """
     Creates an Ego Network subgraph (a central node and its neighbors within a radius).
@@ -108,7 +108,7 @@ def create_path_subgraph(
     network_id: Annotated[int, Field(description="The ID of the source network.")],
     source_node_id: Annotated[str, Field(description="The start node ID.")],
     target_node_id: Annotated[str, Field(description="The end node ID.")],
-    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = False
+    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = True
 ) -> dict:
     """
     Creates a subgraph containing the shortest path between two specific nodes.
@@ -137,7 +137,7 @@ def create_path_subgraph(
 def create_k_core_subgraph(
     network_id: Annotated[int, Field(description="The ID of the source network.")],
     k: Annotated[int, Field(description="The minimum degree for nodes to include.")],
-    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = False
+    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = True
 ) -> dict:
     """
     Creates a k-core subgraph (containing only nodes with degree >= k).
@@ -246,7 +246,7 @@ def filter_nodes(
 def create_subgraph_by_filter(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     conditions: Annotated[List[Dict[str, Any]], Field(description="List of conditions. Schema: [{'attribute': 'Name', 'categories': ['A', 'B'], 'ranges': [{'min': 10, 'max': 20}]}]")],
-    preserve_layout: Annotated[bool, Field(description="If True, keeps x,y positions from source.")] = False,
+    preserve_layout: Annotated[bool, Field(description="If True, keeps x,y positions from source.")] = True,
     description: Annotated[Optional[str], Field(description="Description of the subgraph.")] = None
 ) -> dict:
     """

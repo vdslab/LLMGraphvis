@@ -210,3 +210,30 @@ def update_node_size(
 
     finally:
         db.close()
+
+
+@mcp.tool()
+def switch_to_network(
+    network_id: Annotated[int, Field(description="The ID of the network to switch context to (e.g. returning to main graph).")]
+) -> dict:
+    """
+    Switches the active view to a specific network (e.g., returning to the main graph from a subgraph).
+    Retains the existing visualization state of that network.
+    
+    Returns:
+        dict: The visualization data for the target network.
+    """
+    db = database.SessionLocal()
+    try:
+        from app.logic import visualization_builder
+        # Build visualization with stored configs (pass nothing to preserve state)
+        vis_data = visualization_builder.build_visualization(
+            db,
+            network_id
+        )
+        return vis_data
+    except Exception as e:
+        logger.error(f"switch_to_network failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
+    finally:
+        db.close()

@@ -392,20 +392,15 @@ sequenceDiagram
     participant DB
 
     User->>LLM: "元のグラフに戻って"
-    LLM->>Backend: switch_to_main_network()
+    LLM->>Backend: switch_to_network(network_id=Root ID)
+    Backend->>NetworkXAPI: Call MCP Tool: switch_to_network(network_id)
     
-    Backend->>DB: Get current Chat.network_id
-    DB-->>Backend: Current ID (Subgraph)
-    Backend->>DB: Find root network ID
-    DB-->>Backend: Root ID (Main Graph)
-    
-    note right of Backend: Update Context Case
+    note right of Backend: Update Context
     Backend->>DB: Chat.network_id = Root ID
+
+    NetworkXAPI->>DB: Fetch Visualization State
+    NetworkXAPI-->>Backend: Visualization Data (Main Graph)
     
-    Backend-->>LLM: Success Message (Switched to Main ID)
-    
-    note right of LLM: Visualize the main network
-    LLM->>Backend: generate_visualization(network_id=Root ID)
     Backend-->>User: Render Update (Main Graph)
 
 ### 6.10.1. 親ネットワークへの切り替え (switch_to_parent_network)
@@ -417,21 +412,16 @@ sequenceDiagram
     participant User
     participant LLM
     participant Backend
+    participant NetworkXAPI
     participant DB
 
     User->>LLM: "一つ上の階層に戻って"
-    LLM->>Backend: switch_to_parent_network()
+    LLM->>Backend: switch_to_network(network_id=Parent ID)
+    Backend->>NetworkXAPI: Call MCP Tool: switch_to_network
     
-    Backend->>DB: Get current Chat.network_id
-    DB-->>Backend: Current ID (Subgraph)
-    Backend->>DB: Find parent_network_id
-    DB-->>Backend: Parent ID
-    
-    note right of Backend: Update Context
     Backend->>DB: Chat.network_id = Parent ID
     
-    Backend-->>LLM: Success Message (Switched to Parent ID)
-    LLM->>Backend: generate_visualization(network_id=Parent ID)
+    NetworkXAPI-->>Backend: Visualization Data
     Backend-->>User: Render Update
 ```
 
@@ -455,8 +445,8 @@ sequenceDiagram
     NetworkXAPI-->>Backend: [Age (float), Gender (string)]
     
     note right of LLM: 2. 条件を構築して実行
-    LLM->>Backend: create_subgraph_by_attribute_filter(<br/>  conditions=[<br/>    {attribute_name: "Age", ranges: [{min: 20, max: 29}]},<br/>    {attribute_name: "Gender", categories: ["Female"]}<br/>  ]<br/>)
-    Backend->>NetworkXAPI: Call MCP Tool: create_subgraph_by_attribute_filter
+    LLM->>Backend: create_subgraph_by_filter(<br/>  conditions=[<br/>    {attribute: "Age", ranges: [{min: 20, max: 29}]},<br/>    {attribute: "Gender", categories: ["Female"]}<br/>  ]<br/>)
+    Backend->>NetworkXAPI: Call MCP Tool: create_subgraph_by_filter
     NetworkXAPI->>DB: Query Nodes Matching Conditions (AND/OR Logic)
     NetworkXAPI->>DB: Create Subgraph Network
     NetworkXAPI-->>Backend: Subgraph Info (new_network_id)

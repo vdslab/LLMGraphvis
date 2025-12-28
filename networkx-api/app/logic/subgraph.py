@@ -80,6 +80,16 @@ def create_subgraph_from_nodes(
     new_network = models.Network(
         name=target_name, parent_network_id=source_network_id, description=description
     )
+    
+    # [FIX] Inherit visualization settings if preserving layout
+    if preserve_layout and source_network:
+         new_network.last_layout_name = source_network.last_layout_name
+         new_network.last_node_size_config = source_network.last_node_size_config
+         new_network.last_node_color_config = source_network.last_node_color_config
+         new_network.last_edge_width_config = source_network.last_edge_width_config
+         new_network.last_edge_color_config = source_network.last_edge_color_config
+         new_network.last_node_label_config = source_network.last_node_label_config
+
     db.add(new_network)
     db.commit()
     db.refresh(new_network)
@@ -99,7 +109,7 @@ def create_subgraph_from_nodes(
     excluded_attrs = list(TOPOLOGICAL_ATTRIBUTES)
 
     if preserve_layout:
-        # If preserving layout, we DO want x and y, so remove them from exclusion list
+        # If preserving layout, we DO want x and y (and specific layout attributes), so remove generic exclusion if present
         if "x" in excluded_attrs:
             excluded_attrs.remove("x")
         if "y" in excluded_attrs:
@@ -119,8 +129,11 @@ def create_subgraph_from_nodes(
         logger.info("Calculating initial layout (spring)...")
         calculate_layout(new_network_id, "spring", db)
     else:
-        logger.info("Preserving existing layout (x, y copied).")
-
+        logger.info(f"Preserving existing layout (x, y copied) from {source_network.last_layout_name}.")
+        # Verify if the specific layout attributes exist?
+        # Ideally, AttributeCopier copied everything. 
+        # If source_network.last_layout_name was 'forceatlas2', then 'forceatlas2_x' should have been copied.
+        
     return {"new_network_id": new_network_id, "name": new_network.name}
 
 
