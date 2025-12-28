@@ -189,6 +189,11 @@ class GraphVisAgent:
                 async for chunk in response:
                     if chunk.candidates:
                         candidate = chunk.candidates[0]
+                        # Safety check: content might be None if filtered
+                        if not candidate.content:
+                            logger.warning(f"Candidate has no content. Finish reason: {candidate.finish_reason if hasattr(candidate, 'finish_reason') else 'Unknown'}")
+                            continue
+
                         for part in candidate.content.parts:
                             if part.text:
                                 final_text += part.text
@@ -202,13 +207,17 @@ class GraphVisAgent:
         else:
             # Static response
             if response.candidates:
-                content = response.candidates[0].content
-                for part in content.parts:
-                    if part.text:
-                        final_text += part.text
-                        await self._emit_message_chunk(queue, part.text)
-                    if part.function_call:
-                        all_function_calls.append(part.function_call)
+                candidate = response.candidates[0]
+                if candidate.content:
+                    content = candidate.content
+                    for part in content.parts:
+                        if part.text:
+                            final_text += part.text
+                            await self._emit_message_chunk(queue, part.text)
+                        if part.function_call:
+                            all_function_calls.append(part.function_call)
+                else:
+                    logger.warning(f"Static response candidate has no content. Finish reason: {candidate.finish_reason if hasattr(candidate, 'finish_reason') else 'Unknown'}")
 
         return final_text, all_function_calls
 
