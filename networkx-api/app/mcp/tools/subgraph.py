@@ -52,7 +52,12 @@ def create_largest_component_subgraph(
 ) -> dict:
     """
     Extracts the largest connected component from the network as a new subgraph.
-        
+    
+    IMPORTANT:
+    After creating the subgraph, you SHOULD almost always call a layout calculation tool 
+    (e.g., `calculate_layout` or `update_layout`) to ensure the new subgraph is properly 
+    visualized. The default layout inheritance might not be optimal for the component.
+
     Returns:
         dict: {"new_network_id": int, "content": str}
     """
