@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, memo } from 'react';
 import * as d3 from 'd3';
 
-const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick, onBackgroundClick }) => {
+const NetworkGraph = memo(({ nodes, links, showLabels = false, onNodeClick, onBackgroundClick }) => {
   const svgRef = useRef();
 
   // Keep refs for callbacks to avoid re-triggering the effect
@@ -15,6 +15,11 @@ const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick, onBackgro
 
   useEffect(() => {
     const svg = d3.select(svgRef.current);
+    
+    // Explicit clean up of listeners before clearing content
+    svg.on("click", null);
+    svg.on(".zoom", null);
+    
     svg.selectAll("*").remove(); // Clear previous
 
     if (!nodes.length) return;
@@ -139,8 +144,13 @@ const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick, onBackgro
       });
 
     svg.call(zoom);
-    // Be careful with d3.zoom consuming clicks.
-    // However, SVG click listener should typically fire if not stopped.
+    
+    // Cleanup on unmount
+    return () => {
+        svg.on("click", null);
+        svg.on(".zoom", null);
+        svg.selectAll("*").remove();
+    };
 
   }, [nodes, links, showLabels]); // Dependencies updated to exclude callbacks
 
@@ -149,5 +159,6 @@ const NetworkGraph = ({ nodes, links, showLabels = false, onNodeClick, onBackgro
       <svg ref={svgRef} style={{ width: '100%', height: '100%' }}></svg>
     </div>
   );
-};
+});
+
 export default NetworkGraph;

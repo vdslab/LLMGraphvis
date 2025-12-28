@@ -88,48 +88,69 @@ const NetworkChatPage = () => {
   const [nodeDetailsPanelOpen, setNodeDetailsPanelOpen] = useState(false);
   const [contextNode, setContextNode] = useState(null); // Node selected for chat context
 
-  const handleNodeClick = async (nodeData) => {
+  const handleNodeClick = useCallback(async (nodeData) => {
     try {
         setSelectedNode({ id: nodeData.id, label: nodeData.label });
         setNodeDetailsPanelOpen(true);
         // Do not set contextNode automatically
         
-        if (!networkId) {
+        // Cannot access latest state inside useCallback without dependency, 
+        // but networkId is needed.
+        // We can use a ref or just include it in dependency.
+        // networkId from store might change? usually stable per chat?
+        // Let's get it directly from store helper or make sure it's in dep.
+        const currentNetworkId = useNetworkStore.getState().networkId;
+        
+        if (!currentNetworkId) {
             console.warn("Network ID not available for node details");
             return;
         }
         
-        const response = await api.getNodeDetails(networkId, nodeData.id);
-        if (response && response.data) {
+        // Don't await in the event handler if we want snappy UI? 
+        // But we need details.
+        api.getNodeDetails(currentNetworkId, nodeData.id).then(response => {
+           if (response && response.data) {
              setSelectedNode(prev => ({ ...prev, details: response.data }));
-        }
-    } catch (e) {
-        console.error("Failed to fetch node details:", e);
-    }
-  };
+           }
+        }).catch(e => {
+            console.error("Failed to fetch node details:", e);
+        });
 
-  const handleCloseNodeDetails = () => {
+    } catch (e) {
+        console.error("Error in node click handler:", e);
+    }
+  }, []); // Empty dependency: references are stable or fetched from store directly
+
+  const handleCloseNodeDetails = useCallback(() => {
       setNodeDetailsPanelOpen(false);
       setSelectedNode(null);
-  };
+  }, []);
 
-  const handleAskAboutNode = () => {
-      if (selectedNode) {
-          setContextNode(selectedNode);
-          // If on mobile/small screen, we might want to close the panel or focus chat?
-          // For now, just set the context.
-      }
-  };
+  const handleAskAboutNode = useCallback(() => {
+      // selectedNode is in state, but we need it here.
+      // This function is passed to NodeDetailsPanel, which re-renders when selectedNode changes anyway?
+      // Actually handleAskAboutNode depends on selectedNode state.
+      // But we can pass the node AS ARGUMENT from the child if strictly needed,
+      // or just rebuild this callback when selectedNode changes.
+      // Re-building callback when selectedNode changes is fine, it's not the heavy Graph.
+      setContextNode(selectedNode);
+  }, [selectedNode]);
 
-  const handleMessageSent = () => {
+  const handleMessageSent = useCallback(() => {
       setContextNode(null);
-  };
+  }, []);
   
-  const handleBackgroundClick = () => {
-      if (selectedNode) {
-          handleCloseNodeDetails();
-      }
-  };
+  const handleBackgroundClick = useCallback(() => {
+      // access state inside callback?
+      // "selectedNode" is needed to know if we should close.
+      // Actually we can just unconditionally close if we want, or check state setter?
+      // "setNodeDetailsPanelOpen(false)" is safe.
+      setNodeDetailsPanelOpen((prev) => {
+          if (prev) return false;
+          return prev;
+      });
+      setSelectedNode(null);
+  }, []);
 
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
