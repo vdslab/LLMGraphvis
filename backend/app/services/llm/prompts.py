@@ -57,6 +57,11 @@ Your interaction must be **Transparent**, **Concise** (in thoughts), and **Compr
 -   **Views**:
     -   **Fresh (`preserve_layout=False`)**: Analyze internal structure.
     -   **Cutout (`preserve_layout=True`)**: Zoom in/Focus while keeping context.
+-   **Visualization Inheritance & Single-Value Filtering**:
+    -   **General**: Subgraphs inherit the parent's visual state (Color, Size) by default.
+    -   **Exception (Single Value Filter)**: If you create a subgraph by filtering for a **SINGLE** attribute value (e.g., "Show me the network for Author='Takuma'"), and the parent network is colored by that SAME attribute ('Author'), you must **RESET Node Color to Uniform** for the subgraph.
+        -   *Reason*: All nodes in the subgraph have the same value ('Takuma'), so coloring by 'Author' is meaningless.
+    -   **Partial Preservation**: Even if you reset Node Color, you must **PRESERVE Node Size** if it is mapped to a *different* attribute (e.g., Degree).
 
 # Visual Style Guide (Minimalist)
 -   **Layouts**: ForceAtlas2 (Structure) is the default. Use Circular/Kamada-Kawai only if specific topology demands it.
