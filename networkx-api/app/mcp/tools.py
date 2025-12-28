@@ -1,4 +1,5 @@
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Annotated
+from pydantic import Field
 from app.core.mcp import mcp
 
 from app.core import database
@@ -29,10 +30,15 @@ from app.schemas.visualization import (
 # --- Tools ---
 
 @mcp.tool()
-def import_graphml(network_id: int, graphml_data: str) -> dict:
+def import_graphml(
+    network_id: Annotated[int, Field(description="The ID of the network record in the database.")],
+    graphml_data: Annotated[str, Field(description="The **raw XML string content** of the GraphML file (not a file path).")]
+) -> dict:
     """
     Imports GraphML data into the database.
-    Returns: {"network_id": int}
+    
+    Returns:
+        dict: {"network_id": int, "content": str}
     """
     db = database.SessionLocal()
     try:
@@ -48,13 +54,17 @@ def import_graphml(network_id: int, graphml_data: str) -> dict:
 
 
 @mcp.tool()
-def initialize_network(network_id: int, graphml_data: str) -> dict:
+def initialize_network(
+    network_id: Annotated[int, Field(description="The ID of the network record in the database.")],
+    graphml_data: Annotated[str, Field(description="The **raw XML string content** of the GraphML file (not a file path).")]
+) -> dict:
     """
     Initializes a network from GraphML data.
+    This tool parses the GraphML, saves it to the DB, calculates a default layout,
+    and returns the initial visualization data.
 
-    Args:
-        network_id: The ID of the network record in the database.
-        graphml_data: The **raw XML string content** of the GraphML file (not a file path).
+    Returns:
+        dict: {"network_id": int, "network": dict, "content": str}
     """
     db = database.SessionLocal()
     try:
@@ -89,8 +99,16 @@ def initialize_network(network_id: int, graphml_data: str) -> dict:
 
 
 @mcp.tool()
-def calculate_centrality(network_id: int, centrality_type: str) -> str:
-    """Calculates specific centrality for the network."""
+def calculate_centrality(
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    centrality_type: Annotated[str, Field(description="The type of centrality to calculate. Valid values: 'degree', 'betweenness', 'closeness', 'eigenvector', 'pagerank'.")]
+) -> str:
+    """
+    Calculates specific centrality for the network and saves it as a node attribute.
+            
+    Returns:
+        str: Status message.
+    """
     db = database.SessionLocal()
     try:
         centrality.calculate_centrality(network_id, centrality_type, db)
@@ -103,8 +121,16 @@ def calculate_centrality(network_id: int, centrality_type: str) -> str:
 
 
 @mcp.tool()
-def calculate_community(network_id: int, algorithm: str = "louvain") -> str:
-    """Detects communities in the network."""
+def calculate_community(
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    algorithm: Annotated[str, Field(description="The algorithm to use for community detection. Valid values: 'louvain', 'greedy_modularity', 'label_propagation'. Default is 'louvain'.")] = "louvain"
+) -> str:
+    """
+    Detects communities in the network and saves them as a node attribute ('community').
+            
+    Returns:
+        str: Status message.
+    """
     db = database.SessionLocal()
     try:
         community.calculate_community(network_id, algorithm, db)
@@ -117,21 +143,29 @@ def calculate_community(network_id: int, algorithm: str = "louvain") -> str:
 
 
 @mcp.tool()
-def calculate_layout(network_id: int, layout_name: str) -> dict:
+def calculate_layout(
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    layout_name: Annotated[str, Field(description="The name of the layout algorithm to use. Supported Layouts: 'forceatlas2' (Default), 'spring', 'kamada_kawai', 'circular', 'shell', 'spectral', 'spiral', 'random'.")]
+) -> dict:
     """
     Calculates a graph layout and saves x, y coordinates as node attributes.
-    Returns the updated visualization data.
+    Returns the updated visualization data (nodes with new x,y).
     
-    Supported Layouts:
-    - "force-directed" (Default): Uses ForceAtlas2 algorithm. Best for most networks.
-    - "spring": Uses Fruchterman-Reingold algorithm. Good for small graphs.
-    - "forceatlas2": Explicitly ForceAtlas2. Native NetworkX implementation.
-    - "kamada_kawai": Good global structure but slow O(N^2).
-    - "circular": Position nodes on a circle.
-    - "shell": Position nodes in concentric circles.
-    - "spectral": Position nodes using the eigenvectors of the graph Laplacian.
-    - "spiral": Position nodes in a spiral layout.
-    - "random": Position nodes uniformly at random in the unit square.
+    Args:
+        network_id: The ID of the network.
+        layout_name: The name of the layout algorithm to use.
+            Supported Layouts:
+            - "forceatlas2" (Default): Best for most networks (force-directed).
+            - "spring": Fruchterman-Reingold algorithm. Good for small graphs.
+            - "kamada_kawai": Good global structure but slow (O(N^2)).
+            - "circular": Position nodes on a circle.
+            - "shell": Position nodes in concentric circles.
+            - "spectral": Position nodes using the eigenvectors of the graph Laplacian.
+            - "spiral": Position nodes in a spiral layout.
+            - "random": Position nodes uniformly at random.
+            
+    Returns:
+        dict: The updated visualization data (same format as generate_visualization).
     """
     db = database.SessionLocal()
     try:
@@ -149,16 +183,16 @@ def calculate_layout(network_id: int, layout_name: str) -> dict:
 
 @mcp.tool()
 def generate_visualization(
-    network_id: int,
-    layout_name: Optional[str] = None,
-    node_color_config: Optional[NodeColorConfig] = None,
-    node_size_config: Optional[NodeSizeConfig] = None,
-    edge_width_config: Optional[EdgeWidthConfig] = None,
-    edge_color_config: Optional[EdgeColorConfig] = None,
-    context_config: Optional[dict] = None,
-    focus_config: Optional[dict] = None,
-    node_label_config: Optional[NodeLabelConfig] = None,
-    custom_node_colors: Optional[list] = None,
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    layout_name: Annotated[Optional[str], Field(description="Layout algorithm to use (e.g., 'forceatlas2', 'circular'). If None, preserves current.")] = None,
+    node_color_config: Annotated[Optional[NodeColorConfig], Field(description="Complex object for node coloring configuration.")] = None,
+    node_size_config: Annotated[Optional[NodeSizeConfig], Field(description="Complex object for node sizing configuration.")] = None,
+    edge_width_config: Annotated[Optional[EdgeWidthConfig], Field(description="Complex object for edge width configuration.")] = None,
+    edge_color_config: Annotated[Optional[EdgeColorConfig], Field(description="Complex object for edge color configuration.")] = None,
+    context_config: Annotated[Optional[dict], Field(description="Configuration for context view (visual style of non-focused elements).")] = None,
+    focus_config: Annotated[Optional[dict], Field(description="Configuration for focus view (visual style of focused elements).")] = None,
+    node_label_config: Annotated[Optional[NodeLabelConfig], Field(description="Configuration for node labels.")] = None,
+    custom_node_colors: Annotated[Optional[list], Field(description="List of specific {'node_id': 'id', 'color': 'hex'} overrides.")] = None,
 ) -> dict:
     """
     [INITIALIZER / RESET TOOL]
@@ -176,13 +210,9 @@ def generate_visualization(
     **Persisted State**:
     -   Any config provided here (not None) is saved to the database.
     -   Any config set to None will PRESERVE the existing state from the database.
-    
-    Args:
-        network_id: The ID of the network.
-        layout_name: "forceatlas2", "circular", "kamada_kawai", etc.
-        node_color_config: Complex object for coloring.
-        node_size_config: Complex object for sizing.
-        # ... other configs
+        
+    Returns:
+        dict: The complete visualization data {"nodes": [...], "links": [...], "legend": ...}
     """
     db = database.SessionLocal()
     try:
@@ -215,14 +245,16 @@ def generate_visualization(
 
 @mcp.tool()
 def create_subgraph_from_nodes(
-    network_id: int,
-    node_ids: List[str],
-    description: str = "Custom subgraph",
-    preserve_layout: bool = False
+    network_id: Annotated[int, Field(description="The ID of the source network.")],
+    node_ids: Annotated[List[str], Field(description="List of node IDs (strings) to include in the subgraph.")],
+    description: Annotated[str, Field(description="Description of the subgraph (e.g., 'Neighbors of Node A').")] = "Custom subgraph",
+    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = False
 ) -> dict:
     """
-    Creates a NEW subgraph network from a list of node IDs.
-    Returns schema with new_network_id.
+    Creates a NEW subgraph network from a list of specific node IDs.
+        
+    Returns:
+        dict: {"new_network_id": int, "content": str}
     """
     db = database.SessionLocal()
     try:
@@ -251,11 +283,14 @@ def create_subgraph_from_nodes(
 
 @mcp.tool()
 def create_largest_component_subgraph(
-    network_id: int, 
-    preserve_layout: bool = False
+    network_id: Annotated[int, Field(description="The ID of the source network.")], 
+    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = False
 ) -> dict:
     """
-    Extracts the largest connected component as a new subgraph.
+    Extracts the largest connected component from the network as a new subgraph.
+        
+    Returns:
+        dict: {"new_network_id": int, "content": str}
     """
     db = database.SessionLocal()
     try:
@@ -276,13 +311,16 @@ def create_largest_component_subgraph(
 
 @mcp.tool()
 def create_ego_network(
-    network_id: int,
-    center_node_id: str,
-    radius: int,
-    preserve_layout: bool = False
+    network_id: Annotated[int, Field(description="The ID of the source network.")],
+    center_node_id: Annotated[str, Field(description="The ID of the central node.")],
+    radius: Annotated[int, Field(description="The radius of the ego network (1 = direct neighbors).")],
+    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = False
 ) -> dict:
     """
-    Creates an Ego Network subgraph (node + neighbors within radius).
+    Creates an Ego Network subgraph (a central node and its neighbors within a radius).
+        
+    Returns:
+        dict: {"new_network_id": int, "content": str}
     """
     db = database.SessionLocal()
     try:
@@ -303,13 +341,16 @@ def create_ego_network(
 
 @mcp.tool()
 def create_path_subgraph(
-    network_id: int,
-    source_node_id: str,
-    target_node_id: str,
-    preserve_layout: bool = False
+    network_id: Annotated[int, Field(description="The ID of the source network.")],
+    source_node_id: Annotated[str, Field(description="The start node ID.")],
+    target_node_id: Annotated[str, Field(description="The end node ID.")],
+    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = False
 ) -> dict:
     """
-    Creates a subgraph containing the shortest path between two nodes.
+    Creates a subgraph containing the shortest path between two specific nodes.
+        
+    Returns:
+        dict: {"new_network_id": int, "content": str}
     """
     db = database.SessionLocal()
     try:
@@ -330,12 +371,15 @@ def create_path_subgraph(
 
 @mcp.tool()
 def create_k_core_subgraph(
-    network_id: int,
-    k: int,
-    preserve_layout: bool = False
+    network_id: Annotated[int, Field(description="The ID of the source network.")],
+    k: Annotated[int, Field(description="The minimum degree for nodes to include.")],
+    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = False
 ) -> dict:
     """
-    Creates a k-core subgraph (nodes with degree >= k).
+    Creates a k-core subgraph (containing only nodes with degree >= k).
+        
+    Returns:
+        dict: {"new_network_id": int, "content": str}
     """
     db = database.SessionLocal()
     try:
@@ -354,9 +398,14 @@ def create_k_core_subgraph(
 
 
 @mcp.tool()
-def get_subgraphs(network_id: int) -> dict:
+def get_subgraphs(
+    network_id: Annotated[int, Field(description="The ID of the parent network.")]
+) -> dict:
     """
     Lists all subgraphs derived from the given network.
+        
+    Returns:
+        dict: {"subgraphs": [{"id": int, "name": str, ...}]}
     """
     db = database.SessionLocal()
     try:
@@ -372,13 +421,15 @@ def get_subgraphs(network_id: int) -> dict:
 
 @mcp.tool()
 def get_top_nodes(
-    network_id: int, 
-    metric: str, 
-    k: int = 5
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    metric: Annotated[str, Field(description="Centrality metric to use. Valid values: 'degree', 'betweenness', 'closeness', 'eigenvector', 'pagerank'.")],
+    k: Annotated[int, Field(description="Number of top nodes to return.")] = 10
 ) -> dict:
     """
     Returns the top k nodes based on a centrality metric.
-    Metric options: 'degree', 'betweenness', 'closeness', 'eigenvector', 'pagerank'.
+        
+    Returns:
+        dict: {"nodes": [{"id": str, "score": float}, ...]}
     """
     db = database.SessionLocal()
     try:
@@ -394,12 +445,15 @@ def get_top_nodes(
 
 @mcp.tool()
 def search_nodes(
-    network_id: int,
-    query: str,
-    limit: int = 10
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    query: Annotated[str, Field(description="The search string (matches partial node IDs).")],
+    limit: Annotated[int, Field(description="Max results to return.")] = 10
 ) -> str:
     """
     Search for nodes by ID or attributes.
+        
+    Returns:
+        str: Description of found nodes.
     """
     db = database.SessionLocal()
     try:
@@ -413,9 +467,14 @@ def search_nodes(
 
 
 @mcp.tool()
-def export_network(network_id: int) -> str:
+def export_network(
+    network_id: Annotated[int, Field(description="The ID of the network.")]
+) -> str:
     """
     Exports the network as a GraphML string.
+        
+    Returns:
+        str: The GraphML content string.
     """
     db = database.SessionLocal()
     try:
@@ -429,9 +488,15 @@ def export_network(network_id: int) -> str:
 
 
 @mcp.tool()
-def get_visualization_state(network_id: int) -> dict:
+def get_visualization_state(
+    network_id: Annotated[int, Field(description="The ID of the network.")]
+) -> dict:
     """
-    Returns the current visualization configuration (color mapping, sizing, etc.).
+    Returns the current visualization configuration (color mapping, sizing, layout, etc.).
+    By reading this, you can understand how the network is currently visualized.
+        
+    Returns:
+        dict: A dictionary containing 'layout_name', 'node_size', 'node_color', etc.
     """
     db = database.SessionLocal()
     try:
@@ -445,7 +510,7 @@ def get_visualization_state(network_id: int) -> dict:
 
 @mcp.tool()
 def get_network_structure(
-    network_id: int
+    network_id: Annotated[int, Field(description="The ID of the network.")]
 ) -> dict:
     """
     Returns basic structural statistics (node count, edge count, density).
@@ -463,7 +528,7 @@ def get_network_structure(
 
 @mcp.tool()
 def list_node_attributes(
-    network_id: int
+    network_id: Annotated[int, Field(description="The ID of the network.")]
 ) -> dict:
     """
     Lists available node attributes with statistics (min/max/top values).
@@ -489,7 +554,7 @@ def list_node_attributes(
 
 @mcp.tool()
 def list_edge_attributes(
-    network_id: int
+    network_id: Annotated[int, Field(description="The ID of the network.")]
 ) -> dict:
     """
     Lists available edge attributes with statistics.
@@ -515,22 +580,14 @@ def list_edge_attributes(
 
 @mcp.tool()
 def update_layout(
-    network_id: int,
-    layout_name: str
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    layout_name: Annotated[str, Field(description="The layout algorithm. Supported: 'forceatlas2', 'spring', etc.")]
 ) -> dict:
     """
     Updates the network layout.
-    
-    Supported Layouts:
-    - "force-directed" (Default, ForceAtlas2)
-    - "spring" (Fruchterman-Reingold)
-    - "circular": Position nodes on a circle.
-    - "shell": Position nodes in concentric circles.
-    - "spectral": Eigenvectors of graph Laplacian.
-    - "spiral": Spiral layout.
-    - "kamada_kawai", "random", etc.
-    
-    Recalculates positions and refreshes the visualization.
+        
+    Returns:
+        dict: Updated visualization data.
     """
 
     db = database.SessionLocal()
@@ -553,36 +610,30 @@ def update_layout(
 
 @mcp.tool()
 def update_node_color(
-    network_id: int,
-    attribute: str,
-    scale_type: str = "CATEGORICAL",
-    mapping: Optional[Dict[str, str]] = None,
-    default_color: Optional[str] = None,
-    fixed: bool = False,
-    gradient: Optional[List[str]] = None
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    attribute: Annotated[str, Field(description="The attribute name (e.g., 'country', 'modularity_class') to use for coloring.")],
+    scale_type: Annotated[str, Field(description="How to map values to colors. 'CATEGORICAL' (distinct), 'LINEAR' (gradient), 'RANKING' (top-k).")] = "CATEGORICAL",
+    mapping: Annotated[Optional[Dict[str, str]], Field(description="Optional dictionary for explicit value->color pairs. e.g. {'Japan': 'red'}.")] = None,
+    default_color: Annotated[Optional[str], Field(description="Fallback color for nodes that don't match mapping or are null. Default: '#d3d3d3'.")] = None,
+    fixed: Annotated[bool, Field(description="If True, strictly uses mapping+default. If False (default), auto-generates types.")] = False,
+    gradient: Annotated[Optional[List[str]], Field(description="List of colors for LINEAR scale (e.g. ['#ffffff', '#ff0000']).")] = None
 ) -> dict:
     """
-     Updates the node coloring based on an attribute.
+    Updates the node coloring based on an attribute.
     
-    **Example: Specific Value Mapping**
+    Returns:
+        dict: Updated visualization data.
+        
+    Example:
     To color "Austria" nodes red and all others gray:
     >>> update_node_color(
             network_id=1,
-            attribute="country",          # The attribute to check
+            attribute="country",
             scale_type="CATEGORICAL",
-            mapping={"Austria": "red"},   # Specific mapping
-            default_color="gray",         # Fallback for others
-            fixed=True                    # Do not auto-generate other colors
+            mapping={"Austria": "red"},
+            default_color="#d3d3d3",
+            fixed=True
         )
-        
-    Args:
-        network_id: The ID of the network.
-        attribute: The attribute name (e.g., 'country', 'modularity_class').
-        scale_type: "CATEGORICAL" (text), "LINEAR" (numbers), "RANKING" (top k).
-        mapping: Dictionary for explicit value->color pairs (e.g., {"Japanese": "red"}).
-        default_color: Color for nodes that don't match the mapping or are null. Defaults to Gray (#d3d3d3).
-        fixed: If True, STRICTLY uses the mapping + default. If False, auto-assigns colors to missing values.
-        gradient: List of colors for LINEAR scale (e.g. ["#start", "#end"] or ["#start", "#mid", "#end"]).
     """
     db = database.SessionLocal()
     try:
@@ -610,13 +661,16 @@ def update_node_color(
 
 @mcp.tool()
 def update_node_size(
-    network_id: int,
-    attribute: str,
-    min_size: float = 5.0,
-    max_size: float = 20.0
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    attribute: Annotated[str, Field(description="The attribute name (number) to use for sizing.")],
+    min_size: Annotated[float, Field(description="Node radius for the minimum attribute value.")] = 5.0,
+    max_size: Annotated[float, Field(description="Node radius for the maximum attribute value.")] = 20.0
 ) -> dict:
     """
     Updates the node sizing based on an attribute.
+    
+    Returns:
+        dict: Updated visualization data.
     """
     db = database.SessionLocal()
     try:
@@ -638,8 +692,8 @@ def update_node_size(
 
 @mcp.tool()
 def get_node_details(
-    network_id: int,
-    node_id: str
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    node_id: Annotated[str, Field(description="The ID of the node to retrieve details for.")]
 ) -> dict:
     """
     Returns full details for a specific node, including all attributes.
@@ -660,24 +714,24 @@ def get_node_details(
 
 @mcp.tool()
 def filter_nodes(
-    network_id: int,
-    attribute_name: str,
-    value: Optional[str] = None,
-    min_value: Optional[float] = None,
-    max_value: Optional[float] = None,
-    limit: int = 100
+    network_id: Annotated[int, Field(description="ID of the network.")],
+    attribute_name: Annotated[str, Field(description="Name of the attribute to filter by.")],
+    value: Annotated[Optional[str], Field(description="Exact string match for text attributes OR exact float match for numeric.")] = None,
+    min_value: Annotated[Optional[float], Field(description="Minimum value for numeric range.")] = None,
+    max_value: Annotated[Optional[float], Field(description="Maximum value for numeric range.")] = None,
+    limit: Annotated[int, Field(description="Max number of nodes to return.")] = 100
 ) -> dict:
     """
     Lists nodes that match a specific attribute condition.
     Does NOT create a new network, just returns a list of matching nodes (id, label).
     
-    Args:
-        network_id: ID of the network.
-        attribute_name: Name of the attribute to filter by.
-        value: Exact string match for text attributes OR exact float match for numeric.
-        min_value: Minimum value for numeric range.
-        max_value: Maximum value for numeric range.
-        limit: Max number of nodes to return (default 100).
+    Returns:
+        dict: {"count": int, "truncated": bool, "nodes": List[dict]}
+        
+    WARNING:
+    - Use this tool ONLY for retrieving information (e.g., "List Austrian composers").
+    - Do NOT use this tool to get IDs for creating a subgraph. Use `create_subgraph_by_filter` instead,
+      which handles the filtering server-side and avoids Context Window limits.
     """
     db = database.SessionLocal()
     try:
@@ -712,6 +766,93 @@ def filter_nodes(
         }
     except Exception as e:
         logger.error(f"filter_nodes failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
+    finally:
+        db.close()
+
+
+@mcp.tool()
+def create_subgraph_by_filter(
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    conditions: Annotated[List[Dict[str, Any]], Field(description="List of conditions. Schema: [{'attribute': 'Name', 'categories': ['A', 'B'], 'ranges': [{'min': 10, 'max': 20}]}]")],
+    preserve_layout: Annotated[bool, Field(description="If True, keeps x,y positions from source.")] = False,
+    description: Annotated[Optional[str], Field(description="Description of the subgraph.")] = None
+) -> dict:
+    """
+    Creates a NEW subgraph by filtering nodes based on multiple attribute conditions.
+    
+    Logic:
+    - Multiple conditions in the `conditions` list are combined with **AND**.
+    - Within a single condition, values in `categories` and `ranges` are combined with **OR**.
+
+    Args:
+        network_id: The ID of the network.
+        conditions: List of filter conditions. Each dictionary MUST follow this schema:
+            ```json
+            {
+               "attribute": "Attribute Name",
+               "categories": ["Category1", "Category2"],  // Exact matches (OR logic)
+               "ranges": [{"min": 10, "max": 20}, {"min": 50}] // Numeric ranges (OR logic)
+            }
+            ```
+        preserve_layout: If True, keeps x,y positions from source.
+        description: Description of the subgraph.
+        
+    Returns:
+        dict: {"new_network_id": int, "content": str}
+    """
+    db = database.SessionLocal()
+    try:
+        from app.logic import filter as filter_logic
+        from app.schemas.filter import AttributeCondition, Range
+
+        parsed_conditions = []
+        for cond_dict in conditions:
+            # 1. Attribute Name
+            attr_name = cond_dict.get("attribute")
+            if not attr_name:
+                continue # Skip invalid
+            
+            # 2. Categories
+            categories = cond_dict.get("categories")
+            
+            # 3. Ranges
+            ranges_data = cond_dict.get("ranges")
+            parsed_ranges = None
+            if ranges_data:
+                parsed_ranges = []
+                for r in ranges_data:
+                    parsed_ranges.append(Range(min=r.get("min"), max=r.get("max")))
+
+            parsed_conditions.append(AttributeCondition(
+                attribute_name=attr_name,
+                categories=categories,
+                ranges=parsed_ranges
+            ))
+
+        if not parsed_conditions:
+            return {"error": "No valid conditions provided."}
+
+        if not description:
+            description = "Custom filtered subgraph"
+
+        result = filter_logic.create_subgraph_by_filter(
+            network_id=network_id,
+            conditions=parsed_conditions,
+            suffix="Filtered",
+            db=db,
+            preserve_layout=preserve_layout,
+            description=description
+        )
+        
+        return {
+            "new_network_id": result["new_network_id"],
+            "content": f"Subgraph created (ID: {result['new_network_id']}) based on filters."
+        }
+            
+    except Exception as e:
+        logger.error(f"create_subgraph_by_filter failed: {e}")
+        logger.error(traceback.format_exc())
         return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()

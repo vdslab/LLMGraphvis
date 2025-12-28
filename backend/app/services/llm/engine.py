@@ -161,6 +161,9 @@ class GraphVisAgent:
             logger.info(f"--- Gemini API Request (Iteration {iteration}) ---")
             current_response = await self._gemini_generate(history, all_tools, tool_config)
 
+        if not final_text_content:
+            return "I have completed the requested actions, but the process reached its step limit before generating a final report."
+
         return final_text_content
 
     async def _gemini_generate(self, history, tools, tool_config):
