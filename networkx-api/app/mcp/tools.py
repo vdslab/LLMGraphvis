@@ -3,6 +3,10 @@ from app.core.mcp import mcp
 
 from app.core import database
 from common import models
+import logging
+import traceback
+
+logger = logging.getLogger("app.mcp.tools")
 
 from app.logic import (
     centrality,
@@ -36,7 +40,9 @@ def import_graphml(network_id: int, graphml_data: str) -> dict:
         final_network_id = importer.parse_and_save_graphml(network_id, graphml_data, db)
         return {"network_id": final_network_id, "content": f"Imported network {final_network_id}"}
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"import_graphml failed: {e}")
+        logger.error(traceback.format_exc())
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
 
@@ -52,8 +58,6 @@ def initialize_network(network_id: int, graphml_data: str) -> dict:
     """
     db = database.SessionLocal()
     try:
-        import logging
-        logger = logging.getLogger("app.mcp.tools")
         logger.info(f"DEBUG: initialize_network args types: network_id={type(network_id)}, graphml_data={type(graphml_data)}, db={type(db)}")
         
         try:
@@ -74,7 +78,12 @@ def initialize_network(network_id: int, graphml_data: str) -> dict:
                 "content": f"Network initialized (ID: {final_network_id}) with {len(vis_data['nodes'])} nodes."
             }
         except Exception as e:
-             return {"content": f"Import failed: {str(e)}"}
+             logger.error(f"initialize_network logic failed: {e}")
+             logger.error(traceback.format_exc())
+             return {"content": f"Import failed: {type(e).__name__}: {str(e)}"}
+    except Exception as e:
+        logger.error(f"initialize_network critical failure: {e}")
+        return {"error": str(e)}
     finally:
         db.close()
 
@@ -86,8 +95,9 @@ def calculate_centrality(network_id: int, centrality_type: str) -> str:
     try:
         centrality.calculate_centrality(network_id, centrality_type, db)
         return f"{centrality_type} centrality calculated."
-    except ValueError as e:
-        return f"Error: {str(e)}"
+    except Exception as e:
+        logger.error(f"calculate_centrality failed: {e}")
+        return f"Error: {type(e).__name__}: {str(e)}"
     finally:
         db.close()
 
@@ -99,8 +109,9 @@ def calculate_community(network_id: int, algorithm: str = "louvain") -> str:
     try:
         community.calculate_community(network_id, algorithm, db)
         return f"Communities detected using {algorithm}."
-    except ValueError as e:
-        return f"Error: {str(e)}"
+    except Exception as e:
+        logger.error(f"calculate_community failed: {e}")
+        return f"Error: {type(e).__name__}: {str(e)}"
     finally:
         db.close()
 
@@ -129,8 +140,9 @@ def calculate_layout(network_id: int, layout_name: str) -> dict:
         return visualization_builder.build_visualization(
             db, network_id, layout_name=layout_name
         )
-    except ValueError as e:
-        return {"error": str(e)}
+    except Exception as e:
+        logger.error(f"calculate_layout failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
 
@@ -193,6 +205,10 @@ def generate_visualization(
             custom_node_colors
         )
         return vis_data
+    except Exception as e:
+        logger.error(f"generate_visualization failed: {e}")
+        logger.error(traceback.format_exc())
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
 
@@ -226,9 +242,9 @@ def create_subgraph_from_nodes(
             "content": f"Subgraph created (ID: {result['new_network_id']}) with {len(node_ids)} nodes."
         }
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {"error": str(e)}
+        logger.error(f"create_subgraph_from_nodes failed: {e}")
+        logger.error(traceback.format_exc())
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
 
@@ -252,7 +268,8 @@ def create_largest_component_subgraph(
         )
         return result
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"create_largest_component_subgraph failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
 
@@ -278,7 +295,8 @@ def create_ego_network(
             preserve_layout=preserve_layout
         )
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"create_ego_network failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
 
@@ -304,7 +322,8 @@ def create_path_subgraph(
             preserve_layout=preserve_layout
         )
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"create_path_subgraph failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
 
@@ -328,7 +347,8 @@ def create_k_core_subgraph(
             preserve_layout=preserve_layout
         )
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"create_k_core_subgraph failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
 
@@ -344,7 +364,8 @@ def get_subgraphs(network_id: int) -> dict:
         subgraphs = network_metadata.get_subgraphs(db, network_id)
         return {"subgraphs": subgraphs}
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"get_subgraphs failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
 
@@ -365,7 +386,8 @@ def get_top_nodes(
         nodes = centrality.get_top_nodes(network_id, metric, k, db)
         return {"top_nodes": nodes}
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"get_top_nodes failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
 
@@ -383,6 +405,9 @@ def search_nodes(
     try:
         nodes = search.search_nodes(network_id, query, limit=limit, db=db)
         return f"Found {len(nodes)} nodes: {nodes}"
+    except Exception as e:
+        logger.error(f"search_nodes failed: {e}")
+        return f"Error: {type(e).__name__}: {str(e)}"
     finally:
         db.close()
 
@@ -396,6 +421,9 @@ def export_network(network_id: int) -> str:
     try:
         from app.logic import export
         return export.export_to_graphml(db, network_id)
+    except Exception as e:
+        logger.error(f"export_network failed: {e}")
+        return f"Error: {type(e).__name__}: {str(e)}"
     finally:
         db.close()
 
@@ -408,6 +436,9 @@ def get_visualization_state(network_id: int) -> dict:
     db = database.SessionLocal()
     try:
         return visualization_builder.get_current_visualization(db, network_id)
+    except Exception as e:
+        logger.error(f"get_visualization_state failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
 
@@ -424,7 +455,8 @@ def get_network_structure(
         from app.logic import network_metadata
         return network_metadata.get_network_structure(db, network_id)
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"get_network_structure failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
 
@@ -449,7 +481,8 @@ def list_node_attributes(
         )
         return {"attributes": stats}
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"list_node_attributes failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
 
@@ -474,7 +507,8 @@ def list_edge_attributes(
         )
         return {"attributes": stats}
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"list_edge_attributes failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
 
@@ -568,7 +602,8 @@ def update_node_color(
             db, network_id, node_color_config=config
         )
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"update_node_color failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
 
@@ -594,7 +629,8 @@ def update_node_size(
             db, network_id, node_size_config=config
         )
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"update_node_size failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
 
     finally:
         db.close()
@@ -616,7 +652,8 @@ def get_node_details(
             return {"error": f"Node '{node_id}' not found in network {network_id}."}
         return details
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"get_node_details failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
 
@@ -674,6 +711,7 @@ def filter_nodes(
             "nodes": nodes
         }
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"filter_nodes failed: {e}")
+        return {"error": f"{type(e).__name__}: {str(e)}"}
     finally:
         db.close()
