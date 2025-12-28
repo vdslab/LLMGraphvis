@@ -177,7 +177,19 @@ async def session_scope():
                 yield session
     except Exception as e:
         _log_exception_details(e, "MCP Session connection")
-        raise
+        raise _unwrap_exception(e) from e
+
+def _unwrap_exception(e: BaseException) -> BaseException:
+    """
+    Unwraps an ExceptionGroup if it contains only a single exception.
+    """
+    try:
+        if isinstance(e, BaseExceptionGroup):
+            if len(e.exceptions) == 1:
+                return _unwrap_exception(e.exceptions[0])
+    except NameError:
+        pass # Pre-3.11
+    return e
 
 async def execute_tool(tool_name: str, arguments: dict, session: ClientSession = None):
     """
@@ -239,7 +251,7 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
         import traceback
         _log_exception_details(e, f"executing tool {tool_name} with args {arguments}")
         traceback.print_exc()
-        raise
+        raise _unwrap_exception(e) from e
 
 
 async def get_resource(uri: str, session: ClientSession = None) -> dict:
