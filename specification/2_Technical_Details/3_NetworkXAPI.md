@@ -50,7 +50,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 | `create_path_subgraph` | 最短経路サブグラフを作成する。 |
 | `create_k_core_subgraph` | K-Coreサブグラフを作成する。 |
 | `create_largest_component_subgraph` | 最大連結成分サブグラフを作成する。 |
-| `create_component_containing_node` | 指定ノードを含む連結成分サブグラフを作成する。 |
+
 | `create_subgraph_by_filter` | 属性条件に基づいてサブグラフを作成する（サーバーサイドフィルタリング）。 |
 | `switch_to_network` | コンテキストを指定IDに切り替え、そのネットワークの可視化を返す。 |
 | `get_subgraphs` | 親ネットワークから派生したサブグラフの一覧を取得する。 |
@@ -205,11 +205,6 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
   - `network_id`: int
   - `preserve_layout`: bool (Default: True)
 
-### `create_component_containing_node`
-- **Description**: 指定ノードを含む連結成分のサブグラフを作成する。
-- **Arguments**:
-  - `source_network_id`: int
-  - `node_id`: str
 
 ### `create_subgraph_by_filter`
 - **Description**: 属性フィルタ条件に基づいてサブグラフを作成する。サーバーサイドで処理されるため、大量のノードIDを渡す必要がない。
