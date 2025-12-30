@@ -9,6 +9,12 @@ export const useChatConnection = (id, isAuthenticated) => {
         render_update: (data) => {
             console.log("Render Update:", data);
             useNetworkStore.getState().setNetworkData(data);
+            
+            // Fix for lost network ID context: Sync ID if backend provides it
+            if (data.network_id) {
+                useNetworkStore.getState().setNetworkId(data.network_id);
+            }
+
             useChatStore.getState().setIsLoading(false);
             useChatStore.getState().setThinkingMessage(null);
         },

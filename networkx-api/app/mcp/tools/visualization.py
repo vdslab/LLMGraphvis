@@ -48,6 +48,7 @@ def generate_visualization(
                 node_size_config=node_size, 
                 edge_width_config=ew_config
             )
+            vis_data["network_id"] = network_id
             return vis_data
         except Exception as e:
             logger.error(f"generate_visualization failed: {e}")
@@ -69,7 +70,10 @@ def get_visualization_state(
     with get_db_context() as db:
         try:
             from app.logic import visualization_builder
-            return visualization_builder.get_stored_visualization(db, network_id)
+            vis_data = visualization_builder.get_stored_visualization(db, network_id)
+            if vis_data:
+                vis_data["network_id"] = network_id
+            return vis_data
         except Exception as e:
             logger.error(f"get_visualization_state failed: {e}")
             raise RuntimeError(f"Failed to get visualization state: {str(e)}") from e
@@ -90,7 +94,9 @@ def update_layout(
         try:
             from app.logic import visualization_builder
             # Force rebuild to pick up new layout coords from node attributes
-            return visualization_builder.build_visualization(db, network_id)
+            vis_data = visualization_builder.build_visualization(db, network_id)
+            vis_data["network_id"] = network_id
+            return vis_data
         except Exception as e:
             logger.error(f"update_layout failed: {e}")
             raise RuntimeError(f"Layout update failed: {str(e)}") from e
@@ -128,9 +134,9 @@ def update_node_color(
                 fixed_mapping=fixed,
                 gradient=gradient
             )
-            return visualization_builder.build_visualization(
-                db, network_id, node_color_config=config
             )
+            vis_data["network_id"] = network_id
+            return vis_data
         except Exception as e:
             logger.error(f"update_node_color failed: {e}")
             raise RuntimeError(f"Node color update failed: {str(e)}") from e
@@ -160,9 +166,9 @@ def update_node_size(
                 max_size=max_size,
                 default_size=default_size
             )
-            return visualization_builder.build_visualization(
-                db, network_id, node_size_config=config
             )
+            vis_data["network_id"] = network_id
+            return vis_data
         except Exception as e:
             logger.error(f"update_node_size failed: {e}")
             raise RuntimeError(f"Node size update failed: {str(e)}") from e
@@ -182,7 +188,10 @@ def switch_to_network(
     with get_db_context() as db:
         try:
             from app.logic import visualization_builder
-            return visualization_builder.get_stored_visualization(db, network_id)
+            vis_data = visualization_builder.get_stored_visualization(db, network_id)
+            if vis_data:
+                vis_data["network_id"] = network_id
+            return vis_data
         except Exception as e:
             logger.error(f"switch_to_network failed: {e}")
             raise RuntimeError(f"Switch network failed: {str(e)}") from e

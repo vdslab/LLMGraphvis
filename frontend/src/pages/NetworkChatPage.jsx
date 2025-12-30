@@ -90,36 +90,42 @@ const NetworkChatPage = () => {
 
   const handleNodeClick = useCallback(async (nodeData) => {
     try {
+        console.log("Node clicked:", nodeData);
+        // Set basic info immediately so the panel opens
         setSelectedNode({ id: nodeData.id, label: nodeData.label });
         setNodeDetailsPanelOpen(true);
-        // Do not set contextNode automatically
         
-        // Cannot access latest state inside useCallback without dependency, 
-        // but networkId is needed.
-        // We can use a ref or just include it in dependency.
-        // networkId from store might change? usually stable per chat?
-        // Let's get it directly from store helper or make sure it's in dep.
+        // Get networkId from store state to ensure we have the latest
         const currentNetworkId = useNetworkStore.getState().networkId;
         
         if (!currentNetworkId) {
-            console.warn("Network ID not available for node details");
-            return;
+            console.warn("Network ID not available for node details. Retrying fetch from store...");
+            // Fallback: check if we can get it from the chat store or if it was just set
+             const chat = useChatStore.getState();
+             // Maybe the chat is loaded but networkId store not updated? (Unlikely due to previous logic)
+             console.warn("Current Store State - NetworkID:", currentNetworkId, "ChatID:", chat.chatId);
+             return;
         }
         
-        // Don't await in the event handler if we want snappy UI? 
-        // But we need details.
-        api.getNodeDetails(currentNetworkId, nodeData.id).then(response => {
-           if (response && response.data) {
-             setSelectedNode(prev => ({ ...prev, details: response.data }));
-           }
-        }).catch(e => {
+        try {
+            const response = await api.getNodeDetails(currentNetworkId, nodeData.id);
+            if (response && response.data) {
+                console.log("Node details fetched:", response.data);
+                setSelectedNode(prev => ({ ...prev, details: response.data }));
+            }
+        } catch (e) {
             console.error("Failed to fetch node details:", e);
-        });
+            // Optionally show error in the panel
+            setSelectedNode(prev => ({ 
+                ...prev, 
+                details: { description: "Failed to load details." } 
+            }));
+        }
 
     } catch (e) {
         console.error("Error in node click handler:", e);
     }
-  }, []); // Empty dependency: references are stable or fetched from store directly
+  }, []); // networkId is accessed via getState(), so we don't need it in dependency. Stable callback.
 
   const handleCloseNodeDetails = useCallback(() => {
       setNodeDetailsPanelOpen(false);

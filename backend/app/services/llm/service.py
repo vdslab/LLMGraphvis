@@ -12,6 +12,22 @@ from .prompts import SYSTEM_INSTRUCTION
 logger = get_logger(__name__)
 
 
+def _format_exception_message(e: BaseException) -> str:
+    """
+    Format exception message, handling ExceptionGroup/TaskGroup recursively.
+    """
+    try:
+        # Python 3.11+ BaseExceptionGroup
+        if isinstance(e, BaseExceptionGroup):
+            msgs = []
+            for exc in e.exceptions:
+                msgs.append(_format_exception_message(exc))
+            return "; ".join(msgs)
+    except NameError:
+        pass  # Pre-3.11
+
+    return f"{type(e).__name__}: {str(e)}"
+
 async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
     """Process a chat message using Gemini API with function calling"""
     logger.info(f"Processing chat_id={chat_id}, message='{user_message[:50]}...'")
@@ -73,8 +89,11 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
         import traceback
 
         traceback.print_exc()
+        traceback.print_exc()
         await queue.put({"event": "error", "data": str(e)})
-        return f"I encountered an error: {str(e)}"
+        
+        error_msg = _format_exception_message(e)
+        return f"I encountered an error: {error_msg}"
 
 
 async def _build_context_summary(network_id: int) -> str:
