@@ -7,6 +7,8 @@ from typing import Any, Dict, List, Optional, Tuple
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception, before_sleep_log
+import logging
 
 from common import models
 from app.core.logging import get_logger
@@ -45,6 +47,33 @@ class GraphVisAgent:
             logger.info("Using Google AI Studio with API Key")
             return genai.Client(api_key=api_key)
 
+
+    def is_retryable_error(exception):
+        """Check if the exception is a transient error suitable for retry."""
+        try:
+            # Check for HTTP status codes (429, 5xx)
+            code = getattr(exception, "code", None)
+            status = getattr(exception, "status", None)
+            
+            retryable_codes = [429, 500, 502, 503, 504]
+            if code in retryable_codes:
+                return True
+                
+            # Check for specific status strings
+            # User error: 'status': 'RESOURCE_EXHAUSTED'
+            retryable_statuses = ["RESOURCE_EXHAUSTED", "INTERNAL", "UNAVAILABLE", "DEADLINE_EXCEEDED"]
+            if str(status) in retryable_statuses:
+                return True
+
+            # Fallback: Check message content
+            msg = str(exception).lower()
+            if "resource exhausted" in msg or "internal server error" in msg or "service unavailable" in msg:
+                return True
+                
+        except Exception:
+            pass
+        return False
+
     async def process_turn(
         self,
         history: List[types.Content],
@@ -61,21 +90,8 @@ class GraphVisAgent:
         # 1. Prepare Tools
         all_tools = await self._get_all_tools()
 
-        # 2. Generate Initial Response Stream
-        try:
-            current_response = await self.client.aio.models.generate_content_stream(
-                model=self.model_name,
-                contents=history,
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_INSTRUCTION,
-                    tools=all_tools,
-                    tool_config=tool_config,
-                    temperature=0.1,
-                ),
-            )
-        except Exception as e:
-            logger.error(f"Initial generation failed: {e}")
-            raise e
+        # 2. Generate Initial Response Stream (using retry-wrapped method)
+        current_response = await self._gemini_generate(history, all_tools, tool_config)
 
         # 3. Enter Tool Execution Loop within Session Scope
         # This ensures we reuse the same MCP connection for all tool calls in this turn
@@ -166,6 +182,12 @@ class GraphVisAgent:
 
         return final_text_content
 
+    @retry(
+        retry=retry_if_exception(lambda e: GraphVisAgent.is_retryable_error(e)),
+        wait=wait_exponential(multiplier=1, min=2, max=60),
+        stop=stop_after_attempt(5),
+        before_sleep=before_sleep_log(logger, logging.WARNING)
+    )
     async def _gemini_generate(self, history, tools, tool_config):
         try:
             return await self.client.aio.models.generate_content_stream(

@@ -13,3 +13,4 @@ sse-starlette
 mcp
 pytest
 pytest-asyncio
+tenacity

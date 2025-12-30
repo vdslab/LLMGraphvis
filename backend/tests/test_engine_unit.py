@@ -94,7 +94,7 @@ async def test_check_and_handle_lazy_intent_detected(mock_agent, mock_queue):
     loop_context = {}
     
     result = await mock_agent._check_and_handle_lazy_intent(
-        text_content, history, loop_context, mock_queue, [], None
+        text_content, history, loop_context, mock_queue, [], None, None
     )
     
     assert result is True
@@ -113,7 +113,7 @@ async def test_check_and_handle_lazy_intent_not_lazy(mock_agent, mock_queue):
     text_content = "Here is the result."
     
     result = await mock_agent._check_and_handle_lazy_intent(
-        text_content, history, {}, mock_queue, [], None
+        text_content, history, {}, mock_queue, [], None, None
     )
     
     assert result is False
@@ -167,7 +167,7 @@ async def test_execute_tools_and_update_history(mock_agent, mock_queue):
     # Let's verify this.
     
     await mock_agent._execute_tools_and_update_history(
-        [fc], text_content, history, mock_queue, chat_id=1, loop_context={"network_id": 1}
+        [fc], text_content, history, mock_queue, chat_id=1, loop_context={"network_id": 1}, session=None
     )
     
     # Check execution
@@ -177,4 +177,66 @@ async def test_execute_tools_and_update_history(mock_agent, mock_queue):
     # Check history update
     assert len(history) == 2
     assert history[0].role == "model"
+    assert len(history) == 2
+    assert history[0].role == "model"
     assert history[1].role == "user"
+
+def test_is_retryable_error():
+    """Test the retry predicate."""
+    class MockError:
+        def __init__(self, code=None, status=None, message=""):
+            self.code = code
+            self.status = status
+            self.message = message
+        def __str__(self):
+            return self.message
+
+    # True cases
+    assert GraphVisAgent.is_retryable_error(MockError(code=429))
+    assert GraphVisAgent.is_retryable_error(MockError(code=503))
+    assert GraphVisAgent.is_retryable_error(MockError(status="RESOURCE_EXHAUSTED"))
+    assert GraphVisAgent.is_retryable_error(MockError(message="Service Unavailable"))
+    
+    # False cases
+    assert not GraphVisAgent.is_retryable_error(MockError(code=400))
+    assert not GraphVisAgent.is_retryable_error(MockError(code=404))
+    assert not GraphVisAgent.is_retryable_error(MockError(message="Syntax Error"))
+
+@pytest.mark.asyncio
+async def test_gemini_generate_retry_success(mock_agent):
+    """Test that it retries on 429 and eventually succeeds."""
+    class MockError(Exception):
+        def __init__(self, code=None):
+            self.code = code
+
+    # Side effect: Fail once with 429, then return "Success"
+    mock_agent.client.aio.models.generate_content_stream = AsyncMock(side_effect=[
+        MockError(code=429),
+        "Success"
+    ])
+    
+    # We patch asyncio.sleep to speed up the test
+    with patch("asyncio.sleep", new_callable=AsyncMock):
+        result = await mock_agent._gemini_generate([], [], None)
+    
+    assert result == "Success"
+    assert mock_agent.client.aio.models.generate_content_stream.call_count == 2
+
+@pytest.mark.asyncio
+async def test_gemini_generate_fail_non_retryable(mock_agent):
+    """Test that it does NOT retry on non-retryable error."""
+    class MockError(Exception):
+        def __init__(self, code=None):
+            self.code = code
+
+    # Side effect: Fail with 400
+    mock_agent.client.aio.models.generate_content_stream = AsyncMock(side_effect=[
+        MockError(code=400),
+        "Success"
+    ])
+    
+    with pytest.raises(MockError):
+        await mock_agent._gemini_generate([], [], None)
+    
+    # Should only be called once
+    assert mock_agent.client.aio.models.generate_content_stream.call_count == 1
