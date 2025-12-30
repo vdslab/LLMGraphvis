@@ -28,8 +28,14 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       host: '0.0.0.0',
-      allowedHosts: true,
+      port: 5173,
       proxy: proxyConfig,
+      hmr: {
+        clientPort: 5173,
+      },
+      watch: {
+        usePolling: true,
+      },
     },
     test: {
       globals: true,
