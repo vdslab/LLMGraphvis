@@ -20,9 +20,26 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 
+import contextlib
+
 def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
+
+@contextlib.contextmanager
+def get_db_context():
+    """
+    Context manager for database sessions.
+    Usage:
+        with get_db_context() as db:
+            db.query(...)
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+

@@ -1,7 +1,7 @@
-from typing import Annotated
+from typing import Annotated, Optional
 from pydantic import Field
 from app.core.mcp import mcp
-from app.core import database
+from app.core.database import get_db_context
 import logging
 import traceback
 
@@ -18,17 +18,16 @@ def import_graphml(
     Returns:
         dict: {"network_id": int, "content": str}
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import importer
-        final_network_id = importer.parse_and_save_graphml(network_id, graphml_data, db)
-        return {"network_id": final_network_id, "content": f"Imported network {final_network_id}"}
-    except Exception as e:
-        logger.error(f"import_graphml failed: {e}")
-        logger.error(traceback.format_exc())
-        return {"error": f"{type(e).__name__}: {str(e)}"}
-    finally:
-        db.close()
+    with get_db_context() as db:
+        try:
+            from app.logic import importer
+            final_network_id = importer.parse_and_save_graphml(network_id, graphml_data, db)
+            return {"network_id": final_network_id, "content": f"Imported network {final_network_id}"}
+        except Exception as e:
+            logger.error(f"import_graphml failed: {e}")
+            logger.error(traceback.format_exc())
+            # Raise exception to ensure isError=True in MCP response
+            raise RuntimeError(f"Import failed: {str(e)}") from e
 
 
 @mcp.tool()
@@ -44,11 +43,10 @@ def initialize_network(
     Returns:
         dict: {"network_id": int, "network": dict, "content": str}
     """
-    db = database.SessionLocal()
     try:
-        logger.info(f"DEBUG: initialize_network args types: network_id={type(network_id)}, graphml_data={type(graphml_data)}, db={type(db)}")
-        
-        try:
+        with get_db_context() as db:
+            logger.info(f"DEBUG: initialize_network args types: network_id={type(network_id)}, graphml_data={type(graphml_data)}")
+            
             from app.logic import importer, layout, visualization_builder
 
             # Importer handles parsing and collision logic
@@ -67,12 +65,28 @@ def initialize_network(
                 "network": vis_data,
                 "content": f"Network initialized (ID: {final_network_id}) with {len(vis_data['nodes'])} nodes."
             }
-        except Exception as e:
-             logger.error(f"initialize_network logic failed: {e}")
-             logger.error(traceback.format_exc())
-             return {"content": f"Import failed: {type(e).__name__}: {str(e)}"}
     except Exception as e:
         logger.error(f"initialize_network critical failure: {e}")
-        return {"error": str(e)}
-    finally:
-        db.close()
+        logger.error(traceback.format_exc())
+        raise RuntimeError(f"Initialization failed: {str(e)}") from e
+
+
+@mcp.tool()
+def update_network_metadata(
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    description: Annotated[Optional[str], Field(description="New description for the network.")] = None,
+    name: Annotated[Optional[str], Field(description="New name for the network.")] = None
+) -> str:
+    """
+    Updates the network's name or description.
+    
+    Returns:
+        str: Status message.
+    """
+    with get_db_context() as db:
+        try:
+            from app.logic import network_metadata
+            return network_metadata.update_network_metadata(db, network_id, description, name)
+        except Exception as e:
+            logger.error(f"update_network_metadata failed: {e}")
+            raise RuntimeError(f"Metadata update failed: {str(e)}") from e

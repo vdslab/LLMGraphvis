@@ -1,7 +1,7 @@
 from typing import List, Optional, Dict, Any, Annotated
 from pydantic import Field
 from app.core.mcp import mcp
-from app.core import database
+from app.core.database import get_db_context
 import logging
 import traceback
 
@@ -20,29 +20,27 @@ def create_subgraph_from_nodes(
     Returns:
         dict: {"new_network_id": int, "content": str}
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import subgraph
-        # Correct argument mapping:
-        # source_network_id, node_ids, db, suffix, preserve_layout, description
-        result = subgraph.create_subgraph_from_nodes(
-            source_network_id=network_id,
-            node_ids=node_ids,
-            db=db,
-            suffix="Subgraph",
-            preserve_layout=preserve_layout,
-            description=description
-        )
-        return {
-            "new_network_id": result["new_network_id"],
-            "content": f"Subgraph created (ID: {result['new_network_id']}) with {len(node_ids)} nodes."
-        }
-    except Exception as e:
-        logger.error(f"create_subgraph_from_nodes failed: {e}")
-        logger.error(traceback.format_exc())
-        return {"error": f"{type(e).__name__}: {str(e)}"}
-    finally:
-        db.close()
+    with get_db_context() as db:
+        try:
+            from app.logic import subgraph
+            # Correct argument mapping:
+            # source_network_id, node_ids, db, suffix, preserve_layout, description
+            result = subgraph.create_subgraph_from_nodes(
+                source_network_id=network_id,
+                node_ids=node_ids,
+                db=db,
+                suffix="Subgraph",
+                preserve_layout=preserve_layout,
+                description=description
+            )
+            return {
+                "new_network_id": result["new_network_id"],
+                "content": f"Subgraph created (ID: {result['new_network_id']}) with {len(node_ids)} nodes."
+            }
+        except Exception as e:
+            logger.error(f"create_subgraph_from_nodes failed: {e}")
+            logger.error(traceback.format_exc())
+            raise RuntimeError(f"Subgraph create failed: {str(e)}") from e
 
 
 @mcp.tool()
@@ -61,21 +59,19 @@ def create_largest_component_subgraph(
     Returns:
         dict: {"new_network_id": int, "content": str}
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import subgraph 
-        
-        result = subgraph.create_largest_component_subgraph(
-            source_network_id=network_id,
-            db=db,
-            preserve_layout=preserve_layout
-        )
-        return result
-    except Exception as e:
-        logger.error(f"create_largest_component_subgraph failed: {e}")
-        return {"error": f"{type(e).__name__}: {str(e)}"}
-    finally:
-        db.close()
+    with get_db_context() as db:
+        try:
+            from app.logic import subgraph 
+            
+            result = subgraph.create_largest_component_subgraph(
+                source_network_id=network_id,
+                db=db,
+                preserve_layout=preserve_layout
+            )
+            return result
+        except Exception as e:
+            logger.error(f"create_largest_component_subgraph failed: {e}")
+            raise RuntimeError(f"Largest component extraction failed: {str(e)}") from e
 
 
 @mcp.tool()
@@ -91,21 +87,19 @@ def create_ego_network(
     Returns:
         dict: {"new_network_id": int, "content": str}
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import subgraph
-        return subgraph.create_ego_network(
-            source_network_id=network_id,
-            center_node_id=center_node_id,
-            radius=radius,
-            db=db,
-            preserve_layout=preserve_layout
-        )
-    except Exception as e:
-        logger.error(f"create_ego_network failed: {e}")
-        return {"error": f"{type(e).__name__}: {str(e)}"}
-    finally:
-        db.close()
+    with get_db_context() as db:
+        try:
+            from app.logic import subgraph
+            return subgraph.create_ego_network(
+                source_network_id=network_id,
+                center_node_id=center_node_id,
+                radius=radius,
+                db=db,
+                preserve_layout=preserve_layout
+            )
+        except Exception as e:
+            logger.error(f"create_ego_network failed: {e}")
+            raise RuntimeError(f"Ego network creation failed: {str(e)}") from e
 
 
 @mcp.tool()
@@ -121,21 +115,19 @@ def create_path_subgraph(
     Returns:
         dict: {"new_network_id": int, "content": str}
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import subgraph
-        return subgraph.create_path_subgraph(
-            source_network_id=network_id,
-            source_node_id=source_node_id,
-            target_node_id=target_node_id,
-            db=db,
-            preserve_layout=preserve_layout
-        )
-    except Exception as e:
-        logger.error(f"create_path_subgraph failed: {e}")
-        return {"error": f"{type(e).__name__}: {str(e)}"}
-    finally:
-        db.close()
+    with get_db_context() as db:
+        try:
+            from app.logic import subgraph
+            return subgraph.create_path_subgraph(
+                source_network_id=network_id,
+                source_node_id=source_node_id,
+                target_node_id=target_node_id,
+                db=db,
+                preserve_layout=preserve_layout
+            )
+        except Exception as e:
+            logger.error(f"create_path_subgraph failed: {e}")
+            raise RuntimeError(f"Path subgraph creation failed: {str(e)}") from e
 
 
 @mcp.tool()
@@ -150,20 +142,18 @@ def create_k_core_subgraph(
     Returns:
         dict: {"new_network_id": int, "content": str}
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import subgraph
-        return subgraph.create_k_core_subgraph(
-            source_network_id=network_id,
-            k=k,
-            db=db,
-            preserve_layout=preserve_layout
-        )
-    except Exception as e:
-        logger.error(f"create_k_core_subgraph failed: {e}")
-        return {"error": f"{type(e).__name__}: {str(e)}"}
-    finally:
-        db.close()
+    with get_db_context() as db:
+        try:
+            from app.logic import subgraph
+            return subgraph.create_k_core_subgraph(
+                source_network_id=network_id,
+                k=k,
+                db=db,
+                preserve_layout=preserve_layout
+            )
+        except Exception as e:
+            logger.error(f"create_k_core_subgraph failed: {e}")
+            raise RuntimeError(f"K-core subgraph creation failed: {str(e)}") from e
 
 
 @mcp.tool()
@@ -176,16 +166,14 @@ def get_subgraphs(
     Returns:
         dict: {"subgraphs": [{"id": int, "name": str, ...}]}
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import network_metadata
-        subgraphs = network_metadata.get_subgraphs(db, network_id)
-        return {"subgraphs": subgraphs}
-    except Exception as e:
-        logger.error(f"get_subgraphs failed: {e}")
-        return {"error": f"{type(e).__name__}: {str(e)}"}
-    finally:
-        db.close()
+    with get_db_context() as db:
+        try:
+            from app.logic import network_metadata
+            subgraphs = network_metadata.get_subgraphs(db, network_id)
+            return {"subgraphs": subgraphs}
+        except Exception as e:
+            logger.error(f"get_subgraphs failed: {e}")
+            raise RuntimeError(f"Failed to list subgraphs: {str(e)}") from e
 
 
 @mcp.tool()
@@ -209,42 +197,40 @@ def filter_nodes(
     - Do NOT use this tool to get IDs for creating a subgraph. Use `create_subgraph_by_filter` instead,
       which handles the filtering server-side and avoids Context Window limits.
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import filter as filter_logic
-        from app.schemas.filter import AttributeCondition, Range
+    with get_db_context() as db:
+        try:
+            from app.logic import filter as filter_logic
+            from app.schemas.filter import AttributeCondition, Range
 
-        # Construct condition
-        condition = AttributeCondition(attribute_name=attribute_name)
-        
-        if value is not None:
-             # Try to parse as float if it looks like a number, otherwise keep as string
-            try:
-                condition.categories = [float(value)]
-            except ValueError:
-                condition.categories = [value]
-        
-        if min_value is not None or max_value is not None:
-            condition.ranges = [Range(min=min_value, max=max_value)]
+            # Construct condition
+            condition = AttributeCondition(attribute_name=attribute_name)
             
-        nodes = filter_logic.get_nodes_by_filter(network_id, [condition], db)
-        
-        # Limit results
-        truncated = False
-        if len(nodes) > limit:
-            nodes = nodes[:limit]
-            truncated = True
+            if value is not None:
+                 # Try to parse as float if it looks like a number, otherwise keep as string
+                try:
+                    condition.categories = [float(value)]
+                except ValueError:
+                    condition.categories = [value]
             
-        return {
-            "count": len(nodes),
-            "truncated": truncated,
-            "nodes": nodes
-        }
-    except Exception as e:
-        logger.error(f"filter_nodes failed: {e}")
-        return {"error": f"{type(e).__name__}: {str(e)}"}
-    finally:
-        db.close()
+            if min_value is not None or max_value is not None:
+                condition.ranges = [Range(min=min_value, max=max_value)]
+                
+            nodes = filter_logic.get_nodes_by_filter(network_id, [condition], db)
+            
+            # Limit results
+            truncated = False
+            if len(nodes) > limit:
+                nodes = nodes[:limit]
+                truncated = True
+                
+            return {
+                "count": len(nodes),
+                "truncated": truncated,
+                "nodes": nodes
+            }
+        except Exception as e:
+            logger.error(f"filter_nodes failed: {e}")
+            raise RuntimeError(f"Node filtering failed: {str(e)}") from e
 
 
 @mcp.tool()
@@ -277,58 +263,56 @@ def create_subgraph_by_filter(
     Returns:
         dict: {"new_network_id": int, "content": str}
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import filter as filter_logic
-        from app.schemas.filter import AttributeCondition, Range
+    with get_db_context() as db:
+        try:
+            from app.logic import filter as filter_logic
+            from app.schemas.filter import AttributeCondition, Range
 
-        parsed_conditions = []
-        for cond_dict in conditions:
-            # 1. Attribute Name
-            attr_name = cond_dict.get("attribute")
-            if not attr_name:
-                continue # Skip invalid
+            parsed_conditions = []
+            for cond_dict in conditions:
+                # 1. Attribute Name
+                attr_name = cond_dict.get("attribute")
+                if not attr_name:
+                    continue # Skip invalid
+                
+                # 2. Categories
+                categories = cond_dict.get("categories")
+                
+                # 3. Ranges
+                ranges_data = cond_dict.get("ranges")
+                parsed_ranges = None
+                if ranges_data:
+                    parsed_ranges = []
+                    for r in ranges_data:
+                        parsed_ranges.append(Range(min=r.get("min"), max=r.get("max")))
+
+                parsed_conditions.append(AttributeCondition(
+                    attribute_name=attr_name,
+                    categories=categories,
+                    ranges=parsed_ranges
+                ))
+
+            if not parsed_conditions:
+                raise ValueError("No valid conditions provided.")
+
+            if not description:
+                description = "Custom filtered subgraph"
+
+            result = filter_logic.create_subgraph_by_filter(
+                network_id=network_id,
+                conditions=parsed_conditions,
+                suffix="Filtered",
+                db=db,
+                preserve_layout=preserve_layout,
+                description=description
+            )
             
-            # 2. Categories
-            categories = cond_dict.get("categories")
-            
-            # 3. Ranges
-            ranges_data = cond_dict.get("ranges")
-            parsed_ranges = None
-            if ranges_data:
-                parsed_ranges = []
-                for r in ranges_data:
-                    parsed_ranges.append(Range(min=r.get("min"), max=r.get("max")))
-
-            parsed_conditions.append(AttributeCondition(
-                attribute_name=attr_name,
-                categories=categories,
-                ranges=parsed_ranges
-            ))
-
-        if not parsed_conditions:
-            return {"error": "No valid conditions provided."}
-
-        if not description:
-            description = "Custom filtered subgraph"
-
-        result = filter_logic.create_subgraph_by_filter(
-            network_id=network_id,
-            conditions=parsed_conditions,
-            suffix="Filtered",
-            db=db,
-            preserve_layout=preserve_layout,
-            description=description
-        )
-        
-        return {
-            "new_network_id": result["new_network_id"],
-            "content": f"Subgraph created (ID: {result['new_network_id']}) based on filters."
-        }
-            
-    except Exception as e:
-        logger.error(f"create_subgraph_by_filter failed: {e}")
-        logger.error(traceback.format_exc())
-        return {"error": f"{type(e).__name__}: {str(e)}"}
-    finally:
-        db.close()
+            return {
+                "new_network_id": result["new_network_id"],
+                "content": f"Subgraph created (ID: {result['new_network_id']}) based on filters."
+            }
+                
+        except Exception as e:
+            logger.error(f"create_subgraph_by_filter failed: {e}")
+            logger.error(traceback.format_exc())
+            raise RuntimeError(f"Subgraph create by filter failed: {str(e)}") from e

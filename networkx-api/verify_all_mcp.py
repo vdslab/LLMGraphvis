@@ -96,10 +96,10 @@ async def test_tool_execution():
         res = await mcp.call_tool("list_node_attributes", {"network_id": net_id})
         print(f"Result: {res}")
         
-        # Test update_network_metadata (removed or missing, skipping)
-        # print(f"Testing update_network_metadata({net_id})...")
-        # res = await mcp.call_tool("update_network_metadata", {"network_id": net_id, "description": "Verified"})
-        # print(f"Result: {res}")
+        # Test update_network_metadata
+        print(f"Testing update_network_metadata({net_id})...")
+        res = await mcp.call_tool("update_network_metadata", {"network_id": net_id, "description": "Verified"})
+        print(f"Result: {res}")
 
         # Clean up
         db.delete(test_net)

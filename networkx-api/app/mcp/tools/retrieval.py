@@ -1,147 +1,129 @@
-from typing import Annotated
+from typing import Annotated, Optional
 from pydantic import Field
 from app.core.mcp import mcp
-from app.core import database
-from common import models
+from app.core.database import get_db_context
 import logging
+import traceback
+import json
 
 logger = logging.getLogger(__name__)
 
 @mcp.tool()
 def get_top_nodes(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    metric: Annotated[str, Field(description="Centrality metric to use. Valid values: 'degree', 'betweenness', 'closeness', 'eigenvector', 'pagerank'.")],
-    k: Annotated[int, Field(description="Number of top nodes to return.")] = 10
-) -> dict:
+    metric: Annotated[str, Field(description="The node attribute/metric to sort by (e.g., 'degree', 'betweenness').")],
+    n: Annotated[int, Field(description="Number of top nodes to retrieve.")] = 10,
+    order: Annotated[str, Field(description="'desc' (highest first) or 'asc' (lowest first).")] = "desc"
+) -> str:
     """
-    Returns the top k nodes based on a centrality metric.
-        
+    Retrieves the top N nodes based on a specific metric.
+    
     Returns:
-        dict: {"nodes": [{"id": str, "score": float}, ...]}
+        str: Formatted string list of nodes and their values.
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import centrality
-        nodes = centrality.get_top_nodes(network_id, metric, k, db)
-        return {"top_nodes": nodes}
-    except Exception as e:
-        logger.error(f"get_top_nodes failed: {e}")
-        return {"error": f"{type(e).__name__}: {str(e)}"}
-    finally:
-        db.close()
+    with get_db_context() as db:
+        try:
+            from app.logic import retrieval
+            return retrieval.get_top_nodes(network_id, metric, n, order, db)
+        except Exception as e:
+            logger.error(f"get_top_nodes failed: {e}")
+            raise RuntimeError(f"Failed to get top nodes: {str(e)}") from e
 
 
 @mcp.tool()
 def search_nodes(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    query: Annotated[str, Field(description="The search string (matches partial node IDs).")],
-    limit: Annotated[int, Field(description="Max results to return.")] = 10
+    query: Annotated[str, Field(description="The search query (part of node ID or label).")]
 ) -> str:
     """
-    Search for nodes by ID or attributes.
-        
+    Searches for nodes whose ID or label matches the query.
+    
     Returns:
-        str: Description of found nodes.
+        str: Formatted list of matching nodes.
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import search
-        nodes = search.search_nodes(network_id, query, limit=limit, db=db)
-        return f"Found {len(nodes)} nodes: {nodes}"
-    except Exception as e:
-        logger.error(f"search_nodes failed: {e}")
-        return f"Error: {type(e).__name__}: {str(e)}"
-    finally:
-        db.close()
+    with get_db_context() as db:
+        try:
+            from app.logic import retrieval
+            return retrieval.search_nodes(network_id, query, db)
+        except Exception as e:
+            logger.error(f"search_nodes failed: {e}")
+            raise RuntimeError(f"Node search failed: {str(e)}") from e
 
 
 @mcp.tool()
 def get_network_structure(
     network_id: Annotated[int, Field(description="The ID of the network.")]
-) -> dict:
+) -> str:
     """
-    Returns basic structural statistics (node count, edge count, density).
+    Returns a summary of the network structure (node count, edge count, density, etc.).
+    Useful for understanding the dataset before performing heavy operations.
+
+    Returns:
+        str: Summary text.
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import network_metadata
-        return network_metadata.get_network_structure(db, network_id)
-    except Exception as e:
-        logger.error(f"get_network_structure failed: {e}")
-        return {"error": f"{type(e).__name__}: {str(e)}"}
-    finally:
-        db.close()
+    with get_db_context() as db:
+        try:
+            from app.logic import network_metadata
+            return json.dumps(network_metadata.get_network_structure(db, network_id))
+        except Exception as e:
+            logger.error(f"get_network_structure failed: {e}")
+            raise RuntimeError(f"Failed to get network structure: {str(e)}") from e
 
 
 @mcp.tool()
 def list_node_attributes(
     network_id: Annotated[int, Field(description="The ID of the network.")]
-) -> dict:
+) -> str:
     """
-    Lists available node attributes with statistics (min/max/top values).
+    Lists all available node attributes (metadata) in the network.
+    Use this to see what data is available for coloring, sizing, or filtering.
+
+    Returns:
+        str: List of attribute names and types.
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import attributes
-        stats = attributes.get_attribute_stats(
-            network_id,
-            models.NodeAttribute,
-            models.NodeAttributeValue,
-            models.NodeFloatAttributeValue,
-            models.NodeTextAttributeValue,
-            db
-        )
-        return {"attributes": stats}
-    except Exception as e:
-        logger.error(f"list_node_attributes failed: {e}")
-        return {"error": f"{type(e).__name__}: {str(e)}"}
-    finally:
-        db.close()
+    with get_db_context() as db:
+        try:
+            from app.logic import network_metadata
+            return network_metadata.list_node_attributes(db, network_id)
+        except Exception as e:
+            logger.error(f"list_node_attributes failed: {e}")
+            raise RuntimeError(f"Failed to list node attributes: {str(e)}") from e
 
 
 @mcp.tool()
 def list_edge_attributes(
     network_id: Annotated[int, Field(description="The ID of the network.")]
-) -> dict:
+) -> str:
     """
-    Lists available edge attributes with statistics.
+    Lists all available edge attributes (metadata) in the network.
+
+    Returns:
+        str: List of attribute names and types.
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import attributes
-        stats = attributes.get_attribute_stats(
-            network_id,
-            models.EdgeAttribute,
-            models.EdgeAttributeValue,
-            models.EdgeFloatAttributeValue,
-            models.EdgeTextAttributeValue,
-            db
-        )
-        return {"attributes": stats}
-    except Exception as e:
-        logger.error(f"list_edge_attributes failed: {e}")
-        return {"error": f"{type(e).__name__}: {str(e)}"}
-    finally:
-        db.close()
+    with get_db_context() as db:
+        try:
+            from app.logic import network_metadata
+            return network_metadata.list_edge_attributes(db, network_id)
+        except Exception as e:
+            logger.error(f"list_edge_attributes failed: {e}")
+            raise RuntimeError(f"Failed to list edge attributes: {str(e)}") from e
 
 
 @mcp.tool()
 def get_node_details(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     node_id: Annotated[str, Field(description="The ID of the node to retrieve details for.")]
-) -> dict:
+) -> str:
     """
-    Returns full details for a specific node, including all attributes.
+    Retrieves all attributes for a specific node.
+
+    Returns:
+        str: JSON-formatted details of the node.
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import search
-        details = search.get_node_details(network_id, node_id, db)
-        if not details:
-            return {"error": f"Node '{node_id}' not found in network {network_id}."}
-        return details
-    except Exception as e:
-        logger.error(f"get_node_details failed: {e}")
-        return {"error": f"{type(e).__name__}: {str(e)}"}
-    finally:
-        db.close()
+    with get_db_context() as db:
+        try:
+            from app.logic import retrieval
+            return retrieval.get_node_details(network_id, node_id, db)
+        except Exception as e:
+            logger.error(f"get_node_details failed: {e}")
+            raise RuntimeError(f"Failed to get node details: {str(e)}") from e

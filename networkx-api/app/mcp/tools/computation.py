@@ -1,7 +1,7 @@
 from typing import Annotated
 from pydantic import Field
 from app.core.mcp import mcp
-from app.core import database
+from app.core.database import get_db_context
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,16 +17,14 @@ def calculate_centrality(
     Returns:
         str: Status message.
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import centrality
-        centrality.calculate_centrality(network_id, centrality_type, db)
-        return f"{centrality_type} centrality calculated."
-    except Exception as e:
-        logger.error(f"calculate_centrality failed: {e}")
-        return f"Error: {type(e).__name__}: {str(e)}"
-    finally:
-        db.close()
+    with get_db_context() as db:
+        try:
+            from app.logic import centrality
+            centrality.calculate_centrality(network_id, centrality_type, db)
+            return f"{centrality_type} centrality calculated."
+        except Exception as e:
+            logger.error(f"calculate_centrality failed: {e}")
+            raise RuntimeError(f"Centrality calculation failed: {str(e)}") from e
 
 
 @mcp.tool()
@@ -40,16 +38,14 @@ def calculate_community(
     Returns:
         str: Status message.
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import community
-        community.calculate_community(network_id, algorithm, db)
-        return f"Communities detected using {algorithm}."
-    except Exception as e:
-        logger.error(f"calculate_community failed: {e}")
-        return f"Error: {type(e).__name__}: {str(e)}"
-    finally:
-        db.close()
+    with get_db_context() as db:
+        try:
+            from app.logic import community
+            community.calculate_community(network_id, algorithm, db)
+            return f"Communities detected using {algorithm}."
+        except Exception as e:
+            logger.error(f"calculate_community failed: {e}")
+            raise RuntimeError(f"Community detection failed: {str(e)}") from e
 
 
 @mcp.tool()
@@ -78,13 +74,11 @@ def calculate_layout(
     Returns:
         str: Status message.
     """
-    db = database.SessionLocal()
-    try:
-        from app.logic import layout
-        layout.calculate_layout(network_id, layout_name, db)
-        return f"Layout '{layout_name}' calculated. Call `update_layout` to visualize it."
-    except Exception as e:
-        logger.error(f"calculate_layout failed: {e}")
-        return f"Error: {type(e).__name__}: {str(e)}"
-    finally:
-        db.close()
+    with get_db_context() as db:
+        try:
+            from app.logic import layout
+            layout.calculate_layout(network_id, layout_name, db)
+            return f"Layout '{layout_name}' calculated. Call `update_layout` to visualize it."
+        except Exception as e:
+            logger.error(f"calculate_layout failed: {e}")
+            raise RuntimeError(f"Layout calculation failed: {str(e)}") from e
