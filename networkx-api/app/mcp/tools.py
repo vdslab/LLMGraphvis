@@ -2,6 +2,7 @@ from typing import List, Optional, Dict, Any
 from app.core.mcp import mcp
 
 from app.core import database
+from app.core.decorators import safe_mcp_tool
 from common import models
 
 from app.logic import (
@@ -25,6 +26,7 @@ from app.schemas.visualization import (
 # --- Tools ---
 
 @mcp.tool()
+@safe_mcp_tool
 def import_graphml(network_id: int, graphml_data: str) -> dict:
     """
     Imports GraphML data into the database.
@@ -35,13 +37,12 @@ def import_graphml(network_id: int, graphml_data: str) -> dict:
         from app.logic import importer
         final_network_id = importer.parse_and_save_graphml(network_id, graphml_data, db)
         return {"network_id": final_network_id, "content": f"Imported network {final_network_id}"}
-    except Exception as e:
-        return {"error": str(e)}
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def initialize_network(network_id: int, graphml_data: str) -> dict:
     """
     Initializes a network from GraphML data.
@@ -56,56 +57,66 @@ def initialize_network(network_id: int, graphml_data: str) -> dict:
         logger = logging.getLogger("app.mcp.tools")
         logger.info(f"DEBUG: initialize_network args types: network_id={type(network_id)}, graphml_data={type(graphml_data)}, db={type(db)}")
         
-        try:
-            # Importer handles parsing and collision logic
-            logger.info("Calling importer.parse_and_save_graphml...")
-            final_network_id = importer.parse_and_save_graphml(network_id, graphml_data, db)
-            logger.info(f"Importer returned: {final_network_id}")
-            
-            # 3. Calculate Default Layout
-            layout.calculate_layout(final_network_id, "forceatlas2", db)
+        # Importer handles parsing and collision logic
+        logger.info("Calling importer.parse_and_save_graphml...")
+        final_network_id = importer.parse_and_save_graphml(network_id, graphml_data, db)
+        logger.info(f"Importer returned: {final_network_id}")
+        
+        # 3. Calculate Default Layout
+        layout.calculate_layout(final_network_id, "forceatlas2", db)
 
-            # 4. Generate Visualization
-            vis_data = visualization_builder.build_visualization(db, final_network_id)
-            
-            return {
-                "network_id": final_network_id,
-                "network": vis_data,
-                "content": f"Network initialized (ID: {final_network_id}) with {len(vis_data['nodes'])} nodes."
-            }
-        except Exception as e:
-             return {"content": f"Import failed: {str(e)}"}
+        # 4. Generate Visualization
+        vis_data = visualization_builder.build_visualization(db, final_network_id)
+        
+        return {
+            "network_id": final_network_id,
+            "network": vis_data,
+            "content": f"Network initialized (ID: {final_network_id}) with {len(vis_data['nodes'])} nodes."
+        }
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
+def list_networks(limit: int = 100, offset: int = 0) -> dict:
+    """
+    Lists available networks.
+    """
+    db = database.SessionLocal()
+    try:
+        networks = network_metadata.list_networks(db, limit, offset)
+        return {"networks": networks}
+    finally:
+        db.close()
+
+
+@mcp.tool()
+@safe_mcp_tool
 def calculate_centrality(network_id: int, centrality_type: str) -> str:
     """Calculates specific centrality for the network."""
     db = database.SessionLocal()
     try:
         centrality.calculate_centrality(network_id, centrality_type, db)
         return f"{centrality_type} centrality calculated."
-    except ValueError as e:
-        return f"Error: {str(e)}"
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def calculate_community(network_id: int, algorithm: str = "louvain") -> str:
     """Detects communities in the network."""
     db = database.SessionLocal()
     try:
         community.calculate_community(network_id, algorithm, db)
         return f"Communities detected using {algorithm}."
-    except ValueError as e:
-        return f"Error: {str(e)}"
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def calculate_layout(network_id: int, layout_name: str) -> dict:
     """
     Calculates a graph layout and saves x, y coordinates as node attributes.
@@ -129,13 +140,12 @@ def calculate_layout(network_id: int, layout_name: str) -> dict:
         return visualization_builder.build_visualization(
             db, network_id, layout_name=layout_name
         )
-    except ValueError as e:
-        return {"error": str(e)}
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def generate_visualization(
     network_id: int,
     layout_name: Optional[str] = None,
@@ -198,6 +208,7 @@ def generate_visualization(
 
 
 @mcp.tool()
+@safe_mcp_tool
 def create_subgraph_from_nodes(
     network_id: int,
     node_ids: List[str],
@@ -225,15 +236,12 @@ def create_subgraph_from_nodes(
             "new_network_id": result["new_network_id"],
             "content": f"Subgraph created (ID: {result['new_network_id']}) with {len(node_ids)} nodes."
         }
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return {"error": str(e)}
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def create_largest_component_subgraph(
     network_id: int, 
     preserve_layout: bool = False
@@ -251,13 +259,12 @@ def create_largest_component_subgraph(
             preserve_layout=preserve_layout
         )
         return result
-    except Exception as e:
-        return {"error": str(e)}
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def create_ego_network(
     network_id: int,
     center_node_id: str,
@@ -277,13 +284,12 @@ def create_ego_network(
             db=db,
             preserve_layout=preserve_layout
         )
-    except Exception as e:
-        return {"error": str(e)}
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def create_path_subgraph(
     network_id: int,
     source_node_id: str,
@@ -303,13 +309,12 @@ def create_path_subgraph(
             db=db,
             preserve_layout=preserve_layout
         )
-    except Exception as e:
-        return {"error": str(e)}
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def create_k_core_subgraph(
     network_id: int,
     k: int,
@@ -327,13 +332,12 @@ def create_k_core_subgraph(
             db=db,
             preserve_layout=preserve_layout
         )
-    except Exception as e:
-        return {"error": str(e)}
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def get_subgraphs(network_id: int) -> dict:
     """
     Lists all subgraphs derived from the given network.
@@ -343,13 +347,12 @@ def get_subgraphs(network_id: int) -> dict:
         from app.logic import network_metadata
         subgraphs = network_metadata.get_subgraphs(db, network_id)
         return {"subgraphs": subgraphs}
-    except Exception as e:
-        return {"error": str(e)}
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def get_top_nodes(
     network_id: int, 
     metric: str, 
@@ -364,13 +367,12 @@ def get_top_nodes(
         from app.logic import centrality
         nodes = centrality.get_top_nodes(network_id, metric, k, db)
         return {"top_nodes": nodes}
-    except Exception as e:
-        return {"error": str(e)}
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def search_nodes(
     network_id: int,
     query: str,
@@ -388,6 +390,7 @@ def search_nodes(
 
 
 @mcp.tool()
+@safe_mcp_tool
 def export_network(network_id: int) -> str:
     """
     Exports the network as a GraphML string.
@@ -401,6 +404,7 @@ def export_network(network_id: int) -> str:
 
 
 @mcp.tool()
+@safe_mcp_tool
 def get_visualization_state(network_id: int) -> dict:
     """
     Returns the current visualization configuration (color mapping, sizing, etc.).
@@ -413,6 +417,7 @@ def get_visualization_state(network_id: int) -> dict:
 
 
 @mcp.tool()
+@safe_mcp_tool
 def get_network_structure(
     network_id: int
 ) -> dict:
@@ -423,13 +428,12 @@ def get_network_structure(
     try:
         from app.logic import network_metadata
         return network_metadata.get_network_structure(db, network_id)
-    except Exception as e:
-        return {"error": str(e)}
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def list_node_attributes(
     network_id: int
 ) -> dict:
@@ -448,13 +452,12 @@ def list_node_attributes(
             db
         )
         return {"attributes": stats}
-    except Exception as e:
-        return {"error": str(e)}
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def list_edge_attributes(
     network_id: int
 ) -> dict:
@@ -473,13 +476,12 @@ def list_edge_attributes(
             db
         )
         return {"attributes": stats}
-    except Exception as e:
-        return {"error": str(e)}
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def update_layout(
     network_id: int,
     layout_name: str
@@ -511,13 +513,12 @@ def update_layout(
             network_id,
             layout_name=layout_name # Update the layout preference
         )
-    except Exception as e:
-        return {"error": str(e)}
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def update_node_color(
     network_id: int,
     attribute: str,
@@ -567,13 +568,12 @@ def update_node_color(
         return visualization_builder.build_visualization(
             db, network_id, node_color_config=config
         )
-    except Exception as e:
-        return {"error": str(e)}
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def update_node_size(
     network_id: int,
     attribute: str,
@@ -593,14 +593,13 @@ def update_node_size(
         return visualization_builder.build_visualization(
             db, network_id, node_size_config=config
         )
-    except Exception as e:
-        return {"error": str(e)}
 
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def get_node_details(
     network_id: int,
     node_id: str
@@ -615,13 +614,12 @@ def get_node_details(
         if not details:
             return {"error": f"Node '{node_id}' not found in network {network_id}."}
         return details
-    except Exception as e:
-        return {"error": str(e)}
     finally:
         db.close()
 
 
 @mcp.tool()
+@safe_mcp_tool
 def filter_nodes(
     network_id: int,
     attribute_name: str,
@@ -673,7 +671,5 @@ def filter_nodes(
             "truncated": truncated,
             "nodes": nodes
         }
-    except Exception as e:
-        return {"error": str(e)}
     finally:
         db.close()

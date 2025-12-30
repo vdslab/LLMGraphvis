@@ -107,3 +107,25 @@ def get_visualization_state(db: Session, network_id: int) -> Dict[str, Any]:
             "attribute": node_size_config.get("attribute") if node_size_config else None,
         }
     }
+
+
+def list_networks(db: Session, limit: int = 100, offset: int = 0) -> List[Dict[str, Any]]:
+    """Lists available networks with basic stats."""
+    networks = db.query(models.Network).order_by(models.Network.created_at.desc()).offset(offset).limit(limit).all()
+    results = []
+    
+    for net in networks:
+        # Basic stats (could be optimized with a join if needed, but separate count is safer for now)
+        node_count = db.query(models.Node).filter(models.Node.network_id == net.id).count()
+        edge_count = db.query(models.Edge).filter(models.Edge.network_id == net.id).count()
+        
+        results.append({
+            "id": net.id,
+            "name": net.name or f"Network {net.id}",
+            "description": net.description,
+            "created_at": str(net.created_at),
+            "node_count": node_count,
+            "edge_count": edge_count
+        })
+    
+    return results
