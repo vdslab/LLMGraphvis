@@ -61,6 +61,16 @@ api.interceptors.response.use(
       // useAuthStore.getState().logout(); // Avoid circular dependency
       window.location.href = '/login';
     }
+    // Dispatch global error event for UI notification
+    const errorMessage = error.response?.data?.detail || error.message || 'Unknown error occurred';
+    window.dispatchEvent(new CustomEvent('api-error', { 
+        detail: { 
+            message: errorMessage,
+            status: error.response?.status,
+            url: error.config?.url
+        } 
+    }));
+
     return Promise.reject(error);
   }
 );

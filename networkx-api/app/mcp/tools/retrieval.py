@@ -23,8 +23,8 @@ def get_top_nodes(
     """
     with get_db_context() as db:
         try:
-            from app.logic import retrieval
-            return retrieval.get_top_nodes(network_id, metric, n, order, db)
+            from app.logic import centrality
+            return json.dumps(centrality.get_top_nodes(network_id, metric, n, order, db), default=str)
         except Exception as e:
             logger.error(f"get_top_nodes failed: {e}")
             raise RuntimeError(f"Failed to get top nodes: {str(e)}") from e
@@ -43,8 +43,8 @@ def search_nodes(
     """
     with get_db_context() as db:
         try:
-            from app.logic import retrieval
-            return retrieval.search_nodes(network_id, query, db)
+            from app.logic import search
+            return json.dumps(search.search_nodes(network_id, query, db=db), default=str)
         except Exception as e:
             logger.error(f"search_nodes failed: {e}")
             raise RuntimeError(f"Node search failed: {str(e)}") from e
@@ -84,7 +84,7 @@ def list_node_attributes(
     with get_db_context() as db:
         try:
             from app.logic import network_metadata
-            return network_metadata.list_node_attributes(db, network_id)
+            return json.dumps(network_metadata.list_node_attributes(db, network_id), default=str)
         except Exception as e:
             logger.error(f"list_node_attributes failed: {e}")
             raise RuntimeError(f"Failed to list node attributes: {str(e)}") from e
@@ -103,7 +103,7 @@ def list_edge_attributes(
     with get_db_context() as db:
         try:
             from app.logic import network_metadata
-            return network_metadata.list_edge_attributes(db, network_id)
+            return json.dumps(network_metadata.list_edge_attributes(db, network_id), default=str)
         except Exception as e:
             logger.error(f"list_edge_attributes failed: {e}")
             raise RuntimeError(f"Failed to list edge attributes: {str(e)}") from e
@@ -122,8 +122,11 @@ def get_node_details(
     """
     with get_db_context() as db:
         try:
-            from app.logic import retrieval
-            return retrieval.get_node_details(network_id, node_id, db)
+            import app.logic.search
+            result = app.logic.search.get_node_details(network_id, node_id, db)
+            if result is None:
+                return json.dumps({"error": "Node not found"})
+            return json.dumps(result, default=str)
         except Exception as e:
             logger.error(f"get_node_details failed: {e}")
             raise RuntimeError(f"Failed to get node details: {str(e)}") from e

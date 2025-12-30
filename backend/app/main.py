@@ -33,7 +33,9 @@ async def global_exception_handler(request: Request, exc: Exception):
     import traceback
 
     traceback.print_exc()
-    return {"detail": "Internal Server Error"}
+    traceback.print_exc()
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 
 # Public endpoints that don't require authentication

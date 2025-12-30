@@ -109,7 +109,7 @@ def get_visualization_state(db: Session, network_id: int) -> Dict[str, Any]:
     }
 
 
-def list_node_attributes(db: Session, network_id: int) -> str:
+def list_node_attributes(db: Session, network_id: int) -> List[Dict[str, Any]]:
     """Lists available node attributes."""
     from app.logic import attributes
     stats = attributes.get_attribute_stats(
@@ -120,10 +120,10 @@ def list_node_attributes(db: Session, network_id: int) -> str:
         models.NodeTextAttributeValue,
         db
     )
-    return str(stats)
+    return stats
 
 
-def list_edge_attributes(db: Session, network_id: int) -> str:
+def list_edge_attributes(db: Session, network_id: int) -> List[Dict[str, Any]]:
     """Lists available edge attributes."""
     from app.logic import attributes
     stats = attributes.get_attribute_stats(
@@ -134,4 +134,4 @@ def list_edge_attributes(db: Session, network_id: int) -> str:
         models.EdgeTextAttributeValue,
         db
     )
-    return str(stats)
+    return stats

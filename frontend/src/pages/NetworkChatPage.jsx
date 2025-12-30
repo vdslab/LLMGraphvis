@@ -96,15 +96,30 @@ const NetworkChatPage = () => {
         setNodeDetailsPanelOpen(true);
         
         // Get networkId from store state to ensure we have the latest
-        const currentNetworkId = useNetworkStore.getState().networkId;
+
+        
+        let currentNetworkId = useNetworkStore.getState().networkId;
         
         if (!currentNetworkId) {
-            console.warn("Network ID not available for node details. Retrying fetch from store...");
-            // Fallback: check if we can get it from the chat store or if it was just set
-             const chat = useChatStore.getState();
-             // Maybe the chat is loaded but networkId store not updated? (Unlikely due to previous logic)
-             console.warn("Current Store State - NetworkID:", currentNetworkId, "ChatID:", chat.chatId);
-             return;
+            console.warn("Network ID not available for node details. Attempting to recover...");
+            
+            // Try to recover by fetching chat details if we have a chat ID
+            const currentChatId = useChatStore.getState().chatId || (id !== 'new' ? parseInt(id) : null);
+            
+            if (currentChatId) {
+                console.log(`Fetching chat ${currentChatId} to recover network ID...`);
+                try {
+                    await useChatStore.getState().fetchChat(currentChatId);
+                    currentNetworkId = useNetworkStore.getState().networkId;
+                } catch (err) {
+                    console.error("Failed to recover network ID via fetchChat:", err);
+                }
+            }
+            
+            if (!currentNetworkId) {
+                 console.error("Could not recover network ID. Node details cannot be fetched.");
+                 return;
+            }
         }
         
         try {

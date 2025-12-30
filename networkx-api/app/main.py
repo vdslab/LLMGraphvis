@@ -24,6 +24,10 @@ app = FastAPI(
     version="1.0.0",
 )
 
+import sys
+sys.stderr.flush()
+
+
 # Add logging middleware
 app.add_middleware(LoggingMiddleware)
 

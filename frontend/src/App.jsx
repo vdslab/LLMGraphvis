@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
 import HomePage from './pages/HomePage';
@@ -16,6 +16,57 @@ const ProtectedRoute = ({ children }) => {
   return children;
 };
 
+const ErrorBanner = () => {
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const handleError = (event) => {
+      console.log('API Error caught:', event.detail);
+      setError(event.detail);
+      // Auto-dismiss after 5 seconds
+      setTimeout(() => setError(null), 5000);
+    };
+
+    window.addEventListener('api-error', handleError);
+    return () => window.removeEventListener('api-error', handleError);
+  }, []);
+
+  if (!error) return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: '20px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      backgroundColor: '#f44336',
+      color: 'white',
+      padding: '12px 24px',
+      borderRadius: '4px',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+      zIndex: 9999,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px'
+    }}>
+      <span>⚠️ {error.message || 'Connection Error'}</span>
+      <button 
+        onClick={() => setError(null)}
+        style={{
+          background: 'none',
+          border: 'none',
+          color: 'white',
+          cursor: 'pointer',
+          padding: 0,
+          marginLeft: '10px'
+        }}
+      >
+        ✕
+      </button>
+    </div>
+  );
+};
+
 function App() {
   const checkAuth = useAuthStore((state) => state.checkAuth);
 
@@ -25,6 +76,7 @@ function App() {
 
   return (
     <Router>
+      <ErrorBanner />
       <Routes>
         <Route path="/" element={<Layout><HomePage /></Layout>} />
         <Route path="/login" element={<LoginPage />} />

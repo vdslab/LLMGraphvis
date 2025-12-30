@@ -134,6 +134,11 @@ def update_node_color(
                 fixed_mapping=fixed,
                 gradient=gradient
             )
+            vis_data = visualization_builder.build_visualization(
+                db, 
+                network_id, 
+                node_color_config=config
+            )
             vis_data["network_id"] = network_id
             return vis_data
         except Exception as e:
@@ -164,6 +169,11 @@ def update_node_size(
                 min_size=min_size,
                 max_size=max_size,
                 default_size=default_size
+            )
+            vis_data = visualization_builder.build_visualization(
+                db, 
+                network_id, 
+                node_size_config=config
             )
             vis_data["network_id"] = network_id
             return vis_data
