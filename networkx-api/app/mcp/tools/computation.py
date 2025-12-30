@@ -27,7 +27,7 @@ def calculate_centrality(
             raise RuntimeError(f"Centrality calculation failed: {str(e)}") from e
 
 
-@mcp.tool()
+# @mcp.tool()
 def calculate_community(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     algorithm: Annotated[str, Field(description="The algorithm to use for community detection. Valid values: 'louvain', 'greedy_modularity', 'label_propagation'. Default is 'louvain'.")] = "louvain"
