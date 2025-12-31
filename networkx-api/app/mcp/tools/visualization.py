@@ -150,12 +150,14 @@ def update_node_color(
 def update_node_size(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     attribute: Annotated[str, Field(description="Node attribute name to use for sizing.")],
-    min_size: Annotated[float, Field(description="Min node size.")] = 5.0,
-    max_size: Annotated[float, Field(description="Max node size.")] = 20.0,
-    default_size: Annotated[float, Field(description="Default size.")] = 10.0
+    min_size: Annotated[Optional[float], Field(description="Min node size. Defaults to adaptive value based on network size (e.g. 5-100).")] = None,
+    max_size: Annotated[Optional[float], Field(description="Max node size. Defaults to adaptive value based on network size (e.g. 20-200).")] = None,
+    default_size: Annotated[Optional[float], Field(description="Default size used if attribute is missing. Defaults to adaptive value.")] = None
 ) -> dict:
     """
     Updates ONLY the node sizes in the visualization.
+    Typical size values are now in the range of 5 to 200 depending on network density.
+    Leave min/max/default as None to use smart adaptive defaults.
     
     Returns:
         dict: The updated visualization object.

@@ -149,11 +149,14 @@ def calculate_smart_node_size(num_nodes: int) -> dict:
         return {"default": 20, "min": 5, "max": 50}
 
     # Heuristic: Larger graphs need smaller nodes
-    # Formula: base = 300 / sqrt(N), clamped between 3 and 30
+    # Formula: base = 600 / sqrt(N)
+    # Target: 
+    #   N=30  -> ~110 size -> Radius ~ 19 (in 2000px space) -> Good visibility
+    #   N=1000 -> ~19 size  -> Radius ~ 8 (in 2000px space) -> Small, readable dots
     import math
 
-    base_size = 300 / math.sqrt(num_nodes)
-    base_size = max(3, min(30, base_size))
+    base_size = 600 / math.sqrt(num_nodes)
+    base_size = max(5.0, min(200.0, base_size))
 
     return {
         "default": round(base_size, 1),
@@ -168,14 +171,23 @@ def calculate_smart_edge_width(num_edges: int) -> dict:
     Returns a dict with 'default', 'min', 'max'.
     """
     if num_edges <= 0:
-        return {"default": 1.0, "min": 0.5, "max": 5.0}
+        return {"default": 2.0, "min": 0.5, "max": 10.0}
 
     # Heuristic: Dense graphs need thinner edges
-    # Formula: base = 50 / sqrt(E), clamped between 0.2 and 5
+    # Formula: base = 150 / sqrt(E)
+    # Target:
+    #   E=50   -> ~21?? No wait, 150/7 = 21. Maybe too thick? 
+    #   Let's check the plan: Target ~5-8 units for low density.
+    #   150 / sqrt(50) = 21... The plan said 150 but maybe meant a bit less or I should clamp stricter?
+    #   Plan said "Target ~5-8 units". 
+    #   If E=50, sqrt(50)=7. 150/7 = 21. That is very thick.
+    #   Maybe 50 / sqrt(E) was better? 50/7 = 7. 
+    #   Wait, the plan approved was 150. But 21px edge on 2000px canvas is 1%. That's okay.
+    #   Let's stick to the plan but maybe lower the clamp if it gets too crazy.
     import math
 
-    base_width = 50 / math.sqrt(num_edges)
-    base_width = max(0.2, min(5.0, base_width))
+    base_width = 150 / math.sqrt(num_edges)
+    base_width = max(0.2, min(10.0, base_width))
 
     return {
         "default": round(base_width, 1),
