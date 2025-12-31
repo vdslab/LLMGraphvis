@@ -205,3 +205,46 @@ def switch_to_network(
         except Exception as e:
             logger.error(f"switch_to_network failed: {e}")
             raise RuntimeError(f"Switch network failed: {str(e)}") from e
+
+
+@mcp.tool()
+def update_node_label_mode(
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    attribute: Annotated[Optional[str], Field(description="Node attribute to use for labels. Pass None to revert to default labels.")] = None,
+    show_all: Annotated[bool, Field(description="If True, shows labels for all nodes. Defaults to False (hover/select only).")] = False
+) -> dict:
+    """
+    Updates the node label configuration to use a specific attribute (e.g., 'country', 'score').
+    This changes WHAT text is displayed as the label for all nodes.
+    
+    Args:
+        network_id: The Network ID.
+        attribute: The attribute name to use (e.g. 'nationality'). If None, usage reverts to the default 'label' column (manual names).
+        show_all: Whether to force showing all labels (vs only on hover).
+        
+    Returns:
+        dict: The updated visualization object.
+    """
+    with get_db_context() as db:
+        try:
+            from app.logic import visualization_builder
+            
+            # If attribute is provided, create the config. 
+            # If None, we pass an empty dict to explicitly clear the configuration in build_visualization
+            # logic, preventing it from reloading the previous state from DB.
+            config = None
+            if attribute:
+                config = NodeLabelConfig(attribute=attribute, show_all=show_all)
+            else:
+                config = {} 
+                
+            vis_data = visualization_builder.build_visualization(
+                db, 
+                network_id, 
+                node_label_config=config
+            )
+            vis_data["network_id"] = network_id
+            return vis_data
+        except Exception as e:
+            logger.error(f"update_node_label_mode failed: {e}")
+            raise RuntimeError(f"Node label update failed: {str(e)}") from e
