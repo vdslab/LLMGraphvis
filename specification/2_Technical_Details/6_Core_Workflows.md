@@ -196,22 +196,22 @@ sequenceDiagram
     participant LLM as LLM Service
     participant N as NetworkXAPI
 
-    U->>F: 「PageRankを計算して」
+    U->>F: 「Betweenness Centralityを計算して」
     F->>B: POST /chat/{id}/process (message)
     B-->>F: 202 Accepted
 
     B->>LLM: ユーザーの指示を送信
-    LLM-->>B: ツール呼び出しを要求 (calculate_centrality, centrality_type:"pagerank")
+    LLM-->>B: ツール呼び出しを要求 (calculate_centrality, centrality_type:"betweenness")
 
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "started" })
-    B->>N: Call MCP Tool: calculate_centrality (network_id, centrality_type:"pagerank")
-    note over N: "pagerank" は未実装のためエラーを返す
+    B->>N: Call MCP Tool: calculate_centrality (network_id, centrality_type:"betweenness")
+    note over N: 計算エラー発生（例：メモリ不足）
     N-->>B: 実行失敗の応答 (エラーメッセージ)
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "failed", error: "..." })
 
     B->>LLM: ツールの実行結果（失敗）を送信
     note right of LLM: LLMは失敗を認識し、<br/>ユーザーへの説明と代替案を生成する。
-    LLM-->>B: 最終的な応答メッセージを生成 (例: 「申し訳ありません、PageRankの計算に失敗しました。次数中心性など、他の指標ではいかがでしょうか？」)
+    LLM-->>B: 最終的な応答メッセージを生成 (例: 「申し訳ありません、Betweennessの計算に失敗しました。次数中心性など、他の指標ではいかがでしょうか？」)
 
     B-->>F: SSEイベント (event: message, data: { role: "assistant", content: "申し訳ありません..." })
     note right of F: グラフは変更せず、LLMからのエラーメッセージをチャット履歴に表示する。
@@ -469,23 +469,23 @@ sequenceDiagram
     participant Backend
     participant NetworkXAPI
     
-    Note right of LLM: ユーザー: "PageRankで色付けして"
-    
+    Note right of LLM: ユーザー: "Degreeで色付けして"
+
     critical Phase 1: Verification (確認)
         LLM->>Backend: read_resource("network://{id}/attributes/nodes")
         Backend->>NetworkXAPI: Call MCP Tool: read_resource
-        NetworkXAPI-->>Backend: { attributes: [{name: "degree", ...}] }
-        note right of LLM: "pagerank" がリストにないことを確認
+        NetworkXAPI-->>Backend: { attributes: [{name: "id", ...}] }
+        note right of LLM: "degree" がリストにないことを確認
     end
-    
+
     critical Phase 2: Action (計算)
-        LLM->>Backend: calculate_centrality(type="pagerank")
+        LLM->>Backend: calculate_centrality(type="degree")
         Backend->>NetworkXAPI: Call MCP Tool: calculate_centrality
         NetworkXAPI-->>Backend: Success
     end
-    
+
     critical Phase 3: Finalization (可視化)
-        LLM->>Backend: generate_visualization(node_color_config={attribute: "pagerank"})
+        LLM->>Backend: generate_visualization(node_color_config={attribute: "degree"})
         Backend->>NetworkXAPI: Call MCP Tool: generate_visualization
         NetworkXAPI-->>Backend: Render Data
     end

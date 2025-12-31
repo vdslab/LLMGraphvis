@@ -37,8 +37,9 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 | `initialize_network` | GraphMLデータを受け取り、初期化（パース、DB保存、初期レイアウト計算、初期レンダリング）を行う。 |
 | `import_graphml` | GraphMLデータをDBにインポートするのみ。初期化プロセス（レイアウト計算等）は行わない。 |
 | `update_network_metadata` | ネットワークの名前や説明を更新する。 |
+| `update_node_label` | 特定のノードのラベルを更新する。 |
 | `calculate_centrality` | 中心性指標を計算して永続化する。 |
-| `calculate_community` | コミュニティ抽出（Louvain等）を行い、ノード属性として保存する。 |
+| `calculate_community` | (Disabled) コミュニティ抽出は現在無効化されています。 |
 | `calculate_layout` | レイアウト座標を計算して永続化する（可視化データの更新は返さない）。 |
 | `update_layout` | レイアウトを計算し、即座に可視化データを返す。 |
 | `update_node_color` | ノードの色設定を更新し、即座に可視化データを返す。 |
@@ -109,6 +110,13 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
   - `description`: str (Optional)
   - `name`: str (Optional)
 
+### `update_node_label`
+- **Description**: 特定のノードのラベルを更新する。
+- **Arguments**:
+  - `network_id`: int
+  - `node_id`: str
+  - `new_label`: str
+
 ### `calculate_centrality`
 - **Description**: 指定された中心性指標を計算し、ノード属性として保存する。
 - **Arguments**:
@@ -116,10 +124,11 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
   - `centrality_type`: str ("degree", "betweenness", "closeness", "eigenvector", "pagerank")
 
 ### `calculate_community`
-- **Description**: コミュニティ抽出を行い、ノード属性として保存する。
+### `calculate_community`
+- **Description**: (Disabled) コミュニティ抽出は現在実装上の理由により無効化されています。
 - **Arguments**:
   - `network_id`: int
-  - `algorithm`: str ("louvain", "greedy_modularity", "label_propagation")
+  - `algorithm`: str (Optional)
 
 ### `calculate_layout`
 - **Description**: 指定されたレイアウトアルゴリズムで座標を計算し、ノード属性として保存する。
@@ -158,7 +167,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
   - `network_id`: int
   - `node_color_config`: NodeColorConfig (Optional)
   - `node_size_config`: NodeSizeConfig (Optional)
-  - `edge_width_config`: EdgeWidthConfig (Optional)
+  - `edge_width_attribute`: str (Optional, Description: "Attribute for edge width.")
   - `context_config`: dict (Optional)
   - `focus_config`: dict (Optional)
   - `layout_name`: str (Optional)
@@ -207,7 +216,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 
 ### `create_subgraph_by_filter`
-- **Description**: 属性フィルタ条件に基づいてサブグラフを作成する。サーバーサイドで処理されるため、大量のノードIDを渡す必要がない。
+- **Description**: 属性フィルタ条件に基づいてサブグラフを作成する。サーバーサイドで処理されるため、大量のノードIDを渡す必要がない。条件はAND、値はOR結合。
 - **Arguments**:
   - `network_id`: int
   - `conditions`: List[dict] (e.g. `[{'attribute': 'Country', 'categories': ['USA']}]`)
@@ -225,11 +234,12 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
   - `network_id`: int
 
 ### `filter_nodes`
-- **Description**: 属性条件でノードを検索・フィルタリングする。リスト取得のみで、サブグラフは作成しない。
+### `filter_nodes`
+- **Description**: 属性条件でノードを検索・フィルタリングする。リスト取得のみで、サブグラフは作成しない。**注意: サブグラフ作成用ID取得には使用しないこと。**
 - **Arguments**:
   - `network_id`: int
   - `attribute_name`: str
-  - `value`: str (Optional)
+  - `value`: str (Optional, Exact match)
   - `min_value`: float (Optional)
   - `max_value`: float (Optional)
   - `limit`: int
@@ -239,14 +249,14 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 - **Arguments**:
   - `network_id`: int
   - `query`: str
-  - `attribute`: str (Optional)
 
 ### `get_top_nodes`
 - **Description**: 中心性指標の上位ノードを取得する。
 - **Arguments**:
   - `network_id`: int
   - `metric`: str
-  - `k`: int
+  - `n`: int (Default: 10)
+  - `order`: str ("desc" or "asc", Default: "desc")
 
 ### `get_network_structure`
 - **Description**: ネットワークの基本構造統計（ノード数、エッジ数、密度）を取得する。
