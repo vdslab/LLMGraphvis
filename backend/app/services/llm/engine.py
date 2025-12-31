@@ -432,10 +432,14 @@ class GraphVisAgent:
             loop_context["network_id"] = new_id
             return
 
-        # 2. Visualization Updates
+        # 2. Explicit Visualization Triggers (Edit operations)
+        if function_name in ["update_node_label"]:
+            await self._auto_generate_visualization(current_network_id, queue, session)
+            return
+
+        # 3. Visualization Updates
         vis_data = None
-        # 2. Visualization Updates
-        vis_data = None
+
         
         # Check if result looks like visualization data (Duck Typing)
         if isinstance(result, dict):
