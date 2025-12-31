@@ -388,6 +388,34 @@ class VisualizationBuilder:
                     "opacity": opacity,
                 }
             )
+
+        # --- Normalization [NEW] ---
+        # Normalize coordinates to a fixed logical range (e.g. [-1000, 1000])
+        # This ensures node sizes (typically 5-20) have a consistent relative scale to the layout.
+        if vis_nodes:
+            xs = [n["x"] for n in vis_nodes]
+            ys = [n["y"] for n in vis_nodes]
+            
+            min_x, max_x = min(xs), max(xs)
+            min_y, max_y = min(ys), max(ys)
+            
+            # Avoid divide by zero if all nodes are at same spot
+            range_x = (max_x - min_x) if (max_x - min_x) > 0 else 1.0
+            range_y = (max_y - min_y) if (max_y - min_y) > 0 else 1.0
+            
+            # Target range: -1000 to 1000 (Size = 2000)
+            TARGET_EXTENT = 1000.0
+            
+            for node in vis_nodes:
+                # Normalize to 0..1 then shift/scale to -1000..1000
+                nx = (node["x"] - min_x) / range_x
+                ny = (node["y"] - min_y) / range_y
+                
+                # Center around 0: (0..1) -> (-0.5 .. 0.5) -> * 2000 -> (-1000 .. 1000)
+                node["x"] = (nx - 0.5) * (2 * TARGET_EXTENT)
+                node["y"] = (ny - 0.5) * (2 * TARGET_EXTENT)
+        # ---------------------------
+
         return vis_nodes
 
     def _build_vis_edges(self, vis_nodes: List[Dict]) -> List[Dict]:

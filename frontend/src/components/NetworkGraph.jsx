@@ -67,27 +67,25 @@ const NetworkGraph = memo(({ nodes, links, showLabels = false, onNodeClick, onBa
     const yExtent = d3.extent(nodes, d => d.y);
     
     // Handle case where all x or y are same or undefined (fallback)
-    const xMin = xExtent[0] !== undefined ? xExtent[0] : 0;
-    const xMax = xExtent[1] !== undefined ? xExtent[1] : 1;
-    const yMin = yExtent[0] !== undefined ? yExtent[0] : 0;
-    const yMax = yExtent[1] !== undefined ? yExtent[1] : 1;
+    const xMin = xExtent[0] !== undefined ? xExtent[0] : -500;
+    const xMax = xExtent[1] !== undefined ? xExtent[1] : 500;
+    const yMin = yExtent[0] !== undefined ? yExtent[0] : -500;
+    const yMax = yExtent[1] !== undefined ? yExtent[1] : 500;
 
-    const padding = 40;
-    const availWidth = width - 2 * padding;
-    const availHeight = height - 2 * padding;
-
-    const dataWidth = xMax - xMin || 1; // Avoid divide by zero
-    const dataHeight = yMax - yMin || 1;
-
-    // Calculate uniform scale to fit within available space
-    const scale = Math.min(availWidth / dataWidth, availHeight / dataHeight);
-
-    // Calculate offsets to center the graph
-    const xOffset = (width - dataWidth * scale) / 2 - xMin * scale;
-    const yOffset = (height - dataHeight * scale) / 2 - yMin * scale;
-
-    const xScale = (val) => val * scale + xOffset;
-    const yScale = (val) => val * scale + yOffset;
+    // Use viewBox to handle scaling automatically
+    // Determine the bounding box of the graph content
+    const contentWidth = xMax - xMin || 1000;
+    const contentHeight = yMax - yMin || 1000;
+    
+    const padding = Math.max(contentWidth, contentHeight) * 0.1; // 10% padding
+    
+    const viewBoxX = xMin - padding;
+    const viewBoxY = yMin - padding;
+    const viewBoxW = contentWidth + 2 * padding;
+    const viewBoxH = contentHeight + 2 * padding;
+    
+    svg.attr("viewBox", `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`)
+       .attr("preserveAspectRatio", "xMidYMid meet");
 
     // Group for zoomable content
     const g = svg.append("g");
@@ -100,22 +98,22 @@ const NetworkGraph = memo(({ nodes, links, showLabels = false, onNodeClick, onBa
       .attr("x1", d => {
         const sId = typeof d.source === 'object' ? d.source.id : d.source;
         const n = nodeMap.get(sId);
-        return n ? xScale(n.x) : 0;
+        return n ? n.x : 0;
       })
       .attr("y1", d => {
         const sId = typeof d.source === 'object' ? d.source.id : d.source;
         const n = nodeMap.get(sId);
-        return n ? yScale(n.y) : 0;
+        return n ? n.y : 0;
       })
       .attr("x2", d => {
         const tId = typeof d.target === 'object' ? d.target.id : d.target;
         const n = nodeMap.get(tId);
-        return n ? xScale(n.x) : 0;
+        return n ? n.x : 0;
       })
       .attr("y2", d => {
         const tId = typeof d.target === 'object' ? d.target.id : d.target;
         const n = nodeMap.get(tId);
-        return n ? yScale(n.y) : 0;
+        return n ? n.y : 0;
       })
       .attr("stroke", d => d.color || "#999")
       .attr("stroke-opacity", 0.3) // NetworkX default/script specified
@@ -126,7 +124,7 @@ const NetworkGraph = memo(({ nodes, links, showLabels = false, onNodeClick, onBa
       .selectAll("g")
       .data(nodes)
       .join("g")
-      .attr("transform", d => `translate(${xScale(d.x)},${yScale(d.y)})`)
+      .attr("transform", d => `translate(${d.x},${d.y})`)
       .style("cursor", "pointer") // Indicate clickable
       .on("click", (event, d) => {
         // Prevent background click
