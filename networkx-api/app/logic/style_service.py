@@ -197,8 +197,14 @@ class StyleService:
         if config and stats[0]:
             val = cls.get_val(db_id, config["attribute"], attr_map, values_map)
             if isinstance(val, (int, float)):
-                target_min = config.get("min", smart_defaults["min"])
-                target_max = config.get("max", smart_defaults["max"])
+                target_min = config.get("min")
+                if target_min is None:
+                    target_min = smart_defaults["min"]
+                
+                target_max = config.get("max")
+                if target_max is None:
+                    target_max = smart_defaults["max"]
+                    
                 size = utils.normalize(val, stats[1], stats[2], target_min, target_max)
         return size
 
@@ -273,8 +279,14 @@ class StyleService:
         if config and stats[0]:
             val = cls.get_val(db_id, config["attribute"], attr_map, values_map)
             if isinstance(val, (int, float)):
-                target_min = config.get("min", smart_defaults["min"])
-                target_max = config.get("max", smart_defaults["max"])
+                target_min = config.get("min")
+                if target_min is None:
+                    target_min = smart_defaults["min"]
+                
+                target_max = config.get("max")
+                if target_max is None:
+                    target_max = smart_defaults["max"]
+                    
                 width = utils.normalize(val, stats[1], stats[2], target_min, target_max)
         return width
 

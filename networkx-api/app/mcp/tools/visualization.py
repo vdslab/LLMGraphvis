@@ -128,7 +128,7 @@ def update_node_color(
 
             config = NodeColorConfig(
                 attribute=attribute,
-                scale_type=scale_type,
+                scale_type=scale_type.upper(),
                 color_map=mapping,
                 default_color=default_color,
                 fixed_mapping=fixed,

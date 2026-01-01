@@ -79,7 +79,7 @@ def calculate_centrality(network_id: int, centrality_type: str, db: Session):
 
 
 def get_top_nodes(
-    network_id: int, metric: str, k: int, db: Session
+    network_id: int, metric: str, k: int, order: str, db: Session
 ) -> List[Dict[str, Any]]:
     """
     Returns the top k nodes based on the specified centrality metric.
@@ -88,8 +88,13 @@ def get_top_nodes(
     # We reuse the existing logic.
     centrality = calculate_centrality(network_id, metric, db)
 
-    # Sort by score descending
-    sorted_nodes = sorted(centrality.items(), key=lambda item: item[1], reverse=True)
+    # Determine reverse flag based on order
+    reverse = True
+    if order == "asc":
+        reverse = False
+
+    # Sort by score
+    sorted_nodes = sorted(centrality.items(), key=lambda item: item[1], reverse=reverse)
 
     # Take top k
     top_nodes = sorted_nodes[:k]
