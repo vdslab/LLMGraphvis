@@ -73,7 +73,6 @@ class ChatWithNetwork(Chat):
 class ChatMessageBase(BaseModel):
     role: str
     content: str
-    content: str
 
 
 class ChatMessageCreate(ChatMessageBase):
@@ -83,6 +82,7 @@ class ChatMessageCreate(ChatMessageBase):
 class ChatMessage(ChatMessageBase):
     id: int
     chat_id: int
+    meta_data: Optional[Any] = None
     created_at: datetime
 
     class Config:

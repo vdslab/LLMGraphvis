@@ -150,6 +150,67 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
                   );
                 }
                 
+                // Tool Execution Logs (Persistent)
+                if (msg.meta_data) {
+                    let steps = [];
+                    // Handle both array (new format) and object (legacy/future-proof)
+                    if (Array.isArray(msg.meta_data)) {
+                        steps = msg.meta_data;
+                    } else if (msg.meta_data.steps) {
+                        steps = msg.meta_data.steps;
+                    }
+
+                    if (steps.length > 0) {
+                        const toolLogs = steps.flatMap((step, stepIdx) => {
+                            if (!step.tool_calls) return [];
+                            return step.tool_calls.map((tc, tcIdx) => (
+                                <div key={`tool-${stepIdx}-${tcIdx}`} style={{
+                                    marginTop: '0.5rem',
+                                    marginBottom: '0.5rem',
+                                    padding: '0.5rem',
+                                    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+                                    borderRadius: '4px',
+                                    borderLeft: `3px solid ${tc.status === 'failed' ? '#ff5252' : '#4caf50'}`,
+                                    fontSize: '0.85rem',
+                                    fontFamily: 'monospace'
+                                }}>
+                                    <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>🛠️ {tc.name}</span>
+                                        <span style={{ 
+                                            color: tc.status === 'failed' ? '#d32f2f' : '#2e7d32',
+                                            textTransform: 'uppercase',
+                                            fontSize: '0.7rem'
+                                        }}>
+                                            {tc.status || 'COMPLETED'}
+                                        </span>
+                                    </div>
+                                    <div style={{ color: '#666', marginTop: '0.25rem', fontSize: '0.75rem' }}>
+                                        Running with args: {JSON.stringify(tc.args).slice(0, 100)}{JSON.stringify(tc.args).length > 100 ? '...' : ''}
+                                    </div>
+                                    {tc.error && (
+                                        <div style={{ color: '#d32f2f', marginTop: '0.25rem' }}>
+                                            Error: {typeof tc.error === 'string' ? tc.error : JSON.stringify(tc.error)}
+                                        </div>
+                                    )}
+                                </div>
+                            ));
+                        });
+
+                        if (toolLogs.length > 0) {
+                            parts.push(
+                                <details key="tool-logs" style={{ width: '100%', marginBottom: '0.5rem' }}>
+                                    <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#666', userSelect: 'none' }}>
+                                        View Action Log ({toolLogs.length} actions)
+                                    </summary>
+                                    <div style={{ marginTop: '0.5rem' }}>
+                                        {toolLogs}
+                                    </div>
+                                </details>
+                            );
+                        }
+                    }
+                }
+
                 // Regular message bubble
                 return (
                   <div key={partIdx} style={{ 

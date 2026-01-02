@@ -1,4 +1,5 @@
 import json
+from typing import List, Any, Tuple
 
 from google.genai import types
 from sqlalchemy.orm import Session
@@ -28,7 +29,7 @@ def _format_exception_message(e: BaseException) -> str:
 
     return f"{type(e).__name__}: {str(e)}"
 
-async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
+async def process_chat(chat_id: int, user_message: str, db: Session) -> Tuple[str, List[Any]]:
     """Process a chat message using Gemini API with function calling"""
     logger.info(f"Processing chat_id={chat_id}, message='{user_message[:50]}...'")
     queue = await events.get_event_queue(chat_id)
@@ -74,7 +75,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
             function_calling_config=types.FunctionCallingConfig(mode="AUTO")
         )
 
-        final_response_text = await agent.process_turn(
+        final_response_text, execution_log = await agent.process_turn(
             history=chat_history,
             queue=queue,
             chat_id=chat_id,
@@ -82,7 +83,7 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
             tool_config=tool_config
         )
         
-        return final_response_text
+        return final_response_text, execution_log
 
     except Exception as e:
         logger.error(f"Error in process_chat: {e}")
@@ -93,7 +94,8 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> str:
         await queue.put({"event": "error", "data": str(e)})
         
         error_msg = _format_exception_message(e)
-        return f"I encountered an error: {error_msg}"
+        # Return empty log on error
+        return f"I encountered an error: {error_msg}", []
 
 
 async def _build_context_summary(network_id: int) -> str:

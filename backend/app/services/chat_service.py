@@ -144,12 +144,16 @@ async def handle_process_background(chat_id: int, user_message: str) -> None:
     db = database.SessionLocal()
     try:
         # Process chat and get response
-        final_response = await llm_service.process_chat(chat_id, user_message, db)
+        # process_turn now returns (final_text, execution_log)
+        final_response_text, execution_log = await llm_service.process_chat(chat_id, user_message, db)
 
         # Save Assistant Message
-        if final_response:
+        if final_response_text:
             db_msg = models.ChatMessage(
-                chat_id=chat_id, role="model", content=final_response
+                chat_id=chat_id, 
+                role="model", 
+                content=final_response_text,
+                meta_data=execution_log # Save the execution log here
             )
             db.add(db_msg)
             db.commit()
