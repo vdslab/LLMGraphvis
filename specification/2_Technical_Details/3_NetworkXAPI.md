@@ -135,6 +135,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 - **Arguments**:
   - `network_id`: int
   - `layout_name`: str ("spring", "forceatlas2", "circular", "kamada_kawai", "shell", "spectral", "spiral")
+    - **Note**: `forceatlas2` uses dynamic iteration counts (1000-5000) based on graph size to ensure convergence.
 
 ### `update_layout`
 - **Description**: レイアウトを計算し、即座に可視化データを返す。

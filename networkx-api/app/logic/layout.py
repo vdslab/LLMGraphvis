@@ -48,20 +48,16 @@ def determine_layout_params(G, layout_name: str):
 
     elif layout_name == "forceatlas2":
         # Native NetworkX ForceAtlas2 optimization
-        # Reducing iterations significantly as pure Python implementation is slow.
-        if is_small:
-            max_iter = 500
-        elif is_medium:
-            max_iter = 250
-        else: # Large
-            max_iter = 100
+        # Dynamic iterations based on graph size
+        # Formula: max_iter = max(1000, min(5000, num_nodes * 2))
+        max_iter = max(1000, min(5000, num_nodes * 2))
 
         # Force Constants
         params = {
             "max_iter": max_iter,
-            "scaling_ratio": 80.0,
-            "gravity": 0.03,
-            "jitter_tolerance": 2.0,  # Increase tolerance to speed up convergence (keep temperature high)
+            "scaling_ratio": 2.0,  # Standard scaling
+            "gravity": 1.0,        # Standard gravity
+            "jitter_tolerance": 1.0, # Standard tolerance for better convergence
             "seed": 42
         }
 
