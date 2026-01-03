@@ -5,6 +5,7 @@ import { useNetworkStore } from '../stores/networkStore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
+import remarkColorPreview from '../utils/remarkColorPreview';
 
 const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
   const { messages, sendMessage, isLoading, thinkingMessage, uploadNetwork, chatId } = useChatStore();
@@ -294,7 +295,31 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
                     borderTopRightRadius: msg.role === 'user' ? '0' : '1rem',
                     boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
                   }}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm, remarkBreaks, remarkColorPreview]}
+                      components={{
+                        a: ({node, href, children, ...props}) => {
+                          if (href === '#color-preview') {
+                            const color = node.data?.hProperties?.['data-color'] || children.toString(); // Fallback
+                            return (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{
+                                  display: 'inline-block',
+                                  width: '12px',
+                                  height: '12px',
+                                  backgroundColor: color,
+                                  border: '1px solid #ccc',
+                                  borderRadius: '2px',
+                                  flexShrink: 0
+                                }}></span>
+                                {children}
+                              </span>
+                            );
+                          }
+                          return <a href={href} {...props} target="_blank" rel="noopener noreferrer">{children}</a>;
+                        }
+                      }}
+                    >
                       {cleanPart}
                     </ReactMarkdown>
                   </div>
