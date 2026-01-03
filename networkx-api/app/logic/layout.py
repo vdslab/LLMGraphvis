@@ -52,10 +52,20 @@ def determine_layout_params(G, layout_name: str):
         # Formula: max_iter = max(1000, min(5000, num_nodes * 2))
         max_iter = max(1000, min(5000, num_nodes * 2))
 
+        # Dynamic Scaling Ratio for Overlap Reduction
+        # Use Average Degree as a proxy for local density clumping
+        num_edges = len(G.edges)
+        avg_degree = (2 * num_edges) / num_nodes if num_nodes > 0 else 0
+        
+        # If avg_degree is high, nodes are pulled tighter. We increase scaling to compensate.
+        # Base scaling is 2.0. Cap at 10.0.
+        # Formula: scaling_ratio = max(2.0, min(10.0, avg_degree * 0.5))
+        scaling_ratio = max(2.0, min(10.0, avg_degree * 0.5))
+
         # Force Constants
         params = {
             "max_iter": max_iter,
-            "scaling_ratio": 2.0,  # Standard scaling
+            "scaling_ratio": scaling_ratio, 
             "gravity": 1.0,        # Standard gravity
             "jitter_tolerance": 1.0, # Standard tolerance for better convergence
             "seed": 42
