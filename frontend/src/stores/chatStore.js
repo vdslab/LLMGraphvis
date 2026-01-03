@@ -65,6 +65,15 @@ export const useChatStore = create((set, get) => ({
     return res.data;
   },
 
+  // Rename a chat
+  renameChat: async (chatId, name) => {
+    const res = await import('../services/api').then(module => module.updateChat(chatId, { name }));
+    // We don't strictly manage the chats list in store but since ChatList calls fetchChats on mount, and we might want to update it.
+    // Ideally we should just return success and let component handle or update list if we had one.
+    // Let's just return data. The component can optimistically update or refetch.
+    return res.data;
+  },
+
   // Upload network file to chat
   uploadNetwork: async (chatId, file) => {
     set({ isLoading: true, thinkingMessage: "Uploading..." });

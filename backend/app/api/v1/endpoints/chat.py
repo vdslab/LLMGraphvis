@@ -240,3 +240,21 @@ async def stream(
 
     # Return SSE response with event generator
     return EventSourceResponse(llm_service.event_generator(chat_id, request), ping=15)
+
+
+@router.patch("/{chat_id}", response_model=schemas.Chat)
+def update_chat(
+    chat_id: int,
+    chat_update: schemas.ChatUpdate,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Update a chat (e.g. rename)"""
+    logger.info(f"Updating chat {chat_id} with data: {chat_update}")
+    chat = verify_chat_ownership(chat_id, current_user.id, db)
+
+    chat.name = chat_update.name
+    db.commit()
+    db.refresh(chat)
+
+    return chat

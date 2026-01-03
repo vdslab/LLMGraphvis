@@ -95,6 +95,9 @@ export const getNodeDetails = (networkId, nodeId) =>
 // Create chat
 export const createChat = (name) => api.post('/chat', { name });
 
+// Update chat (e.g. rename)
+export const updateChat = (chatId, data) => api.patch(`/chat/${chatId}`, data);
+
 // Process message
 export const processMessage = (chatId, content) =>
   api.post(`/chat/${chatId}/process`, {

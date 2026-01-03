@@ -58,7 +58,7 @@ class GraphVisAgent:
     def __init__(self, db: Any = None):
         self.db = db
         self.client = self._initialize_client()
-        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     def _initialize_client(self) -> genai.Client:
         project_id = os.getenv("VERTEX_PROJECT_ID")
