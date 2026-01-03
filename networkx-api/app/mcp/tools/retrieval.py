@@ -55,7 +55,7 @@ def get_network_structure(
     network_id: Annotated[int, Field(description="The ID of the network.")]
 ) -> str:
     """
-    Returns a summary of the network structure (node count, edge count, density, etc.).
+    Returns a summary of the network structure (node count, edge count, density) AND metadata (name, description).
     Useful for understanding the dataset before performing heavy operations.
 
     Returns:
@@ -64,7 +64,11 @@ def get_network_structure(
     with get_db_context() as db:
         try:
             from app.logic import network_metadata
-            return json.dumps(network_metadata.get_network_structure(db, network_id))
+            structure = network_metadata.get_network_structure(db, network_id)
+            metadata = network_metadata.get_network_metadata(db, network_id)
+            # Combine structure and metadata
+            result = {**structure, **metadata}
+            return json.dumps(result, default=str)
         except Exception as e:
             logger.error(f"get_network_structure failed: {e}")
             raise RuntimeError(f"Failed to get network structure: {str(e)}") from e
