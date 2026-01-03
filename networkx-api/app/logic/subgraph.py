@@ -126,8 +126,8 @@ def create_subgraph_from_nodes(
 
     # 7. Calculate Initial Layout (only if NOT preserved)
     if not preserve_layout:
-        logger.info("Calculating initial layout (spring)...")
-        calculate_layout(new_network_id, "spring", db)
+        logger.info("Calculating initial layout (forceatlas2)...")
+        calculate_layout(new_network_id, "forceatlas2", db)
     else:
         logger.info(f"Preserving existing layout (x, y copied) from {source_network.last_layout_name}.")
         # Verify if the specific layout attributes exist?

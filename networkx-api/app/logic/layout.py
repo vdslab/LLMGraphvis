@@ -47,24 +47,21 @@ def determine_layout_params(G, layout_name: str):
         }
 
     elif layout_name == "forceatlas2":
-        # Native NetworkX ForceAtlas2
-        # Tuning for quality
-        
-        # Iterations
+        # Native NetworkX ForceAtlas2 optimization
+        # Reducing iterations significantly as pure Python implementation is slow.
         if is_small:
-            max_iter = 2000 # Let it settle completely
+            max_iter = 500
         elif is_medium:
-            max_iter = 1000
+            max_iter = 250
         else: # Large
-            max_iter = 500 # Practical limit for interactive response
+            max_iter = 100
 
         # Force Constants
-        # gravity: Attracts to center. Too high = collapse, Too low = drift.
-        # scaling_ratio: Repulsion strength. High = more spread.
         params = {
             "max_iter": max_iter,
-            "scaling_ratio": 80.0, # Standard scaling
-            "gravity": 0.03,      # Gentle gravity to keep shape
+            "scaling_ratio": 80.0,
+            "gravity": 0.03,
+            "jitter_tolerance": 2.0,  # Increase tolerance to speed up convergence (keep temperature high)
             "seed": 42
         }
 
