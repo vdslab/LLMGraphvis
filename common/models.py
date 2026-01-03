@@ -98,6 +98,25 @@ class ChatMessage(Base):
     )
 
     chat = relationship("Chat", back_populates="messages")
+    tool_executions = relationship("ToolExecution", back_populates="message", cascade="all, delete-orphan")
+
+
+class ToolExecution(Base):
+    __tablename__ = "tool_executions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    message_id = Column(Integer, ForeignKey("chat_messages.id"), nullable=False)
+    tool_name = Column(String, nullable=False)
+    arguments = Column(JSON, nullable=True)
+    result = Column(JSON, nullable=True)
+    thought = Column(Text, nullable=True)
+    status = Column(String, nullable=False)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    message = relationship("ChatMessage", back_populates="tool_executions")
 
 
 class Node(Base):

@@ -153,10 +153,30 @@ async def handle_process_background(chat_id: int, user_message: str) -> None:
                 chat_id=chat_id, 
                 role="model", 
                 content=final_response_text,
-                meta_data=execution_log # Save the execution log here
             )
             db.add(db_msg)
             db.commit()
+            db.refresh(db_msg)
+
+            # Persist separate Tool Executions
+            if execution_log:
+                for step in execution_log:
+                    if step.get("step_type") == "tool_execution":
+                        for tool_call in step.get("tool_calls", []):
+                            execution = models.ToolExecution(
+                                message_id=db_msg.id,
+                                tool_name=tool_call.get("name"),
+                                arguments=tool_call.get("args"),
+                                result=tool_call.get("result"),
+                                thought=step.get("thought"),
+                                status=tool_call.get("status", "unknown"),
+                                error=tool_call.get("error"),
+                                started_at=tool_call.get("started_at"),
+                                completed_at=tool_call.get("completed_at")
+                            )
+                            db.add(execution)
+                db.commit()
+            
             logger.info(f"Saved assistant message for chat_id={chat_id}")
 
             # Emit message_complete event

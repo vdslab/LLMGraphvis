@@ -151,7 +151,75 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
                 }
                 
                 // Tool Execution Logs (Persistent)
-                if (msg.meta_data) {
+                let toolLogsRender = null;
+                
+                // 1. New Schema: tool_executions
+                if (msg.tool_executions && msg.tool_executions.length > 0) {
+                     const logs = msg.tool_executions.map((tc, idx) => {
+                        let durationStr = "";
+                        if (tc.started_at && tc.completed_at) {
+                            const start = new Date(tc.started_at);
+                            const end = new Date(tc.completed_at);
+                            const diff = end - start;
+                            durationStr = diff < 1000 ? `${diff}ms` : `${(diff/1000).toFixed(2)}s`;
+                        }
+
+                        return (
+                                <div key={`exec-${idx}`} style={{
+                                    marginTop: '0.5rem',
+                                    marginBottom: '0.5rem',
+                                    padding: '0.5rem',
+                                    backgroundColor: 'rgba(0, 0, 0, 0.03)',
+                                    borderRadius: '4px',
+                                    borderLeft: `3px solid ${tc.status === 'failed' ? '#ff5252' : '#4caf50'}`,
+                                    fontSize: '0.85rem',
+                                    fontFamily: 'monospace'
+                                }}>
+                                    <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                                        <span>🛠️ {tc.tool_name}</span>
+                                        <span style={{ 
+                                            display: 'flex', gap: '8px', alignItems: 'center'
+                                        }}>
+                                            {durationStr && <span style={{color: '#888', fontSize: '0.7rem'}}>⏱️ {durationStr}</span>}
+                                            <span style={{ 
+                                                color: tc.status === 'failed' ? '#d32f2f' : '#2e7d32',
+                                                textTransform: 'uppercase',
+                                                fontSize: '0.7rem'
+                                            }}>
+                                                {tc.status || 'COMPLETED'}
+                                            </span>
+                                        </span>
+                                    </div>
+                                    {tc.thought && (
+                                         <div style={{ fontStyle: 'italic', color: '#555', marginBottom: '4px', fontSize: '0.8rem' }}>
+                                            "{tc.thought}"
+                                         </div>
+                                    )}
+                                    <div style={{ color: '#666', marginTop: '0.25rem', fontSize: '0.75rem' }}>
+                                        Args: {JSON.stringify(tc.arguments).slice(0, 100)}{JSON.stringify(tc.arguments).length > 100 ? '...' : ''}
+                                    </div>
+                                    {tc.error && (
+                                        <div style={{ color: '#d32f2f', marginTop: '0.25rem' }}>
+                                            Error: {tc.error}
+                                        </div>
+                                    )}
+                                </div>
+                        );
+                     });
+                     
+                     toolLogsRender = (
+                        <details key="tool-logs-new" style={{ width: '100%', marginBottom: '0.5rem' }}>
+                            <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#666', userSelect: 'none' }}>
+                                View Action Log ({logs.length} actions)
+                            </summary>
+                            <div style={{ marginTop: '0.5rem' }}>
+                                {logs}
+                            </div>
+                        </details>
+                     );
+
+                // 2. Legacy Schema: meta_data
+                } else if (msg.meta_data) {
                     let steps = [];
                     // Handle both array (new format) and object (legacy/future-proof)
                     if (Array.isArray(msg.meta_data)) {
@@ -197,7 +265,7 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
                         });
 
                         if (toolLogs.length > 0) {
-                            parts.push(
+                            toolLogsRender = (
                                 <details key="tool-logs" style={{ width: '100%', marginBottom: '0.5rem' }}>
                                     <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#666', userSelect: 'none' }}>
                                         View Action Log ({toolLogs.length} actions)
@@ -209,6 +277,10 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
                             );
                         }
                     }
+                }
+                
+                if (toolLogsRender) {
+                    parts.push(toolLogsRender);
                 }
 
                 // Regular message bubble

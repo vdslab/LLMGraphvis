@@ -79,10 +79,31 @@ class ChatMessageCreate(ChatMessageBase):
     pass
 
 
+class ToolExecutionBase(BaseModel):
+    tool_name: str
+    arguments: Optional[Any] = None
+    result: Optional[Any] = None
+    thought: Optional[str] = None
+    status: str
+    error: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+
+class ToolExecution(ToolExecutionBase):
+    id: int
+    message_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class ChatMessage(ChatMessageBase):
     id: int
     chat_id: int
     meta_data: Optional[Any] = None
+    tool_executions: List[ToolExecution] = []
     created_at: datetime
 
     class Config:

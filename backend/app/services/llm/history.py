@@ -19,8 +19,66 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[types.Co
     for msg in messages:
         role = "user" if msg.role == "user" else "model"
         
-        # 1. Expand intermediate tool steps if present (Fix for Amnesia)
-        if msg.role == "model" and msg.meta_data and isinstance(msg.meta_data, list):
+        # 1. Expand intermediate tool steps from ToolExecution table (New Schema)
+        if msg.role == "model" and getattr(msg, "tool_executions", None):
+            try:
+                # Group executions by thought to reconstruct "steps"
+                # Sort by ID to ensure chronological order
+                executions = sorted(msg.tool_executions, key=lambda x: x.id)
+                
+                steps = []
+                current_step = None
+                
+                for exc in executions:
+                    # Start a new step if thought changes (or first item)
+                    # Note: We treat None thought and "" thought as same for grouping if we want, 
+                    # but usually thought is unique per step.
+                    if current_step is None or exc.thought != current_step['thought']:
+                        if current_step:
+                            steps.append(current_step)
+                        current_step = {'thought': exc.thought, 'tool_calls': []}
+                    
+                    current_step['tool_calls'].append(exc)
+                
+                if current_step:
+                    steps.append(current_step)
+                
+                # Reconstruct history from steps
+                for step in steps:
+                    # A. Reconstruct Model Turn
+                    model_parts = []
+                    if step['thought']:
+                        model_parts.append(types.Part(text=step['thought']))
+                    
+                    user_parts = []
+                    for exc in step['tool_calls']:
+                        # Function Call
+                        model_parts.append(types.Part(
+                            function_call=types.FunctionCall(name=exc.tool_name, args=exc.arguments)
+                        ))
+                        
+                        # Function Response
+                        result_data = exc.result
+                        if exc.status == "failed":
+                            result_data = {"error": exc.error}
+                        
+                        user_parts.append(
+                            types.Part.from_function_response(name=exc.tool_name, response=result_data)
+                        )
+                    
+                    if model_parts:
+                        history.append(types.Content(role="model", parts=model_parts))
+                    
+                    if user_parts:
+                        history.append(types.Content(role="user", parts=user_parts))
+
+            except Exception as e:
+                from app.core.logging import get_logger
+                logger = get_logger(__name__)
+                logger.warning(f"Failed to expand tool_executions for msg {msg.id}: {e}")
+
+        # 2. Legacy Meta Data check (Backward Compatibility)
+        elif msg.role == "model" and msg.meta_data and isinstance(msg.meta_data, list):
             try:
                 for step in msg.meta_data:
                     # step is a dict: {'step_type': 'tool_execution', 'thought': '...', 'tool_calls': [...]}

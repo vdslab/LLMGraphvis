@@ -21,6 +21,34 @@ logger = get_logger(__name__)
 load_dotenv()
 
 
+
+def is_retryable_error(exception):
+    """Check if the exception is a transient error suitable for retry."""
+    try:
+        # Check for HTTP status codes (429, 5xx)
+        code = getattr(exception, "code", None)
+        status = getattr(exception, "status", None)
+        
+        retryable_codes = [429, 500, 502, 503, 504]
+        if code in retryable_codes:
+            return True
+            
+        # Check for specific status strings
+        # User error: 'status': 'RESOURCE_EXHAUSTED'
+        retryable_statuses = ["RESOURCE_EXHAUSTED", "INTERNAL", "UNAVAILABLE", "DEADLINE_EXCEEDED"]
+        if str(status) in retryable_statuses:
+            return True
+
+        # Fallback: Check message content
+        msg = str(exception).lower()
+        if "resource exhausted" in msg or "internal server error" in msg or "service unavailable" in msg:
+            return True
+            
+    except Exception:
+        pass
+    return False
+
+
 class GraphVisAgent:
     """
     Agent service for Graph Visualization (Single Agent Mode).
@@ -30,7 +58,7 @@ class GraphVisAgent:
     def __init__(self, db: Any = None):
         self.db = db
         self.client = self._initialize_client()
-        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
 
     def _initialize_client(self) -> genai.Client:
         project_id = os.getenv("VERTEX_PROJECT_ID")
@@ -48,31 +76,87 @@ class GraphVisAgent:
             logger.info("Using Google AI Studio with API Key")
             return genai.Client(api_key=api_key)
 
+    @retry(
+        retry=retry_if_exception(is_retryable_error),
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        before_sleep=before_sleep_log(logger, logging.WARNING),
+    )
+    async def _gemini_generate(
+        self,
+        history: List[types.Content],
+        tools: List[types.Tool],
+        tool_config: Optional[types.ToolConfig] = None,
+    ):
+        """Generates content stream from Gemini."""
+        return await self.client.aio.models.generate_content_stream(
+            model=self.model_name,
+            contents=history,
+            config=types.GenerateContentConfig(
+                tools=tools,
+                tool_config=tool_config,
+                system_instruction=SYSTEM_INSTRUCTION,
+            ),
+        )
 
-    def is_retryable_error(exception):
-        """Check if the exception is a transient error suitable for retry."""
+    async def _consume_stream(self, response: Any, queue: Any) -> Tuple[str, List[types.FunctionCall]]:
+        """Consumes the stream and emits events."""
+        text_content = ""
+        function_calls = []
+        
         try:
-            # Check for HTTP status codes (429, 5xx)
-            code = getattr(exception, "code", None)
-            status = getattr(exception, "status", None)
+            async for chunk in response:
+                if chunk.candidates:
+                    cand = chunk.candidates[0]
+                    if cand.content and cand.content.parts:
+                        for part in cand.content.parts:
+                            if part.text:
+                                text_content += part.text
+                                await self._emit_message_chunk(queue, part.text)
+                            if part.function_call:
+                                function_calls.append(part.function_call)
+        except Exception as e:
+            logger.error(f"Error consuming stream: {e}")
+            raise e
             
-            retryable_codes = [429, 500, 502, 503, 504]
-            if code in retryable_codes:
-                return True
-                
-            # Check for specific status strings
-            # User error: 'status': 'RESOURCE_EXHAUSTED'
-            retryable_statuses = ["RESOURCE_EXHAUSTED", "INTERNAL", "UNAVAILABLE", "DEADLINE_EXCEEDED"]
-            if str(status) in retryable_statuses:
-                return True
+        return text_content, function_calls
 
-            # Fallback: Check message content
-            msg = str(exception).lower()
-            if "resource exhausted" in msg or "internal server error" in msg or "service unavailable" in msg:
-                return True
-                
-        except Exception:
-            pass
+    async def _check_and_handle_lazy_intent(
+        self,
+        text_content: str,
+        history: List[types.Content],
+        loop_context: Dict[str, Any],
+        queue: Any,
+        all_tools: List[types.Tool],
+        tool_config: Optional[types.ToolConfig],
+        session: Any
+    ) -> bool:
+        """
+        Detects if the model expressed intent to use a tool but didn't call it.
+        If so, injects a user prompt to force the tool call.
+        """
+        # Simple keyword matching for Lazy Intent (could be improved with another LLM call)
+        # Check if text contains "I will" or "let me" followed by "visualize", "calculate", etc.
+        # and NO function calls were made (handled by caller).
+        
+        keywords = ["visualize", "calculate", "import", "update", "change"]
+        lower_text = text_content.lower()
+        
+        intent_detected = False
+        for kw in keywords:
+            if kw in lower_text and ("will" in lower_text or "let me" in lower_text):
+                intent_detected = True
+                break
+        
+        if intent_detected:
+            logger.info(f"Lazy intent detected in text: '{text_content[:50]}...'")
+            # Inject prompt
+            history.append(types.Content(
+                role="user", 
+                parts=[types.Part.from_text(text="Please proceed with the action you described.")]
+            ))
+            return True
+            
         return False
 
     async def process_turn(
@@ -213,6 +297,9 @@ class GraphVisAgent:
         Executes tools in PARALLEL and updates history.
         Returns a dict representing this step's execution log.
         """
+        import asyncio
+        from datetime import datetime
+        
         function_calls_parts = []
         function_responses_parts = []
         
@@ -236,7 +323,7 @@ class GraphVisAgent:
             feature_name = fc.name
             args = dict(fc.args)
 
-            # Record in log
+            # Record in log (Placeholder, will fill result later)
             step_record["tool_calls"].append({
                 "name": feature_name,
                 "args": args
@@ -250,11 +337,11 @@ class GraphVisAgent:
             )
 
         # 2. Execute Parallel
-        # Returns list of (result, status, error_msg, feature_name)
+        # Returns list of (result, status, error_msg, feature_name, started_at, completed_at)
         results = await asyncio.gather(*tasks)
 
         # 3. Process Results (Sequential Side Effects)
-        for result, status, error_msg, feature_name in results:
+        for result, status, error_msg, feature_name, started_at, completed_at in results:
             
             # Handle Side Effects (Visualization, Context Switch)
             # We must do this sequentially to avoid race conditions on DB/loop_context
@@ -268,12 +355,14 @@ class GraphVisAgent:
                 types.Part.from_function_response(name=feature_name, response=result)
             )
 
-            # Update log with result (find usage)
+            # Update log with result and timing
             for call_record in step_record["tool_calls"]:
                 if call_record["name"] == feature_name and "result" not in call_record:
                     call_record["result"] = result
                     call_record["status"] = status
                     call_record["error"] = error_msg
+                    call_record["started_at"] = started_at
+                    call_record["completed_at"] = completed_at
                     break
 
         # Update History with valid turn structure
@@ -284,11 +373,15 @@ class GraphVisAgent:
 
     async def _run_tool_with_events(
         self, feature_name: str, args: Dict[str, Any], chat_id: int, network_id: int, session: Any, queue: Any
-    ) -> Tuple[Any, str, Optional[str], str]:
+    ) -> Tuple[Any, str, Optional[str], str, Any, Any]:
         """
         Wrapper to handle event emission and execution for a single tool.
-        Returns (result, status, error_msg, feature_name)
+        Returns (result, status, error_msg, feature_name, started_at, completed_at)
         """
+        from datetime import datetime, timezone
+        
+        started_at = datetime.now(timezone.utc)
+        
         # Emit "Started" event
         await self._emit_tool_event(queue, feature_name, "started", args)
 
@@ -297,10 +390,12 @@ class GraphVisAgent:
             feature_name, args, chat_id, network_id, session
         )
         
+        completed_at = datetime.now(timezone.utc)
+        
         # Emit "Completed" event
         await self._emit_tool_event(queue, feature_name, status, error_msg)
         
-        return result, status, error_msg, feature_name
+        return result, status, error_msg, feature_name, started_at, completed_at
 
     async def _run_tool(
         self, function_name: str, args: Dict[str, Any], chat_id: int, network_id: int, session: Any
