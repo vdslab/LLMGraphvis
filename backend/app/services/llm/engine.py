@@ -66,14 +66,16 @@ class GraphVisAgent:
         api_key = os.getenv("GOOGLE_API_KEY")
 
         if project_id:
-            logger.info(
-                f"Using Vertex AI with Project ID: {project_id}, Location: {location}"
-            )
+            msg = f"🟢 Using Vertex AI (Project: {project_id}, Location: {location})"
+            logger.info(msg)
+            print(msg) # Immediate console feedback
             return genai.Client(
                 vertexai=True, project=project_id, location=location
             )
         else:
-            logger.info("Using Google AI Studio with API Key")
+            msg = "🔵 Using Google AI Studio (API Key)"
+            logger.info(msg)
+            print(msg) # Immediate console feedback
             return genai.Client(api_key=api_key)
 
     @retry(
