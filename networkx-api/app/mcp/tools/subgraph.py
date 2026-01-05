@@ -16,6 +16,11 @@ def create_subgraph_from_nodes(
 ) -> dict:
     """
     Creates a NEW subgraph network from a list of specific node IDs.
+    
+    WARNING:
+    - Use this tool ONLY when the user explicitly provides a list of specific Node IDs (e.g. "Create a subgraph for nodes A, B, and C").
+    - Do NOT use this tool to "guess" or "find" nodes based on attributes (e.g. "nodes from Men"). Use `create_subgraph_by_filter` for that.
+    - Do NOT use this tool if you are trying to get the main component. Use `create_largest_component_subgraph`.
         
     Returns:
         dict: {"new_network_id": int, "content": str}
