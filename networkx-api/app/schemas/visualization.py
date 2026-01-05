@@ -42,6 +42,9 @@ class NodeSizeConfig(BaseModel):
     default: Optional[float] = Field(
         None, description="Default radius if attribute is missing."
     )
+    scaling_factor: float = Field(
+        1.0, description="Multiplier for node sizes (default 1.0)."
+    )
 
 
 class EdgeWidthConfig(BaseModel):

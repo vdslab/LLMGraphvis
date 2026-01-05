@@ -152,7 +152,8 @@ def update_node_size(
     attribute: Annotated[str, Field(description="Node attribute name to use for sizing.")],
     min_size: Annotated[Optional[float], Field(description="Min node size. Defaults to adaptive value based on network size (e.g. 5-100).")] = None,
     max_size: Annotated[Optional[float], Field(description="Max node size. Defaults to adaptive value based on network size (e.g. 20-200).")] = None,
-    default_size: Annotated[Optional[float], Field(description="Default size used if attribute is missing. Defaults to adaptive value.")] = None
+    default_size: Annotated[Optional[float], Field(description="Default size used if attribute is missing. Defaults to adaptive value.")] = None,
+    scaling_factor: Annotated[float, Field(description="Global multiplier for node sizes. Default 1.0. Use >1.0 to increase sizes, <1.0 to decrease.")] = 1.0
 ) -> dict:
     """
     Updates ONLY the node sizes in the visualization.
@@ -170,7 +171,8 @@ def update_node_size(
                 attribute=attribute,
                 min_size=min_size,
                 max_size=max_size,
-                default_size=default_size
+                default_size=default_size,
+                scaling_factor=scaling_factor,
             )
             vis_data = visualization_builder.build_visualization(
                 db, 

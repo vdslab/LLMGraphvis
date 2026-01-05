@@ -206,6 +206,13 @@ class StyleService:
                     target_max = smart_defaults["max"]
                     
                 size = utils.normalize(val, stats[1], stats[2], target_min, target_max)
+        
+        # Apply scaling factor if present
+        if config:
+            scaling_factor = config.get("scaling_factor", 1.0)
+            if scaling_factor != 1.0:
+                size *= scaling_factor
+                
         return size
 
     @classmethod
