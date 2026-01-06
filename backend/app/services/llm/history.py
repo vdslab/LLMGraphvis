@@ -47,8 +47,11 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[types.Co
                 for step in steps:
                     # A. Reconstruct Model Turn
                     model_parts = []
-                    if step['thought']:
-                        model_parts.append(types.Part(text=step['thought']))
+                    # Optimization: Do NOT include past "thoughts" in the history.
+                    # This prevents the model from looping on its own past planning statements ("I will...")
+                    # and encourages "Action First" behavior.
+                    # if step['thought']:
+                    #    model_parts.append(types.Part(text=step['thought']))
                     
                     user_parts = []
                     for exc in step['tool_calls']:
@@ -86,8 +89,9 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[types.Co
                     # A. Reconstruct Model Turn (Thought + Calls)
                     model_parts = []
                     thought = step.get("thought")
-                    if thought:
-                        model_parts.append(types.Part(text=thought))
+                    # Optimization: Exclude thoughts for legacy data as well
+                    # if thought:
+                    #     model_parts.append(types.Part(text=thought))
                     
                     tool_calls_data = step.get("tool_calls", [])
                     for tc in tool_calls_data:

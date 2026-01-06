@@ -133,7 +133,13 @@ async def _build_context_summary(network_id: int) -> str:
             if attrs and isinstance(attrs, list):
                 if attrs:
                     summary_lines.append(f"Available {label}:")
-                    for attr in attrs:
+                    # Limit to top 15 to avoid context saturation
+                    limit = 15
+                    for i, attr in enumerate(attrs):
+                        if i >= limit:
+                            remaining = len(attrs) - limit
+                            summary_lines.append(f"- ... and {remaining} more")
+                            break
                         name = attr.get("name")
                         dtype = attr.get("data_type")
                         summary_lines.append(f"- {name} ({dtype})")
@@ -144,7 +150,12 @@ async def _build_context_summary(network_id: int) -> str:
                 ats = attrs["attributes"]
                 if ats:
                     summary_lines.append(f"Available {label}:")
-                    for attr in ats:
+                    limit = 15
+                    for i, attr in enumerate(ats):
+                        if i >= limit:
+                            remaining = len(ats) - limit
+                            summary_lines.append(f"- ... and {remaining} more")
+                            break
                         name = attr.get("name")
                         dtype = attr.get("data_type")
                         summary_lines.append(f"- {name} ({dtype})")
