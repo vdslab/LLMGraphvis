@@ -21,7 +21,7 @@ def calculate_centrality(
         try:
             from app.logic import centrality
             centrality.calculate_centrality(network_id, centrality_type, db)
-            return f"{centrality_type} centrality calculated."
+            return f"{centrality_type} centrality calculated and saved as node attribute '{centrality_type}_centrality'."
         except Exception as e:
             logger.error(f"calculate_centrality failed: {e}")
             raise RuntimeError(f"Centrality calculation failed: {str(e)}") from e
