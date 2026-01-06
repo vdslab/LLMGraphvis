@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from common import models
 
-from .attributes import delete_attribute_values, get_or_create_attribute
+from .attributes import bulk_save_node_attributes
 
 
 def calculate_community(network_id: int, algorithm: str, db: Session) -> str:
@@ -18,7 +18,7 @@ def calculate_community(network_id: int, algorithm: str, db: Session) -> str:
         db: Database session.
         
     Returns:
-        The name of the attribute created (e.g., "community").
+        The name of the attribute created (e.g., "louvain_community").
     """
     # Reconstruct graph
     G = nx.Graph()
@@ -57,82 +57,20 @@ def calculate_community(network_id: int, algorithm: str, db: Session) -> str:
         raise ValueError(f"Unknown community algorithm: {algorithm}")
 
     # attribute name to save
-    attr_name = "community" # Simplified name for easier usage
+    attr_name = f"{algorithm}_community"
     
-    # Save to DB
-    attr = get_or_create_attribute(
-        network_id, attr_name, models.NodeAttribute, db, data_type="string"
-    )
-
-    # Delete existing values for this attribute
-    delete_attribute_values(network_id, attr.id, models.NodeAttributeValue, db)
-
     # Prepare data for bulk insert
-    node_text_values = []
-    
-    # Map node_id -> community_id (string)
-    # partition is a list of sets. Index can be the community ID.
-    for i, community_nodes in enumerate(partition):
-        cluster_id = str(i)
-        for node_id in community_nodes:
-            if node_id in node_map:
-                db_node_id = node_map[node_id]
-                
-                # We need to create a NodeAttributeValue first (or do it efficiently)
-                # But our models separate the mapping from the value.
-                # Common pattern in centrality.py:
-                # 1. Bulk insert NodeAttributeValue mappings
-                # 2. Bulk insert value tables (NodeFloatAttributeValue, etc.)
-                # However, for text attributes, we might want to just create them.
-                # Let's check logic/centrality.py pattern again.
-                pass
-
-    # Centrality.py does:
-    # 1. Bulk insert NodeAttributeValue
-    # 2. Query back to get IDs
-    # 3. Bulk insert Value table
-    
-    # Let's replicate this pattern
-    
-    # 1. Prepare NodeAttributeValue data
-    nav_data = []
-    # Temporarily store the value mapping to use in step 3
-    node_to_cluster = {}
+    # db_node_id -> community_id (string)
+    data_map = {}
     
     for i, community_nodes in enumerate(partition):
         cluster_id = str(i)
         for node_id in community_nodes:
             if node_id in node_map:
                 db_node_id = node_map[node_id]
-                nav_data.append({"node_id": db_node_id, "attribute_id": attr.id})
-                node_to_cluster[db_node_id] = cluster_id
+                data_map[db_node_id] = cluster_id
 
-    if nav_data:
-        db.bulk_insert_mappings(models.NodeAttributeValue, nav_data)
-        db.commit()
-
-        # 2. Get IDs back
-        all_navs = (
-            db.query(models.NodeAttributeValue)
-            .filter(
-                models.NodeAttributeValue.attribute_id == attr.id,
-                models.NodeAttributeValue.node_id.in_(node_to_cluster.keys()),
-            )
-            .all()
-        )
-        
-        # 3. Insert into NodeTextAttributeValue
-        text_vals = []
-        for nav in all_navs:
-            cluster_id = node_to_cluster.get(nav.node_id)
-            if cluster_id is not None:
-                text_vals.append({
-                    "node_attribute_value_id": nav.id,
-                    "text_value": cluster_id
-                })
-        
-        if text_vals:
-            db.bulk_insert_mappings(models.NodeTextAttributeValue, text_vals)
-        db.commit()
+    # Save to DB
+    bulk_save_node_attributes(network_id, attr_name, "string", data_map, db)
     
     return attr_name

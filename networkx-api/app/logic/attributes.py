@@ -86,6 +86,85 @@ def clear_network_data(network_id: int, db: Session) -> None:
     db.commit()
 
 
+def bulk_save_node_attributes(
+    network_id: int,
+    attr_name: str,
+    attr_type: str,
+    data_map: Dict[int, Any],  # db_node_id -> value
+    db: Session,
+):
+    """
+    Helper function to bulk save node attributes.
+    Handles attribute creation, clearing old values, and bulk insertion.
+
+    Args:
+        network_id: The ID of the network.
+        attr_name: Name of the attribute to save (e.g., "degree_centrality").
+        attr_type: "float" or "string".
+        data_map: Dictionary mapping internal DB node ID to the value.
+        db: Database session.
+    """
+    # 1. Get or Create Attribute
+    attr = get_or_create_attribute(
+        network_id, attr_name, models.NodeAttribute, db, data_type=attr_type
+    )
+
+    # 2. Delete existing values
+    delete_attribute_values(
+        network_id, attr.id, models.NodeAttributeValue, db, commit=False
+    )
+
+    if not data_map:
+        db.commit()
+        return
+
+    # 3. Bulk Insert Mappings (NodeAttributeValue)
+    nav_data = [
+        {"node_id": node_id, "attribute_id": attr.id} for node_id in data_map.keys()
+    ]
+    db.bulk_insert_mappings(models.NodeAttributeValue, nav_data)
+    db.commit()
+
+    # 4. Fetch back generated NodeAttributeValue IDs
+    #    We query by (attribute_id, node_id) which should be unique per attribute
+    all_navs = (
+        db.query(models.NodeAttributeValue)
+        .filter(
+            models.NodeAttributeValue.attribute_id == attr.id,
+            models.NodeAttributeValue.node_id.in_(data_map.keys()),
+        )
+        .all()
+    )
+
+    # Map db_node_id -> nav_id
+    nav_map = {nav.node_id: nav.id for nav in all_navs}
+
+    # 5. Bulk Insert Values (Float or Text)
+    value_data = []
+    
+    if attr_type == "float":
+        for node_id, value in data_map.items():
+            nav_id = nav_map.get(node_id)
+            if nav_id:
+                value_data.append(
+                    {"node_attribute_value_id": nav_id, "float_value": float(value)}
+                )
+        if value_data:
+            db.bulk_insert_mappings(models.NodeFloatAttributeValue, value_data)
+
+    elif attr_type == "string":
+        for node_id, value in data_map.items():
+            nav_id = nav_map.get(node_id)
+            if nav_id:
+                value_data.append(
+                    {"node_attribute_value_id": nav_id, "text_value": str(value)}
+                )
+        if value_data:
+            db.bulk_insert_mappings(models.NodeTextAttributeValue, value_data)
+    
+    db.commit()
+
+
 def ensure_attributes(
     network_id: int,
     attr_types: Dict[str, str],

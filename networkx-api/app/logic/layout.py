@@ -128,62 +128,29 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
         raise ValueError(f"Unknown layout algorithm: {layout_name}")
 
     # Save to DB - Bulk Update Strategy
-    # 1. Ensure attributes exist
-    attr_x = get_or_create_attribute(
-        network_id, f"{layout_name}_x", models.NodeAttribute, db, data_type="float"
-    )
-    attr_y = get_or_create_attribute(
-        network_id, f"{layout_name}_y", models.NodeAttribute, db, data_type="float"
-    )
-    print(f"DEBUG: layout.calculate_layout created attributes {attr_x.id}, {attr_y.id} for network {network_id}")
+    # We save two attributes: {layout_name}_x and {layout_name}_y
+    
+    # Prepare data maps
+    data_map_x = {}
+    data_map_y = {}
 
-
-    # 2. Delete existing values for these attributes (Clean slate)
-    delete_attribute_values(network_id, attr_x.id, models.NodeAttributeValue, db, commit=False)
-    delete_attribute_values(network_id, attr_y.id, models.NodeAttributeValue, db, commit=False)
-
-    # 3. Bulk Insert New Values
-    nav_data = []
-    for node_id in pos:
-        db_node_id = node_map[node_id]
-        nav_data.append({"node_id": db_node_id, "attribute_id": attr_x.id})
-        nav_data.append({"node_id": db_node_id, "attribute_id": attr_y.id})
-
-    if nav_data:
-        db.bulk_insert_mappings(models.NodeAttributeValue, nav_data)
-        db.commit()
-
-        # Fetch back IDs
-        all_navs = (
-            db.query(models.NodeAttributeValue)
-            .filter(
-                models.NodeAttributeValue.attribute_id.in_([attr_x.id, attr_y.id]),
-                models.NodeAttributeValue.node_id.in_(node_map.values()),
-            )
-            .all()
-        )
-
-        nav_map = {(nav.node_id, nav.attribute_id): nav.id for nav in all_navs}
-
-        float_vals = []
-        for node_id, (x, y) in pos.items():
+    for node_id, (x, y) in pos.items():
+        if node_id in node_map:
             db_node_id = node_map[node_id]
+            data_map_x[db_node_id] = float(x)
+            data_map_y[db_node_id] = float(y)
 
-            nav_x_id = nav_map.get((db_node_id, attr_x.id))
-            if nav_x_id:
-                float_vals.append(
-                    {"node_attribute_value_id": nav_x_id, "float_value": float(x)}
-                )
-
-            nav_y_id = nav_map.get((db_node_id, attr_y.id))
-            if nav_y_id:
-                float_vals.append(
-                    {"node_attribute_value_id": nav_y_id, "float_value": float(y)}
-                )
-
-        if float_vals:
-            db.bulk_insert_mappings(models.NodeFloatAttributeValue, float_vals)
-        db.commit()
+    from .attributes import bulk_save_node_attributes
+    
+    # Save X
+    bulk_save_node_attributes(
+        network_id, f"{layout_name}_x", "float", data_map_x, db
+    )
+    
+    # Save Y
+    bulk_save_node_attributes(
+        network_id, f"{layout_name}_y", "float", data_map_y, db
+    )
 
     # 4. Update Network Record with last layout name
     from sqlalchemy import text
