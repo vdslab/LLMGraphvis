@@ -159,9 +159,9 @@ def calculate_smart_node_size(num_nodes: int) -> dict:
     base_size = max(5.0, min(200.0, base_size))
 
     return {
-        "default": round(base_size, 1),
-        "min": round(base_size * 0.5, 1),
-        "max": round(base_size * 2.5, 1),
+        "default": round(base_size * 2.0, 1),
+        "min": round(base_size * 1.0, 1),
+        "max": round(base_size * 5.0, 1),
     }
 
 

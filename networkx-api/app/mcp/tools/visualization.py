@@ -149,9 +149,9 @@ def update_node_color(
 @mcp.tool()
 def update_node_size(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    attribute: Annotated[str, Field(description="Node attribute name to use for sizing.")],
-    min_size: Annotated[Optional[float], Field(description="Min node size. Defaults to adaptive value based on network size (e.g. 5-100).")] = None,
-    max_size: Annotated[Optional[float], Field(description="Max node size. Defaults to adaptive value based on network size (e.g. 20-200).")] = None,
+    attribute: Annotated[str, Field(description="Node attribute name to use for sizing. Calculate centrality first if needed.")],
+    min_size: Annotated[Optional[float], Field(description="Min node size. Prefer leaving as None to allow adaptive sizing (recommended). Example range: 10-200.")] = None,
+    max_size: Annotated[Optional[float], Field(description="Max node size. Prefer leaving as None to allow adaptive sizing (recommended). Example range: 20-400.")] = None,
     default_size: Annotated[Optional[float], Field(description="Default size used if attribute is missing. Defaults to adaptive value.")] = None,
     scaling_factor: Annotated[float, Field(description="Global multiplier for node sizes. Default 1.0. Use >1.0 to increase sizes, <1.0 to decrease.")] = 1.0
 ) -> dict:
