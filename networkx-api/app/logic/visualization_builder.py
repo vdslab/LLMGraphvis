@@ -265,19 +265,28 @@ class VisualizationBuilder:
             .filter(models.Node.network_id == self.network_id)
             .all()
         )
-        smart_defaults = calculate_smart_node_size(len(nodes))
+        # Pre-filter nodes for visibility to calculate correct smart defaults
+        visible_nodes = []
         focus_node_ids_str = set(self.focus_node_map.keys())
 
-        vis_nodes = []
         for n in nodes:
             is_focused = n.node_id in focus_node_ids_str
-
             if (
                 not is_focused
                 and self.context_config
                 and self.context_config.get("visible") is False
             ):
                 continue
+            visible_nodes.append(n)
+
+        # Calculate defaults based on VISIBLE count, not DB count
+        smart_defaults = calculate_smart_node_size(len(visible_nodes))
+        
+        vis_nodes = []
+        for n in visible_nodes:
+            is_focused = n.node_id in focus_node_ids_str
+            # Visibility check already done above check
+
 
             # Resolve Size & Color common logic
             size = StyleService.resolve_node_size(
