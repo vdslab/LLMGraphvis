@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from common import models
 
-from .attributes import delete_attribute_values, get_or_create_attribute
+from .attributes import bulk_save_node_attributes
 
 
 def calculate_centrality(network_id: int, centrality_type: str, db: Session):
@@ -33,47 +33,16 @@ def calculate_centrality(network_id: int, centrality_type: str, db: Session):
     else:
         raise ValueError(f"Unknown centrality type: {centrality_type}")
 
+    # Prepare data for bulk save (db_node_id -> value)
+    data_map = {}
+    for node_id, score in centrality.items():
+        if node_id in node_map:
+            db_node_id = node_map[node_id]
+            data_map[db_node_id] = score
+
     # Save to DB - Bulk Update Strategy
     attr_name = f"{centrality_type}_centrality"
-    attr = get_or_create_attribute(
-        network_id, attr_name, models.NodeAttribute, db, data_type="float"
-    )
-
-    # Delete existing
-    delete_attribute_values(network_id, attr.id, models.NodeAttributeValue, db, commit=False)
-
-    # Bulk Insert
-    nav_data = []
-    for node_id in centrality:
-        db_node_id = node_map[node_id]
-        nav_data.append({"node_id": db_node_id, "attribute_id": attr.id})
-
-    if nav_data:
-        db.bulk_insert_mappings(models.NodeAttributeValue, nav_data)
-        db.commit()
-
-        all_navs = (
-            db.query(models.NodeAttributeValue)
-            .filter(
-                models.NodeAttributeValue.attribute_id == attr.id,
-                models.NodeAttributeValue.node_id.in_(node_map.values()),
-            )
-            .all()
-        )
-        nav_map = {(nav.node_id, nav.attribute_id): nav.id for nav in all_navs}
-
-        float_vals = []
-        for node_id, value in centrality.items():
-            db_node_id = node_map[node_id]
-            nav_id = nav_map.get((db_node_id, attr.id))
-            if nav_id:
-                float_vals.append(
-                    {"node_attribute_value_id": nav_id, "float_value": float(value)}
-                )
-
-        if float_vals:
-            db.bulk_insert_mappings(models.NodeFloatAttributeValue, float_vals)
-        db.commit()
+    bulk_save_node_attributes(network_id, attr_name, "float", data_map, db)
 
     return centrality
 

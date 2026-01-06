@@ -15,6 +15,7 @@ export const useChatStore = create((set, get) => ({
   messages: [],
   isLoading: false,
   thinkingMessage: null,
+  streamingMessageId: null,
 
   // Get all chats for current user
   fetchChats: async () => {
@@ -126,17 +127,26 @@ export const useChatStore = create((set, get) => ({
       
       // Also check if we have a streaming message that needs to be replaced/merged
       // This handles the race condition where `message` event arrives but we have a `isStreaming` placeholder
-      const streamingMsg = state.messages.find(m => m.isStreaming && m.role === 'assistant');
+      
+      // Use ID check if available, otherwise strict role/streaming check
+      const streamingMsg = state.streamingMessageId 
+        ? state.messages.find(m => m.id === state.streamingMessageId)
+        : state.messages.find(m => m.isStreaming && m.role === 'assistant');
+
       if (streamingMsg && message.role === 'assistant') {
          // Assuming this is the finalized version of the streaming message
-         // We Map it properly
          const updatedMessages = state.messages.map(m => {
-            if (m.isStreaming && m.role === 'assistant') {
+            if (m.id === streamingMsg.id) {
                 return { ...message, isStreaming: false };
             }
             return m;
          });
-         return { messages: updatedMessages, isLoading: false, thinkingMessage: null };
+         return { 
+            messages: updatedMessages, 
+            isLoading: false, 
+            thinkingMessage: null,
+            streamingMessageId: null 
+         };
       }
 
       return { 
@@ -150,28 +160,41 @@ export const useChatStore = create((set, get) => ({
   appendMessageChunk: (content) => {
     set((state) => {
       const messages = [...state.messages];
-      const lastMessage = messages[messages.length - 1];
+      let msgIndex = -1;
+      
+      // 1. Try to find by streamingMessageId
+      if (state.streamingMessageId) {
+          msgIndex = messages.findIndex(m => m.id === state.streamingMessageId);
+      }
+      
+      // 2. Fallback: Find last streaming assistant message
+      if (msgIndex === -1) {
+          msgIndex = messages.findLastIndex(m => m.isStreaming && m.role === 'assistant');
+      }
 
-      if (lastMessage && lastMessage.role === 'assistant' && lastMessage.isStreaming) {
-        // Append to existing streaming message
-        lastMessage.content += content;
+      if (msgIndex !== -1) {
+        // Update existing
+        const msg = { ...messages[msgIndex] };
+        msg.content += content;
+        messages[msgIndex] = msg;
         return { 
           messages,
-          // Hide thinking message as soon as we have content
           thinkingMessage: null 
         };
       } else {
-        // Create new streaming message
+        // Create new
+        const newId = Date.now();
         const newMessage = {
           role: 'assistant',
           content,
-          id: Date.now(), // Temporary ID until confirmed
+          id: newId,
           created_at: new Date().toISOString(),
           isStreaming: true
         };
         return { 
           messages: [...messages, newMessage],
-          thinkingMessage: null
+          thinkingMessage: null,
+          streamingMessageId: newId
         };
       }
     });
@@ -180,14 +203,18 @@ export const useChatStore = create((set, get) => ({
   finalizeStreamingMessage: (realId) => {
     set((state) => {
       const messages = [...state.messages];
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage && lastMessage.isStreaming) {
-        lastMessage.isStreaming = false;
+      // Use findLast or specific ID
+      const idx = state.streamingMessageId 
+        ? messages.findIndex(m => m.id === state.streamingMessageId)
+        : messages.findLastIndex(m => m.isStreaming);
+        
+      if (idx !== -1) {
+        messages[idx].isStreaming = false;
         if (realId) {
-            lastMessage.id = realId;
+            messages[idx].id = realId;
         }
       }
-      return { messages, isLoading: false, thinkingMessage: null };
+      return { messages, isLoading: false, thinkingMessage: null, streamingMessageId: null };
     });
   },
 
