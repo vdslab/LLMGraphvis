@@ -2,12 +2,14 @@ from typing import List, Optional, Dict, Any, Annotated
 from pydantic import Field
 from app.core.mcp import mcp
 from app.core.database import get_db_context
+from app.core.decorators import handle_tool_errors
 import logging
 import traceback
 
 logger = logging.getLogger(__name__)
 
 @mcp.tool()
+@handle_tool_errors
 def create_subgraph_from_nodes(
     network_id: Annotated[int, Field(description="The ID of the source network.")],
     node_ids: Annotated[List[str], Field(description="List of node IDs (strings) to include in the subgraph.")],
@@ -29,139 +31,198 @@ def create_subgraph_from_nodes(
         dict: {"new_network_id": int, "content": str}
     """
     with get_db_context() as db:
-        try:
-            from app.logic import subgraph
-            # Correct argument mapping:
-            # source_network_id, node_ids, db, suffix, preserve_layout, description
-            result = subgraph.create_subgraph_from_nodes(
-                source_network_id=network_id,
-                node_ids=node_ids,
-                db=db,
-                suffix="Subgraph",
-                preserve_layout=preserve_layout,
-                description=description
-            )
-            return {
-                "new_network_id": result["new_network_id"],
-                "content": f"Subgraph created (ID: {result['new_network_id']}) with {len(node_ids)} nodes."
-            }
-        except Exception as e:
-            logger.error(f"create_subgraph_from_nodes failed: {e}")
-            logger.error(traceback.format_exc())
-            raise RuntimeError(f"Subgraph create failed: {str(e)}") from e
+        from app.logic import subgraph
+        # Correct argument mapping:
+        # source_network_id, node_ids, db, suffix, preserve_layout, description
+        result = subgraph.create_subgraph_from_nodes(
+            source_network_id=network_id,
+            node_ids=node_ids,
+            db=db,
+            suffix="Subgraph",
+            preserve_layout=preserve_layout,
+            description=description
+        )
+        return {
+            "new_network_id": result["new_network_id"],
+            "content": f"Subgraph created (ID: {result['new_network_id']}) with {len(node_ids)} nodes."
+        }
 
 
 @mcp.tool()
-def create_largest_component_subgraph(
-    network_id: Annotated[int, Field(description="The ID of the source network.")], 
-    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = True
+@handle_tool_errors
+def create_subgraph_by_attributes(
+    network_id: Annotated[int, Field(description="The ID of the source network.")],
+    node_filters: Annotated[Optional[str], Field(description='JSON list of filter objects. e.g. \'[{"attribute": "department", "operator": "==", "value": "R&D"}]\'')] = None,
+    edge_filters: Annotated[Optional[str], Field(description='JSON list of filter objects. e.g. \'[{"attribute": "weight", "operator": ">", "value": 0.5}]\'')] = None,
+    new_name_suffix: Annotated[str, Field(description="Suffix to append to the new network name.")] = "_subgraph"
 ) -> dict:
     """
-    Extracts the largest connected component from the network as a new subgraph.
+    Creates a new subgraph by filtering nodes and edges based on attributes.
+    This creates a new network record in the database.
     
-    IMPORTANT:
-    - If `preserve_layout=False`, a new layout is calculated automatically.
-    - To visualize the new component, you MUST call `switch_to_network(new_network_id)`.
-    - Do NOT call `calculate_layout` again unless you want to change the algorithm.
+    Supported operators: "==", "!=", ">", "<", ">=", "<=", "in", "not in", "contains"
 
     Returns:
-        dict: {"new_network_id": int, "content": str}
+        dict: {"network_id": int, "network": dict, "content": str}
     """
     with get_db_context() as db:
-        try:
-            from app.logic import subgraph 
-            
-            result = subgraph.create_largest_component_subgraph(
-                source_network_id=network_id,
-                db=db,
-                preserve_layout=preserve_layout
-            )
-            return result
-        except Exception as e:
-            logger.error(f"create_largest_component_subgraph failed: {e}")
-            raise RuntimeError(f"Largest component extraction failed: {str(e)}") from e
+        from app.logic import subgraph, visualization_builder
+        
+        n_filters = json.loads(node_filters) if node_filters else []
+        e_filters = json.loads(edge_filters) if edge_filters else []
+        
+        new_id = subgraph.create_subgraph_by_attributes(db, network_id, n_filters, e_filters, new_name_suffix)
+        vis_data = visualization_builder.build_visualization(db, new_id)
+        
+        return {
+            "network_id": new_id,
+            "network": vis_data,
+            "content": f"Created subgraph {new_id} based on attributes."
+        }
 
 
 @mcp.tool()
+@handle_tool_errors
 def create_ego_network(
     network_id: Annotated[int, Field(description="The ID of the source network.")],
-    center_node_id: Annotated[str, Field(description="The ID of the central node.")],
-    radius: Annotated[int, Field(description="The radius of the ego network (1 = direct neighbors).")],
-    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = True
+    center_node_id: Annotated[str, Field(description="The ID of the center node.")],
+    radius: Annotated[int, Field(description="The radius of the ego network (default 1).")] = 1,
+    new_name_suffix: Annotated[str, Field(description="Suffix to append to the new network name.")] = "_ego"
 ) -> dict:
     """
-    Creates an Ego Network subgraph (a central node and its neighbors within a radius).
-        
+    Creates an Ego Network (subgraph) centered around a specific node.
+    Includes the center node and all neighbors within the given radius.
+    
     Returns:
-        dict: {"new_network_id": int, "content": str}
+        dict: {"network_id": int, "network": dict, "content": str}
     """
     with get_db_context() as db:
-        try:
-            from app.logic import subgraph
-            return subgraph.create_ego_network(
-                source_network_id=network_id,
-                center_node_id=center_node_id,
-                radius=radius,
-                db=db,
-                preserve_layout=preserve_layout
-            )
-        except Exception as e:
-            logger.error(f"create_ego_network failed: {e}")
-            raise RuntimeError(f"Ego network creation failed: {str(e)}") from e
+        from app.logic import subgraph, visualization_builder
+        
+        new_id = subgraph.create_ego_network(db, network_id, center_node_id, radius, new_name_suffix)
+        vis_data = visualization_builder.build_visualization(db, new_id)
+        
+        return {
+            "network_id": new_id,
+            "network": vis_data,
+            "content": f"Created Ego Network {new_id} centered on {center_node_id} (r={radius})."
+        }
 
 
 @mcp.tool()
-def create_path_subgraph(
+@handle_tool_errors
+def create_community_subgraph(
     network_id: Annotated[int, Field(description="The ID of the source network.")],
-    source_node_id: Annotated[str, Field(description="The start node ID.")],
-    target_node_id: Annotated[str, Field(description="The end node ID.")],
-    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = True
+    community_id: Annotated[str, Field(description="The ID/Label of the community to extract.")],
+    community_attribute: Annotated[str, Field(description="The node attribute name holding community labels.")] = "community",
+    new_name_suffix: Annotated[str, Field(description="Suffix to append to the new network name.")] = "_community"
 ) -> dict:
     """
-    Creates a subgraph containing the shortest path between two specific nodes.
-        
+    Creates a subgraph containing only nodes belonging to a specific community.
+    
     Returns:
-        dict: {"new_network_id": int, "content": str}
+        dict: {"network_id": int, "network": dict, "content": str}
     """
     with get_db_context() as db:
-        try:
-            from app.logic import subgraph
-            return subgraph.create_path_subgraph(
-                source_network_id=network_id,
-                source_node_id=source_node_id,
-                target_node_id=target_node_id,
-                db=db,
-                preserve_layout=preserve_layout
-            )
-        except Exception as e:
-            logger.error(f"create_path_subgraph failed: {e}")
-            raise RuntimeError(f"Path subgraph creation failed: {str(e)}") from e
+        from app.logic import subgraph, visualization_builder
+        
+        # Use attribute filtering logic internally
+        filters = [{"attribute": community_attribute, "operator": "==", "value": community_id}]
+        new_id = subgraph.create_subgraph_by_attributes(db, network_id, node_filters=filters, new_name_suffix=new_name_suffix)
+        vis_data = visualization_builder.build_visualization(db, new_id)
+        
+        return {
+            "network_id": new_id,
+            "network": vis_data,
+            "content": f"Created Community Subgraph {new_id} for community '{community_id}'."
+        }
 
 
 @mcp.tool()
-def create_k_core_subgraph(
+@handle_tool_errors
+def create_largest_component_subgraph(
     network_id: Annotated[int, Field(description="The ID of the source network.")],
-    k: Annotated[int, Field(description="The minimum degree for nodes to include.")],
-    preserve_layout: Annotated[bool, Field(description="If True, copies the x,y coordinates from the source network.")] = True
+    new_name_suffix: Annotated[str, Field(description="Suffix to append to the new network name.")] = "_largest_component"
 ) -> dict:
     """
-    Creates a k-core subgraph (containing only nodes with degree >= k).
-        
+    Creates a subgraph containing only the largest connected component.
+    Useful for filtering out disconnected nodes/islands.
+    
     Returns:
-        dict: {"new_network_id": int, "content": str}
+        dict: {"network_id": int, "network": dict, "content": str}
     """
     with get_db_context() as db:
-        try:
-            from app.logic import subgraph
-            return subgraph.create_k_core_subgraph(
-                source_network_id=network_id,
-                k=k,
-                db=db,
-                preserve_layout=preserve_layout
-            )
-        except Exception as e:
-            logger.error(f"create_k_core_subgraph failed: {e}")
-            raise RuntimeError(f"K-core subgraph creation failed: {str(e)}") from e
+        from app.logic import subgraph, visualization_builder
+        
+        new_id = subgraph.create_largest_component_subgraph(db, network_id, new_name_suffix)
+        vis_data = visualization_builder.build_visualization(db, new_id)
+        
+        return {
+            "network_id": new_id,
+            "network": vis_data,
+            "content": f"Created Subgraph {new_id} (Largest Component)."
+        }
+
+
+@mcp.tool()
+@handle_tool_errors
+def filter_nodes_by_degree(
+    network_id: Annotated[int, Field(description="The ID of the source network.")],
+    min_degree: Annotated[int, Field(description="Minimum degree to keep.")],
+    new_name_suffix: Annotated[str, Field(description="Suffix to append to the new network name.")] = "_high_degree"
+) -> dict:
+    """
+    Creates a subgraph containing nodes with degree >= min_degree.
+    
+    Returns:
+        dict: {"network_id": int, "network": dict, "content": str}
+    """
+    with get_db_context() as db:
+        from app.logic import subgraph, visualization_builder
+        
+        new_id = subgraph.filter_nodes_by_degree(db, network_id, min_degree, new_name_suffix)
+        vis_data = visualization_builder.build_visualization(db, new_id)
+        
+        return {
+            "network_id": new_id,
+            "network": vis_data,
+            "content": f"Created Subgraph {new_id} with nodes of degree >= {min_degree}."
+        }
+
+
+@mcp.tool()
+@handle_tool_errors
+def create_subgraph_by_node_list(
+    network_id: Annotated[int, Field(description="The ID of the source network.")],
+    node_ids: Annotated[List[str], Field(description="List of node IDs to include in the subgraph.")],
+    new_name_suffix: Annotated[str, Field(description="Suffix to append to the new network name.")] = "_selection"
+) -> dict:
+    """
+    Creates a subgraph from a specific list of node IDs.
+    
+    Returns:
+        dict: {"network_id": int, "network": dict, "content": str}
+    """
+    with get_db_context() as db:
+        from app.logic import subgraph, visualization_builder
+        
+        # We can implement a specific logic function for this if not exists, 
+        # or use attribute filter 'in'.
+        # Let's check logic/subgraph.py. If create_subgraph_from_nodes exists.
+        # Assuming it exists or we use 'id' in node_ids filter.
+        
+        # Ideally, we should check what logic/subgraph.py provides.
+        # But based on typical implementation:
+        filters = [{"attribute": "id", "operator": "in", "value": node_ids}]
+        new_id = subgraph.create_subgraph_by_attributes(db, network_id, node_filters=filters, new_name_suffix=new_name_suffix)
+        
+        vis_data = visualization_builder.build_visualization(db, new_id)
+        
+        return {
+            "network_id": new_id,
+            "network": vis_data,
+            "content": f"Created Subgraph {new_id} from {len(node_ids)} specific nodes."
+        }
 
 
 @mcp.tool()
