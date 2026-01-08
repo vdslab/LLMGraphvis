@@ -3,7 +3,8 @@ from pydantic import Field
 from app.core.mcp import mcp
 from app.core.database import get_db_context
 import logging
-import traceback
+from app.core.decorators import handle_tool_errors
+import logging
 
 from app.schemas.visualization import (
     EdgeColorConfig,
@@ -16,6 +17,7 @@ from app.schemas.visualization import (
 logger = logging.getLogger(__name__)
 
 @mcp.tool()
+@handle_tool_errors
 def generate_visualization(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     node_color: Annotated[Optional[NodeColorConfig], Field(description="Configuration for node coloring.")] = None,
@@ -34,29 +36,25 @@ def generate_visualization(
         dict: The complete visualization object (nodes, links) ready for the frontend.
     """
     with get_db_context() as db:
-        try:
-            from app.logic import visualization_builder
+        from app.logic import visualization_builder
+        
+        ew_config = None
+        if edge_width_attribute:
+            ew_config = {"attribute": edge_width_attribute}
             
-            ew_config = None
-            if edge_width_attribute:
-                ew_config = {"attribute": edge_width_attribute}
-                
-            vis_data = visualization_builder.build_visualization(
-                db, 
-                network_id, 
-                node_color_config=node_color, 
-                node_size_config=node_size, 
-                edge_width_config=ew_config
-            )
-            vis_data["network_id"] = network_id
-            return vis_data
-        except Exception as e:
-            logger.error(f"generate_visualization failed: {e}")
-            logger.error(traceback.format_exc())
-            raise RuntimeError(f"Visualization generation failed: {str(e)}") from e
+        vis_data = visualization_builder.build_visualization(
+            db, 
+            network_id, 
+            node_color_config=node_color, 
+            node_size_config=node_size, 
+            edge_width_config=ew_config
+        )
+        vis_data["network_id"] = network_id
+        return vis_data
 
 
 @mcp.tool()
+@handle_tool_errors
 def get_visualization_state(
     network_id: Annotated[int, Field(description="The ID of the network.")]
 ) -> dict:
@@ -68,18 +66,15 @@ def get_visualization_state(
         dict: The visualization object.
     """
     with get_db_context() as db:
-        try:
-            from app.logic import visualization_builder
-            vis_data = visualization_builder.get_stored_visualization(db, network_id)
-            if vis_data:
-                vis_data["network_id"] = network_id
-            return vis_data
-        except Exception as e:
-            logger.error(f"get_visualization_state failed: {e}")
-            raise RuntimeError(f"Failed to get visualization state: {str(e)}") from e
+        from app.logic import visualization_builder
+        vis_data = visualization_builder.get_stored_visualization(db, network_id)
+        if vis_data:
+            vis_data["network_id"] = network_id
+        return vis_data
 
 
 @mcp.tool()
+@handle_tool_errors
 def update_layout(
     network_id: Annotated[int, Field(description="The ID of the network.")]
 ) -> dict:
@@ -91,18 +86,15 @@ def update_layout(
         dict: The updated visualization object.
     """
     with get_db_context() as db:
-        try:
-            from app.logic import visualization_builder
-            # Force rebuild to pick up new layout coords from node attributes
-            vis_data = visualization_builder.build_visualization(db, network_id)
-            vis_data["network_id"] = network_id
-            return vis_data
-        except Exception as e:
-            logger.error(f"update_layout failed: {e}")
-            raise RuntimeError(f"Layout update failed: {str(e)}") from e
+        from app.logic import visualization_builder
+        # Force rebuild to pick up new layout coords from node attributes
+        vis_data = visualization_builder.build_visualization(db, network_id)
+        vis_data["network_id"] = network_id
+        return vis_data
 
 
 @mcp.tool()
+@handle_tool_errors
 def update_node_color(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     attribute: Annotated[str, Field(description="Node attribute name to use for coloring.")],
@@ -110,7 +102,7 @@ def update_node_color(
     mapping: Annotated[Optional[Dict[str, str]], Field(description="Category->Color map for ordinal.")] = None,
     default_color: Annotated[str, Field(description="Fallback color.")] = "#d3d3d3",
     fixed: Annotated[Optional[bool], Field(description="If True, uses fixed mapping.")] = False,
-    gradient: Annotated[Optional[Dict[str, str]], Field(description="{'min': '#...', 'max': '#...'} for linear.")] = None
+    gradient: Annotated[Optional[List[str]], Field(description="['#start_color', '#end_color'] for linear.")] = None
 ) -> dict:
     """
     Updates ONLY the node colors in the visualization.
@@ -119,34 +111,31 @@ def update_node_color(
         dict: The updated visualization object.
     """
     with get_db_context() as db:
-        try:
-            from app.logic import visualization_builder
-            
-            # Default to Gray for null/mismatched values if not specified
-            if not default_color:
-                default_color = "#d3d3d3"
+        from app.logic import visualization_builder
+        
+        # Default to Gray for null/mismatched values if not specified
+        if not default_color:
+            default_color = "#d3d3d3"
 
-            config = NodeColorConfig(
-                attribute=attribute,
-                scale_type=scale_type.upper(),
-                color_map=mapping,
-                default_color=default_color,
-                fixed_mapping=fixed,
-                gradient=gradient
-            )
-            vis_data = visualization_builder.build_visualization(
-                db, 
-                network_id, 
-                node_color_config=config
-            )
-            vis_data["network_id"] = network_id
-            return vis_data
-        except Exception as e:
-            logger.error(f"update_node_color failed: {e}")
-            raise RuntimeError(f"Node color update failed: {str(e)}") from e
+        config = NodeColorConfig(
+            attribute=attribute,
+            scale_type=scale_type.upper(),
+            color_map=mapping,
+            default_color=default_color,
+            fixed_mapping=fixed,
+            gradient=gradient
+        )
+        vis_data = visualization_builder.build_visualization(
+            db, 
+            network_id, 
+            node_color_config=config
+        )
+        vis_data["network_id"] = network_id
+        return vis_data
 
 
 @mcp.tool()
+@handle_tool_errors
 def update_node_size(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     attribute: Annotated[str, Field(description="Node attribute name to use for sizing. Calculate centrality first if needed.")],
@@ -164,29 +153,26 @@ def update_node_size(
         dict: The updated visualization object.
     """
     with get_db_context() as db:
-        try:
-            from app.logic import visualization_builder
-            
-            config = NodeSizeConfig(
-                attribute=attribute,
-                min_size=min_size,
-                max_size=max_size,
-                default_size=default_size,
-                scaling_factor=scaling_factor,
-            )
-            vis_data = visualization_builder.build_visualization(
-                db, 
-                network_id, 
-                node_size_config=config
-            )
-            vis_data["network_id"] = network_id
-            return vis_data
-        except Exception as e:
-            logger.error(f"update_node_size failed: {e}")
-            raise RuntimeError(f"Node size update failed: {str(e)}") from e
+        from app.logic import visualization_builder
+        
+        config = NodeSizeConfig(
+            attribute=attribute,
+            min_size=min_size,
+            max_size=max_size,
+            default_size=default_size,
+            scaling_factor=scaling_factor,
+        )
+        vis_data = visualization_builder.build_visualization(
+            db, 
+            network_id, 
+            node_size_config=config
+        )
+        vis_data["network_id"] = network_id
+        return vis_data
 
 
 @mcp.tool()
+@handle_tool_errors
 def switch_to_network(
     network_id: Annotated[int, Field(description="The ID of the network to switch to.")]
 ) -> dict:
@@ -198,18 +184,15 @@ def switch_to_network(
         dict: The visualization object of the target network.
     """
     with get_db_context() as db:
-        try:
-            from app.logic import visualization_builder
-            vis_data = visualization_builder.get_stored_visualization(db, network_id)
-            if vis_data:
-                vis_data["network_id"] = network_id
-            return vis_data
-        except Exception as e:
-            logger.error(f"switch_to_network failed: {e}")
-            raise RuntimeError(f"Switch network failed: {str(e)}") from e
+        from app.logic import visualization_builder
+        vis_data = visualization_builder.get_stored_visualization(db, network_id)
+        if vis_data:
+            vis_data["network_id"] = network_id
+        return vis_data
 
 
 @mcp.tool()
+@handle_tool_errors
 def update_node_label_mode(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     attribute: Annotated[Optional[str], Field(description="Node attribute to use for labels. Pass None to revert to default labels.")] = None,
@@ -228,25 +211,21 @@ def update_node_label_mode(
         dict: The updated visualization object.
     """
     with get_db_context() as db:
-        try:
-            from app.logic import visualization_builder
+        from app.logic import visualization_builder
+        
+        # If attribute is provided, create the config. 
+        # If None, we pass an empty dict to explicitly clear the configuration in build_visualization
+        # logic, preventing it from reloading the previous state from DB.
+        config = None
+        if attribute:
+            config = NodeLabelConfig(attribute=attribute, show_all=show_all)
+        else:
+            config = {} 
             
-            # If attribute is provided, create the config. 
-            # If None, we pass an empty dict to explicitly clear the configuration in build_visualization
-            # logic, preventing it from reloading the previous state from DB.
-            config = None
-            if attribute:
-                config = NodeLabelConfig(attribute=attribute, show_all=show_all)
-            else:
-                config = {} 
-                
-            vis_data = visualization_builder.build_visualization(
-                db, 
-                network_id, 
-                node_label_config=config
-            )
-            vis_data["network_id"] = network_id
-            return vis_data
-        except Exception as e:
-            logger.error(f"update_node_label_mode failed: {e}")
-            raise RuntimeError(f"Node label update failed: {str(e)}") from e
+        vis_data = visualization_builder.build_visualization(
+            db, 
+            network_id, 
+            node_label_config=config
+        )
+        vis_data["network_id"] = network_id
+        return vis_data
