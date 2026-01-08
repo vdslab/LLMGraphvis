@@ -98,6 +98,7 @@ class GraphVisAgent:
                 tools=tools,
                 tool_config=tool_config,
                 system_instruction=SYSTEM_INSTRUCTION,
+                thinking_config=types.ThinkingConfig(thinking_budget=2048),
             ),
         )
 

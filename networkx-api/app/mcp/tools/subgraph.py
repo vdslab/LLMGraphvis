@@ -20,7 +20,10 @@ def create_subgraph_from_nodes(
     WARNING:
     - Use this tool ONLY when the user explicitly provides a list of specific Node IDs (e.g. "Create a subgraph for nodes A, B, and C").
     - Do NOT use this tool to "guess" or "find" nodes based on attributes (e.g. "nodes from Men"). Use `create_subgraph_by_filter` for that.
-    - Do NOT use this tool if you are trying to get the main component. Use `create_largest_component_subgraph`.
+    
+    NOTE:
+    - If `preserve_layout=False` (default), a new layout is automatically calculated (saved as attributes), but NOT returned.
+    - To visualize the result, you MUST call `switch_to_network(new_network_id)`.
         
     Returns:
         dict: {"new_network_id": int, "content": str}
@@ -57,9 +60,9 @@ def create_largest_component_subgraph(
     Extracts the largest connected component from the network as a new subgraph.
     
     IMPORTANT:
-    After creating the subgraph, you SHOULD almost always call a layout calculation tool 
-    (e.g., `calculate_layout` or `update_layout`) to ensure the new subgraph is properly 
-    visualized. The default layout inheritance might not be optimal for the component.
+    - If `preserve_layout=False`, a new layout is calculated automatically.
+    - To visualize the new component, you MUST call `switch_to_network(new_network_id)`.
+    - Do NOT call `calculate_layout` again unless you want to change the algorithm.
 
     Returns:
         dict: {"new_network_id": int, "content": str}
@@ -265,6 +268,10 @@ def create_subgraph_by_filter(
         preserve_layout: If True, keeps x,y positions from source.
         description: Description of the subgraph.
         
+    NOTE:
+    - If `preserve_layout=False` (default), a new layout is calculated automatically.
+    - To visualize the result, you MUST call `switch_to_network(new_network_id)`.
+
     Returns:
         dict: {"new_network_id": int, "content": str}
     """
