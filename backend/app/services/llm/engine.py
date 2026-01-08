@@ -314,7 +314,14 @@ class GraphVisAgent:
         }
 
         if text_content:
-            function_calls_parts.append(types.Part.from_text(text=text_content))
+            # OPTIMIZATION: Do NOT append text_content (Thought) to the history for the model.
+            # This aligns with history.py logic and prevents the model from looping on its own explanations.
+            # function_calls_parts.append(types.Part.from_text(text=text_content))
+            
+            # Check for repetition in the current turn's output
+            # (Simple heuristic: if the exact same thought text appears twice)
+            # This is just for logging/debugging purposes.
+            pass
 
         if function_calls:
             loop_context["tools_executed"] = True
