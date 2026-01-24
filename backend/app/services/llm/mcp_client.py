@@ -40,8 +40,8 @@ async def get_tools_as_gemini_functions() -> list[types.Tool]:
                 fd = _convert_to_gemini(tool)
                 gemini_tools_list.append(types.Tool(function_declarations=[fd]))
 
-            # Add read_resource client-side tool
-            gemini_tools_list.append(
+            # Add client-side tools
+            gemini_tools_list.extend([
                 types.Tool(
                     function_declarations=[
                         types.FunctionDeclaration(
@@ -59,8 +59,54 @@ async def get_tools_as_gemini_functions() -> list[types.Tool]:
                             },
                         )
                     ]
+                ),
+                types.Tool(
+                    function_declarations=[
+                        types.FunctionDeclaration(
+                            name="list_resources",
+                            description="Lists all available resources on the MCP server.",
+                            parameters={
+                                "type": "OBJECT",
+                                "properties": {},
+                            },
+                        )
+                    ]
+                ),
+                types.Tool(
+                    function_declarations=[
+                        types.FunctionDeclaration(
+                            name="list_prompts",
+                            description="Lists all available prompts on the MCP server.",
+                            parameters={
+                                "type": "OBJECT",
+                                "properties": {},
+                            },
+                        )
+                    ]
+                ),
+                types.Tool(
+                    function_declarations=[
+                        types.FunctionDeclaration(
+                            name="get_prompt",
+                            description="Gets a prompt from the MCP server by name, with optional arguments.",
+                            parameters={
+                                "type": "OBJECT",
+                                "properties": {
+                                    "name": {
+                                        "type": "STRING",
+                                        "description": "The name of the prompt to retrieve.",
+                                    },
+                                    "arguments": {
+                                        "type": "OBJECT",
+                                        "description": "Arguments for the prompt template.",
+                                    }
+                                },
+                                "required": ["name"],
+                            },
+                        )
+                    ]
                 )
-            )
+            ])
             
             _tools_cache = gemini_tools_list
             return gemini_tools_list
@@ -215,6 +261,7 @@ async def execute_tool(tool_name: str, arguments: dict, session: ClientSession =
 async def _execute_internal(session: ClientSession, tool_name: str, arguments: dict):
     try:
         # Handle client-side tools
+        # Handle client-side tools
         if tool_name == "read_resource":
             uri = arguments.get("uri")
             result = await session.read_resource(uri)
@@ -224,6 +271,26 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
             if isinstance(parsed_result, list):
                 return {"result": parsed_result}
             return parsed_result
+
+        if tool_name == "list_resources":
+            result = await session.list_resources()
+            # Convert Resource objects to dicts
+            resources = [{"uri": r.uri, "name": r.name, "description": r.description, "mimeType": r.mimeType} for r in result.resources]
+            return {"resources": resources}
+
+        if tool_name == "list_prompts":
+            result = await session.list_prompts()
+            # Convert Prompt objects to dicts
+            prompts = [{"name": p.name, "description": p.description, "arguments": [a.model_dump() for a in p.arguments] if p.arguments else []} for p in result.prompts]
+            return {"prompts": prompts}
+
+        if tool_name == "get_prompt":
+            name = arguments.get("name")
+            args = arguments.get("arguments", {})
+            result = await session.get_prompt(name, args)
+            # PromptResult has messages
+            messages = [{"role": m.role, "content": m.content.text} for m in result.messages]
+            return {"messages": messages}
 
         result = await session.call_tool(tool_name, arguments)
 
