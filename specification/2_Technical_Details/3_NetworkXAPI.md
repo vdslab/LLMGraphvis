@@ -207,6 +207,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 - **Arguments**:
   - `network_id`: int
   - `k`: int
+  - `new_name_suffix`: str (Default: "_k_core")
   - `preserve_layout`: bool (Default: True)
 
 ### `create_largest_component_subgraph`

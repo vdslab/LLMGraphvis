@@ -13,6 +13,51 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
   const [input, setInput] = useState('');
   const fileInputRef = React.useRef(null);
   const textareaRef = React.useRef(null);
+  
+  // Scroll refs
+  const scrollRef = React.useRef(null);
+  const isAtBottomRef = React.useRef(true); // Default to true so first load scrolls down
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
+
+  // Helper to scroll to bottom
+  const scrollToBottom = (behavior = 'auto') => {
+    if (scrollRef.current) {
+        scrollRef.current.scrollTo({
+            top: scrollRef.current.scrollHeight,
+            behavior: behavior
+        });
+    }
+  };
+
+  // Handle scroll events to update tracking refs and button visibility
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    
+    // Threshold for "at bottom" (e.g. 50px)
+    const isAtBottom = distanceFromBottom < 50;
+    isAtBottomRef.current = isAtBottom;
+    
+    // Show button if we are far from bottom (e.g. > 100px)
+    setShowScrollBottom(distanceFromBottom > 100);
+  };
+
+  // Auto-scroll effect
+  React.useEffect(() => {
+    // If we are "at bottom", keep scrolling down as content comes in.
+    // Also scroll down if it's the very first load (implied by isAtBottomRef default true)
+    // Or if a new user message was just added (we might need a flag for that, but usually user message implies desire to see it)
+    
+    // Check if the last message is from user -> Force scroll
+    const lastMsg = messages[messages.length - 1];
+    const isLastMsgUser = lastMsg?.role === 'user';
+
+    if (isAtBottomRef.current || isLastMsgUser) {
+        scrollToBottom('smooth');
+    }
+  }, [messages, thinkingMessage, isLoading]);
 
   // Auto-resize textarea
   React.useEffect(() => {
@@ -33,6 +78,9 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
 
     await sendMessage(content);
     setInput('');
+    // Force scroll to bottom immediately when sending
+    // Use setTimeout to ensure state update has likely triggered render or just to be safe async
+    setTimeout(() => scrollToBottom('smooth'), 0);
     if (onMessageSent) onMessageSent();
   };
 
@@ -96,7 +144,12 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
         </div>
       )}
       
-    <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      
+    <div 
+        ref={scrollRef}
+        onScroll={handleScroll}
+        style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', position: 'relative' }}
+    >
         {messages.map((msg, idx) => {
           // Parse <thought> tags
           const parts = msg.content.split(/(<thought>[\s\S]*?(?:<\/thought>|$))/g);
@@ -332,6 +385,40 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
           <div style={{ alignSelf: 'flex-start', color: 'var(--text-secondary)', fontSize: '0.8rem', fontStyle: 'italic', marginLeft: '1rem' }}>
              {thinkingMessage || "Thinking..."}
           </div>
+        )}
+
+        
+        {/* Scroll to Bottom Button */}
+        {showScrollBottom && (
+            <button
+                onClick={() => scrollToBottom('smooth')}
+                style={{
+                    position: 'sticky',
+                    bottom: '20px',
+                    alignSelf: 'flex-end',
+                    marginRight: '1rem',
+                    backgroundColor: 'var(--primary-color)',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '4rem',
+                    height: '4rem',
+                    fontSize: '1.5rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                    zIndex: 10,
+                    marginTop: '-4rem', // Negative margin to overlay on content if needed, or just let it float
+                    marginBottom: '0', // Reset
+                    opacity: 0.9,
+                    transition: 'opacity 0.2s'
+                }}
+                title="Scroll to bottom"
+            >
+                ↓
+            </button>
         )}
       </div>
       
