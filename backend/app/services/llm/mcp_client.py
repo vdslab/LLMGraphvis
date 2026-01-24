@@ -265,12 +265,24 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
         if tool_name == "read_resource":
             uri = arguments.get("uri")
             result = await session.read_resource(uri)
-            # Resource content is a list of ReadResourceResult
-            # We assume text content for now
-            parsed_result = json.loads(result.contents[0].text)
-            if isinstance(parsed_result, list):
-                return {"result": parsed_result}
-            return parsed_result
+            # Inspect the first content item (assuming single file for now)
+            content_item = result.contents[0]
+            
+            # naive mimeType check
+            mime = getattr(content_item, "mimeType", None) or "text/plain"
+            
+            if "application/json" in mime:
+                 try:
+                    parsed_result = json.loads(content_item.text)
+                    if isinstance(parsed_result, list):
+                        return {"result": parsed_result}
+                    return parsed_result
+                 except json.JSONDecodeError:
+                    # Fallback to text if JSON parse fails despite mimeType
+                    return {"content": content_item.text, "error": "Invalid JSON"}
+            
+            # Default: Return as text wrapped in dict
+            return {"content": content_item.text}
 
         if tool_name == "list_resources":
             result = await session.list_resources()
@@ -338,10 +350,20 @@ async def get_resource(uri: str, session: ClientSession = None) -> dict:
 
 async def _read_resource_internal(session: ClientSession, uri: str) -> dict:
     result = await session.read_resource(uri)
-    # Resource content is a list of ReadResourceResult
-    # We assume text content for now
-    parsed_result = json.loads(result.contents[0].text)
-    return parsed_result
+    content_item = result.contents[0]
+    
+    mime = getattr(content_item, "mimeType", None) or "text/plain"
+    
+    if "application/json" in mime:
+         try:
+            return json.loads(content_item.text)
+         except Exception:
+            # Fallback
+            return {}
+            
+    # If not JSON, we might return empty or handle differently.
+    # For internal context usage, we expect dictionaries.
+    return {}
 
 
 def _log_exception_details(e: BaseException, context: str):
