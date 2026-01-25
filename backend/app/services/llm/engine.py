@@ -102,10 +102,13 @@ class GraphVisAgent:
             ),
         )
 
-    async def _consume_stream(self, response: Any, queue: Any) -> Tuple[str, List[types.FunctionCall]]:
+    async def _consume_stream(self, response: Any, queue: Any) -> Tuple[str, str, List[types.FunctionCall]]:
         """Consumes the stream and emits events."""
         text_content = ""
+        thought_content = ""
         function_calls = []
+        
+        in_simulated_thought = False
         
         try:
             async for chunk in response:
@@ -113,16 +116,66 @@ class GraphVisAgent:
                     cand = chunk.candidates[0]
                     if cand.content and cand.content.parts:
                         for part in cand.content.parts:
-                            if part.text:
-                                text_content += part.text
-                                await self._emit_message_chunk(queue, part.text)
+                            # Handle Thinking (if supported by model/SDK)
+                            is_thought = False
+                            current_thought_text = ""
+
+                            # Check if 'thought' is a string content (earlier SDKs/Models)
+                            if hasattr(part, "thought") and isinstance(part.thought, str) and part.thought:
+                                is_thought = True
+                                current_thought_text = part.thought
+                            
+                            # Check if 'thought' is a boolean flag (Gemini 2.5 style according to some docs)
+                            elif hasattr(part, "thought") and isinstance(part.thought, bool) and part.thought:
+                                is_thought = True
+                                if part.text:
+                                    current_thought_text = part.text
+
+                            if is_thought:
+                                thought_content += current_thought_text
+                                await self._emit_thinking_chunk(queue, current_thought_text)
+                            elif part.text:
+                                # Parsing <thought> tags in text (Simulated Thinking)
+                                txt = part.text
+                                
+                                # Check for start tag if not in thought
+                                if not in_simulated_thought:
+                                    if "<thought>" in txt:
+                                        valid_text, rest = txt.split("<thought>", 1)
+                                        if valid_text:
+                                            text_content += valid_text
+                                            await self._emit_message_chunk(queue, valid_text)
+                                        in_simulated_thought = True
+                                        txt = rest # Continue processing as thought
+                                    else:
+                                        # Standard text
+                                        text_content += txt
+                                        await self._emit_message_chunk(queue, txt)
+                                        continue
+                                
+                                # Inside simulated thought
+                                if in_simulated_thought:
+                                    if "</thought>" in txt:
+                                        t_content, rest_text = txt.split("</thought>", 1)
+                                        thought_content += t_content
+                                        await self._emit_thinking_chunk(queue, t_content)
+                                        in_simulated_thought = False
+                                        
+                                        if rest_text:
+                                            text_content += rest_text
+                                            await self._emit_message_chunk(queue, rest_text)
+                                    else:
+                                        # All content is thought
+                                        thought_content += txt
+                                        await self._emit_thinking_chunk(queue, txt)
+
                             if part.function_call:
                                 function_calls.append(part.function_call)
         except Exception as e:
             logger.error(f"Error consuming stream: {e}")
             raise e
             
-        return text_content, function_calls
+        return text_content, thought_content, function_calls
 
     async def _check_and_handle_lazy_intent(
         self,
@@ -217,6 +270,7 @@ class GraphVisAgent:
         max_iterations = 10
         iteration = 0
         final_text_content = ""
+        all_thought_content = ""
         
         # Log of all actions taken in this turn
         execution_log = []
@@ -229,10 +283,13 @@ class GraphVisAgent:
             
             # Step A: Consume Stream
             # Returns aggregated text and a list of tool calls
-            chunk_text, function_calls = await self._consume_stream(current_response, queue)
+            chunk_text, chunk_thought, function_calls = await self._consume_stream(current_response, queue)
             
             if chunk_text:
                 final_text_content += chunk_text
+            
+            if chunk_thought:
+                all_thought_content += chunk_thought
 
             # Step B: Check for Completion or Tool Calls
             if not function_calls:
@@ -259,9 +316,18 @@ class GraphVisAgent:
                     continue
                 
                 # If we are truly done (no tools, no lazy intent), exit.
+                # Prepare final text with thoughts
+                result_text = final_text_content
+                if all_thought_content:
+                    result_text = f"<thought>{all_thought_content}</thought>\n\n{final_text_content}"
+                
                 if not final_text_content:
+                    # Even if no text, return thoughts if any? Or standard msg.
+                    if all_thought_content:
+                        return result_text, execution_log
                     return "I have processed your request.", execution_log
-                return final_text_content, execution_log
+                    
+                return result_text, execution_log
 
             # Step C: Execute Tools (Parallelized)
             step_log = await self._execute_tools_and_update_history(
@@ -274,9 +340,22 @@ class GraphVisAgent:
             current_response = await self._gemini_generate(history, all_tools, tool_config)
 
         if not final_text_content:
+            # Check for thoughts at the very end if loop limit reached
+            result_text = final_text_content
+            if all_thought_content:
+                result_text = f"<thought>{all_thought_content}</thought>\n\n{final_text_content}"
+                if result_text.strip():
+                    return result_text, execution_log
+
             return "I have completed the requested actions, but the process reached its step limit before generating a final report.", execution_log
 
-        return final_text_content, execution_log
+        # Loop finished successfully (logic wise) but broke loop?
+        # Actually this part is only reached if max_iterations is hit.
+        result_text = final_text_content
+        if all_thought_content:
+             result_text = f"<thought>{all_thought_content}</thought>\n\n{final_text_content}"
+             
+        return result_text, execution_log
     
     # ... (retry decorators omitted, kept as is in original file) ...
     # Note: I am not replacing _gemini_generate or _consume_stream, assuming they are outside the range or handled separately.
@@ -511,6 +590,11 @@ class GraphVisAgent:
     async def _emit_message_chunk(self, queue: Any, text: str):
         await queue.put(
             {"event": "message_chunk", "data": json.dumps({"content": text})}
+        )
+
+    async def _emit_thinking_chunk(self, queue: Any, text: str):
+        await queue.put(
+            {"event": "thinking_stream", "data": json.dumps({"content": text})}
         )
 
     async def _emit_tool_event(self, queue: Any, tool: str, status: str, args_or_error: Any):

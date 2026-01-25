@@ -98,8 +98,8 @@ def update_layout(
 def update_node_color(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     attribute: Annotated[str, Field(description="Node attribute name to use for coloring.")],
-    scale_type: Annotated[str, Field(description="'ordinal' or 'linear'.")],
-    mapping: Annotated[Optional[Dict[str, str]], Field(description="Category->Color map for ordinal.")] = None,
+    scale_type: Annotated[str, Field(description="'CATEGORICAL' or 'LINEAR' or 'RANKING'.")],
+    mapping: Annotated[Optional[Dict[str, str]], Field(description="Category->Color map for CATEGORICAL.")] = None,
     default_color: Annotated[str, Field(description="Fallback color.")] = "#d3d3d3",
     fixed: Annotated[Optional[bool], Field(description="If True, uses fixed mapping.")] = False,
     gradient: Annotated[Optional[List[str]], Field(description="['#start_color', '#end_color'] for linear.")] = None
