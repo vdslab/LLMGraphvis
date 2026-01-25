@@ -226,6 +226,10 @@ export const useChatStore = create((set, get) => ({
 
   setThinkingMessage: (msg) => set({ thinkingMessage: msg }),
   
+  appendThinkingMessage: (chunk) => set((state) => ({ 
+    thinkingMessage: (state.thinkingMessage || "") + chunk 
+  })),
+  
   setIsLoading: (loading) => set({ isLoading: loading }),
   
   setChatId: (id) => set({ chatId: id })

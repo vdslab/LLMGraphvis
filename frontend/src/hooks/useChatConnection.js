@@ -20,7 +20,9 @@ export const useChatConnection = (id, isAuthenticated) => {
         },
         thinking_stream: (data) => {
             const content = data.content || data;
-            useChatStore.getState().setThinkingMessage(content);
+            if (content) {
+                useChatStore.getState().appendThinkingMessage(content);
+            }
             useChatStore.getState().setIsLoading(true);
         },
         tool_execution: (data) => {
