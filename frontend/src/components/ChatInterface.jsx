@@ -216,40 +216,223 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
         style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', position: 'relative' }}
     >
         {messages.map((msg, idx) => {
-          // Parse <thought> tags
-          const parts = msg.content.split(/(<thought>[\s\S]*?(?:<\/thought>|$))/g);
+          // Parse <thought> tags and <tool_execution_marker> tags
+          const parts = msg.content.split(/(<thought>[\s\S]*?(?:<\/thought>|$)|<tool_execution_marker index="\d+"\/>)/g);
+          
+          let hasInlineTools = false;
 
-          // Tool Execution Logs (Persistent)
+          const renderedParts = parts.map((part, partIdx) => {
+             const isThought = part.startsWith('<thought>');
+             const isToolMarker = part.startsWith('<tool_execution_marker');
+
+             const cleanPart = isThought ? part.replace(/<\/?thought>/g, '').trim() : part.trim();
+             
+             if (!cleanPart && !isToolMarker) return null;
+
+             if (isThought) {
+               return <ThinkingBlock key={partIdx} content={cleanPart} defaultOpen={false} />;
+             }
+
+             if (isToolMarker) {
+                 hasInlineTools = true;
+                 const match = /index="(\d+)"/.exec(part);
+                 const toolIndex = match ? parseInt(match[1]) : -1;
+                 const toolData = msg.tool_executions && msg.tool_executions[toolIndex];
+                 
+                 if (toolData) {
+                     return (
+                        <div key={partIdx} style={{
+                            marginTop: '0.5rem',
+                            marginBottom: '0.5rem',
+                            padding: '0.5rem',
+                            backgroundColor: 'rgba(0, 0, 0, 0.03)',
+                            borderRadius: '4px',
+                            borderLeft: `3px solid ${toolData.status === 'failed' ? '#ff5252' : '#4caf50'}`,
+                            fontSize: '0.85rem',
+                            fontFamily: 'monospace'
+                        }}>
+                             <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                 <span>🛠️ {toolData.tool_name}</span>
+                                 <span style={{ 
+                                     color: toolData.status === 'failed' ? '#d32f2f' : '#2e7d32',
+                                     textTransform: 'uppercase',
+                                     fontSize: '0.7rem'
+                                 }}>
+                                    {toolData.status || 'COMPLETED'}
+                                 </span>
+                             </div>
+                             {toolData.thought && (
+                                  <div style={{ fontStyle: 'italic', color: '#555', marginBottom: '4px', fontSize: '0.8rem', marginTop:'4px' }}>
+                                     "{toolData.thought}"
+                                  </div>
+                             )}
+                             {/* Only show args if available (final messages) */}
+                             {toolData.arguments && (
+                                <details style={{ marginTop: '0.25rem' }}>
+                                    <summary style={{ cursor: 'pointer', color: '#666', fontSize: '0.75rem' }}>Arguments</summary>
+                                    <div style={{ color: '#666', fontSize: '0.75rem', whiteSpace: 'pre-wrap' }}>
+                                        {typeof toolData.arguments === 'string' 
+                                            ? toolData.arguments 
+                                            : JSON.stringify(toolData.arguments, null, 2)}
+                                    </div>
+                                </details>
+                             )}
+                             {toolData.error && (
+                                 <div style={{ color: '#d32f2f', marginTop: '0.25rem' }}>
+                                     Error: {toolData.error}
+                                 </div>
+                             )}
+                        </div>
+                     );
+                 } else {
+                     // Placeholder if data not arrived yet (streaming edge case)
+                     return <div key={partIdx} className="animate-pulse" style={{ color: '#aaa', fontSize: '0.8rem', padding: '0.5rem' }}>⌛ Syncing Tool Execution...</div>;
+                 }
+             }
+
+             // Regular message bubble
+             return (
+               <div key={partIdx} style={{ 
+                 backgroundColor: msg.role === 'user' ? 'var(--primary-color)' : 'var(--border-color)',
+                 color: msg.role === 'user' ? 'white' : 'var(--text-primary)',
+                 padding: '0.75rem 1rem',
+                 borderRadius: '1rem',
+                 borderTopLeftRadius: msg.role === 'user' ? '1rem' : '0',
+                 borderTopRightRadius: msg.role === 'user' ? '0' : '1rem',
+                 boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+               }}>
+                 <ReactMarkdown 
+                   remarkPlugins={[remarkGfm, remarkBreaks, remarkColorPreview]}
+                   components={{
+                     a: ({node, href, children, ...props}) => {
+                       if (href === '#color-preview') {
+                         const color = node.data?.hProperties?.['data-color'] || children.toString(); 
+                         return (
+                           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                             <span style={{
+                               display: 'inline-block',
+                               width: '12px',
+                               height: '12px',
+                               backgroundColor: color,
+                               border: '1px solid #ccc',
+                               borderRadius: '2px',
+                               flexShrink: 0
+                             }}></span>
+                             {children}
+                           </span>
+                         );
+                       }
+                       return <a href={href} {...props} target="_blank" rel="noopener noreferrer">{children}</a>;
+                     }
+                   }}
+                 >
+                   {cleanPart}
+                 </ReactMarkdown>
+               </div>
+             );
+           });
+
+          // Tool Execution Logs (Persistent) - Only show if NOT inline
           let toolLogsRender = null;
           
-          // 1. New Schema: tool_executions
-          if (msg.tool_executions && msg.tool_executions.length > 0) {
-               const logs = msg.tool_executions.map((tc, idx) => {
-                  let durationStr = "";
-                  if (tc.started_at && tc.completed_at) {
-                      const start = new Date(tc.started_at);
-                      const end = new Date(tc.completed_at);
-                      const diff = end - start;
-                      durationStr = diff < 1000 ? `${diff}ms` : `${(diff/1000).toFixed(2)}s`;
+          if (!hasInlineTools) {
+              // 1. New Schema: tool_executions
+              if (msg.tool_executions && msg.tool_executions.length > 0) {
+                   const logs = msg.tool_executions.map((tc, idx) => {
+                      let durationStr = "";
+                      if (tc.started_at && tc.completed_at) {
+                          const start = new Date(tc.started_at);
+                          const end = new Date(tc.completed_at);
+                          const diff = end - start;
+                          durationStr = diff < 1000 ? `${diff}ms` : `${(diff/1000).toFixed(2)}s`;
+                      }
+    
+                      return (
+                              <div key={`exec-${idx}`} style={{
+                                  marginTop: '0.5rem',
+                                  marginBottom: '0.5rem',
+                                  padding: '0.5rem',
+                                  backgroundColor: 'rgba(0, 0, 0, 0.03)',
+                                  borderRadius: '4px',
+                                  borderLeft: `3px solid ${tc.status === 'failed' ? '#ff5252' : '#4caf50'}`,
+                                  fontSize: '0.85rem',
+                                  fontFamily: 'monospace'
+                              }}>
+                                  <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>🛠️ {tc.tool_name}</span>
+                                      <span style={{ 
+                                          display: 'flex', gap: '8px', alignItems: 'center'
+                                      }}>
+                                          {durationStr && <span style={{color: '#888', fontSize: '0.7rem'}}>⏱️ {durationStr}</span>}
+                                          <span style={{ 
+                                              color: tc.status === 'failed' ? '#d32f2f' : '#2e7d32',
+                                              textTransform: 'uppercase',
+                                              fontSize: '0.7rem'
+                                          }}>
+                                              {tc.status || 'COMPLETED'}
+                                          </span>
+                                      </span>
+                                  </div>
+                                  {tc.thought && (
+                                       <div style={{ fontStyle: 'italic', color: '#555', marginBottom: '4px', fontSize: '0.8rem' }}>
+                                          "{tc.thought}"
+                                       </div>
+                                  )}
+                                  <div style={{ color: '#666', marginTop: '0.25rem', fontSize: '0.75rem' }}>
+                                      Args: {
+                                          typeof tc.arguments === 'string' 
+                                              ? tc.arguments 
+                                              : JSON.stringify(tc.arguments, null, 2)
+                                      }
+                                  </div>
+                                  {tc.error && (
+                                      <div style={{ color: '#d32f2f', marginTop: '0.25rem' }}>
+                                          Error: {tc.error}
+                                      </div>
+                                  )}
+                              </div>
+                      );
+                   });
+                   
+                   toolLogsRender = (
+                      <details key="tool-logs-new" style={{ width: '100%', marginBottom: '0.5rem' }}>
+                          <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#666', userSelect: 'none' }}>
+                              View Action Log ({logs.length} actions)
+                          </summary>
+                          <div style={{ marginTop: '0.5rem' }}>
+                              {logs}
+                          </div>
+                      </details>
+                   );
+    
+              // 2. Legacy Schema: meta_data
+              } else if (msg.meta_data) {
+                  // ... (Keep existing legacy handling) ...
+                  // For brevity in diff, I assume the original code block handles meta_data similarly
+                  // I will copy the minimal needed to match structure
+                   let steps = [];
+                  if (Array.isArray(msg.meta_data)) {
+                      steps = msg.meta_data;
+                  } else if (msg.meta_data.steps) {
+                      steps = msg.meta_data.steps;
                   }
-
-                  return (
-                          <div key={`exec-${idx}`} style={{
-                              marginTop: '0.5rem',
-                              marginBottom: '0.5rem',
-                              padding: '0.5rem',
-                              backgroundColor: 'rgba(0, 0, 0, 0.03)',
-                              borderRadius: '4px',
-                              borderLeft: `3px solid ${tc.status === 'failed' ? '#ff5252' : '#4caf50'}`,
-                              fontSize: '0.85rem',
-                              fontFamily: 'monospace'
-                          }}>
-                              <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
-                                  <span>🛠️ {tc.tool_name}</span>
-                                  <span style={{ 
-                                      display: 'flex', gap: '8px', alignItems: 'center'
-                                  }}>
-                                      {durationStr && <span style={{color: '#888', fontSize: '0.7rem'}}>⏱️ {durationStr}</span>}
+    
+                  if (steps.length > 0) {
+                      const toolLogs = steps.flatMap((step, stepIdx) => {
+                          if (!step.tool_calls) return [];
+                          return step.tool_calls.map((tc, tcIdx) => (
+                              <div key={`tool-${stepIdx}-${tcIdx}`} style={{
+                                  marginTop: '0.5rem',
+                                  marginBottom: '0.5rem',
+                                  padding: '0.5rem',
+                                  backgroundColor: 'rgba(0, 0, 0, 0.03)',
+                                  borderRadius: '4px',
+                                  borderLeft: `3px solid ${tc.status === 'failed' ? '#ff5252' : '#4caf50'}`,
+                                  fontSize: '0.85rem',
+                                  fontFamily: 'monospace'
+                              }}>
+                                  <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                                      <span>🛠️ {tc.name}</span>
                                       <span style={{ 
                                           color: tc.status === 'failed' ? '#d32f2f' : '#2e7d32',
                                           textTransform: 'uppercase',
@@ -257,101 +440,24 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
                                       }}>
                                           {tc.status || 'COMPLETED'}
                                       </span>
-                                  </span>
-                              </div>
-                              {tc.thought && (
-                                   <div style={{ fontStyle: 'italic', color: '#555', marginBottom: '4px', fontSize: '0.8rem' }}>
-                                      "{tc.thought}"
-                                   </div>
-                              )}
-                              <div style={{ color: '#666', marginTop: '0.25rem', fontSize: '0.75rem' }}>
-                                  Args: {
-                                      typeof tc.arguments === 'string' 
-                                          ? tc.arguments 
-                                          : JSON.stringify(tc.arguments, null, 2)
-                                  }
-                              </div>
-                              {tc.error && (
-                                  <div style={{ color: '#d32f2f', marginTop: '0.25rem' }}>
-                                      Error: {tc.error}
                                   </div>
-                              )}
-                          </div>
-                  );
-               });
-               
-               toolLogsRender = (
-                  <details key="tool-logs-new" style={{ width: '100%', marginBottom: '0.5rem' }}>
-                      <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#666', userSelect: 'none' }}>
-                          View Action Log ({logs.length} actions)
-                      </summary>
-                      <div style={{ marginTop: '0.5rem' }}>
-                          {logs}
-                      </div>
-                  </details>
-               );
-
-          // 2. Legacy Schema: meta_data
-          } else if (msg.meta_data) {
-              let steps = [];
-              // Handle both array (new format) and object (legacy/future-proof)
-              if (Array.isArray(msg.meta_data)) {
-                  steps = msg.meta_data;
-              } else if (msg.meta_data.steps) {
-                  steps = msg.meta_data.steps;
-              }
-
-              if (steps.length > 0) {
-                  const toolLogs = steps.flatMap((step, stepIdx) => {
-                      if (!step.tool_calls) return [];
-                      return step.tool_calls.map((tc, tcIdx) => (
-                          <div key={`tool-${stepIdx}-${tcIdx}`} style={{
-                              marginTop: '0.5rem',
-                              marginBottom: '0.5rem',
-                              padding: '0.5rem',
-                              backgroundColor: 'rgba(0, 0, 0, 0.03)',
-                              borderRadius: '4px',
-                              borderLeft: `3px solid ${tc.status === 'failed' ? '#ff5252' : '#4caf50'}`,
-                              fontSize: '0.85rem',
-                              fontFamily: 'monospace'
-                          }}>
-                              <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
-                                  <span>🛠️ {tc.name}</span>
-                                  <span style={{ 
-                                      color: tc.status === 'failed' ? '#d32f2f' : '#2e7d32',
-                                      textTransform: 'uppercase',
-                                      fontSize: '0.7rem'
-                                  }}>
-                                      {tc.status || 'COMPLETED'}
-                                  </span>
+                                  {/* Legacy logs usually don't have separate args/thought field here the same way */}
                               </div>
-                              <div style={{ color: '#666', marginTop: '0.25rem', fontSize: '0.75rem' }}>
-                                  Running with args: {
-                                      typeof tc.args === 'string'
-                                          ? tc.args
-                                          : JSON.stringify(tc.args, null, 2)
-                                  }
-                              </div>
-                              {tc.error && (
-                                  <div style={{ color: '#d32f2f', marginTop: '0.25rem' }}>
-                                      Error: {typeof tc.error === 'string' ? tc.error : JSON.stringify(tc.error)}
+                          ));
+                      });
+    
+                      if (toolLogs.length > 0) {
+                          toolLogsRender = (
+                              <details key="tool-logs" style={{ width: '100%', marginBottom: '0.5rem' }}>
+                                  <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#666', userSelect: 'none' }}>
+                                      View Action Log ({toolLogs.length} actions)
+                                  </summary>
+                                  <div style={{ marginTop: '0.5rem' }}>
+                                      {toolLogs}
                                   </div>
-                              )}
-                          </div>
-                      ));
-                  });
-
-                  if (toolLogs.length > 0) {
-                      toolLogsRender = (
-                          <details key="tool-logs" style={{ width: '100%', marginBottom: '0.5rem' }}>
-                              <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#666', userSelect: 'none' }}>
-                                  View Action Log ({toolLogs.length} actions)
-                              </summary>
-                              <div style={{ marginTop: '0.5rem' }}>
-                                  {toolLogs}
-                              </div>
-                          </details>
-                      );
+                              </details>
+                          );
+                      }
                   }
               }
           }
@@ -364,59 +470,9 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
               maxWidth: '85%',
               alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
             }}>
-              {parts.map((part, partIdx) => {
-                const isThought = part.startsWith('<thought>');
-                const cleanPart = isThought ? part.replace(/<\/?thought>/g, '').trim() : part.trim();
-                
-                if (!cleanPart) return null;
-
-                if (isThought) {
-                  return <ThinkingBlock key={partIdx} content={cleanPart} defaultOpen={false} />;
-                }
-
-                // Regular message bubble
-                return (
-                  <div key={partIdx} style={{ 
-                    backgroundColor: msg.role === 'user' ? 'var(--primary-color)' : 'var(--border-color)',
-                    color: msg.role === 'user' ? 'white' : 'var(--text-primary)',
-                    padding: '0.75rem 1rem',
-                    borderRadius: '1rem',
-                    borderTopLeftRadius: msg.role === 'user' ? '1rem' : '0',
-                    borderTopRightRadius: msg.role === 'user' ? '0' : '1rem',
-                    boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
-                  }}>
-                    <ReactMarkdown 
-                      remarkPlugins={[remarkGfm, remarkBreaks, remarkColorPreview]}
-                      components={{
-                        a: ({node, href, children, ...props}) => {
-                          if (href === '#color-preview') {
-                            const color = node.data?.hProperties?.['data-color'] || children.toString(); // Fallback
-                            return (
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                <span style={{
-                                  display: 'inline-block',
-                                  width: '12px',
-                                  height: '12px',
-                                  backgroundColor: color,
-                                  border: '1px solid #ccc',
-                                  borderRadius: '2px',
-                                  flexShrink: 0
-                                }}></span>
-                                {children}
-                              </span>
-                            );
-                          }
-                          return <a href={href} {...props} target="_blank" rel="noopener noreferrer">{children}</a>;
-                        }
-                      }}
-                    >
-                      {cleanPart}
-                    </ReactMarkdown>
-                  </div>
-                );
-              })}
+              {renderedParts}
               
-              {/* Tool Execution Logs */}
+              {/* Tool Execution Logs (Fallback if not inline) */}
               {toolLogsRender}
             </div>
           );

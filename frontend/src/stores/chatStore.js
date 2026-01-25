@@ -190,7 +190,8 @@ export const useChatStore = create((set, get) => ({
           content,
           id: newId,
           created_at: new Date().toISOString(),
-          isStreaming: true
+          isStreaming: true,
+          tool_executions: []
         };
         return { 
           messages: [...messages, newMessage],
@@ -199,6 +200,24 @@ export const useChatStore = create((set, get) => ({
         };
       }
     });
+  },
+
+  addToolExecutionToStreamingMessage: (toolData) => {
+      set((state) => {
+          if (!state.streamingMessageId) return {};
+
+          const messages = [...state.messages];
+          const idx = messages.findIndex(m => m.id === state.streamingMessageId);
+          if (idx === -1) return {};
+
+          const msg = { ...messages[idx] };
+          if (!msg.tool_executions) msg.tool_executions = [];
+          
+          msg.tool_executions = [...msg.tool_executions, toolData];
+          messages[idx] = msg;
+          
+          return { messages };
+      });
   },
 
   finalizeStreamingMessage: (realId, content = null, tool_executions = null) => {

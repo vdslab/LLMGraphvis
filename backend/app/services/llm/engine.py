@@ -279,6 +279,8 @@ class GraphVisAgent:
         # Using a context object to track state across the loop (e.g. network_id updates)
         loop_context = {"network_id": network_id, "tools_executed": False}
 
+        tool_call_counter = 0
+
         while iteration < max_iterations:
             iteration += 1
             
@@ -331,8 +333,17 @@ class GraphVisAgent:
                 function_calls, chunk_text, chunk_thought, history, queue, chat_id, loop_context, session
             )
             execution_log.append(step_log)
+
+            # Step D: Inject Tool Markers into Transcript and Emit
+            # This allows the frontend to render the tools chronologically in the stream
+            if step_log.get("tool_calls"):
+                for _ in step_log["tool_calls"]:
+                    marker = f"\n\n<tool_execution_marker index=\"{tool_call_counter}\"/>\n\n"
+                    full_transcript += marker
+                    await self._emit_message_chunk(queue, marker)
+                    tool_call_counter += 1
             
-            # Step D: Next Generation
+            # Step E: Next Generation
             logger.info(f"--- Gemini API Request (Iteration {iteration}) ---")
             current_response = await self._gemini_generate(history, all_tools, tool_config)
 

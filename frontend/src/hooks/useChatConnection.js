@@ -32,14 +32,30 @@ export const useChatConnection = (id, isAuthenticated) => {
                 useChatStore.getState().setRunningTool({ name: data.tool, status: 'running' });
                 useChatStore.getState().setIsLoading(true);
             } else if (data.status === 'completed') {
-                // Keep the success state briefly or clear it? 
-                // Usually we want to clear it so it doesn't stay "Running" forever if we don't get another update.
-                // But for now let's set it to completed so UI can show checkmark
                 useChatStore.getState().setRunningTool(null);
+                
+                // Add to the streaming message logs so the marker can find it
+                // We construct a partial object since we don't have full args/result here yet in this event
+                // But the marker just needs existence usually, or we show what we have.
+                // Actually the "started" event had args. We might have missed capturing them for this log.
+                // For now, let's just log the name and status.
+                useChatStore.getState().addToolExecutionToStreamingMessage({
+                    tool_name: data.tool,
+                    status: 'completed',
+                    // arguments? context? We don't have them in 'completed' event from backend currently.
+                    // But for the UI "View details" it might be enough to show "Completed".
+                });
+
             } else if (data.status === 'failed') {
                 console.error(`Tool ${data.tool} failed:`, data.error);
                 useChatStore.getState().setRunningTool(null);
                 useChatStore.getState().setIsLoading(false);
+                
+                useChatStore.getState().addToolExecutionToStreamingMessage({
+                    tool_name: data.tool,
+                    status: 'failed',
+                    error: data.error
+                });
             }
         },
         message: (data) => {
