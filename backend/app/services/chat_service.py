@@ -51,7 +51,11 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
     
     try:
         # Step 1: Import
-        await queue.put({"event": "thinking_stream", "data": {"content": "Importing GraphML data..."}})
+        thoughts = []
+        msg = "Importing GraphML data..."
+        thoughts.append(msg)
+        await queue.put({"event": "thinking_stream", "data": {"content": msg + "\n"}})
+        
         import_result = await mcp_client.execute_tool(
             "import_graphml",
             {"network_id": network_id, "graphml_data": graphml_data},
@@ -65,7 +69,10 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
              raise ValueError("Import tool did not return a valid network_id")
 
         # Step 2: Layout
-        await queue.put({"event": "thinking_stream", "data": {"content": "Calculating ForceAtlas2 layout..."}})
+        msg = "Calculating ForceAtlas2 layout..."
+        thoughts.append(msg)
+        await queue.put({"event": "thinking_stream", "data": {"content": msg + "\n"}})
+        
         layout_result = await mcp_client.execute_tool(
             "calculate_layout",
             {"network_id": final_network_id, "layout_name": "forceatlas2"}
@@ -76,7 +83,10 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
              raise ValueError(layout_result)
 
         # Step 3: Visualization
-        await queue.put({"event": "thinking_stream", "data": {"content": "Generating initial visualization..."}})
+        msg = "Generating initial visualization..."
+        thoughts.append(msg)
+        await queue.put({"event": "thinking_stream", "data": {"content": msg + "\n"}})
+        
         vis_data = await mcp_client.execute_tool(
             "generate_visualization",
             {"network_id": final_network_id}
@@ -107,27 +117,38 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
                 if vis_data:
                     chat.visualization_state = vis_data
                     logger.info(f"Saved initial visualization state for chat_id={chat_id}")
-
+                
+                # Persist the success message with thoughts
+                full_thought = "\n".join(thoughts)
+                final_content = f"<thought>{full_thought}</thought>\n\nGraph uploaded and initialized successfully."
+                
+                db_msg = models.ChatMessage(
+                    chat_id=chat_id,
+                    role="model",
+                    content=final_content
+                )
+                db_session.add(db_msg)
                 db_session.commit()
+                db_session.refresh(db_msg)
+                
+                # Broadcast message event (replaces system_message)
+                # We send role="assistant" for frontend consistency
+                await queue.put({
+                    "event": "message",
+                    "data": json.dumps({
+                        "id": db_msg.id,
+                        "role": "assistant",
+                        "content": db_msg.content,
+                        "created_at": db_msg.created_at.isoformat() if db_msg.created_at else None
+                    })
+                })
+
         finally:
             db_session.close()
 
         # Broadcast render_update
         logger.info(f"Broadcasting render_update for chat_id={chat_id}")
         await queue.put({"event": "render_update", "data": json.dumps(vis_data)})
-        
-        # Clear the thinking message
-        await queue.put({"event": "thinking_stream", "data": {"content": None}})
-
-        # Also notify system message
-        await queue.put(
-            {
-                "event": "system_message",
-                "data": json.dumps(
-                    {"content": "Graph uploaded and initialized successfully."}
-                ),
-            }
-        )
 
     except Exception as e:
         await _handle_background_error(chat_id, e, "Error in upload background task")
