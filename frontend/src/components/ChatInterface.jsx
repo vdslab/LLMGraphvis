@@ -7,6 +7,71 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import remarkColorPreview from '../utils/remarkColorPreview';
 
+const ThinkingBlock = ({ content, defaultOpen = false, isStreaming = false }) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  React.useEffect(() => {
+    if (isStreaming) {
+      setIsOpen(true);
+    }
+  }, [isStreaming]);
+
+  return (
+    <div style={{
+      marginBottom: '0.5rem',
+      maxWidth: '100%',
+      width: '100%',
+      border: '1px solid #e0e0e0',
+      borderRadius: '8px',
+      overflow: 'hidden'
+    }}>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{
+          width: '100%',
+          padding: '0.5rem 0.8rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem',
+          background: '#f8f9fa',
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: '0.8rem',
+          color: '#666',
+          textAlign: 'left'
+        }}
+      >
+        <span style={{ 
+          transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)', 
+          transition: 'transform 0.2s',
+          fontSize: '0.7rem' 
+        }}>▶</span>
+        <span style={{ fontWeight: 500 }}>
+          Thinking Process {isStreaming ? '(Generating...)' : ''}
+        </span>
+      </button>
+      
+      {isOpen && (
+        <div style={{
+          padding: '0.8rem',
+          backgroundColor: '#fff',
+          fontSize: '0.85rem',
+          color: '#444',
+          whiteSpace: 'pre-wrap',
+          borderTop: '1px solid #e0e0e0',
+          fontFamily: 'monospace',
+          lineHeight: '1.5',
+          maxHeight: '400px',
+          overflowY: 'auto'
+        }}>
+          {content}
+          {isStreaming && <span className="animate-pulse">_</span>}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
   const { messages, sendMessage, isLoading, thinkingMessage, uploadNetwork, chatId } = useChatStore();
   const { nodes } = useNetworkStore();
@@ -153,6 +218,143 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
         {messages.map((msg, idx) => {
           // Parse <thought> tags
           const parts = msg.content.split(/(<thought>[\s\S]*?(?:<\/thought>|$))/g);
+
+          // Tool Execution Logs (Persistent)
+          let toolLogsRender = null;
+          
+          // 1. New Schema: tool_executions
+          if (msg.tool_executions && msg.tool_executions.length > 0) {
+               const logs = msg.tool_executions.map((tc, idx) => {
+                  let durationStr = "";
+                  if (tc.started_at && tc.completed_at) {
+                      const start = new Date(tc.started_at);
+                      const end = new Date(tc.completed_at);
+                      const diff = end - start;
+                      durationStr = diff < 1000 ? `${diff}ms` : `${(diff/1000).toFixed(2)}s`;
+                  }
+
+                  return (
+                          <div key={`exec-${idx}`} style={{
+                              marginTop: '0.5rem',
+                              marginBottom: '0.5rem',
+                              padding: '0.5rem',
+                              backgroundColor: 'rgba(0, 0, 0, 0.03)',
+                              borderRadius: '4px',
+                              borderLeft: `3px solid ${tc.status === 'failed' ? '#ff5252' : '#4caf50'}`,
+                              fontSize: '0.85rem',
+                              fontFamily: 'monospace'
+                          }}>
+                              <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                                  <span>🛠️ {tc.tool_name}</span>
+                                  <span style={{ 
+                                      display: 'flex', gap: '8px', alignItems: 'center'
+                                  }}>
+                                      {durationStr && <span style={{color: '#888', fontSize: '0.7rem'}}>⏱️ {durationStr}</span>}
+                                      <span style={{ 
+                                          color: tc.status === 'failed' ? '#d32f2f' : '#2e7d32',
+                                          textTransform: 'uppercase',
+                                          fontSize: '0.7rem'
+                                      }}>
+                                          {tc.status || 'COMPLETED'}
+                                      </span>
+                                  </span>
+                              </div>
+                              {tc.thought && (
+                                   <div style={{ fontStyle: 'italic', color: '#555', marginBottom: '4px', fontSize: '0.8rem' }}>
+                                      "{tc.thought}"
+                                   </div>
+                              )}
+                              <div style={{ color: '#666', marginTop: '0.25rem', fontSize: '0.75rem' }}>
+                                  Args: {
+                                      typeof tc.arguments === 'string' 
+                                          ? tc.arguments 
+                                          : JSON.stringify(tc.arguments, null, 2)
+                                  }
+                              </div>
+                              {tc.error && (
+                                  <div style={{ color: '#d32f2f', marginTop: '0.25rem' }}>
+                                      Error: {tc.error}
+                                  </div>
+                              )}
+                          </div>
+                  );
+               });
+               
+               toolLogsRender = (
+                  <details key="tool-logs-new" style={{ width: '100%', marginBottom: '0.5rem' }}>
+                      <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#666', userSelect: 'none' }}>
+                          View Action Log ({logs.length} actions)
+                      </summary>
+                      <div style={{ marginTop: '0.5rem' }}>
+                          {logs}
+                      </div>
+                  </details>
+               );
+
+          // 2. Legacy Schema: meta_data
+          } else if (msg.meta_data) {
+              let steps = [];
+              // Handle both array (new format) and object (legacy/future-proof)
+              if (Array.isArray(msg.meta_data)) {
+                  steps = msg.meta_data;
+              } else if (msg.meta_data.steps) {
+                  steps = msg.meta_data.steps;
+              }
+
+              if (steps.length > 0) {
+                  const toolLogs = steps.flatMap((step, stepIdx) => {
+                      if (!step.tool_calls) return [];
+                      return step.tool_calls.map((tc, tcIdx) => (
+                          <div key={`tool-${stepIdx}-${tcIdx}`} style={{
+                              marginTop: '0.5rem',
+                              marginBottom: '0.5rem',
+                              padding: '0.5rem',
+                              backgroundColor: 'rgba(0, 0, 0, 0.03)',
+                              borderRadius: '4px',
+                              borderLeft: `3px solid ${tc.status === 'failed' ? '#ff5252' : '#4caf50'}`,
+                              fontSize: '0.85rem',
+                              fontFamily: 'monospace'
+                          }}>
+                              <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                                  <span>🛠️ {tc.name}</span>
+                                  <span style={{ 
+                                      color: tc.status === 'failed' ? '#d32f2f' : '#2e7d32',
+                                      textTransform: 'uppercase',
+                                      fontSize: '0.7rem'
+                                  }}>
+                                      {tc.status || 'COMPLETED'}
+                                  </span>
+                              </div>
+                              <div style={{ color: '#666', marginTop: '0.25rem', fontSize: '0.75rem' }}>
+                                  Running with args: {
+                                      typeof tc.args === 'string'
+                                          ? tc.args
+                                          : JSON.stringify(tc.args, null, 2)
+                                  }
+                              </div>
+                              {tc.error && (
+                                  <div style={{ color: '#d32f2f', marginTop: '0.25rem' }}>
+                                      Error: {typeof tc.error === 'string' ? tc.error : JSON.stringify(tc.error)}
+                                  </div>
+                              )}
+                          </div>
+                      ));
+                  });
+
+                  if (toolLogs.length > 0) {
+                      toolLogsRender = (
+                          <details key="tool-logs" style={{ width: '100%', marginBottom: '0.5rem' }}>
+                              <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#666', userSelect: 'none' }}>
+                                  View Action Log ({toolLogs.length} actions)
+                              </summary>
+                              <div style={{ marginTop: '0.5rem' }}>
+                                  {toolLogs}
+                              </div>
+                          </details>
+                      );
+                  }
+              }
+          }
           
           return (
             <div key={idx} style={{ 
@@ -169,172 +371,7 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
                 if (!cleanPart) return null;
 
                 if (isThought) {
-                  return (
-                    <details 
-                      key={partIdx} 
-                      open={false}
-                      style={{ 
-                        marginBottom: '0.5rem', 
-                        maxWidth: '100%',
-                        width: '100%' 
-                      }}
-                    >
-                      <summary style={{ 
-                        cursor: 'pointer', 
-                        fontSize: '0.75rem', 
-                        color: '#888',
-                        userSelect: 'none',
-                        fontStyle: 'italic'
-                      }}>
-                        Thinking Process {part.includes('</thought>') ? '' : '(Thinking...)'}
-                      </summary>
-                      <div style={{ 
-                        fontSize: '0.8rem', 
-                        color: '#666',
-                        marginTop: '0.25rem',
-                        padding: '0.5rem',
-                        backgroundColor: '#f5f5f5',
-                        borderRadius: '4px',
-                        whiteSpace: 'pre-wrap',
-                        borderLeft: '3px solid #ddd'
-                      }}>
-                        {cleanPart}
-                      </div>
-                    </details>
-                  );
-                }
-                
-                // Tool Execution Logs (Persistent)
-                let toolLogsRender = null;
-                
-                // 1. New Schema: tool_executions
-                if (msg.tool_executions && msg.tool_executions.length > 0) {
-                     const logs = msg.tool_executions.map((tc, idx) => {
-                        let durationStr = "";
-                        if (tc.started_at && tc.completed_at) {
-                            const start = new Date(tc.started_at);
-                            const end = new Date(tc.completed_at);
-                            const diff = end - start;
-                            durationStr = diff < 1000 ? `${diff}ms` : `${(diff/1000).toFixed(2)}s`;
-                        }
-
-                        return (
-                                <div key={`exec-${idx}`} style={{
-                                    marginTop: '0.5rem',
-                                    marginBottom: '0.5rem',
-                                    padding: '0.5rem',
-                                    backgroundColor: 'rgba(0, 0, 0, 0.03)',
-                                    borderRadius: '4px',
-                                    borderLeft: `3px solid ${tc.status === 'failed' ? '#ff5252' : '#4caf50'}`,
-                                    fontSize: '0.85rem',
-                                    fontFamily: 'monospace'
-                                }}>
-                                    <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>🛠️ {tc.tool_name}</span>
-                                        <span style={{ 
-                                            display: 'flex', gap: '8px', alignItems: 'center'
-                                        }}>
-                                            {durationStr && <span style={{color: '#888', fontSize: '0.7rem'}}>⏱️ {durationStr}</span>}
-                                            <span style={{ 
-                                                color: tc.status === 'failed' ? '#d32f2f' : '#2e7d32',
-                                                textTransform: 'uppercase',
-                                                fontSize: '0.7rem'
-                                            }}>
-                                                {tc.status || 'COMPLETED'}
-                                            </span>
-                                        </span>
-                                    </div>
-                                    {tc.thought && (
-                                         <div style={{ fontStyle: 'italic', color: '#555', marginBottom: '4px', fontSize: '0.8rem' }}>
-                                            "{tc.thought}"
-                                         </div>
-                                    )}
-                                    <div style={{ color: '#666', marginTop: '0.25rem', fontSize: '0.75rem' }}>
-                                        Args: {JSON.stringify(tc.arguments).slice(0, 100)}{JSON.stringify(tc.arguments).length > 100 ? '...' : ''}
-                                    </div>
-                                    {tc.error && (
-                                        <div style={{ color: '#d32f2f', marginTop: '0.25rem' }}>
-                                            Error: {tc.error}
-                                        </div>
-                                    )}
-                                </div>
-                        );
-                     });
-                     
-                     toolLogsRender = (
-                        <details key="tool-logs-new" style={{ width: '100%', marginBottom: '0.5rem' }}>
-                            <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#666', userSelect: 'none' }}>
-                                View Action Log ({logs.length} actions)
-                            </summary>
-                            <div style={{ marginTop: '0.5rem' }}>
-                                {logs}
-                            </div>
-                        </details>
-                     );
-
-                // 2. Legacy Schema: meta_data
-                } else if (msg.meta_data) {
-                    let steps = [];
-                    // Handle both array (new format) and object (legacy/future-proof)
-                    if (Array.isArray(msg.meta_data)) {
-                        steps = msg.meta_data;
-                    } else if (msg.meta_data.steps) {
-                        steps = msg.meta_data.steps;
-                    }
-
-                    if (steps.length > 0) {
-                        const toolLogs = steps.flatMap((step, stepIdx) => {
-                            if (!step.tool_calls) return [];
-                            return step.tool_calls.map((tc, tcIdx) => (
-                                <div key={`tool-${stepIdx}-${tcIdx}`} style={{
-                                    marginTop: '0.5rem',
-                                    marginBottom: '0.5rem',
-                                    padding: '0.5rem',
-                                    backgroundColor: 'rgba(0, 0, 0, 0.03)',
-                                    borderRadius: '4px',
-                                    borderLeft: `3px solid ${tc.status === 'failed' ? '#ff5252' : '#4caf50'}`,
-                                    fontSize: '0.85rem',
-                                    fontFamily: 'monospace'
-                                }}>
-                                    <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
-                                        <span>🛠️ {tc.name}</span>
-                                        <span style={{ 
-                                            color: tc.status === 'failed' ? '#d32f2f' : '#2e7d32',
-                                            textTransform: 'uppercase',
-                                            fontSize: '0.7rem'
-                                        }}>
-                                            {tc.status || 'COMPLETED'}
-                                        </span>
-                                    </div>
-                                    <div style={{ color: '#666', marginTop: '0.25rem', fontSize: '0.75rem' }}>
-                                        Running with args: {JSON.stringify(tc.args).slice(0, 100)}{JSON.stringify(tc.args).length > 100 ? '...' : ''}
-                                    </div>
-                                    {tc.error && (
-                                        <div style={{ color: '#d32f2f', marginTop: '0.25rem' }}>
-                                            Error: {typeof tc.error === 'string' ? tc.error : JSON.stringify(tc.error)}
-                                        </div>
-                                    )}
-                                </div>
-                            ));
-                        });
-
-                        if (toolLogs.length > 0) {
-                            toolLogsRender = (
-                                <details key="tool-logs" style={{ width: '100%', marginBottom: '0.5rem' }}>
-                                    <summary style={{ cursor: 'pointer', fontSize: '0.8rem', color: '#666', userSelect: 'none' }}>
-                                        View Action Log ({toolLogs.length} actions)
-                                    </summary>
-                                    <div style={{ marginTop: '0.5rem' }}>
-                                        {toolLogs}
-                                    </div>
-                                </details>
-                            );
-                        }
-                    }
-                }
-                
-                if (toolLogsRender) {
-                    parts.push(toolLogsRender);
+                  return <ThinkingBlock key={partIdx} content={cleanPart} defaultOpen={false} />;
                 }
 
                 // Regular message bubble
@@ -378,13 +415,24 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
                   </div>
                 );
               })}
+              
+              {/* Tool Execution Logs */}
+              {toolLogsRender}
             </div>
           );
         })}
-        {isLoading && (
-          <div style={{ alignSelf: 'flex-start', color: 'var(--text-secondary)', fontSize: '0.8rem', fontStyle: 'italic', marginLeft: '1rem' }}>
-             {thinkingMessage || "Thinking..."}
-          </div>
+        {/* Real-time Thinking Stream Display */}
+        {(isLoading || thinkingMessage) && (
+            <div style={{ alignSelf: 'flex-start', maxWidth: '85%' }}>
+                 {thinkingMessage ? (
+                    <ThinkingBlock content={thinkingMessage} defaultOpen={true} isStreaming={true} />
+                 ) : (
+                    /* Fallback for generic loading without text */
+                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontStyle: 'italic', marginLeft: '1rem' }}>
+                        Thinking...
+                    </div>
+                 )}
+            </div>
         )}
 
         

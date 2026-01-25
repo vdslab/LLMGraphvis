@@ -19,6 +19,7 @@ export const useChatConnection = (id, isAuthenticated) => {
             useChatStore.getState().setThinkingMessage(null);
         },
         thinking_stream: (data) => {
+            console.log("RX thinking_stream:", data);
             const content = data.content || data;
             if (content) {
                 useChatStore.getState().appendThinkingMessage(content);

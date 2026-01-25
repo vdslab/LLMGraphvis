@@ -55,7 +55,7 @@ export const useNetworkRealtime = (url, { delay = 0, onMessage, onError, eventHa
 
     es.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data);
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         setLastMessage(data);
         if (onMessageRef.current) onMessageRef.current(data);
       } catch (err) {
@@ -71,7 +71,7 @@ export const useNetworkRealtime = (url, { delay = 0, onMessage, onError, eventHa
       Object.keys(eventHandlersRef.current).forEach((type) => {
         es.addEventListener(type, (event) => {
           try {
-            const data = JSON.parse(event.data);
+            const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
             // Always call the latest handler
             if (eventHandlersRef.current && eventHandlersRef.current[type]) {
                 eventHandlersRef.current[type](data);
