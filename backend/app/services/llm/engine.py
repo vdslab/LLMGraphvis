@@ -269,8 +269,9 @@ class GraphVisAgent:
         current_response = initial_response
         max_iterations = 10
         iteration = 0
-        final_text_content = ""
-        all_thought_content = ""
+        
+        # We build the full transcript (Thoughts + Text) chronologically
+        full_transcript = ""
         
         # Log of all actions taken in this turn
         execution_log = []
@@ -285,17 +286,17 @@ class GraphVisAgent:
             # Returns aggregated text and a list of tool calls
             chunk_text, chunk_thought, function_calls = await self._consume_stream(current_response, queue)
             
-            if chunk_text:
-                final_text_content += chunk_text
-            
             if chunk_thought:
-                all_thought_content += chunk_thought
+                full_transcript += f"<thought>{chunk_thought}</thought>\n\n"
+            
+            if chunk_text:
+                full_transcript += chunk_text
 
             # Step B: Check for Completion or Tool Calls
             if not function_calls:
                 # No tools called. Check for "Lazy Intent" (Reflection)
                 if await self._check_and_handle_lazy_intent(
-                    final_text_content, history, loop_context, queue, all_tools, tool_config, session
+                    full_transcript, history, loop_context, queue, all_tools, tool_config, session
                 ):
                     # Lazy Intent Detected & Alert Added to History.
                     logger.info("Lazy Intent detected. Retrying generation...")
@@ -304,10 +305,12 @@ class GraphVisAgent:
 
                 # NEW: If tools were executed but we have no meaningful response text, force a summary.
                 # We check loop_context to see if we did anything.
-                if loop_context.get("tools_executed", False) and not final_text_content.strip():
+                # Use a cleaner check for text content (ignoring thoughts)
+                has_text = bool(chunk_text.strip())
+                
+                if loop_context.get("tools_executed", False) and not has_text:
                     logger.info("Tools executed but no final text. Forcing summary generation.")
                     # We inject a user prompt to force the model to summarize.
-                    # Note: history already has the tool outputs appended in previous iterations.
                     summary_request = "The actions have been completed. Please provide a concise final report summarizing what was done (e.g., 'Layout updated', 'Metrics calculated') and any relevant findings."
                     history.append(types.Content(role="user", parts=[types.Part.from_text(text=summary_request)]))
                     
@@ -316,22 +319,16 @@ class GraphVisAgent:
                     continue
                 
                 # If we are truly done (no tools, no lazy intent), exit.
-                # Prepare final text with thoughts
-                result_text = final_text_content
-                if all_thought_content:
-                    result_text = f"<thought>{all_thought_content}</thought>\n\n{final_text_content}"
+                result_text = full_transcript
                 
-                if not final_text_content:
-                    # Even if no text, return thoughts if any? Or standard msg.
-                    if all_thought_content:
-                        return result_text, execution_log
+                if not result_text.strip():
                     return "I have processed your request.", execution_log
                     
                 return result_text, execution_log
 
             # Step C: Execute Tools (Parallelized)
             step_log = await self._execute_tools_and_update_history(
-                function_calls, chunk_text, history, queue, chat_id, loop_context, session
+                function_calls, chunk_text, chunk_thought, history, queue, chat_id, loop_context, session
             )
             execution_log.append(step_log)
             
@@ -339,24 +336,11 @@ class GraphVisAgent:
             logger.info(f"--- Gemini API Request (Iteration {iteration}) ---")
             current_response = await self._gemini_generate(history, all_tools, tool_config)
 
-        if not final_text_content:
-            # Check for thoughts at the very end if loop limit reached
-            result_text = final_text_content
-            if all_thought_content:
-                result_text = f"<thought>{all_thought_content}</thought>\n\n{final_text_content}"
-                if result_text.strip():
-                    return result_text, execution_log
+        if not full_transcript.strip():
+             return "I have completed the requested actions, but the process reached its step limit before generating a final report.", execution_log
 
-            return "I have completed the requested actions, but the process reached its step limit before generating a final report.", execution_log
+        return full_transcript, execution_log
 
-        # Loop finished successfully (logic wise) but broke loop?
-        # Actually this part is only reached if max_iterations is hit.
-        result_text = final_text_content
-        if all_thought_content:
-             result_text = f"<thought>{all_thought_content}</thought>\n\n{final_text_content}"
-             
-        return result_text, execution_log
-    
     # ... (retry decorators omitted, kept as is in original file) ...
     # Note: I am not replacing _gemini_generate or _consume_stream, assuming they are outside the range or handled separately.
     # The tool replacement range ends at 458, which is _handle_side_effects.
@@ -369,6 +353,7 @@ class GraphVisAgent:
         self,
         function_calls: List[Any],
         text_content: str,
+        thought_content: str,  # Accepted thought content
         history: List[types.Content],
         queue: Any,
         chat_id: int,
@@ -386,16 +371,25 @@ class GraphVisAgent:
         function_responses_parts = []
         
         # For the log
+        # Prioritize thought_content for the 'thought' field in execution logs
+        log_thought = thought_content if thought_content else text_content
+        
         step_record = {
             "step_type": "tool_execution",
-            "thought": text_content,
+            "thought": log_thought,
             "tool_calls": []
         }
 
+        # Update History with Context (Thought + Text)
+        # We need to reconstruct the message as the model generated it for the history
+        model_response_text = ""
+        if thought_content:
+            model_response_text += f"<thought>{thought_content}</thought>\n\n"
         if text_content:
-            # APPEND thought content to history.
-            # This enables the "Think -> Act -> Think -> Act" loop.
-            function_calls_parts.append(types.Part.from_text(text=text_content))
+            model_response_text += text_content
+            
+        if model_response_text:
+            function_calls_parts.append(types.Part.from_text(text=model_response_text))
 
         if function_calls:
             loop_context["tools_executed"] = True
