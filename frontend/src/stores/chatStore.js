@@ -16,6 +16,7 @@ export const useChatStore = create((set, get) => ({
   isLoading: false,
   thinkingMessage: null,
   streamingMessageId: null,
+  runningTool: null,
 
   // Get all chats for current user
   fetchChats: async () => {
@@ -225,6 +226,7 @@ export const useChatStore = create((set, get) => ({
   },
 
   setThinkingMessage: (msg) => set({ thinkingMessage: msg }),
+  setRunningTool: (tool) => set({ runningTool: tool }),
   
   appendThinkingMessage: (chunk) => set((state) => ({ 
     thinkingMessage: (state.thinkingMessage || "") + chunk 

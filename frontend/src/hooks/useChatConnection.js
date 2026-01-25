@@ -29,13 +29,16 @@ export const useChatConnection = (id, isAuthenticated) => {
         tool_execution: (data) => {
             console.log("Tool execution:", data);
             if (data.status === 'started') {
-                useChatStore.getState().setThinkingMessage(`Executing ${data.tool}...`);
+                useChatStore.getState().setRunningTool({ name: data.tool, status: 'running' });
                 useChatStore.getState().setIsLoading(true);
             } else if (data.status === 'completed') {
-                useChatStore.getState().setThinkingMessage(`${data.tool} completed`);
+                // Keep the success state briefly or clear it? 
+                // Usually we want to clear it so it doesn't stay "Running" forever if we don't get another update.
+                // But for now let's set it to completed so UI can show checkmark
+                useChatStore.getState().setRunningTool(null);
             } else if (data.status === 'failed') {
                 console.error(`Tool ${data.tool} failed:`, data.error);
-                useChatStore.getState().setThinkingMessage(null);
+                useChatStore.getState().setRunningTool(null);
                 useChatStore.getState().setIsLoading(false);
             }
         },

@@ -73,7 +73,7 @@ const ThinkingBlock = ({ content, defaultOpen = false, isStreaming = false }) =>
 };
 
 const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
-  const { messages, sendMessage, isLoading, thinkingMessage, uploadNetwork, chatId } = useChatStore();
+  const { messages, sendMessage, isLoading, thinkingMessage, uploadNetwork, chatId, runningTool } = useChatStore();
   const { nodes } = useNetworkStore();
   const [input, setInput] = useState('');
   const fileInputRef = React.useRef(null);
@@ -422,16 +422,38 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
           );
         })}
         {/* Real-time Thinking Stream Display */}
-        {(isLoading || thinkingMessage) && (
-            <div style={{ alignSelf: 'flex-start', maxWidth: '85%' }}>
-                 {thinkingMessage ? (
-                    <ThinkingBlock content={thinkingMessage} defaultOpen={true} isStreaming={true} />
-                 ) : (
-                    /* Fallback for generic loading without text */
-                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontStyle: 'italic', marginLeft: '1rem' }}>
-                        Thinking...
-                    </div>
-                 )}
+        {/* Real-time Thinking Stream Display */}
+        {thinkingMessage && (
+            <div style={{ alignSelf: 'flex-start', maxWidth: '85%', marginBottom: '0.5rem' }}>
+                <ThinkingBlock content={thinkingMessage} defaultOpen={true} isStreaming={true} />
+            </div>
+        )}
+
+        {/* Active Tool Execution Display */}
+        {runningTool && (
+             <div style={{ 
+                 alignSelf: 'flex-start', 
+                 maxWidth: '85%',
+                 marginBottom: '0.5rem',
+                 padding: '0.5rem 0.8rem',
+                 border: '1px solid #4caf50',
+                 backgroundColor: '#e8f5e9',
+                 borderRadius: '8px',
+                 fontSize: '0.85rem',
+                 color: '#2e7d32',
+                 display: 'flex',
+                 alignItems: 'center',
+                 gap: '8px'
+             }}>
+                 <span className="animate-spin">⚙️</span>
+                 <span>Executing: <strong>{runningTool.name}</strong>...</span>
+             </div>
+        )}
+
+        {/* Fallback Loading Indicator */}
+        {isLoading && !thinkingMessage && !runningTool && (
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontStyle: 'italic', marginLeft: '1rem' }}>
+                Thinking...
             </div>
         )}
 
