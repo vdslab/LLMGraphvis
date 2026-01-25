@@ -200,7 +200,7 @@ export const useChatStore = create((set, get) => ({
     });
   },
 
-  finalizeStreamingMessage: (realId) => {
+  finalizeStreamingMessage: (realId, content = null, tool_executions = null) => {
     set((state) => {
       const messages = [...state.messages];
       // Use findLast or specific ID
@@ -212,6 +212,12 @@ export const useChatStore = create((set, get) => ({
         messages[idx].isStreaming = false;
         if (realId) {
             messages[idx].id = realId;
+        }
+        if (content) {
+            messages[idx].content = content;
+        }
+        if (tool_executions) {
+            messages[idx].tool_executions = tool_executions;
         }
       }
       return { messages, isLoading: false, thinkingMessage: null, streamingMessageId: null };

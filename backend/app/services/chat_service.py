@@ -181,8 +181,33 @@ async def handle_process_background(chat_id: int, user_message: str) -> None:
 
             # Emit message_complete event
             queue = await llm_service.get_event_queue(chat_id)
+            
+            # Prepare tool executions for frontend
+            tool_executions_data = []
+            if execution_log:
+                for step in execution_log:
+                    if step.get("step_type") == "tool_execution":
+                        for tool_call in step.get("tool_calls", []):
+                            tool_executions_data.append({
+                                "tool_name": tool_call.get("name"),
+                                "arguments": tool_call.get("args"),
+                                "result": tool_call.get("result"),
+                                "thought": step.get("thought"),
+                                "status": tool_call.get("status", "unknown"),
+                                "error": tool_call.get("error"),
+                                "started_at": tool_call.get("started_at").isoformat() if tool_call.get("started_at") else None,
+                                "completed_at": tool_call.get("completed_at").isoformat() if tool_call.get("completed_at") else None
+                            })
+
             await queue.put(
-                {"event": "message_complete", "data": json.dumps({"id": db_msg.id})}
+                {
+                    "event": "message_complete", 
+                    "data": json.dumps({
+                        "id": db_msg.id,
+                        "content": db_msg.content,
+                        "tool_executions": tool_executions_data
+                    })
+                }
             )
 
     except Exception as e:

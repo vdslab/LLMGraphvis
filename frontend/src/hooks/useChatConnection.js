@@ -43,7 +43,7 @@ export const useChatConnection = (id, isAuthenticated) => {
             useChatStore.getState().appendMessageChunk(data.content);
         },
         message_complete: (data) => {
-            useChatStore.getState().finalizeStreamingMessage(data.id);
+            useChatStore.getState().finalizeStreamingMessage(data.id, data.content, data.tool_executions);
         },
         system_message: (data) => {
             console.log("System:", data);
