@@ -456,7 +456,7 @@ class GraphVisAgent:
 
         # Update History with valid turn structure
         history.append(types.Content(role="model", parts=function_calls_parts))
-        history.append(types.Content(role="user", parts=function_responses_parts))
+        history.append(types.Content(role="tool", parts=function_responses_parts))
         
         return step_record
 
