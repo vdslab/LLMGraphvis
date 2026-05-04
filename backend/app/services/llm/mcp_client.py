@@ -26,10 +26,7 @@ async def get_tools_as_gemini_functions() -> list[types.Tool]:
     if _tools_cache is not None:
         return _tools_cache
 
-    # Note: We use sse_client for HTTP/SSE connection
-    async with sse_client(SSE_ENDPOINT) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
+    async with session_scope() as session:
 
             # List tools from the MCP server
             result = await session.list_tools()

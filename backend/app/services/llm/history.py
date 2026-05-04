@@ -73,7 +73,7 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[types.Co
                         history.append(types.Content(role="model", parts=model_parts))
                     
                     if user_parts:
-                        history.append(types.Content(role="user", parts=user_parts))
+                        history.append(types.Content(role="tool", parts=user_parts))
 
             except Exception as e:
                 from app.core.logging import get_logger
@@ -120,7 +120,7 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[types.Co
                         )
                     
                     if user_parts:
-                        history.append(types.Content(role="user", parts=user_parts))
+                        history.append(types.Content(role="tool", parts=user_parts))
             except Exception as e:
                 # Fallback: If parsing fails, just log warning and proceed to add content
                 # This ensures we don't break the whole chat if valid history exists but metadata is malformed

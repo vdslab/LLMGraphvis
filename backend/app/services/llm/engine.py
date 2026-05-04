@@ -206,6 +206,14 @@ class GraphVisAgent:
         
         if intent_detected:
             logger.info(f"Lazy intent detected in text: '{text_content[:50]}...'")
+            # Must append the model's response before injecting user prompt to maintain turn alternation
+            model_parts = []
+            if text_content:
+                model_parts.append(types.Part.from_text(text=text_content))
+            else:
+                model_parts.append(types.Part.from_text(text="I will now proceed."))
+            history.append(types.Content(role="model", parts=model_parts))
+            
             # Inject prompt
             history.append(types.Content(
                 role="user", 
@@ -312,6 +320,14 @@ class GraphVisAgent:
                 
                 if loop_context.get("tools_executed", False) and not has_text:
                     logger.info("Tools executed but no final text. Forcing summary generation.")
+                    # Append a model turn first to acknowledge the tools and maintain alternation
+                    model_parts = []
+                    if chunk_thought:
+                        model_parts.append(types.Part.from_text(text=f"<thought>{chunk_thought}</thought>"))
+                    else:
+                        model_parts.append(types.Part.from_text(text="I have executed the tools."))
+                    history.append(types.Content(role="model", parts=model_parts))
+                    
                     # We inject a user prompt to force the model to summarize.
                     summary_request = "The actions have been completed. Please provide a concise final report summarizing what was done (e.g., 'Layout updated', 'Metrics calculated') and any relevant findings."
                     history.append(types.Content(role="user", parts=[types.Part.from_text(text=summary_request)]))
@@ -532,13 +548,7 @@ class GraphVisAgent:
             vis_data = await self._auto_generate_visualization(new_id, queue, session)
             
             # Update DB
-            if self.db:
-                chat = self.db.query(models.Chat).filter(models.Chat.id == chat_id).first()
-                if chat:
-                    chat.network_id = new_id
-                    if vis_data:
-                        chat.visualization_state = vis_data
-                    self.db.commit()
+            self._update_chat_state(chat_id, network_id=new_id, vis_data=vis_data)
             
             # Update Loop Context
             loop_context["network_id"] = new_id
@@ -563,11 +573,7 @@ class GraphVisAgent:
         if vis_data:
             await self._emit_render_update(queue, vis_data)
             # Save state
-            if self.db:
-                chat = self.db.query(models.Chat).filter(models.Chat.id == chat_id).first()
-                if chat:
-                    chat.visualization_state = vis_data
-                    self.db.commit()
+            self._update_chat_state(chat_id, vis_data=vis_data)
 
     async def _auto_generate_visualization(self, network_id: int, queue: Any, session: Any) -> Optional[Dict]:
         """Triggers visualization generation for a new network context."""
@@ -607,6 +613,18 @@ class GraphVisAgent:
 
     async def _emit_render_update(self, queue: Any, vis_data: Dict):
         await queue.put({"event": "render_update", "data": json.dumps(vis_data)})
+
+    def _update_chat_state(self, chat_id: int, network_id: int = None, vis_data: Dict = None):
+        """Helper to update chat state in DB."""
+        if not self.db:
+            return
+        chat = self.db.query(models.Chat).filter(models.Chat.id == chat_id).first()
+        if chat:
+            if network_id is not None:
+                chat.network_id = network_id
+            if vis_data is not None:
+                chat.visualization_state = vis_data
+            self.db.commit()
 
 
 # --- Legacy/Functional Interface for compatibility with existing route handlers ---

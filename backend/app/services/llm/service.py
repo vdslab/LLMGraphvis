@@ -90,7 +90,6 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> Tuple[st
         import traceback
 
         traceback.print_exc()
-        traceback.print_exc()
         await queue.put({"event": "error", "data": str(e)})
         
         error_msg = _format_exception_message(e)
