@@ -1,0 +1,199 @@
+import json
+import os
+from typing import AsyncIterator, List
+
+from app.core.logging import get_logger
+
+from .base import LLMProvider
+from .types import (
+    FunctionCallData,
+    LLMFunctionCallPart,
+    LLMFunctionResponsePart,
+    LLMMessage,
+    LLMTextPart,
+    StreamChunk,
+    ToolDefinition,
+)
+
+logger = get_logger(__name__)
+
+
+def _lowercase_schema_types(schema) -> dict:
+    """Recursively convert uppercase JSON Schema type values to lowercase.
+
+    Google GenAI uses uppercase types ("OBJECT", "STRING"), but Anthropic
+    requires standard JSON Schema lowercase types ("object", "string").
+    """
+    if not isinstance(schema, dict):
+        return schema
+    result = {}
+    for key, value in schema.items():
+        if key == "type" and isinstance(value, str):
+            result[key] = value.lower()
+        elif isinstance(value, dict):
+            result[key] = _lowercase_schema_types(value)
+        elif isinstance(value, list):
+            result[key] = [
+                _lowercase_schema_types(item) if isinstance(item, dict) else item
+                for item in value
+            ]
+        else:
+            result[key] = value
+    return result
+
+
+class AnthropicProvider(LLMProvider):
+    def __init__(self):
+        self.client = self._initialize_client()
+        self.model_name = os.getenv("CLAUDE_MODEL", "claude-opus-4-8")
+
+    def _initialize_client(self):
+        import anthropic
+        project_id = os.getenv("VERTEX_PROJECT_ID")
+        if project_id:
+            # Anthropic on Vertex AI — uses Google Cloud ADC, no ANTHROPIC_API_KEY needed.
+            # Vertex regions for Claude differ from Google's own services; default to us-east5.
+            region = os.getenv("ANTHROPIC_VERTEX_REGION", os.getenv("VERTEX_LOCATION", "us-east5"))
+            msg = f"Using Anthropic on Vertex AI (Project: {project_id}, Region: {region})"
+            logger.info(msg)
+            print(msg)
+            return anthropic.AsyncAnthropicVertex(project_id=project_id, region=region)
+        else:
+            logger.info("Using Anthropic API (direct)")
+            print("Using Anthropic API (direct)")
+            return anthropic.AsyncAnthropic()
+
+    def _to_anthropic_messages(self, history: List[LLMMessage]) -> List[dict]:
+        """Convert LLMMessage list to Anthropic messages format.
+
+        Role mapping:
+          "user"  -> "user" with text content blocks
+          "model" -> "assistant" with text and/or tool_use blocks
+          "tool"  -> merged into the preceding "user" turn as tool_result blocks
+        """
+        messages = []
+        for msg in history:
+            if msg.role == "model":
+                content = []
+                for part in msg.parts:
+                    if isinstance(part, LLMTextPart) and part.text:
+                        content.append({"type": "text", "text": part.text})
+                    elif isinstance(part, LLMFunctionCallPart):
+                        content.append({
+                            "type": "tool_use",
+                            "id": part.call_id or f"call_{part.name}",
+                            "name": part.name,
+                            "input": part.args,
+                        })
+                if content:
+                    messages.append({"role": "assistant", "content": content})
+
+            elif msg.role == "tool":
+                content = []
+                for part in msg.parts:
+                    if isinstance(part, LLMFunctionResponsePart):
+                        resp = part.response
+                        if not isinstance(resp, str):
+                            resp = json.dumps(resp)
+                        content.append({
+                            "type": "tool_result",
+                            "tool_use_id": part.call_id or f"call_{part.name}",
+                            "content": resp,
+                        })
+                if content:
+                    if messages and messages[-1]["role"] == "user":
+                        prev = messages[-1]["content"]
+                        if isinstance(prev, list):
+                            prev.extend(content)
+                        else:
+                            messages[-1]["content"] = [{"type": "text", "text": prev}] + content
+                    else:
+                        messages.append({"role": "user", "content": content})
+
+            else:  # "user"
+                content = []
+                for part in msg.parts:
+                    if isinstance(part, LLMTextPart):
+                        content.append({"type": "text", "text": part.text})
+                if content:
+                    # Use plain string for single text-only user messages
+                    if len(content) == 1:
+                        messages.append({"role": "user", "content": content[0]["text"]})
+                    else:
+                        messages.append({"role": "user", "content": content})
+        return messages
+
+    def _to_anthropic_tools(self, tools: List[ToolDefinition]) -> List[dict]:
+        return [
+            {
+                "name": t.name,
+                "description": t.description,
+                "input_schema": _lowercase_schema_types(t.parameters)
+                if t.parameters
+                else {"type": "object", "properties": {}},
+            }
+            for t in tools
+        ]
+
+    def generate(
+        self,
+        history: List[LLMMessage],
+        tools: List[ToolDefinition],
+        system_instruction: str,
+    ) -> AsyncIterator[StreamChunk]:
+        return self._stream(history, tools, system_instruction)
+
+    async def _stream(
+        self,
+        history: List[LLMMessage],
+        tools: List[ToolDefinition],
+        system_instruction: str,
+    ):
+        messages = self._to_anthropic_messages(history)
+        anthropic_tools = self._to_anthropic_tools(tools)
+
+        # Accumulate partial tool-call inputs, keyed by content block index
+        pending_tools: dict = {}
+
+        async with self.client.messages.stream(
+            model=self.model_name,
+            max_tokens=16000,
+            system=system_instruction,
+            messages=messages,
+            tools=anthropic_tools,
+            thinking={"type": "adaptive"},
+        ) as stream:
+            async for event in stream:
+                etype = event.type
+
+                if etype == "content_block_start":
+                    cb = event.content_block
+                    if cb.type == "tool_use":
+                        pending_tools[event.index] = {
+                            "id": cb.id,
+                            "name": cb.name,
+                            "input_str": "",
+                        }
+
+                elif etype == "content_block_delta":
+                    delta = event.delta
+                    if delta.type == "thinking_delta":
+                        yield StreamChunk(thought=delta.thinking)
+                    elif delta.type == "text_delta":
+                        yield StreamChunk(text=delta.text)
+                    elif delta.type == "input_json_delta":
+                        idx = event.index
+                        if idx in pending_tools:
+                            pending_tools[idx]["input_str"] += delta.partial_json
+
+                elif etype == "content_block_stop":
+                    idx = event.index
+                    if idx in pending_tools:
+                        tc = pending_tools.pop(idx)
+                        try:
+                            args = json.loads(tc["input_str"]) if tc["input_str"] else {}
+                        except json.JSONDecodeError:
+                            args = {}
+                        yield StreamChunk(function_calls=[
+                            FunctionCallData(name=tc["name"], args=args, call_id=tc["id"])
+                        ])

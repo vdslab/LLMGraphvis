@@ -8,6 +8,7 @@ passlib[argon2]
 python-multipart
 httpx
 google-genai
+anthropic
 python-dotenv
 sse-starlette
 mcp

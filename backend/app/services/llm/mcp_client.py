@@ -1,11 +1,11 @@
 import json
 import os
 
-from google.genai import types
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 
 from app.core.logging import get_logger
+from .providers.types import ToolDefinition
 
 logger = get_logger(__name__)
 
@@ -17,10 +17,10 @@ SSE_ENDPOINT = f"{NETWORKX_API_URL}/mcp/sse"
 # Cache for tools
 _tools_cache = None
 
-async def get_tools_as_gemini_functions() -> list[types.Tool]:
+async def get_tools() -> list[ToolDefinition]:
     """
     Connects to the NetworkXAPI MCP Server, discovers tools,
-    Converts MCP tools to Gemini function declarations.
+    and returns them as provider-agnostic ToolDefinition objects.
     """
     global _tools_cache
     if _tools_cache is not None:
@@ -32,104 +32,80 @@ async def get_tools_as_gemini_functions() -> list[types.Tool]:
             result = await session.list_tools()
             tools = result.tools
 
-            gemini_tools_list = []
+            tool_list: list[ToolDefinition] = []
             for tool in tools:
-                fd = _convert_to_gemini(tool)
-                gemini_tools_list.append(types.Tool(function_declarations=[fd]))
+                tool_list.append(_mcp_to_tool_definition(tool))
 
-            # Add client-side tools
-            gemini_tools_list.extend([
-                types.Tool(
-                    function_declarations=[
-                        types.FunctionDeclaration(
-                            name="read_resource",
-                            description="Reads a resource from the MCP server using its URI.",
-                            parameters={
-                                "type": "OBJECT",
-                                "properties": {
-                                    "uri": {
-                                        "type": "STRING",
-                                        "description": "The URI of the resource to read (e.g., network://1/attributes/nodes)",
-                                    }
-                                },
-                                "required": ["uri"],
-                            },
-                        )
-                    ]
+            # Add client-side MCP protocol tools
+            tool_list.extend([
+                ToolDefinition(
+                    name="read_resource",
+                    description="Reads a resource from the MCP server using its URI.",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "uri": {
+                                "type": "string",
+                                "description": "The URI of the resource to read (e.g., network://1/attributes/nodes)",
+                            }
+                        },
+                        "required": ["uri"],
+                    },
                 ),
-                types.Tool(
-                    function_declarations=[
-                        types.FunctionDeclaration(
-                            name="list_resources",
-                            description="Lists all available resources on the MCP server.",
-                            parameters={
-                                "type": "OBJECT",
-                                "properties": {},
-                            },
-                        )
-                    ]
+                ToolDefinition(
+                    name="list_resources",
+                    description="Lists all available resources on the MCP server.",
+                    parameters={
+                        "type": "object",
+                        "properties": {},
+                    },
                 ),
-                types.Tool(
-                    function_declarations=[
-                        types.FunctionDeclaration(
-                            name="list_prompts",
-                            description="Lists all available prompts on the MCP server.",
-                            parameters={
-                                "type": "OBJECT",
-                                "properties": {},
-                            },
-                        )
-                    ]
+                ToolDefinition(
+                    name="list_prompts",
+                    description="Lists all available prompts on the MCP server.",
+                    parameters={
+                        "type": "object",
+                        "properties": {},
+                    },
                 ),
-                types.Tool(
-                    function_declarations=[
-                        types.FunctionDeclaration(
-                            name="get_prompt",
-                            description="Gets a prompt from the MCP server by name, with optional arguments.",
-                            parameters={
-                                "type": "OBJECT",
-                                "properties": {
-                                    "name": {
-                                        "type": "STRING",
-                                        "description": "The name of the prompt to retrieve.",
-                                    },
-                                    "arguments": {
-                                        "type": "OBJECT",
-                                        "description": "Arguments for the prompt template.",
-                                    }
-                                },
-                                "required": ["name"],
+                ToolDefinition(
+                    name="get_prompt",
+                    description="Gets a prompt from the MCP server by name, with optional arguments.",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "The name of the prompt to retrieve.",
                             },
-                        )
-                    ]
-                )
+                            "arguments": {
+                                "type": "object",
+                                "description": "Arguments for the prompt template.",
+                            },
+                        },
+                        "required": ["name"],
+                    },
+                ),
             ])
-            
-            _tools_cache = gemini_tools_list
-            return gemini_tools_list
+
+            _tools_cache = tool_list
+            return tool_list
 
 
-def _convert_to_gemini(mcp_tool) -> types.FunctionDeclaration:
-    """
-    Converts an MCP Tool definition to a Gemini FunctionDeclaration.
-    """
+def _mcp_to_tool_definition(mcp_tool) -> ToolDefinition:
+    """Converts an MCP Tool definition to a provider-agnostic ToolDefinition."""
     tool_name = str(getattr(mcp_tool, "name", None) or mcp_tool.get("name"))
     tool_desc = str(
         getattr(mcp_tool, "description", None) or mcp_tool.get("description")
     )
     tool_schema = getattr(mcp_tool, "inputSchema", None) or mcp_tool.get("inputSchema")
 
-    # Sanitize schema: remove 'title' which can confuse some parsers
     if tool_schema:
-        # First resolve references ($ref) using $defs if present
         if "$defs" in tool_schema or "definitions" in tool_schema:
             tool_schema = _resolve_schema_refs(tool_schema, tool_schema)
-
         tool_schema = _sanitize_schema(tool_schema)
 
-    return types.FunctionDeclaration(
-        name=tool_name, description=tool_desc, parameters=tool_schema
-    )
+    return ToolDefinition(name=tool_name, description=tool_desc, parameters=tool_schema)
 
 
 def _resolve_schema_refs(schema: dict, root: dict) -> dict:

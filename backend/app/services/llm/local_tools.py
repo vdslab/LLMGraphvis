@@ -1,8 +1,8 @@
-from google.genai import types
 from sqlalchemy.orm import Session
 
 from common import models
 from app.core.logging import get_logger
+from .providers.types import ToolDefinition
 
 logger = get_logger(__name__)
 
@@ -87,24 +87,19 @@ async def switch_to_parent_network(chat_id: int, db: Session) -> dict:
         return {"content": f"Failed to switch to parent network: {str(e)}"}
 
 
-def get_local_tools() -> list[types.Tool]:
-    """Returns the list of local tools as Gemini FunctionDeclarations."""
-
+def get_local_tools() -> list[ToolDefinition]:
+    """Returns the list of local tools as provider-agnostic ToolDefinitions."""
     return [
-        types.Tool(
-            function_declarations=[
-                types.FunctionDeclaration(
-                    name="switch_to_main_network",
-                    description="Switches the chat context back to the main (root) network. Use this when the user wants to go back to the original full graph.",
-                    parameters={"type": "OBJECT", "properties": {}, "required": []},
-                ),
-                types.FunctionDeclaration(
-                    name="switch_to_parent_network",
-                    description="Switches the chat context to the parent network of the current subgraph. Use this when the user wants to go up one level in the hierarchy.",
-                    parameters={"type": "OBJECT", "properties": {}, "required": []},
-                ),
-            ]
-        )
+        ToolDefinition(
+            name="switch_to_main_network",
+            description="Switches the chat context back to the main (root) network. Use this when the user wants to go back to the original full graph.",
+            parameters={"type": "object", "properties": {}, "required": []},
+        ),
+        ToolDefinition(
+            name="switch_to_parent_network",
+            description="Switches the chat context to the parent network of the current subgraph. Use this when the user wants to go up one level in the hierarchy.",
+            parameters={"type": "object", "properties": {}, "required": []},
+        ),
     ]
 
 
