@@ -1,5 +1,7 @@
+import sqlalchemy
 from sqlalchemy import (
     JSON,
+    Boolean,
     Column,
     DateTime,
     Float,
@@ -99,6 +101,7 @@ class ChatMessage(Base):
 
     chat = relationship("Chat", back_populates="messages")
     tool_executions = relationship("ToolExecution", back_populates="message", cascade="all, delete-orphan")
+    usage = relationship("LlmUsage", back_populates="message", uselist=False, cascade="all, delete-orphan")
 
 
 class ToolExecution(Base):
@@ -176,6 +179,13 @@ class NodeAttribute(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    # Derived-attribute / cache provenance metadata (populated by later stages)
+    is_derived = Column(Boolean, nullable=False, server_default=sqlalchemy.sql.false())
+    derived_from = Column(String, nullable=True)
+    computation_params = Column(JSON, nullable=True)
+    graph_state_hash = Column(String, nullable=True)
+    computed_at = Column(DateTime(timezone=True), nullable=True)
+
     network = relationship("Network", back_populates="node_attributes")
     values = relationship("NodeAttributeValue", back_populates="attribute", cascade="all, delete-orphan")
 
@@ -249,6 +259,13 @@ class EdgeAttribute(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    # Derived-attribute / cache provenance metadata (populated by later stages)
+    is_derived = Column(Boolean, nullable=False, server_default=sqlalchemy.sql.false())
+    derived_from = Column(String, nullable=True)
+    computation_params = Column(JSON, nullable=True)
+    graph_state_hash = Column(String, nullable=True)
+    computed_at = Column(DateTime(timezone=True), nullable=True)
+
     network = relationship("Network", back_populates="edge_attributes")
     values = relationship("EdgeAttributeValue", back_populates="attribute", cascade="all, delete-orphan")
 
@@ -305,3 +322,20 @@ class EdgeFloatAttributeValue(Base):
     float_value = Column(Float)
 
     parent = relationship("EdgeAttributeValue", back_populates="float_value")
+
+
+class LlmUsage(Base):
+    __tablename__ = "llm_usages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    message_id = Column(Integer, ForeignKey("chat_messages.id"), nullable=False, unique=True)
+    provider = Column(String, nullable=False)          # "google" | "anthropic"
+    model = Column(String, nullable=False)               # e.g. "gemini-2.5-flash", "claude-opus-4-8"
+    input_tokens = Column(Integer, nullable=False, default=0)
+    output_tokens = Column(Integer, nullable=False, default=0)
+    cached_input_tokens = Column(Integer, nullable=False, default=0)
+    iteration_count = Column(Integer, nullable=False, default=1)
+    estimated_cost_usd = Column(Float, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    message = relationship("ChatMessage", back_populates="usage")

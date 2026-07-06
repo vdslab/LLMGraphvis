@@ -18,6 +18,10 @@ export const useChatStore = create((set, get) => ({
   streamingMessageId: null,
   runningTool: null,
 
+  // Token/cost usage tracking (Stage 7)
+  chatUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0 },   // lifetime total for this chat session (client-side accumulation across turns)
+  currentTurnUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0, provider: null, model: null },  // running total for the turn currently in progress
+
   // Get all chats for current user
   fetchChats: async () => {
     const res = await getChats();
@@ -246,12 +250,43 @@ export const useChatStore = create((set, get) => ({
 
   setThinkingMessage: (msg) => set({ thinkingMessage: msg }),
   setRunningTool: (tool) => set({ runningTool: tool }),
-  
-  appendThinkingMessage: (chunk) => set((state) => ({ 
-    thinkingMessage: (state.thinkingMessage || "") + chunk 
+
+  appendThinkingMessage: (chunk) => set((state) => ({
+    thinkingMessage: (state.thinkingMessage || "") + chunk
   })),
-  
+
   setIsLoading: (loading) => set({ isLoading: loading }),
-  
-  setChatId: (id) => set({ chatId: id })
+
+  setChatId: (id) => set({ chatId: id }),
+
+  // Usage tracking (Stage 7): usage_update SSE events carry a RUNNING TOTAL for the
+  // in-progress turn (not deltas), so this replaces currentTurnUsage wholesale each time.
+  setCurrentTurnUsage: (data) => set({
+    currentTurnUsage: {
+      inputTokens: data.input_tokens ?? 0,
+      outputTokens: data.output_tokens ?? 0,
+      estimatedCostUsd: data.estimated_cost_usd ?? 0,
+      provider: data.provider ?? null,
+      model: data.model ?? null,
+    }
+  }),
+
+  // Folds the now-final currentTurnUsage into the lifetime chatUsage total, then
+  // resets currentTurnUsage for the next turn. Call this once, when a turn fully completes.
+  commitTurnUsage: () => set((state) => ({
+    chatUsage: {
+      inputTokens: state.chatUsage.inputTokens + state.currentTurnUsage.inputTokens,
+      outputTokens: state.chatUsage.outputTokens + state.currentTurnUsage.outputTokens,
+      estimatedCostUsd: state.chatUsage.estimatedCostUsd + state.currentTurnUsage.estimatedCostUsd,
+    },
+    currentTurnUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0, provider: null, model: null },
+  })),
+
+  // Note: no existing reset()/clearChat()-style action was found in this store to hook into
+  // (chat switches go through setChatId + fetchChat + fetchMessages, none of which "reset" state).
+  // This action is provided for future wiring but is not currently called anywhere.
+  resetUsage: () => set({
+    chatUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0 },
+    currentTurnUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0, provider: null, model: null }
+  })
 }));

@@ -43,7 +43,7 @@ services:
       - VERTEX_PROJECT_ID=${VERTEX_PROJECT_ID}
       - VERTEX_LOCATION=${VERTEX_LOCATION}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/application_default_credentials.json
-    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--timeout-keep-alive", "${KEEP_ALIVE_TIMEOUT}"]
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --timeout-keep-alive ${KEEP_ALIVE_TIMEOUT}"]
     depends_on:
       db:
         condition: service_healthy

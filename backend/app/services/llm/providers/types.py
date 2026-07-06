@@ -19,11 +19,20 @@ class FunctionCallData:
 
 
 @dataclass
+class UsageData:
+    """Token usage reported by a provider for a single generate() call."""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cached_input_tokens: int = 0
+
+
+@dataclass
 class StreamChunk:
     """A single normalized event from the LLM stream."""
     text: Optional[str] = None
     thought: Optional[str] = None
     function_calls: List[FunctionCallData] = field(default_factory=list)
+    usage: Optional[UsageData] = None
 
 
 # --- History message part types ---

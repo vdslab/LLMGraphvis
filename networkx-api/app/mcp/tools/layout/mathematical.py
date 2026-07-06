@@ -11,7 +11,8 @@ logger = logging.getLogger(__name__)
 @mcp.tool()
 @handle_tool_errors
 def layout_kamada_kawai(
-    network_id: Annotated[int, Field(description="The ID of the network.")]
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    force_recompute: Annotated[bool, Field(description="If True, bypasses the cache and always recomputes, even if a valid cached result exists for this exact graph state and parameters. Default False preserves current auto-caching behavior.")] = False
 ) -> str:
     """
     Calculates a Kamada-Kawai layout — positions nodes to minimize graph-theoretic distance distortion.
@@ -28,14 +29,15 @@ def layout_kamada_kawai(
     """
     with get_db_context() as db:
         from app.logic import layout
-        layout.calculate_layout(network_id, "kamada_kawai", db)
+        layout.calculate_layout(network_id, "kamada_kawai", db, force=force_recompute)
         return "Kamada-Kawai layout calculated. Call `visualization_apply_layout` to render."
 
 
 @mcp.tool()
 @handle_tool_errors
 def layout_spectral(
-    network_id: Annotated[int, Field(description="The ID of the network.")]
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    force_recompute: Annotated[bool, Field(description="If True, bypasses the cache and always recomputes, even if a valid cached result exists for this exact graph state and parameters. Default False preserves current auto-caching behavior.")] = False
 ) -> str:
     """
     Calculates a spectral layout — uses the eigenvectors of the graph Laplacian matrix.
@@ -52,5 +54,5 @@ def layout_spectral(
     """
     with get_db_context() as db:
         from app.logic import layout
-        layout.calculate_layout(network_id, "spectral", db)
+        layout.calculate_layout(network_id, "spectral", db, force=force_recompute)
         return "Spectral layout calculated. Call `visualization_apply_layout` to render."

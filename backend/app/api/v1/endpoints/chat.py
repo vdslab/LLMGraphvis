@@ -77,8 +77,8 @@ async def get_chat(
             )
             # Generate default visualization data
             vis_data = await mcp_client.execute_tool(
-                "generate_visualization",
-                {"network_id": chat.network_id, "layout_name": "forceatlas2"},
+                "visualization_generate",
+                {"network_id": chat.network_id},
             )
 
         return {

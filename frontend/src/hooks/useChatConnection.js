@@ -66,6 +66,15 @@ export const useChatConnection = (id, isAuthenticated) => {
         },
         message_complete: (data) => {
             useChatStore.getState().finalizeStreamingMessage(data.id, data.content, data.tool_executions);
+            // Turn is fully done: fold the final currentTurnUsage into the lifetime chatUsage total.
+            useChatStore.getState().commitTurnUsage();
+        },
+        // usage_update: { input_tokens, output_tokens, cached_input_tokens, estimated_cost_usd, provider, model }
+        // Fired potentially multiple times per turn (once per ReAct-loop iteration), each carrying
+        // the running total for the turn so far. commitTurnUsage() (above) folds it into the lifetime
+        // total once the turn is fully complete.
+        usage_update: (data) => {
+            useChatStore.getState().setCurrentTurnUsage(data);
         },
         system_message: (data) => {
             console.log("System:", data);

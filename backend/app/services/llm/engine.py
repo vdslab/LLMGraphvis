@@ -20,6 +20,7 @@ from .providers.types import (
     LLMTextPart,
     StreamChunk,
     ToolDefinition,
+    UsageData,
 )
 
 logger = get_logger(__name__)
@@ -51,11 +52,12 @@ class GraphVisAgent:
         self,
         stream: AsyncIterator[StreamChunk],
         queue: Any,
-    ) -> Tuple[str, str, List[FunctionCallData]]:
+    ) -> Tuple[str, str, List[FunctionCallData], UsageData]:
         """Consume a provider stream, emit SSE events, and collect results."""
         text_content = ""
         thought_content = ""
         function_calls: List[FunctionCallData] = []
+        usage = UsageData()
 
         try:
             async for chunk in stream:
@@ -67,11 +69,17 @@ class GraphVisAgent:
                     await self._emit_message_chunk(queue, chunk.text)
                 if chunk.function_calls:
                     function_calls.extend(chunk.function_calls)
+                if chunk.usage:
+                    # A single generate() call typically yields usage once, at the end,
+                    # but sum defensively in case a provider yields it more than once.
+                    usage.input_tokens += chunk.usage.input_tokens
+                    usage.output_tokens += chunk.usage.output_tokens
+                    usage.cached_input_tokens += chunk.usage.cached_input_tokens
         except Exception as e:
             logger.error(f"Error consuming stream: {e}")
             raise
 
-        return text_content, thought_content, function_calls
+        return text_content, thought_content, function_calls, usage
 
     async def _check_and_handle_lazy_intent(
         self,
@@ -112,12 +120,13 @@ class GraphVisAgent:
         queue: Any,
         chat_id: int,
         network_id: int,
-    ) -> Tuple[str, List[Dict[str, Any]]]:
+    ) -> Tuple[str, List[Dict[str, Any]], UsageData]:
         """
         Orchestrates a single turn of the agent (User Input -> [Thoughts/Actions] -> Final Response).
         Returns:
             final_text: The string response to the user.
             execution_log: A list of steps containing tool calls and results for persistence.
+            total_usage: Token usage accumulated across every provider.generate() call this turn.
         """
         logger.info(f"Starting agent turn for Chat ID: {chat_id}, Network ID: {network_id}")
 
@@ -129,7 +138,7 @@ class GraphVisAgent:
 
         # 3. Enter Tool Execution Loop within Session Scope
         async with mcp_client.session_scope() as session:
-            final_text, execution_log = await self._execute_tool_loop(
+            final_text, execution_log, total_usage = await self._execute_tool_loop(
                 initial_stream=initial_stream,
                 history=history,
                 all_tools=all_tools,
@@ -138,7 +147,7 @@ class GraphVisAgent:
                 network_id=network_id,
                 session=session,
             )
-            return final_text, execution_log
+            return final_text, execution_log, total_usage
 
     async def _execute_tool_loop(
         self,
@@ -149,7 +158,7 @@ class GraphVisAgent:
         chat_id: int,
         network_id: int,
         session: Any,
-    ) -> Tuple[str, List[Dict[str, Any]]]:
+    ) -> Tuple[str, List[Dict[str, Any]], UsageData]:
         """Manages the ReAct loop: Consumption -> Execution -> Observation -> Next Generation."""
         current_stream = initial_stream
         max_iterations = 10
@@ -159,14 +168,24 @@ class GraphVisAgent:
         execution_log = []
         loop_context = {"network_id": network_id, "tools_executed": False}
         tool_call_counter = 0
+        total_usage = UsageData()
+        provider_name = os.getenv("LLM_PROVIDER", "google").lower()
 
         while iteration < max_iterations:
             iteration += 1
 
             # Step A: Consume Stream
-            chunk_text, chunk_thought, function_calls = await self._consume_stream(
+            chunk_text, chunk_thought, function_calls, iter_usage = await self._consume_stream(
                 current_stream, queue
             )
+
+            # Iterations are separate generate() calls, each with its own full input
+            # context, so input/cached tokens are SUMMED across iterations.
+            total_usage.input_tokens += iter_usage.input_tokens
+            total_usage.output_tokens += iter_usage.output_tokens
+            total_usage.cached_input_tokens += iter_usage.cached_input_tokens
+            if iter_usage.input_tokens or iter_usage.output_tokens:
+                await self._emit_usage_update(queue, total_usage, provider_name, self.provider.model_name)
 
             if chunk_thought:
                 full_transcript += f"<thought>{chunk_thought}</thought>\n\n"
@@ -201,8 +220,8 @@ class GraphVisAgent:
 
                 result_text = full_transcript
                 if not result_text.strip():
-                    return "I have processed your request.", execution_log
-                return result_text, execution_log
+                    return "I have processed your request.", execution_log, total_usage
+                return result_text, execution_log, total_usage
 
             # Step C: Execute Tools (Parallelized)
             step_log = await self._execute_tools_and_update_history(
@@ -223,9 +242,13 @@ class GraphVisAgent:
             current_stream = self.provider.generate(history, all_tools, SYSTEM_INSTRUCTION)
 
         if not full_transcript.strip():
-            return "I have completed the requested actions, but the process reached its step limit before generating a final report.", execution_log
+            return (
+                "I have completed the requested actions, but the process reached its step limit before generating a final report.",
+                execution_log,
+                total_usage,
+            )
 
-        return full_transcript, execution_log
+        return full_transcript, execution_log, total_usage
 
     async def _execute_tools_and_update_history(
         self,
@@ -376,7 +399,7 @@ class GraphVisAgent:
             loop_context["network_id"] = new_id
             return
 
-        if function_name in ["update_node_label"]:
+        if function_name in ["node_update_label"]:
             await self._auto_generate_visualization(current_network_id, queue, session)
             return
 
@@ -395,7 +418,7 @@ class GraphVisAgent:
         """Triggers visualization generation for a new network context."""
         try:
             vis_data = await mcp_client.execute_tool(
-                "generate_visualization", {"network_id": network_id}, session=session
+                "visualization_generate", {"network_id": network_id}, session=session
             )
             if isinstance(vis_data, dict) and "nodes" in vis_data:
                 await self._emit_render_update(queue, vis_data)
@@ -429,6 +452,18 @@ class GraphVisAgent:
 
     async def _emit_render_update(self, queue: Any, vis_data: Dict):
         await queue.put({"event": "render_update", "data": json.dumps(vis_data)})
+
+    async def _emit_usage_update(self, queue: Any, usage: UsageData, provider_name: str, model_name: str):
+        from .pricing import estimate_cost_usd
+        cost = estimate_cost_usd(model_name, usage.input_tokens, usage.output_tokens, usage.cached_input_tokens)
+        await queue.put({"event": "usage_update", "data": json.dumps({
+            "input_tokens": usage.input_tokens,
+            "output_tokens": usage.output_tokens,
+            "cached_input_tokens": usage.cached_input_tokens,
+            "estimated_cost_usd": cost,
+            "provider": provider_name,
+            "model": model_name,
+        })})
 
     def _update_chat_state(self, chat_id: int, network_id: int = None, vis_data: Dict = None):
         """Helper to update chat state in DB."""

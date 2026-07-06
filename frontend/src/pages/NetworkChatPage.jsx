@@ -5,6 +5,7 @@ import { useNetworkStore } from '../stores/networkStore';
 import { useAuthStore } from '../stores/authStore';
 import { useChatConnection } from '../hooks/useChatConnection';
 import NetworkGraph from '../components/NetworkGraph';
+import LegendPanel from '../components/LegendPanel';
 import ChatInterface from '../components/ChatInterface';
 import NodeDetailsPanel from '../components/NodeDetailsPanel';
 import ChatList from '../components/ChatList';
@@ -323,13 +324,14 @@ const NetworkChatPage = () => {
             />
           )}
 
-          <NetworkGraph 
-            nodes={nodes} 
-            links={links} 
-            showLabels={showLabels} 
+          <NetworkGraph
+            nodes={nodes}
+            links={links}
+            showLabels={showLabels}
             onNodeClick={handleNodeClick}
             onBackgroundClick={handleBackgroundClick}
           />
+          {nodes.length > 0 && <LegendPanel />}
           {nodes.length === 0 && (
             <div style={{
               position: 'absolute',

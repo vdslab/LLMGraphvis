@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Any, List, Tuple
 
 from sqlalchemy.orm import Session
@@ -7,7 +8,7 @@ from common import models
 from app.core.logging import get_logger
 
 from . import engine, events, history, local_tools, mcp_client, context
-from .providers.types import LLMTextPart
+from .providers.types import LLMTextPart, UsageData
 
 logger = get_logger(__name__)
 
@@ -22,7 +23,9 @@ def _format_exception_message(e: BaseException) -> str:
     return f"{type(e).__name__}: {str(e)}"
 
 
-async def process_chat(chat_id: int, user_message: str, db: Session) -> Tuple[str, List[Any]]:
+async def process_chat(
+    chat_id: int, user_message: str, db: Session
+) -> Tuple[str, List[Any], UsageData, str, str]:
     """Process a chat message using the configured LLM provider with function calling."""
     logger.info(f"Processing chat_id={chat_id}, message='{user_message[:50]}...'")
     queue = await events.get_event_queue(chat_id)
@@ -58,15 +61,16 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> Tuple[st
 
         # 2. Delegate to GraphVisAgent
         agent = engine.GraphVisAgent(db)
+        provider_name = os.getenv("LLM_PROVIDER", "google").lower()
 
-        final_response_text, execution_log = await agent.process_turn(
+        final_response_text, execution_log, total_usage = await agent.process_turn(
             history=chat_history,
             queue=queue,
             chat_id=chat_id,
             network_id=network_id,
         )
 
-        return final_response_text, execution_log
+        return final_response_text, execution_log, total_usage, provider_name, agent.provider.model_name
 
     except Exception as e:
         logger.error(f"Error in process_chat: {e}")
@@ -75,4 +79,4 @@ async def process_chat(chat_id: int, user_message: str, db: Session) -> Tuple[st
         await queue.put({"event": "error", "data": str(e)})
 
         error_msg = _format_exception_message(e)
-        return f"I encountered an error: {error_msg}", []
+        return f"I encountered an error: {error_msg}", [], UsageData(), "", ""

@@ -13,8 +13,9 @@ logger = logging.getLogger(__name__)
 def layout_forceatlas2(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     max_iter: Annotated[Optional[int], Field(description="Maximum iterations. Defaults to auto (1000–5000 based on graph size).")] = None,
-    gravity: Annotated[float, Field(description="Gravity constant pulling nodes toward center. Default 1.0.")] = 1.0,
-    scaling_ratio: Annotated[Optional[float], Field(description="Scaling ratio for node repulsion. Defaults to auto based on avg degree.")] = None
+    gravity: Annotated[Optional[float], Field(description="Gravity constant pulling nodes toward center. Defaults to 1.0 (standard gravity) if not specified.")] = None,
+    scaling_ratio: Annotated[Optional[float], Field(description="Scaling ratio for node repulsion. Defaults to auto based on avg degree.")] = None,
+    force_recompute: Annotated[bool, Field(description="If True, bypasses the cache and always recomputes, even if a valid cached result exists for this exact graph state and parameters. Default False preserves current auto-caching behavior.")] = False
 ) -> str:
     """
     Calculates a ForceAtlas2 force-directed layout and saves x, y coordinates as node attributes.
@@ -30,7 +31,14 @@ def layout_forceatlas2(
     """
     with get_db_context() as db:
         from app.logic import layout
-        layout.calculate_layout(network_id, "forceatlas2", db)
+        overrides = {
+            "max_iter": max_iter,
+            "gravity": gravity,
+            "scaling_ratio": scaling_ratio,
+        }
+        layout.calculate_layout(
+            network_id, "forceatlas2", db, overrides=overrides, force=force_recompute
+        )
         return "ForceAtlas2 layout calculated. Call `visualization_apply_layout` to render."
 
 
@@ -39,7 +47,8 @@ def layout_forceatlas2(
 def layout_spring(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     iterations: Annotated[Optional[int], Field(description="Number of iterations. Defaults to auto (200–1000 based on graph size).")] = None,
-    k: Annotated[Optional[float], Field(description="Optimal distance between nodes. Defaults to auto.")] = None
+    k: Annotated[Optional[float], Field(description="Optimal distance between nodes. Defaults to auto.")] = None,
+    force_recompute: Annotated[bool, Field(description="If True, bypasses the cache and always recomputes, even if a valid cached result exists for this exact graph state and parameters. Default False preserves current auto-caching behavior.")] = False
 ) -> str:
     """
     Calculates a Spring (Fruchterman-Reingold) force-directed layout and saves x, y coordinates.
@@ -55,5 +64,8 @@ def layout_spring(
     """
     with get_db_context() as db:
         from app.logic import layout
-        layout.calculate_layout(network_id, "spring", db)
+        overrides = {"iterations": iterations, "k": k}
+        layout.calculate_layout(
+            network_id, "spring", db, overrides=overrides, force=force_recompute
+        )
         return "Spring layout calculated. Call `visualization_apply_layout` to render."

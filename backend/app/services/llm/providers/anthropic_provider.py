@@ -13,11 +13,15 @@ from .types import (
     LLMTextPart,
     StreamChunk,
     ToolDefinition,
+    UsageData,
 )
 
 logger = get_logger(__name__)
 
 
+# TODO: if the debug log below never fires in production logs, this function and its
+# call site can be safely removed as dead code (Gemini-specific uppercase-type quirk
+# that MCP/Pydantic-generated schemas don't exhibit).
 def _lowercase_schema_types(schema) -> dict:
     """Recursively convert uppercase JSON Schema type values to lowercase.
 
@@ -29,6 +33,11 @@ def _lowercase_schema_types(schema) -> dict:
     result = {}
     for key, value in schema.items():
         if key == "type" and isinstance(value, str):
+            if value != value.lower():
+                logger.debug(
+                    f"_lowercase_schema_types: found non-lowercase type value {value!r} "
+                    "— this function may not be dead code after all"
+                )
             result[key] = value.lower()
         elif isinstance(value, dict):
             result[key] = _lowercase_schema_types(value)
@@ -57,11 +66,11 @@ class AnthropicProvider(LLMProvider):
             msg = f"Using Anthropic on Vertex AI (Project: {project_id}, Region: {region})"
             logger.info(msg)
             print(msg)
-            return anthropic.AsyncAnthropicVertex(project_id=project_id, region=region)
+            return anthropic.AsyncAnthropicVertex(project_id=project_id, region=region, max_retries=5)
         else:
             logger.info("Using Anthropic API (direct)")
             print("Using Anthropic API (direct)")
-            return anthropic.AsyncAnthropic()
+            return anthropic.AsyncAnthropic(max_retries=5)
 
     def _to_anthropic_messages(self, history: List[LLMMessage]) -> List[dict]:
         """Convert LLMMessage list to Anthropic messages format.
@@ -155,6 +164,13 @@ class AnthropicProvider(LLMProvider):
         # Accumulate partial tool-call inputs, keyed by content block index
         pending_tools: dict = {}
 
+        # Usage accounting: input/cached tokens arrive once at message_start;
+        # output_tokens arrives on message_delta as a running total for this stream,
+        # so we simply overwrite usage_output rather than summing deltas.
+        usage_input = 0
+        usage_cached = 0
+        usage_output = 0
+
         async with self.client.messages.stream(
             model=self.model_name,
             max_tokens=16000,
@@ -197,3 +213,25 @@ class AnthropicProvider(LLMProvider):
                         yield StreamChunk(function_calls=[
                             FunctionCallData(name=tc["name"], args=args, call_id=tc["id"])
                         ])
+
+                elif etype == "message_start":
+                    u = getattr(event.message, "usage", None)
+                    if u is not None:
+                        usage_input = getattr(u, "input_tokens", 0) or 0
+                        usage_cached = getattr(u, "cache_read_input_tokens", 0) or 0
+
+                elif etype == "message_delta":
+                    u = getattr(event, "usage", None)
+                    if u is not None:
+                        # message_delta.usage.output_tokens is a running total for this
+                        # stream (not a delta) — overwrite rather than accumulate.
+                        output_tokens = getattr(u, "output_tokens", None)
+                        if output_tokens is not None:
+                            usage_output = output_tokens
+
+                elif etype == "message_stop":
+                    yield StreamChunk(usage=UsageData(
+                        input_tokens=usage_input,
+                        output_tokens=usage_output,
+                        cached_input_tokens=usage_cached,
+                    ))

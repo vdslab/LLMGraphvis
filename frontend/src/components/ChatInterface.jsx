@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import remarkColorPreview from '../utils/remarkColorPreview';
+import UsageBadge from './UsageBadge';
 
 const ThinkingBlock = ({ content, defaultOpen = false, isStreaming = false }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -164,14 +165,17 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>
-        <h3>Chat</h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+          <h3 style={{ margin: 0 }}>Chat</h3>
+          <UsageBadge />
+        </div>
         {nodes.length > 0 && (
           <>
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              style={{ display: 'none' }} 
-              onChange={handleFileUpload} 
+            <input
+              type="file"
+              ref={fileInputRef}
+              style={{ display: 'none' }}
+              onChange={handleFileUpload}
               accept=".graphml,.xml"
             />
             <button className="btn" onClick={() => fileInputRef.current.click()}>
@@ -217,6 +221,16 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
     >
         {messages.map((msg, idx) => {
           // Parse <thought> tags and <tool_execution_marker> tags
+          //
+          // NOTE (future extension point, not implemented): this tool_execution_marker + tool_executions[]
+          // mechanism is the recommended foundation for a future interactive parameter-tuning UI — e.g. a
+          // widget that lets the user adjust a tool's already-applied parameters (like node size min/max,
+          // or a layout's max_iter) via sliders rendered inline in the chat, which re-invoke the same MCP
+          // tool with edited values. Each tool_executions[i].result already carries the tool's full resolved
+          // config. A lighter-weight alternative precedent for inline structured content is the
+          // remarkColorPreview.js custom remark plugin (see src/utils/remarkColorPreview.js), used elsewhere
+          // in this file for inline color swatches. No new plumbing is needed for either approach — both
+          // already stream arbitrary JSON per tool call over the existing SSE/tool_executions path.
           const parts = msg.content.split(/(<thought>[\s\S]*?(?:<\/thought>|$)|<tool_execution_marker index="\d+"\/>)/g);
           
           let hasInlineTools = false;

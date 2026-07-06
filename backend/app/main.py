@@ -7,8 +7,10 @@ from common.models import Base
 from app.core.database import engine
 from app.middleware.logging import LoggingMiddleware
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Database schema is managed exclusively by Alembic (see backend/alembic/),
+# which runs via `alembic upgrade head` before this app starts (see
+# docker-compose.yml / backend/Dockerfile). Do not create tables here.
+# Base.metadata.create_all(bind=engine)
 
 # Create FastAPI app with Swagger UI configuration
 app = FastAPI(

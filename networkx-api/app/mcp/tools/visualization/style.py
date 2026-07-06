@@ -59,9 +59,9 @@ def visualization_set_node_color(
 def visualization_set_node_size(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     attribute: Annotated[str, Field(description="Node attribute name to use for sizing (e.g., 'degree_centrality', 'pagerank'). Calculate first if needed.")],
-    min_size: Annotated[Optional[float], Field(description="Minimum node radius. Leave as None for adaptive auto-sizing (recommended).")] = None,
-    max_size: Annotated[Optional[float], Field(description="Maximum node radius. Leave as None for adaptive auto-sizing (recommended).")] = None,
-    default_size: Annotated[Optional[float], Field(description="Default radius for nodes with missing attribute values.")] = None,
+    min_size: Annotated[Optional[float], Field(description="Minimum node size (area-proportional; rendered radius = sqrt(size * 10 / π)). Leave as None for adaptive auto-sizing (recommended).")] = None,
+    max_size: Annotated[Optional[float], Field(description="Maximum node size (area-proportional; rendered radius = sqrt(size * 10 / π)). Leave as None for adaptive auto-sizing (recommended).")] = None,
+    default_size: Annotated[Optional[float], Field(description="Default node size (area-proportional; rendered radius = sqrt(size * 10 / π)) for nodes with missing attribute values.")] = None,
     scaling_factor: Annotated[float, Field(description="Global size multiplier. Use > 1.0 to enlarge all nodes, < 1.0 to shrink.")] = 1.0
 ) -> dict:
     """
@@ -69,6 +69,10 @@ def visualization_set_node_size(
 
     All other visual settings (layout, colors, edge styles) are preserved.
     Leaving min/max/default as None uses smart adaptive sizing based on network density.
+
+    Note: `size` is not a literal pixel radius — it scales with node area, so doubling
+    `size` does not double the visible radius. The frontend renders the visible radius
+    as sqrt(size * 10 / π).
 
     Returns:
         dict: The updated visualization object (nodes, links, legend).

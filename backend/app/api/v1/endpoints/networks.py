@@ -190,7 +190,7 @@ async def get_node_details(
         raise HTTPException(status_code=403, detail="Access denied")
 
     result = await mcp_client.execute_tool(
-        "get_node_details", {"network_id": network_id, "node_id": node_id}
+        "node_get_details", {"network_id": network_id, "node_id": node_id}
     )
 
     # Helper for error handling from tool

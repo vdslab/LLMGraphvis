@@ -28,7 +28,15 @@ def subgraph_ego_network(
     """
     with get_db_context() as db:
         from app.logic import subgraph, visualization_builder
-        new_id = subgraph.create_ego_network(db, network_id, center_node_id, radius, "_ego")
+        result = subgraph.create_ego_network(
+            source_network_id=network_id,
+            center_node_id=center_node_id,
+            radius=radius,
+            db=db,
+            preserve_layout=True,
+            description=f"Ego network of '{center_node_id}' (radius={radius})."
+        )
+        new_id = result["new_network_id"]
         vis_data = visualization_builder.build_visualization(db, new_id)
         return {
             "network_id": new_id,
@@ -42,22 +50,38 @@ def subgraph_ego_network(
 def subgraph_community(
     network_id: Annotated[int, Field(description="The ID of the source network.")],
     community_id: Annotated[str, Field(description="The community label to extract (as assigned by analysis_detect_communities).")],
-    community_attribute: Annotated[str, Field(description="Node attribute holding community labels.")] = "community"
+    community_attribute: Annotated[str, Field(description="The exact node attribute name holding community labels. Pass the exact attribute name returned by `analysis_detect_communities` (e.g. 'louvain_community').")]
 ) -> dict:
     """
     Creates a subgraph containing only nodes belonging to a specific community.
 
     Run `analysis_detect_communities` first, then use this to isolate one community for
-    deeper analysis. The community_id corresponds to values of the 'community' attribute.
+    deeper analysis. The community_attribute MUST match the exact attribute name reported
+    by `analysis_detect_communities` (e.g. 'louvain_community', 'greedy_modularity_community') —
+    it is NOT a fixed attribute called 'community'. The community_id corresponds to values
+    of that attribute.
     After creation, call `visualization_switch_network(new_network_id)` to display.
 
     Returns:
         dict: {"network_id": int, "network": dict, "content": str}
     """
     with get_db_context() as db:
-        from app.logic import subgraph, visualization_builder
-        filters = [{"attribute": community_attribute, "operator": "==", "value": community_id}]
-        new_id = subgraph.create_subgraph_by_attributes(db, network_id, node_filters=filters, new_name_suffix="_community")
+        from app.logic import visualization_builder, filter as filter_logic
+        from app.schemas.filter import AttributeCondition
+
+        condition = AttributeCondition(
+            attribute_name=community_attribute,
+            categories=[community_id]
+        )
+        result = filter_logic.create_subgraph_by_filter(
+            network_id=network_id,
+            conditions=[condition],
+            suffix="_community",
+            db=db,
+            preserve_layout=True,
+            description=f"Community '{community_id}' subgraph (attribute='{community_attribute}')."
+        )
+        new_id = result["new_network_id"]
         vis_data = visualization_builder.build_visualization(db, new_id)
         return {
             "network_id": new_id,
@@ -118,7 +142,13 @@ def subgraph_largest_component(
     """
     with get_db_context() as db:
         from app.logic import subgraph, visualization_builder
-        new_id = subgraph.create_largest_component_subgraph(db, network_id, "_largest_component")
+        result = subgraph.create_largest_component_subgraph(
+            source_network_id=network_id,
+            db=db,
+            preserve_layout=True,
+            description="Largest connected component of the network."
+        )
+        new_id = result["new_network_id"]
         vis_data = visualization_builder.build_visualization(db, new_id)
         return {
             "network_id": new_id,
@@ -146,7 +176,14 @@ def subgraph_high_degree_nodes(
     """
     with get_db_context() as db:
         from app.logic import subgraph, visualization_builder
-        new_id = subgraph.filter_nodes_by_degree(db, network_id, min_degree, "_high_degree")
+        result = subgraph.filter_nodes_by_degree(
+            source_network_id=network_id,
+            min_degree=min_degree,
+            db=db,
+            preserve_layout=True,
+            description=f"Nodes with degree >= {min_degree}."
+        )
+        new_id = result["new_network_id"]
         vis_data = visualization_builder.build_visualization(db, new_id)
         return {
             "network_id": new_id,

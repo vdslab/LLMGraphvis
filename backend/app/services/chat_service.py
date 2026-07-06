@@ -57,7 +57,7 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
         await queue.put({"event": "thinking_stream", "data": {"content": msg + "\n"}})
         
         import_result = await mcp_client.execute_tool(
-            "import_graphml",
+            "network_import_graphml",
             {"network_id": network_id, "graphml_data": graphml_data},
         )
         
@@ -74,8 +74,8 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
         await queue.put({"event": "thinking_stream", "data": {"content": msg + "\n"}})
         
         layout_result = await mcp_client.execute_tool(
-            "calculate_layout",
-            {"network_id": final_network_id, "layout_name": "forceatlas2"}
+            "layout_forceatlas2",
+            {"network_id": final_network_id}
         )
         
         # layout tool returns string message or "Error: ..."
@@ -88,7 +88,7 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
         await queue.put({"event": "thinking_stream", "data": {"content": msg + "\n"}})
         
         vis_data = await mcp_client.execute_tool(
-            "generate_visualization",
+            "visualization_generate",
             {"network_id": final_network_id}
         )
         
@@ -165,19 +165,46 @@ async def handle_process_background(chat_id: int, user_message: str) -> None:
     db = database.SessionLocal()
     try:
         # Process chat and get response
-        # process_turn now returns (final_text, execution_log)
-        final_response_text, execution_log = await llm_service.process_chat(chat_id, user_message, db)
+        # process_turn now returns (final_text, execution_log, total_usage, provider_name, model_name)
+        (
+            final_response_text,
+            execution_log,
+            total_usage,
+            provider_name,
+            model_name,
+        ) = await llm_service.process_chat(chat_id, user_message, db)
 
         # Save Assistant Message
         if final_response_text:
             db_msg = models.ChatMessage(
-                chat_id=chat_id, 
-                role="model", 
+                chat_id=chat_id,
+                role="model",
                 content=final_response_text,
             )
             db.add(db_msg)
             db.commit()
             db.refresh(db_msg)
+
+            # Persist token usage for this turn, now that db_msg.id exists.
+            if total_usage and (total_usage.input_tokens or total_usage.output_tokens):
+                from app.services.llm.pricing import estimate_cost_usd
+
+                cost = estimate_cost_usd(
+                    model_name,
+                    total_usage.input_tokens,
+                    total_usage.output_tokens,
+                    total_usage.cached_input_tokens,
+                )
+                db.add(models.LlmUsage(
+                    message_id=db_msg.id,
+                    provider=provider_name,
+                    model=model_name,
+                    input_tokens=total_usage.input_tokens,
+                    output_tokens=total_usage.output_tokens,
+                    cached_input_tokens=total_usage.cached_input_tokens,
+                    estimated_cost_usd=cost,
+                ))
+                db.commit()
 
             # Persist separate Tool Executions
             if execution_log:

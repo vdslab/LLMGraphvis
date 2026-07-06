@@ -24,6 +24,7 @@ from .types import (
     LLMTextPart,
     StreamChunk,
     ToolDefinition,
+    UsageData,
 )
 
 logger = get_logger(__name__)
@@ -83,7 +84,11 @@ class GoogleGenAIProvider(LLMProvider):
                     parts.append(types.Part.from_function_response(
                         name=part.name, response=part.response
                     ))
-            result.append(types.Content(role=msg.role, parts=parts))
+            # Gemini's Content.role only accepts "user"/"model". Function-call results
+            # (role == "tool") are conventionally sent as "user"-role content, mirroring
+            # how the Anthropic provider folds tool_result blocks into a "user" turn.
+            role = "user" if msg.role in ("user", "tool") else "model"
+            result.append(types.Content(role=role, parts=parts))
         return result
 
     def _to_gemini_tools(self, tools: List[ToolDefinition]) -> List[types.Tool]:
@@ -140,8 +145,12 @@ class GoogleGenAIProvider(LLMProvider):
         response = await self._raw_generate(gemini_history, gemini_tools, system_instruction)
 
         in_simulated_thought = False
+        last_usage = None
 
         async for chunk in response:
+            if getattr(chunk, "usage_metadata", None):
+                last_usage = chunk.usage_metadata
+
             if not chunk.candidates:
                 continue
             cand = chunk.candidates[0]
@@ -193,3 +202,10 @@ class GoogleGenAIProvider(LLMProvider):
                     yield StreamChunk(function_calls=[
                         FunctionCallData(name=fc.name, args=dict(fc.args))
                     ])
+
+        if last_usage is not None:
+            yield StreamChunk(usage=UsageData(
+                input_tokens=last_usage.prompt_token_count or 0,
+                output_tokens=last_usage.candidates_token_count or 0,
+                cached_input_tokens=getattr(last_usage, "cached_content_token_count", 0) or 0,
+            ))
