@@ -167,6 +167,14 @@ def _sanitize_schema(schema: dict) -> dict:
     if "$defs" in new_schema:
         del new_schema["$defs"]
 
+    # Pydantic renders Tuple[...] as a JSON Schema "prefixItems" tuple (draft 2020-12),
+    # which Gemini's Schema type rejects with extra_forbidden. Downgrade to a plain
+    # homogeneous "items" schema, keeping minItems/maxItems to preserve the length.
+    if "prefixItems" in new_schema:
+        prefix_items = new_schema.pop("prefixItems")
+        if "items" not in new_schema and prefix_items:
+            new_schema["items"] = prefix_items[0]
+
     for key, value in new_schema.items():
         if isinstance(value, dict):
             new_schema[key] = _sanitize_schema(value)

@@ -5,6 +5,10 @@ WORKDIR /app
 # Install system dependencies if needed (e.g. for psycopg2)
 RUN apt-get update && apt-get install -y libpq-dev gcc && rm -rf /var/lib/apt/lists/*
 
+# Prefer IPv6 for outbound connections (see comments in the file). Required for
+# LLM API calls to work on IPv6-only (NAT64/DNS64) networks with Docker Desktop.
+COPY backend/gai.conf /etc/gai.conf
+
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

@@ -7,6 +7,7 @@ import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
 import remarkColorPreview from '../utils/remarkColorPreview';
 import UsageBadge from './UsageBadge';
+import ModelSelector from './ModelSelector';
 
 const ThinkingBlock = ({ content, defaultOpen = false, isStreaming = false }) => {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -167,7 +168,10 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
       <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
           <h3 style={{ margin: 0 }}>Chat</h3>
-          <UsageBadge />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <ModelSelector />
+            <UsageBadge />
+          </div>
         </div>
         {nodes.length > 0 && (
           <>

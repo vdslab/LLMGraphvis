@@ -93,10 +93,14 @@ export const getNodeDetails = (networkId, nodeId) =>
   api.get(`/networks/${networkId}/nodes/${nodeId}`);
 
 // Create chat
-export const createChat = (name) => api.post('/chat', { name });
+export const createChat = (name, provider, model) =>
+  api.post('/chat', { name, provider, model });
 
-// Update chat (e.g. rename)
+// Update chat (e.g. rename, or pin its LLM provider/model)
 export const updateChat = (chatId, data) => api.patch(`/chat/${chatId}`, data);
+
+// List available LLM providers/models a chat can be pinned to
+export const getLlmProviders = () => api.get('/chat/providers');
 
 // Process message
 export const processMessage = (chatId, content) =>

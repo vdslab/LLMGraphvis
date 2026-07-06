@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import AsyncIterator, List
+from typing import AsyncIterator, List, Optional
 
 from dotenv import load_dotenv
 from google import genai
@@ -50,9 +50,9 @@ def _is_retryable_error(exception) -> bool:
 
 
 class GoogleGenAIProvider(LLMProvider):
-    def __init__(self):
+    def __init__(self, model_name: Optional[str] = None):
         self.client = self._initialize_client()
-        self.model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        self.model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
     def _initialize_client(self) -> genai.Client:
         project_id = os.getenv("VERTEX_PROJECT_ID")

@@ -33,22 +33,38 @@ class ChatBase(BaseModel):
 
 
 class ChatCreate(ChatBase):
-    pass
+    provider: Optional[str] = None
+    model: Optional[str] = None
 
 
-class ChatUpdate(ChatBase):
-    pass
+class ChatUpdate(BaseModel):
+    name: Optional[str] = None
+    provider: Optional[str] = None
+    model: Optional[str] = None
 
 
 class Chat(ChatBase):
     id: int
     user_id: int
     network_id: int
+    provider: Optional[str] = None
+    model: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class LlmModelOption(BaseModel):
+    id: str
+    label: str
+
+
+class LlmProviderOption(BaseModel):
+    id: str
+    label: str
+    models: List[LlmModelOption]
 
 
 class Network(BaseModel):

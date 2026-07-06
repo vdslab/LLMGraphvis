@@ -27,15 +27,14 @@ logger = get_logger(__name__)
 load_dotenv()
 
 
-def _create_provider() -> LLMProvider:
-    """Instantiate the LLM provider selected by the LLM_PROVIDER env var."""
-    provider_name = os.getenv("LLM_PROVIDER", "google").lower()
+def _create_provider(provider_name: str, model_name: Optional[str] = None) -> LLMProvider:
+    """Instantiate the given LLM provider, optionally pinned to a specific model."""
     if provider_name == "anthropic":
         from .providers.anthropic_provider import AnthropicProvider
-        return AnthropicProvider()
+        return AnthropicProvider(model_name=model_name)
     else:
         from .providers.google_genai import GoogleGenAIProvider
-        return GoogleGenAIProvider()
+        return GoogleGenAIProvider(model_name=model_name)
 
 
 class GraphVisAgent:
@@ -44,9 +43,12 @@ class GraphVisAgent:
     Encapsulates the LLM interaction loop, tool execution, and state management.
     """
 
-    def __init__(self, db: Any = None):
+    def __init__(self, db: Any = None, provider_name: Optional[str] = None, model_name: Optional[str] = None):
         self.db = db
-        self.provider = _create_provider()
+        # provider_name/model_name let a chat pin its own provider/model, overriding
+        # the process-wide LLM_PROVIDER/GEMINI_MODEL/CLAUDE_MODEL env var defaults.
+        self.provider_name = (provider_name or os.getenv("LLM_PROVIDER", "google")).lower()
+        self.provider = _create_provider(self.provider_name, model_name)
 
     async def _consume_stream(
         self,
@@ -169,7 +171,7 @@ class GraphVisAgent:
         loop_context = {"network_id": network_id, "tools_executed": False}
         tool_call_counter = 0
         total_usage = UsageData()
-        provider_name = os.getenv("LLM_PROVIDER", "google").lower()
+        provider_name = self.provider_name
 
         while iteration < max_iterations:
             iteration += 1

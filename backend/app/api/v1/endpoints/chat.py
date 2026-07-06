@@ -21,6 +21,7 @@ from app.core import database
 from app.core.logging import get_logger
 from app.services import llm as llm_service
 from app.services.llm import mcp_client
+from app.services.llm.catalog import PROVIDER_CATALOG
 from app.services import chat_service
 
 logger = get_logger(__name__)
@@ -40,6 +41,14 @@ def verify_chat_ownership(chat_id: int, user_id: int, db: Session) -> models.Cha
         raise HTTPException(status_code=404, detail="Chat not found or access denied")
 
     return chat
+
+
+@router.get("/providers", response_model=List[schemas.LlmProviderOption])
+def list_llm_providers(
+    current_user: models.User = Depends(get_current_user),
+):
+    """List the LLM providers/models a chat can be pinned to."""
+    return PROVIDER_CATALOG
 
 
 @router.get("", response_model=List[schemas.Chat])
@@ -86,6 +95,8 @@ async def get_chat(
             "name": chat.name,
             "user_id": chat.user_id,
             "network_id": chat.network_id,
+            "provider": chat.provider,
+            "model": chat.model,
             "created_at": chat.created_at,
             "updated_at": chat.updated_at,
             "network": vis_data,
@@ -99,6 +110,8 @@ async def get_chat(
             "name": chat.name,
             "user_id": chat.user_id,
             "network_id": chat.network_id,
+            "provider": chat.provider,
+            "model": chat.model,
             "created_at": chat.created_at,
             "updated_at": chat.updated_at,
             "network": None,
@@ -167,7 +180,13 @@ def create_chat(
     db.refresh(db_network)
 
     # Create Chat
-    db_chat = models.Chat(name=chat.name, user_id=user_id, network_id=db_network.id)
+    db_chat = models.Chat(
+        name=chat.name,
+        user_id=user_id,
+        network_id=db_network.id,
+        provider=chat.provider,
+        model=chat.model,
+    )
     db.add(db_chat)
     db.commit()
     db.refresh(db_chat)
@@ -252,11 +271,13 @@ def update_chat(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """Update a chat (e.g. rename)"""
+    """Update a chat (e.g. rename, or pin its LLM provider/model)"""
     logger.info(f"Updating chat {chat_id} with data: {chat_update}")
     chat = verify_chat_ownership(chat_id, current_user.id, db)
 
-    chat.name = chat_update.name
+    update_data = chat_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(chat, field, value)
     db.commit()
     db.refresh(chat)
 

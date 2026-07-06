@@ -1,6 +1,6 @@
 import json
 import os
-from typing import AsyncIterator, List
+from typing import AsyncIterator, List, Optional
 
 from app.core.logging import get_logger
 
@@ -52,9 +52,9 @@ def _lowercase_schema_types(schema) -> dict:
 
 
 class AnthropicProvider(LLMProvider):
-    def __init__(self):
+    def __init__(self, model_name: Optional[str] = None):
         self.client = self._initialize_client()
-        self.model_name = os.getenv("CLAUDE_MODEL", "claude-opus-4-8")
+        self.model_name = model_name or os.getenv("CLAUDE_MODEL", "claude-opus-4-8")
 
     def _initialize_client(self):
         import anthropic

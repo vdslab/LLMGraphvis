@@ -1,5 +1,4 @@
 import json
-import os
 from typing import Any, List, Tuple
 
 from sqlalchemy.orm import Session
@@ -59,9 +58,8 @@ async def process_chat(
             }
         )
 
-        # 2. Delegate to GraphVisAgent
-        agent = engine.GraphVisAgent(db)
-        provider_name = os.getenv("LLM_PROVIDER", "google").lower()
+        # 2. Delegate to GraphVisAgent, honoring this chat's pinned provider/model (if any)
+        agent = engine.GraphVisAgent(db, provider_name=chat.provider, model_name=chat.model)
 
         final_response_text, execution_log, total_usage = await agent.process_turn(
             history=chat_history,
@@ -70,7 +68,7 @@ async def process_chat(
             network_id=network_id,
         )
 
-        return final_response_text, execution_log, total_usage, provider_name, agent.provider.model_name
+        return final_response_text, execution_log, total_usage, agent.provider_name, agent.provider.model_name
 
     except Exception as e:
         logger.error(f"Error in process_chat: {e}")

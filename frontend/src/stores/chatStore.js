@@ -6,8 +6,10 @@ import {
   getChatMessages,
   exportNetwork,
   createChat as createChatAPI,
+  updateChat as updateChatAPI,
   processMessage as processMessageAPI,
-  uploadGraphML
+  uploadGraphML,
+  getLlmProviders
 } from '../services/api';
 
 export const useChatStore = create((set, get) => ({
@@ -17,6 +19,11 @@ export const useChatStore = create((set, get) => ({
   thinkingMessage: null,
   streamingMessageId: null,
   runningTool: null,
+
+  // Per-chat LLM provider/model pin (null means "use server default")
+  chatProvider: null,
+  chatModel: null,
+  llmProviders: [],
 
   // Token/cost usage tracking (Stage 7)
   chatUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0 },   // lifetime total for this chat session (client-side accumulation across turns)
@@ -46,6 +53,23 @@ export const useChatStore = create((set, get) => ({
        useNetworkStore.getState().setNetworkId(res.data.network_id);
     }
 
+    set({ chatProvider: res.data.provider ?? null, chatModel: res.data.model ?? null });
+
+    return res.data;
+  },
+
+  // Load the catalog of provider/model options a chat can be pinned to
+  fetchLlmProviders: async () => {
+    if (get().llmProviders.length > 0) return get().llmProviders;
+    const res = await getLlmProviders();
+    set({ llmProviders: res.data });
+    return res.data;
+  },
+
+  // Pin (or clear, with null) this chat's provider/model
+  updateChatSettings: async (chatId, { provider, model }) => {
+    const res = await updateChatAPI(chatId, { provider, model });
+    set({ chatProvider: res.data.provider ?? null, chatModel: res.data.model ?? null });
     return res.data;
   },
   
