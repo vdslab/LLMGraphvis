@@ -103,11 +103,31 @@ class ToolExecution(ToolExecutionBase):
         from_attributes = True
 
 
+class LlmUsageBase(BaseModel):
+    provider: str
+    model: str
+    input_tokens: int
+    output_tokens: int
+    cached_input_tokens: int
+    iteration_count: int
+    estimated_cost_usd: Optional[float] = None
+
+
+class LlmUsage(LlmUsageBase):
+    id: int
+    message_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class ChatMessage(ChatMessageBase):
     id: int
     chat_id: int
     meta_data: Optional[Any] = None
     tool_executions: List[ToolExecution] = []
+    usage: Optional[LlmUsage] = None
     created_at: datetime
 
     class Config:

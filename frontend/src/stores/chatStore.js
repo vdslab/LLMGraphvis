@@ -59,7 +59,23 @@ export const useChatStore = create((set, get) => ({
     // Race condition guard
     if (get().chatId !== id) return;
 
-    set({ messages: res.data });
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let estimatedCostUsd = 0;
+
+    res.data.forEach(msg => {
+      if (msg.usage) {
+        inputTokens += msg.usage.input_tokens || 0;
+        outputTokens += msg.usage.output_tokens || 0;
+        estimatedCostUsd += msg.usage.estimated_cost_usd || 0;
+      }
+    });
+
+    set({ 
+      messages: res.data,
+      chatUsage: { inputTokens, outputTokens, estimatedCostUsd },
+      currentTurnUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0, provider: null, model: null }
+    });
     return res.data;
   },
 

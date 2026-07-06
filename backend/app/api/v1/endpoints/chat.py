@@ -112,11 +112,14 @@ def get_messages(
     db: Session = Depends(database.get_db),
 ):
     """Get all messages for a specific chat"""
+    from sqlalchemy.orm import joinedload
+    
     # Verify ownership
     verify_chat_ownership(chat_id, current_user.id, db)
 
     messages = (
         db.query(models.ChatMessage)
+        .options(joinedload(models.ChatMessage.usage))
         .filter(models.ChatMessage.chat_id == chat_id)
         .order_by(models.ChatMessage.created_at.asc())
         .all()
