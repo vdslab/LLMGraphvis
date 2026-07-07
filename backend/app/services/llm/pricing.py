@@ -8,13 +8,12 @@ IMPORTANT CAVEATS (verify before relying on these for real billing decisions):
   https://platform.claude.com/docs/en/pricing before relying on this for real costs.
   Gemini's Vertex AI pricing should be independently verified against the Vertex AI Model
   Garden pricing page, NOT assumed identical to Google AI Studio pricing.
-- Whether `cached_input_tokens` is already included inside `input_tokens` (double-counting
-  risk) differs by provider and must be verified empirically (log both values from a real
-  cached request and compare against the expected full prompt size) before trusting the
-  cost math below at the margins. This implementation currently assumes cached tokens are
-  NOT double-counted inside input_tokens for Anthropic (per Anthropic's documented API
-  semantics: cache_read_input_tokens is reported separately from input_tokens) - verify this
-  matches what you observe in production before relying on it.
+- Whether `cached_input_tokens` is already included inside `input_tokens` differs by
+  provider: Gemini's `prompt_token_count` INCLUDES `cached_content_token_count`, while
+  Anthropic reports `cache_read_input_tokens` SEPARATELY from `input_tokens`. The
+  `provider` argument to estimate_cost_usd selects the right formula. Verify empirically
+  (log both values from a real cached request and compare against the expected full
+  prompt size) before trusting the cost math at the margins.
 """
 
 # USD per 1,000,000 tokens.
@@ -35,14 +34,28 @@ MODEL_PRICING = {
 DEFAULT_PRICING = {"input": 0.0, "output": 0.0, "cached_input": 0.0}
 
 
-def estimate_cost_usd(model: str, input_tokens: int, output_tokens: int, cached_input_tokens: int = 0) -> float:
+# Providers whose reported input_tokens already include the cached tokens,
+# so the cached portion must be subtracted before applying the full input rate.
+PROVIDERS_WITH_CACHED_IN_INPUT = {"google"}
+
+
+def estimate_cost_usd(
+    model: str,
+    input_tokens: int,
+    output_tokens: int,
+    cached_input_tokens: int = 0,
+    provider: str = "google",
+) -> float:
     """
     Returns an estimated USD cost. Unknown models return $0.0 rather than raising,
     so a newly-introduced model name never crashes usage tracking - it just under-reports
     cost until MODEL_PRICING is updated.
     """
     pricing = MODEL_PRICING.get(model, DEFAULT_PRICING)
-    billable_input = max(input_tokens - cached_input_tokens, 0)
+    if provider in PROVIDERS_WITH_CACHED_IN_INPUT:
+        billable_input = max(input_tokens - cached_input_tokens, 0)
+    else:
+        billable_input = input_tokens
     cost = (
         billable_input * pricing["input"]
         + cached_input_tokens * pricing.get("cached_input", pricing["input"])

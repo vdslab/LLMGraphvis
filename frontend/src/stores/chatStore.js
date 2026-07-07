@@ -123,9 +123,15 @@ export const useChatStore = create((set, get) => ({
   // Upload network file to chat
   uploadNetwork: async (chatId, file) => {
     set({ isLoading: true, thinkingMessage: "Uploading..." });
-    await uploadGraphML(chatId, file);
-    // Response is 202 Accepted.
-    // SSE will handle the rest.
+    try {
+      await uploadGraphML(chatId, file);
+      // Response is 202 Accepted.
+      // SSE will handle the rest.
+    } catch (error) {
+      console.error("Failed to upload network:", error);
+      set({ isLoading: false, thinkingMessage: null });
+      throw error;
+    }
   },
 
   // Send message to process

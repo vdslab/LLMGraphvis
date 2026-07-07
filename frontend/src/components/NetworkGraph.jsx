@@ -10,6 +10,10 @@ const NetworkGraph = memo(({ nodes, links, showLabels = false, onNodeClick, onBa
   const onNodeClickRef = useRef(onNodeClick);
   const onBackgroundClickRef = useRef(onBackgroundClick);
 
+  // Persist the user's pan/zoom across rebuilds (render_update events,
+  // label toggle, resize) so the view doesn't snap back to default.
+  const zoomTransformRef = useRef(d3.zoomIdentity);
+
   useEffect(() => {
     onNodeClickRef.current = onNodeClick;
     onBackgroundClickRef.current = onBackgroundClick;
@@ -163,10 +167,13 @@ const NetworkGraph = memo(({ nodes, links, showLabels = false, onNodeClick, onBa
     const zoom = d3.zoom()
       .scaleExtent([0.1, 10])
       .on("zoom", (event) => {
+        zoomTransformRef.current = event.transform;
         g.attr("transform", event.transform);
       });
 
     svg.call(zoom);
+    // Restore the previous pan/zoom instead of resetting to identity.
+    svg.call(zoom.transform, zoomTransformRef.current);
     
     // Cleanup on unmount
     return () => {

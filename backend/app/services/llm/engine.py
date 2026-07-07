@@ -480,7 +480,13 @@ class GraphVisAgent:
 
     async def _emit_usage_update(self, queue: Any, usage: UsageData, provider_name: str, model_name: str):
         from .pricing import estimate_cost_usd
-        cost = estimate_cost_usd(model_name, usage.input_tokens, usage.output_tokens, usage.cached_input_tokens)
+        cost = estimate_cost_usd(
+            model_name,
+            usage.input_tokens,
+            usage.output_tokens,
+            usage.cached_input_tokens,
+            provider=provider_name,
+        )
         await queue.put({"event": "usage_update", "data": json.dumps({
             "input_tokens": usage.input_tokens,
             "output_tokens": usage.output_tokens,

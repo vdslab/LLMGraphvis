@@ -51,8 +51,10 @@ api.interceptors.response.use(
     }
 
     if (error.response && error.response.status === 401) {
-      // Ignore 401 from checkAuth to allow non-logged in users to visit /register
-      if (error.config.url && error.config.url.includes('/auth/users/me')) {
+      // Auth endpoints handle their own 401s (wrong credentials, checkAuth for
+      // logged-out visitors). Redirecting here would reload the page and wipe
+      // the error message the form is about to show.
+      if (error.config.url && error.config.url.includes('/auth/')) {
         return Promise.reject(error);
       }
 

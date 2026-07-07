@@ -171,7 +171,7 @@ async def get_top_nodes(
         raise HTTPException(status_code=403, detail="Access denied")
 
     result = await mcp_client.execute_tool(
-        "get_top_nodes", {"network_id": network_id, "metric": metric, "k": k}
+        "node_get_top_ranked", {"network_id": network_id, "metric": metric, "n": k}
     )
     return result
 

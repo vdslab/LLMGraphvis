@@ -43,10 +43,13 @@ def health_check():
 
 from app.api.v1.endpoints import analysis, layout, networks, subgraphs, visualization
 
-app.include_router(networks.router, prefix="/api/v1/networks", tags=["networks"])
+# analysis must be registered before networks: its literal route
+# /{network_id}/nodes/top would otherwise be captured by the
+# /{network_id}/nodes/{node_id} wildcard in networks.
 app.include_router(
     analysis.router, prefix="/api/v1/networks", tags=["analysis"]
 )  # Analysis is typically under a network
+app.include_router(networks.router, prefix="/api/v1/networks", tags=["networks"])
 app.include_router(layout.router, prefix="/api/v1/networks", tags=["layout"])
 app.include_router(
     visualization.router, prefix="/api/v1/networks", tags=["visualization"]

@@ -64,7 +64,7 @@ def test_get_top_nodes(db):
     setup_simple_network(db)
     
     # Get top 1 node by degree
-    top = get_top_nodes(1, "degree", 1, db)
+    top = get_top_nodes(1, "degree", 1, "desc", db)
     
     assert len(top) == 1
     assert top[0]["node_id"] == "n0"

@@ -194,6 +194,9 @@ def create_chat(
     return db_chat
 
 
+MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50MB
+
+
 @router.post("/{chat_id}/upload", status_code=202)
 async def upload_network(
     chat_id: int,
@@ -205,7 +208,20 @@ async def upload_network(
     # Verify chat exists and user owns it
     chat = verify_chat_ownership(chat_id, current_user.id, db)
 
-    content = await file.read()
+    # Read in chunks with a hard cap so an oversized upload can't
+    # exhaust server memory before we reject it.
+    chunks = []
+    total_size = 0
+    while chunk := await file.read(1024 * 1024):
+        total_size += len(chunk)
+        if total_size > MAX_UPLOAD_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Maximum size is {MAX_UPLOAD_SIZE // (1024 * 1024)}MB.",
+            )
+        chunks.append(chunk)
+    content = b"".join(chunks)
+
     # Decode assuming utf-8 for GraphML
     try:
         graphml_data = content.decode("utf-8")
@@ -213,6 +229,12 @@ async def upload_network(
         raise HTTPException(
             status_code=400,
             detail="Invalid file encoding. Please upload a valid UTF-8 encoded GraphML file.",
+        )
+
+    if "<graphml" not in graphml_data[:4096]:
+        raise HTTPException(
+            status_code=400,
+            detail="File does not look like a GraphML document.",
         )
 
     # Start background task utilizing the Service Layer

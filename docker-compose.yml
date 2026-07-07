@@ -59,7 +59,9 @@ services:
     volumes:
       - ./backend:/app
       - ./common:/app/common
-      - ${GOOGLE_APPLICATION_CREDENTIALS}:/app/application_default_credentials.json
+      # Falls back to /dev/null when GOOGLE_APPLICATION_CREDENTIALS is unset
+      # (API-key auth) so the mount spec stays valid and compose can start.
+      - ${GOOGLE_APPLICATION_CREDENTIALS:-/dev/null}:/app/application_default_credentials.json
 
   networkx-api:
     build:

@@ -11,6 +11,9 @@ logger = get_logger(__name__)
 from app.core.database import get_db
 
 
+MAX_GRAPHML_SIZE = 50 * 1024 * 1024  # 50MB, matches the backend upload cap
+
+
 @router.post("/initialize")
 def initialize_network(
     network_id: int = Body(...),
@@ -18,6 +21,8 @@ def initialize_network(
     db: Session = Depends(get_db),
 ):
     """Initializes a network from GraphML data."""
+    if len(graphml_data) > MAX_GRAPHML_SIZE:
+        raise HTTPException(status_code=413, detail="GraphML data too large.")
     try:
         logger.info(f"Initializing network_id={network_id}")
         final_network_id = importer.parse_and_save_graphml(network_id, graphml_data, db)

@@ -21,22 +21,24 @@ async def _handle_background_error(chat_id: int, e: Exception, message: str) -> 
 
     # If it's a process error, persist to DB
     if "process" in message:
+        # Use a fresh session for error logging
+        db_error = database.SessionLocal()
         try:
-             # Use a fresh session for error logging
-            db_error = database.SessionLocal()
             error_content = f"I encountered an internal error while processing your request: {str(e)}"
             db_err_msg = models.ChatMessage(
                 chat_id=chat_id, role="model", content=error_content
             )
             db_error.add(db_err_msg)
             db_error.commit()
-            
+
             await queue.put(
                 {"event": "message_complete", "data": json.dumps({"id": db_err_msg.id})}
             )
-            db_error.close()
         except Exception as inner_e:
             logger.error(f"Failed to save error message to DB: {inner_e}")
+            db_error.rollback()
+        finally:
+            db_error.close()
 
 async def handle_upload_background(chat_id: int, network_id: int, graphml_data: str) -> None:
     """
@@ -194,6 +196,7 @@ async def handle_process_background(chat_id: int, user_message: str) -> None:
                     total_usage.input_tokens,
                     total_usage.output_tokens,
                     total_usage.cached_input_tokens,
+                    provider=provider_name,
                 )
                 db.add(models.LlmUsage(
                     message_id=db_msg.id,
@@ -249,11 +252,26 @@ async def handle_process_background(chat_id: int, user_message: str) -> None:
 
             await queue.put(
                 {
-                    "event": "message_complete", 
+                    "event": "message_complete",
                     "data": json.dumps({
                         "id": db_msg.id,
                         "content": db_msg.content,
                         "tool_executions": tool_executions_data
+                    })
+                }
+            )
+        else:
+            # Even an empty response must emit a terminal event, otherwise the
+            # frontend stream stays in the loading state forever.
+            logger.warning(f"Empty LLM response for chat_id={chat_id}")
+            queue = await llm_service.get_event_queue(chat_id)
+            await queue.put(
+                {
+                    "event": "message_complete",
+                    "data": json.dumps({
+                        "id": None,
+                        "content": None,
+                        "tool_executions": []
                     })
                 }
             )

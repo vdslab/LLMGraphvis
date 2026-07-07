@@ -7,7 +7,7 @@ from .providers.types import ToolDefinition
 logger = get_logger(__name__)
 
 
-async def _get_chat_and_network(chat_id: int, db: Session):
+def _get_chat_and_network(chat_id: int, db: Session):
     """Helper to retrieve chat and its current network."""
     chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
     if not chat:

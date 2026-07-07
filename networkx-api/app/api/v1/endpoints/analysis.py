@@ -26,10 +26,16 @@ def calculate_centrality(
 
 @router.get("/{network_id}/nodes/top")
 def get_top_nodes(
-    network_id: int, metric: str, k: int = 10, db: Session = Depends(get_db)
+    network_id: int,
+    metric: str,
+    k: int = 10,
+    order: str = "desc",
+    db: Session = Depends(get_db),
 ):
     """Returns top K nodes based on a metric."""
     try:
-        return centrality.get_top_nodes(network_id, metric, k, db)
+        return centrality.get_top_nodes(network_id, metric, k, order, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
