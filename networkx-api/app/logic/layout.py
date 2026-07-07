@@ -8,6 +8,8 @@ from common import models
 from .attributes import delete_attribute_values, get_or_create_attribute
 from app.core.logging import get_logger
 
+logger = get_logger(__name__)
+
 
 
 def determine_layout_params(G, layout_name: str):
@@ -102,8 +104,6 @@ def calculate_layout(
     overrides: dict = None,
     force: bool = False,
 ):
-    logger = get_logger(__name__)
-
     # Normalize layout name up front (needed for both cache-check and compute paths)
     if layout_name in ["forceatlas2_layout", "force-directed", "force_directed"]:
         layout_name = "forceatlas2"
@@ -256,5 +256,5 @@ def calculate_layout(
         db.commit()
     except Exception as e:
         db.rollback()
-        print(f"Warning: Failed to update last_layout_name: {e}")
+        logger.warning(f"Failed to update last_layout_name: {e}")
         # non-critical, proceed

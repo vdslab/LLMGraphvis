@@ -103,7 +103,7 @@ async def get_chat(
         }
 
     except Exception as e:
-        print(f"Failed to fetch visualization for chat {chat_id}: {e}")
+        logger.exception(f"Failed to fetch visualization for chat {chat_id}: {e}")
         # Fallback to returning chat with empty network data if fails
         return {
             "id": chat.id,

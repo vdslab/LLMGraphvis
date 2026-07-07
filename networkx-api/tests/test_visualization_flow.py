@@ -81,18 +81,18 @@ def test_visualization_flow_strict_check(db, setup_network):
         # Should fail because we removed auto-calculation
         
         with pytest.raises(RuntimeError) as excinfo:
-            tools.generate_visualization(network_id)
+            tools.visualization_generate(network_id)
         
         assert "Missing required attributes" in str(excinfo.value)
         assert "Missing required attributes" in str(excinfo.value)
         
         # 2. Calculate Layout
-        calc_res = tools.calculate_layout(network_id, "forceatlas2")
+        calc_res = tools.layout_forceatlas2(network_id)
         # Verify calculation succeeded
-        assert "Layout 'forceatlas2' calculated" in calc_res, f"Calculation failed: {calc_res}"
+        assert "ForceAtlas2 layout calculated" in calc_res, f"Calculation failed: {calc_res}"
         
         # 3. Verify attributes exist
-        attrs_str = tools.list_node_attributes(network_id)
+        attrs_str = tools.network_list_node_attributes(network_id)
         # attrs_str is stringified dict/list representation from pydantic/sqlalchemy objects or just valid JSON?
         # The tool returns str(stats). Implementation uses str(list_of_dicts).
         # list_node_attributes implementation: "return str(stats)"
@@ -105,7 +105,7 @@ def test_visualization_flow_strict_check(db, setup_network):
         assert "forceatlas2_y" in attrs_str
         
         # 4. Visualize again -> Should success
-        result = tools.generate_visualization(network_id)
+        result = tools.visualization_generate(network_id)
         assert "nodes" in result
         assert "links" in result
         assert len(result["nodes"]) == 2
@@ -119,11 +119,11 @@ def test_color_patterns(db, setup_network):
     
     with mock.patch("app.core.database.SessionLocal", return_value=session_proxy):
         # Ensure layout exists for visualization to work
-        tools.calculate_layout(network_id, "forceatlas2")
+        tools.layout_forceatlas2(network_id)
         
         # Pattern 1: Categorical (Auto)
         # The user/LLM calls update_node_color with categorical scale
-        res1 = tools.update_node_color(
+        res1 = tools.visualization_set_node_color(
             network_id=network_id,
             attribute="country",
             scale_type="CATEGORICAL"
@@ -137,12 +137,12 @@ def test_color_patterns(db, setup_network):
         
         # Verify score attribute stats
         # Verify score attribute stats
-        attrs_str = tools.list_node_attributes(network_id)
-        assert "'name': 'score'" in attrs_str
-        assert "'min': 10.0" in attrs_str
+        attrs_str = tools.network_list_node_attributes(network_id)
+        assert '"name": "score"' in attrs_str
+        assert '"min": 10.0' in attrs_str
         
         # Pattern 2: Numerical (Linear)
-        res2 = tools.update_node_color(
+        res2 = tools.visualization_set_node_color(
             network_id=network_id,
             attribute="score",
             scale_type="LINEAR"
@@ -153,7 +153,7 @@ def test_color_patterns(db, setup_network):
         
         # Pattern 3: Value Match (Fixed)
         # User says "Europe" is Red.
-        res3 = tools.update_node_color(
+        res3 = tools.visualization_set_node_color(
             network_id=network_id,
             attribute="country",
             scale_type="CATEGORICAL",
@@ -170,7 +170,7 @@ def test_missing_style_attribute(db, setup_network):
     network_id = setup_network
     
     # Ensure layout exists so we don't fail on layout check
-    tools.calculate_layout(network_id, "forceatlas2")
+    tools.layout_forceatlas2(network_id)
     
     session_proxy = mock.MagicMock(wraps=db)
     session_proxy.close.return_value = None
@@ -178,7 +178,7 @@ def test_missing_style_attribute(db, setup_network):
     with mock.patch("app.core.database.SessionLocal", return_value=session_proxy):
         # Try to use a non-existent attribute for coloring
         with pytest.raises(RuntimeError) as excinfo:
-            tools.update_node_color(
+            tools.visualization_set_node_color(
                 network_id=network_id,
                 attribute="non_existent_attr",
                 scale_type="CATEGORICAL"

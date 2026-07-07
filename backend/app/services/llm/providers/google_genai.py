@@ -68,13 +68,10 @@ class GoogleGenAIProvider(LLMProvider):
         api_key = os.getenv("GOOGLE_API_KEY")
 
         if project_id:
-            msg = f"Using Vertex AI (Project: {project_id}, Location: {location})"
-            logger.info(msg)
-            print(msg)
+            logger.info(f"Using Vertex AI (Project: {project_id}, Location: {location})")
             return genai.Client(vertexai=True, project=project_id, location=location)
         else:
             logger.info("Using Google AI Studio (API Key)")
-            print("Using Google AI Studio (API Key)")
             return genai.Client(api_key=api_key)
 
     def _to_gemini_history(self, history: List[LLMMessage]) -> List[types.Content]:

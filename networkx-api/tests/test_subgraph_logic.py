@@ -38,13 +38,13 @@ def test_subgraph_fresh_view(db: Session):
     # Add Attributes (x, y, degree)
     # Define Attributes
     attr_x = models.NodeAttribute(
-        network_id=network.id, attribute_name="x", data_type="float"
+        network_id=network.id, attribute_name="x", data_type="float", is_derived=True
     )
     attr_y = models.NodeAttribute(
-        network_id=network.id, attribute_name="y", data_type="float"
+        network_id=network.id, attribute_name="y", data_type="float", is_derived=True
     )
     attr_deg = models.NodeAttribute(
-        network_id=network.id, attribute_name="degree", data_type="float"
+        network_id=network.id, attribute_name="degree", data_type="float", is_derived=True
     )
     attr_custom = models.NodeAttribute(
         network_id=network.id, attribute_name="custom_score", data_type="float"
@@ -110,9 +110,9 @@ def test_subgraph_fresh_view(db: Session):
     assert "x" not in attr_names
     assert "y" not in attr_names
 
-    # 'spring_x', 'spring_y' should be PRESENT because calculating new layout adds them!
-    assert "spring_x" in attr_names
-    assert "spring_y" in attr_names
+    # 'forceatlas2_x', 'forceatlas2_y' should be PRESENT because calculating new layout adds them!
+    assert "forceatlas2_x" in attr_names
+    assert "forceatlas2_y" in attr_names
     assert "custom_score" in attr_names
 
     # Check values
@@ -131,8 +131,8 @@ def test_subgraph_fresh_view(db: Session):
     )
     assert val_custom.float_value == 99.0
 
-    # Get spring_x - should verify it created values
-    spring_x_attr = next(a for a in new_attrs if a.attribute_name == "spring_x")
+    # Get forceatlas2_x - should verify it created values
+    spring_x_attr = next(a for a in new_attrs if a.attribute_name == "forceatlas2_x")
     val_sx = (
         db.query(models.NodeFloatAttributeValue)
         .join(models.NodeAttributeValue)
@@ -154,7 +154,7 @@ def test_subgraph_cutout_view(db: Session):
     - Should exclude topological metrics (e.g. 'degree').
     """
     # 1. Setup Source Network
-    network = models.Network(name="Source Cutout")
+    network = models.Network(name="Source Cutout", last_layout_name="forceatlas2")
     db.add(network)
     db.commit()
     db.refresh(network)
@@ -167,13 +167,13 @@ def test_subgraph_cutout_view(db: Session):
     db.commit()
 
     attr_x = models.NodeAttribute(
-        network_id=network.id, attribute_name="x", data_type="float"
+        network_id=network.id, attribute_name="forceatlas2_x", data_type="float", is_derived=True
     )
     attr_y = models.NodeAttribute(
-        network_id=network.id, attribute_name="y", data_type="float"
+        network_id=network.id, attribute_name="forceatlas2_y", data_type="float", is_derived=True
     )
     attr_deg = models.NodeAttribute(
-        network_id=network.id, attribute_name="degree", data_type="float"
+        network_id=network.id, attribute_name="degree", data_type="float", is_derived=True
     )
     db.add_all([attr_x, attr_y, attr_deg])
     db.commit()
@@ -223,14 +223,15 @@ def test_subgraph_cutout_view(db: Session):
     # 'degree' should be GONE
     assert "degree" not in attr_names
 
-    # 'x', 'y' should be PRESENT
-    assert "x" in attr_names
-    assert "y" in attr_names
+    # Layout coordinates should be PRESENT (preserve_layout keeps the
+    # current layout's coordinate attributes)
+    assert "forceatlas2_x" in attr_names
+    assert "forceatlas2_y" in attr_names
 
     new_nodes = db.query(models.Node).filter(models.Node.network_id == new_net_id).all()
     node_map = {n.node_id: n for n in new_nodes}
 
-    x_attr = next(a for a in new_attrs if a.attribute_name == "x")
+    x_attr = next(a for a in new_attrs if a.attribute_name == "forceatlas2_x")
 
     # Verify values match source exactly
     n0 = node_map["0"]

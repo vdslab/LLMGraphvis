@@ -17,6 +17,15 @@ SSE_ENDPOINT = f"{NETWORKX_API_URL}/mcp/sse"
 # Cache for tools
 _tools_cache = None
 
+
+def _truncate_args_for_log(arguments: dict) -> dict:
+    """Truncate large string values (e.g. whole GraphML documents) before logging."""
+    log_args = arguments.copy()
+    for k, v in log_args.items():
+        if isinstance(v, str) and len(v) > 100:
+            log_args[k] = v[:100] + f"... ({len(v)} chars)"
+    return log_args
+
 async def get_tools() -> list[ToolDefinition]:
     """
     Connects to the NetworkXAPI MCP Server, discovers tools,
@@ -224,13 +233,9 @@ async def execute_tool(tool_name: str, arguments: dict, session: ClientSession =
     If 'session' is provided, it uses the existing session.
     Otherwise, it creates a transient session (old behavior).
     """
-    # Sanitize arguments for logging (truncate large strings)
-    log_args = arguments.copy()
-    for k, v in log_args.items():
-        if isinstance(v, str) and len(v) > 100:
-            log_args[k] = v[:100] + "..."
-
-    logger.info(f"Executing tool: {tool_name} with arguments: {log_args}")
+    logger.info(
+        f"Executing tool: {tool_name} with arguments: {_truncate_args_for_log(arguments)}"
+    )
 
     if session:
         return await _execute_internal(session, tool_name, arguments)
@@ -308,9 +313,10 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
             return {"content": output_text}
 
     except Exception as e:
-        import traceback
-        _log_exception_details(e, f"executing tool {tool_name} with args {arguments}")
-        traceback.print_exc()
+        _log_exception_details(
+            e, f"executing tool {tool_name} with args {_truncate_args_for_log(arguments)}"
+        )
+        logger.exception(f"Tool execution raised: {tool_name}")
         raise _unwrap_exception(e) from e
 
 

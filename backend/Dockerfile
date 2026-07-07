@@ -5,8 +5,9 @@ WORKDIR /app
 # Install system dependencies if needed (e.g. for psycopg2)
 RUN apt-get update && apt-get install -y libpq-dev gcc && rm -rf /var/lib/apt/lists/*
 
-# Prefer IPv6 for outbound connections (see comments in the file). Required for
-# LLM API calls to work on IPv6-only (NAT64/DNS64) networks with Docker Desktop.
+# IPv6-preferring gai.conf for IPv6-only (NAT64/DNS64) networks (see comments
+# in the file). docker-compose.yml bind-mounts /etc/gai.conf over this:
+# /dev/null (glibc default, normal networks) unless PREFER_IPV6_GAI_CONF is set.
 COPY backend/gai.conf /etc/gai.conf
 
 COPY backend/requirements.txt .

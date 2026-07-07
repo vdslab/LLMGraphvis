@@ -55,21 +55,21 @@ def test_label_mode_switch(db, setup_network):
     with mock.patch("app.core.database.SessionLocal", return_value=session_proxy):
         # 0. Initial State: Should be manual labels
         # Need layout first? visualization_builder says so.
-        tools.calculate_layout(network_id, "forceatlas2")
+        tools.layout_forceatlas2(network_id)
         
-        vis0 = tools.generate_visualization(network_id)
+        vis0 = tools.visualization_generate(network_id)
         labels0 = {n["id"]: n["label"] for n in vis0["nodes"]}
         assert labels0["A"] == "Manual A"
         assert labels0["B"] == "Manual B"
         
         # 1. Switch to Attribute Labeling (country)
-        vis1 = tools.update_node_label_mode(network_id, attribute="country")
+        vis1 = tools.visualization_set_node_labels(network_id, attribute="country")
         labels1 = {n["id"]: n["label"] for n in vis1["nodes"]}
         assert labels1["A"] == "Austria"
         assert labels1["B"] == "Belgium"
         
         # 2. Revert to Default (None)
-        vis2 = tools.update_node_label_mode(network_id, attribute=None)
+        vis2 = tools.visualization_set_node_labels(network_id, attribute=None)
         labels2 = {n["id"]: n["label"] for n in vis2["nodes"]}
         assert labels2["A"] == "Manual A"
         assert labels2["B"] == "Manual B"
@@ -80,10 +80,10 @@ def test_label_mode_strict_validation(db, setup_network):
     session_proxy.close.return_value = None
     
     with mock.patch("app.core.database.SessionLocal", return_value=session_proxy):
-        tools.calculate_layout(network_id, "forceatlas2")
+        tools.layout_forceatlas2(network_id)
         
         # Try non-existent attribute
         with pytest.raises(RuntimeError) as excinfo:
-            tools.update_node_label_mode(network_id, attribute="invalid_attr")
+            tools.visualization_set_node_labels(network_id, attribute="invalid_attr")
         
         assert "Missing required attributes" in str(excinfo.value)

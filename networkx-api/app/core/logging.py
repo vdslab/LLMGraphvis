@@ -1,5 +1,11 @@
 import logging
+import os
 import sys
+
+# Process-wide log level, e.g. LOG_LEVEL=DEBUG. Defaults to INFO.
+_LOG_LEVEL = getattr(
+    logging, (os.getenv("LOG_LEVEL") or "INFO").upper(), logging.INFO
+)
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -7,11 +13,11 @@ def get_logger(name: str) -> logging.Logger:
 
     # Only configure if handlers haven't been added yet
     if not logger.handlers:
-        logger.setLevel(logging.INFO)
+        logger.setLevel(_LOG_LEVEL)
 
         # Create console handler
         handler = logging.StreamHandler(sys.stdout)
-        handler.setLevel(logging.INFO)
+        handler.setLevel(_LOG_LEVEL)
 
         # Create formatter
         formatter = logging.Formatter(

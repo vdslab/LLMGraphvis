@@ -1,5 +1,4 @@
 import json
-import traceback
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -14,8 +13,7 @@ logger = get_logger(__name__)
 
 
 async def _handle_background_error(chat_id: int, e: Exception, message: str) -> None:
-    logger.error(f"{message}: {e}")
-    traceback.print_exc()
+    logger.exception(f"{message}: {e}")
     queue = await llm_service.get_event_queue(chat_id)
     await queue.put({"event": "training_error" if "training" in message else "error", "data": str(e)})
 

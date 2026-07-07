@@ -1,7 +1,7 @@
 import json
 import asyncio
+import logging
 import os
-import traceback
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
@@ -397,8 +397,7 @@ class GraphVisAgent:
 
             return result, "completed", None
         except Exception as e:
-            logger.error(f"Tool execution failed: {e}")
-            traceback.print_exc()
+            logger.exception(f"Tool execution failed: {e}")
             return {"error": str(e)}, "failed", str(e)
 
     async def _handle_side_effects(
@@ -509,21 +508,28 @@ class GraphVisAgent:
             self.db.commit()
 
     def _log_history(self, history: List[LLMMessage], iteration: int):
-        """Helper to log the exact data being sent to the LLM context."""
-        logger.info(f"--- Context Sent to LLM (Iteration {iteration}) ---")
-        logger.info(f"Total History Messages: {len(history)}")
+        """Helper to log the exact data being sent to the LLM context.
+
+        Message contents (user text, tool args/results) are user data, so the
+        full dump is DEBUG-only; INFO gets just the size summary.
+        """
+        logger.info(
+            f"Context sent to LLM (iteration {iteration}): {len(history)} history messages"
+        )
+        if not logger.isEnabledFor(logging.DEBUG):
+            return
         for i, msg in enumerate(history):
-            logger.info(f"  [{i}] Role: {msg.role}")
+            logger.debug(f"  [{i}] Role: {msg.role}")
             for part in msg.parts:
                 if isinstance(part, LLMTextPart):
-                    logger.info(f"      TextPart: {part.text[:200].replace(chr(10), ' ')}...")
+                    logger.debug(f"      TextPart: {part.text[:200].replace(chr(10), ' ')}...")
                 elif isinstance(part, LLMFunctionCallPart):
-                    logger.info(f"      ToolCallPart: {part.name}({part.args})")
+                    logger.debug(f"      ToolCallPart: {part.name}({part.args})")
                 elif isinstance(part, LLMFunctionResponsePart):
                     resp_str = json.dumps(part.response, ensure_ascii=False)
                     # Limit log output to avoid console spam, but show structure
-                    logger.info(f"      ToolResponsePart: {part.name} -> {resp_str[:300]}...")
-        logger.info("-" * 50)
+                    logger.debug(f"      ToolResponsePart: {part.name} -> {resp_str[:300]}...")
+        logger.debug("-" * 50)
 
 
 # --- Legacy/Functional Interface for compatibility with existing route handlers ---

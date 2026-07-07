@@ -1,22 +1,14 @@
 from fastapi import FastAPI
 
-from common.models import Base
-from app.core.database import engine
+from app.api.v1.endpoints import analysis, layout, networks, subgraphs, visualization
 from app.core.logging import get_logger
+from app.mcp_server import mcp
 from app.middleware.logging import LoggingMiddleware
 
 logger = get_logger(__name__)
 
-# Create database tables
-# Note: In a real microservices setup with shared DB, we need to be careful about who creates tables.
-# Here, NetworkXAPI owns the Network/Node/Edge tables.
-logger.info("Starting table creation...")
-try:
-    logger.info(f"Registered tables: {list(Base.metadata.tables.keys())}")
-    # Base.metadata.create_all(bind=engine)
-    logger.info("Table creation completed.")
-except Exception as e:
-    logger.error(f"Table creation FAILED: {e}")
+# Database schema is managed exclusively by Alembic in the backend service
+# (see backend/alembic/); this service only consumes the shared tables.
 
 app = FastAPI(
     title="NetworkX API",
@@ -24,14 +16,8 @@ app = FastAPI(
     version="1.0.0",
 )
 
-import sys
-sys.stderr.flush()
-
-
 # Add logging middleware
 app.add_middleware(LoggingMiddleware)
-
-from app.mcp_server import mcp
 
 app.mount("/mcp", mcp.sse_app())
 
@@ -40,8 +26,6 @@ app.mount("/mcp", mcp.sse_app())
 def health_check():
     return {"status": "ok"}
 
-
-from app.api.v1.endpoints import analysis, layout, networks, subgraphs, visualization
 
 # analysis must be registered before networks: its literal route
 # /{network_id}/nodes/top would otherwise be captured by the

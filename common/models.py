@@ -52,7 +52,7 @@ class Network(Base):
     last_node_label_config = Column(JSON, nullable=True)
 
 
-    parent_network_id = Column(Integer, ForeignKey("networks.id"), nullable=True)
+    parent_network_id = Column(Integer, ForeignKey("networks.id"), nullable=True, index=True)
 
     subgraphs = relationship("Network", back_populates="parent_network", cascade="all, delete-orphan")
     parent_network = relationship(
@@ -73,7 +73,7 @@ class Chat(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     network_id = Column(Integer, ForeignKey("networks.id"), nullable=False, unique=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
@@ -92,7 +92,7 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id = Column(Integer, primary_key=True, index=True)
-    chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False)
+    chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False, index=True)
     role = Column(String, nullable=False)
     content = Column(Text, nullable=False)
     meta_data = Column(JSON, nullable=True)
@@ -110,7 +110,7 @@ class ToolExecution(Base):
     __tablename__ = "tool_executions"
 
     id = Column(Integer, primary_key=True, index=True)
-    message_id = Column(Integer, ForeignKey("chat_messages.id"), nullable=False)
+    message_id = Column(Integer, ForeignKey("chat_messages.id"), nullable=False, index=True)
     tool_name = Column(String, nullable=False)
     arguments = Column(JSON, nullable=True)
     result = Column(JSON, nullable=True)
@@ -150,8 +150,8 @@ class Edge(Base):
     id = Column(Integer, primary_key=True, index=True)
     network_id = Column(Integer, ForeignKey("networks.id"), nullable=False)
     edge_id = Column(String, nullable=False)
-    source_node_id = Column(Integer, ForeignKey("nodes.id"), nullable=False)
-    target_node_id = Column(Integer, ForeignKey("nodes.id"), nullable=False)
+    source_node_id = Column(Integer, ForeignKey("nodes.id"), nullable=False, index=True)
+    target_node_id = Column(Integer, ForeignKey("nodes.id"), nullable=False, index=True)
     weight = Column(Float, default=1.0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
@@ -203,7 +203,7 @@ class NodeAttributeValue(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     node_id = Column(Integer, ForeignKey("nodes.id"), nullable=False)
-    attribute_id = Column(Integer, ForeignKey("node_attributes.id"), nullable=False)
+    attribute_id = Column(Integer, ForeignKey("node_attributes.id"), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -283,7 +283,7 @@ class EdgeAttributeValue(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     edge_id = Column(Integer, ForeignKey("edges.id"), nullable=False)
-    attribute_id = Column(Integer, ForeignKey("edge_attributes.id"), nullable=False)
+    attribute_id = Column(Integer, ForeignKey("edge_attributes.id"), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

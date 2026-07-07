@@ -75,13 +75,12 @@ class AnthropicProvider(LLMProvider):
                 or os.getenv("VERTEX_LOCATION")
                 or DEFAULT_ANTHROPIC_VERTEX_REGION
             )
-            msg = f"Using Anthropic on Vertex AI (Project: {project_id}, Region: {region})"
-            logger.info(msg)
-            print(msg)
+            logger.info(
+                f"Using Anthropic on Vertex AI (Project: {project_id}, Region: {region})"
+            )
             return anthropic.AsyncAnthropicVertex(project_id=project_id, region=region, max_retries=5)
         else:
             logger.info("Using Anthropic API (direct)")
-            print("Using Anthropic API (direct)")
             return anthropic.AsyncAnthropic(max_retries=5)
 
     def _to_anthropic_messages(self, history: List[LLMMessage]) -> List[dict]:

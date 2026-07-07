@@ -71,9 +71,7 @@ async def process_chat(
         return final_response_text, execution_log, total_usage, agent.provider_name, agent.provider.model_name
 
     except Exception as e:
-        logger.error(f"Error in process_chat: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.exception(f"Error in process_chat: {e}")
         await queue.put({"event": "error", "data": str(e)})
 
         error_msg = _format_exception_message(e)

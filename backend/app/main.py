@@ -3,11 +3,13 @@ import os
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+from fastapi.responses import JSONResponse
 
 from app.api.v1.endpoints import auth, chat, networks
-from common.models import Base
-from app.core.database import engine
+from app.core.logging import get_logger
 from app.middleware.logging import LoggingMiddleware
+
+logger = get_logger(__name__)
 
 # Database schema is managed exclusively by Alembic (see backend/alembic/),
 # which runs via `alembic upgrade head` before this app starts (see
@@ -33,12 +35,9 @@ app.add_middleware(LoggingMiddleware)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    print(f"Global exception handler caught: {exc}")
-    import traceback
-
-    traceback.print_exc()
-    traceback.print_exc()
-    from fastapi.responses import JSONResponse
+    logger.exception(
+        f"Unhandled exception on {request.method} {request.url.path}: {exc}"
+    )
     return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 

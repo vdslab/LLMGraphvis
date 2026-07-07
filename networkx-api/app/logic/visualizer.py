@@ -3,6 +3,12 @@ from typing import Dict, Optional, Set
 from sqlalchemy.orm import Session
 
 from app.logic.visualization_builder import VisualizationBuilder
+from app.schemas.visualization import (
+    EdgeColorConfig,
+    EdgeWidthConfig,
+    NodeColorConfig,
+    NodeSizeConfig,
+)
 
 
 def generate_visualization_data(
@@ -63,14 +69,10 @@ def _validate_config_keys(config: Dict, allowed_keys: Set[str], config_name: str
 def _validate_node_color_config(config: Optional[Dict]):
     if not config:
         return
-    allowed = {
-        "attribute",
-        "scale_type",
-        "gradient",
-        "color_map",
-        "ranking_rules",
-        "default_color",
-    }
+    # Allowed keys mirror the request schema so the two can't drift apart
+    # (the REST endpoint sends model_dump() output, which includes every
+    # schema field — e.g. fixed_mapping — even when the client omitted it).
+    allowed = set(NodeColorConfig.model_fields)
     _validate_config_keys(config, allowed, "node_color_config")
 
     if (
@@ -91,17 +93,17 @@ def _validate_node_color_config(config: Optional[Dict]):
 def _validate_node_size_config(config: Optional[Dict]):
     if not config:
         return
-    allowed = {"attribute", "min", "max", "default"}
+    allowed = set(NodeSizeConfig.model_fields)
     _validate_config_keys(config, allowed, "node_size_config")
 
 
 def _validate_edge_configs(width_config: Optional[Dict], color_config: Optional[Dict]):
     if width_config:
-        allowed = {"attribute", "min", "max", "default"}
+        allowed = set(EdgeWidthConfig.model_fields)
         _validate_config_keys(width_config, allowed, "edge_width_config")
 
     if color_config:
-        allowed = {"attribute", "scale_type", "gradient", "color_map", "default_color"}
+        allowed = set(EdgeColorConfig.model_fields)
         _validate_config_keys(color_config, allowed, "edge_color_config")
         if "scale_type" in color_config and color_config["scale_type"] not in [
             "LINEAR",
