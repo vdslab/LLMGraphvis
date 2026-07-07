@@ -9,8 +9,8 @@ from .providers.types import ToolDefinition
 
 logger = get_logger(__name__)
 
-# NetworkX API Configuration
-NETWORKX_API_URL = os.getenv("NETWORKX_API_URL", "http://networkx-api:8000")
+# NetworkX API Configuration (networkx-api serves on port 8001; see networkx-api/Dockerfile)
+NETWORKX_API_URL = os.getenv("NETWORKX_API_URL") or "http://networkx-api:8001"
 SSE_ENDPOINT = f"{NETWORKX_API_URL}/mcp/sse"
 
 

@@ -49,14 +49,22 @@ def _is_retryable_error(exception) -> bool:
     return False
 
 
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_VERTEX_LOCATION = "us-central1"
+DEFAULT_THINKING_BUDGET = 2048
+
+
 class GoogleGenAIProvider(LLMProvider):
     def __init__(self, model_name: Optional[str] = None):
         self.client = self._initialize_client()
-        self.model_name = model_name or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        # `or` chains (instead of os.getenv defaults) so that empty-string values —
+        # e.g. docker-compose passing through an unset host variable — still fall back.
+        self.model_name = model_name or os.getenv("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
+        self.thinking_budget = int(os.getenv("GEMINI_THINKING_BUDGET") or DEFAULT_THINKING_BUDGET)
 
     def _initialize_client(self) -> genai.Client:
         project_id = os.getenv("VERTEX_PROJECT_ID")
-        location = os.getenv("VERTEX_LOCATION", "us-central1")
+        location = os.getenv("VERTEX_LOCATION") or DEFAULT_VERTEX_LOCATION
         api_key = os.getenv("GOOGLE_API_KEY")
 
         if project_id:
@@ -120,7 +128,7 @@ class GoogleGenAIProvider(LLMProvider):
                 tools=gemini_tools,
                 tool_config=tool_config,
                 system_instruction=system_instruction,
-                thinking_config=types.ThinkingConfig(thinking_budget=2048)
+                thinking_config=types.ThinkingConfig(thinking_budget=self.thinking_budget)
                 if "thinking" in self.model_name
                 else None,
             ),

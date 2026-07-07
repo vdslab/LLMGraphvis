@@ -51,18 +51,30 @@ def _lowercase_schema_types(schema) -> dict:
     return result
 
 
+DEFAULT_CLAUDE_MODEL = "claude-opus-4-8"
+DEFAULT_ANTHROPIC_VERTEX_REGION = "us-east5"
+DEFAULT_MAX_TOKENS = 16000
+
+
 class AnthropicProvider(LLMProvider):
     def __init__(self, model_name: Optional[str] = None):
         self.client = self._initialize_client()
-        self.model_name = model_name or os.getenv("CLAUDE_MODEL", "claude-opus-4-8")
+        # `or` chains (instead of os.getenv defaults) so that empty-string values —
+        # e.g. docker-compose passing through an unset host variable — still fall back.
+        self.model_name = model_name or os.getenv("CLAUDE_MODEL") or DEFAULT_CLAUDE_MODEL
+        self.max_tokens = int(os.getenv("ANTHROPIC_MAX_TOKENS") or DEFAULT_MAX_TOKENS)
 
     def _initialize_client(self):
         import anthropic
         project_id = os.getenv("VERTEX_PROJECT_ID")
         if project_id:
             # Anthropic on Vertex AI — uses Google Cloud ADC, no ANTHROPIC_API_KEY needed.
-            # Vertex regions for Claude differ from Google's own services; default to us-east5.
-            region = os.getenv("ANTHROPIC_VERTEX_REGION", os.getenv("VERTEX_LOCATION", "us-east5"))
+            # Vertex regions for Claude differ from Google's own services.
+            region = (
+                os.getenv("ANTHROPIC_VERTEX_REGION")
+                or os.getenv("VERTEX_LOCATION")
+                or DEFAULT_ANTHROPIC_VERTEX_REGION
+            )
             msg = f"Using Anthropic on Vertex AI (Project: {project_id}, Region: {region})"
             logger.info(msg)
             print(msg)
@@ -173,7 +185,7 @@ class AnthropicProvider(LLMProvider):
 
         async with self.client.messages.stream(
             model=self.model_name,
-            max_tokens=16000,
+            max_tokens=self.max_tokens,
             system=system_instruction,
             messages=messages,
             tools=anthropic_tools,

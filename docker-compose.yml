@@ -3,15 +3,15 @@ services:
     image: postgres:15
     container_name: graphvis-db
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: graphvis
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-graphvis}
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -27,23 +27,26 @@ services:
     environment:
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=graphvis
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-graphvis}
       - NETWORKX_API_URL=http://networkx-api:8001
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - LLM_PROVIDER=${LLM_PROVIDER:-google}
-      - CLAUDE_MODEL=${CLAUDE_MODEL:-claude-opus-4-8}
+      - GEMINI_MODEL=${GEMINI_MODEL:-}
+      - CLAUDE_MODEL=${CLAUDE_MODEL:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - ANTHROPIC_VERTEX_REGION=${ANTHROPIC_VERTEX_REGION:-us-east5}
+      # Region fallback chain (ANTHROPIC_VERTEX_REGION -> VERTEX_LOCATION -> code default)
+      # is resolved in the provider code; no default here so .env stays authoritative.
+      - ANTHROPIC_VERTEX_REGION=${ANTHROPIC_VERTEX_REGION:-}
       - SECRET_KEY=${SECRET_KEY}
-      - ALGORITHM=${ALGORITHM}
-      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES}
-      - KEEP_ALIVE_TIMEOUT=${KEEP_ALIVE_TIMEOUT}
+      - ALGORITHM=${ALGORITHM:-HS256}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-}
+      - KEEP_ALIVE_TIMEOUT=${KEEP_ALIVE_TIMEOUT:-86400}
       - VERTEX_PROJECT_ID=${VERTEX_PROJECT_ID}
-      - VERTEX_LOCATION=${VERTEX_LOCATION}
+      - VERTEX_LOCATION=${VERTEX_LOCATION:-}
       - GOOGLE_APPLICATION_CREDENTIALS=/app/application_default_credentials.json
-    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --timeout-keep-alive ${KEEP_ALIVE_TIMEOUT}"]
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --timeout-keep-alive ${KEEP_ALIVE_TIMEOUT:-86400}"]
     depends_on:
       db:
         condition: service_healthy
@@ -68,9 +71,9 @@ services:
     environment:
       - POSTGRES_HOST=db
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=graphvis
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-graphvis}
     depends_on:
       db:
         condition: service_healthy

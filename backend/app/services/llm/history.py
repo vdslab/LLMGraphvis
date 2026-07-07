@@ -9,6 +9,7 @@ from .providers.types import (
     LLMMessage,
     LLMTextPart,
 )
+from .engine import _truncate_tool_result
 
 
 def build_history(chat_id: int, user_message: str, db: Session) -> List[LLMMessage]:
@@ -54,6 +55,8 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[LLMMessa
                         result_data = exc.result
                         if exc.status == "failed":
                             result_data = {"error": exc.error}
+                        else:
+                            result_data = _truncate_tool_result(result_data)
                         tool_parts.append(LLMFunctionResponsePart(
                             name=exc.tool_name,
                             response=result_data,
@@ -88,6 +91,8 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[LLMMessa
                         result_data = tc.get("result")
                         if tc.get("status") == "failed":
                             result_data = {"error": tc.get("error")}
+                        else:
+                            result_data = _truncate_tool_result(result_data)
                         tool_parts.append(LLMFunctionResponsePart(
                             name=tc["name"],
                             response=result_data,

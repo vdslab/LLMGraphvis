@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
@@ -95,10 +97,11 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-# CORS configuration
+# CORS configuration — comma-separated list, e.g. CORS_ORIGINS=http://localhost,http://localhost:5173
 origins = [
-    "http://localhost",
-    "http://localhost:5173",
+    o.strip()
+    for o in (os.getenv("CORS_ORIGINS") or "http://localhost,http://localhost:5173").split(",")
+    if o.strip()
 ]
 
 app.add_middleware(

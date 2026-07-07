@@ -10,6 +10,7 @@ from common import models
 from app.core.logging import get_logger
 
 from . import local_tools, mcp_client
+from .catalog import DEFAULT_PROVIDER
 from .prompts import SYSTEM_INSTRUCTION
 from .providers.base import LLMProvider
 from .providers.types import (
@@ -25,6 +26,22 @@ from .providers.types import (
 
 logger = get_logger(__name__)
 load_dotenv()
+
+# Max ReAct loop iterations per turn (each iteration = one LLM generate() call).
+AGENT_MAX_ITERATIONS = int(os.getenv("AGENT_MAX_ITERATIONS") or 10)
+
+
+def _truncate_tool_result(result: Any, max_list_items: int = 15) -> Any:
+    """Recursively truncates large lists in tool results to prevent LLM token overflow."""
+    if isinstance(result, list):
+        if len(result) > max_list_items:
+            truncated = [_truncate_tool_result(item, max_list_items) for item in result[:max_list_items]]
+            truncated.append(f"[{len(result) - max_list_items} items omitted for brevity]")
+            return truncated
+        return [_truncate_tool_result(item, max_list_items) for item in result]
+    elif isinstance(result, dict):
+        return {k: _truncate_tool_result(v, max_list_items) for k, v in result.items()}
+    return result
 
 
 def _create_provider(provider_name: str, model_name: Optional[str] = None) -> LLMProvider:
@@ -47,7 +64,7 @@ class GraphVisAgent:
         self.db = db
         # provider_name/model_name let a chat pin its own provider/model, overriding
         # the process-wide LLM_PROVIDER/GEMINI_MODEL/CLAUDE_MODEL env var defaults.
-        self.provider_name = (provider_name or os.getenv("LLM_PROVIDER", "google")).lower()
+        self.provider_name = (provider_name or os.getenv("LLM_PROVIDER") or DEFAULT_PROVIDER).lower()
         self.provider = _create_provider(self.provider_name, model_name)
 
     async def _consume_stream(
@@ -135,6 +152,9 @@ class GraphVisAgent:
         # 1. Prepare Tools
         all_tools = await self._get_all_tools()
 
+        # Log what is being sent to the LLM
+        self._log_history(history, iteration=0)
+
         # 2. Initial generation stream
         initial_stream = self.provider.generate(history, all_tools, SYSTEM_INSTRUCTION)
 
@@ -163,7 +183,7 @@ class GraphVisAgent:
     ) -> Tuple[str, List[Dict[str, Any]], UsageData]:
         """Manages the ReAct loop: Consumption -> Execution -> Observation -> Next Generation."""
         current_stream = initial_stream
-        max_iterations = 10
+        max_iterations = AGENT_MAX_ITERATIONS
         iteration = 0
 
         full_transcript = ""
@@ -241,6 +261,7 @@ class GraphVisAgent:
 
             # Step E: Next Generation
             logger.info(f"--- LLM API Request (Iteration {iteration}) ---")
+            self._log_history(history, iteration)
             current_stream = self.provider.generate(history, all_tools, SYSTEM_INSTRUCTION)
 
         if not full_transcript.strip():
@@ -310,13 +331,15 @@ class GraphVisAgent:
                     feature_name, result, chat_id, queue, loop_context, session
                 )
 
+            truncated_result = _truncate_tool_result(result)
+
             tool_parts.append(LLMFunctionResponsePart(
-                name=feature_name, response=result, call_id=call_id
+                name=feature_name, response=truncated_result, call_id=call_id
             ))
 
             for call_record in step_record["tool_calls"]:
                 if call_record["name"] == feature_name and "result" not in call_record:
-                    call_record["result"] = result
+                    call_record["result"] = truncated_result
                     call_record["status"] = status
                     call_record["error"] = error_msg
                     call_record["started_at"] = started_at
@@ -478,6 +501,23 @@ class GraphVisAgent:
             if vis_data is not None:
                 chat.visualization_state = vis_data
             self.db.commit()
+
+    def _log_history(self, history: List[LLMMessage], iteration: int):
+        """Helper to log the exact data being sent to the LLM context."""
+        logger.info(f"--- Context Sent to LLM (Iteration {iteration}) ---")
+        logger.info(f"Total History Messages: {len(history)}")
+        for i, msg in enumerate(history):
+            logger.info(f"  [{i}] Role: {msg.role}")
+            for part in msg.parts:
+                if isinstance(part, LLMTextPart):
+                    logger.info(f"      TextPart: {part.text[:200].replace(chr(10), ' ')}...")
+                elif isinstance(part, LLMFunctionCallPart):
+                    logger.info(f"      ToolCallPart: {part.name}({part.args})")
+                elif isinstance(part, LLMFunctionResponsePart):
+                    resp_str = json.dumps(part.response, ensure_ascii=False)
+                    # Limit log output to avoid console spam, but show structure
+                    logger.info(f"      ToolResponsePart: {part.name} -> {resp_str[:300]}...")
+        logger.info("-" * 50)
 
 
 # --- Legacy/Functional Interface for compatibility with existing route handlers ---

@@ -31,35 +31,43 @@ async def build_context_summary(network_id: int) -> str:
 
         # Helper to format attributes
         def format_attrs(attrs, label):
-            if attrs and isinstance(attrs, list):
-                if attrs:
-                    summary_lines.append(f"Available {label}:")
-                    # Limit to top 15 to avoid context saturation
-                    limit = 15
-                    for i, attr in enumerate(attrs):
-                        if i >= limit:
-                            remaining = len(attrs) - limit
-                            summary_lines.append(f"- ... and {remaining} more")
-                            break
-                        name = attr.get("name")
-                        dtype = attr.get("data_type")
-                        summary_lines.append(f"- {name} ({dtype})")
-                else:
-                    summary_lines.append(f"{label}: None")
-            elif attrs and isinstance(attrs, dict) and "attributes" in attrs:
-                # Fallback if structure changes
-                ats = attrs["attributes"]
-                if ats:
-                    summary_lines.append(f"Available {label}:")
-                    limit = 15
-                    for i, attr in enumerate(ats):
-                        if i >= limit:
-                            remaining = len(ats) - limit
-                            summary_lines.append(f"- ... and {remaining} more")
-                            break
-                        name = attr.get("name")
-                        dtype = attr.get("data_type")
-                        summary_lines.append(f"- {name} ({dtype})")
+            # Normalization: in some cases attrs might be wrapped in a dict
+            if isinstance(attrs, dict) and "attributes" in attrs:
+                attrs_list = attrs["attributes"]
+            elif isinstance(attrs, list):
+                attrs_list = attrs
+            else:
+                attrs_list = []
+
+            if attrs_list:
+                summary_lines.append(f"Available {label}:")
+                limit = 15
+                for i, attr in enumerate(attrs_list):
+                    if i >= limit:
+                        remaining = len(attrs_list) - limit
+                        summary_lines.append(f"- ... and {remaining} more")
+                        break
+                    
+                    name = attr.get("name")
+                    dtype = attr.get("data_type")
+                    stats = attr.get("stats")
+                    
+                    stats_str = ""
+                    if stats:
+                        if dtype == "float" and "min" in stats and "max" in stats:
+                            stats_str = f" [min: {stats['min']:.2f}, max: {stats['max']:.2f}]"
+                        elif dtype == "string" and "top_values" in stats:
+                            top_vals = stats["top_values"]
+                            # Only show up to 5 values in the summary to avoid overwhelming the context
+                            display_vals = top_vals[:5]
+                            vals_str = ", ".join([f"'{v}'" for v in display_vals])
+                            if len(top_vals) > 5:
+                                vals_str += ", ..."
+                            stats_str = f" [values: {vals_str}]"
+                            
+                    summary_lines.append(f"- {name} ({dtype}){stats_str}")
+            else:
+                summary_lines.append(f"{label}: None")
             
         format_attrs(node_attrs, "Node Attributes")
         format_attrs(edge_attrs, "Edge Attributes")

@@ -10,9 +10,14 @@ from passlib.context import CryptContext
 
 load_dotenv()
 
-SECRET_KEY = os.getenv("SECRET_KEY", "your_secret_key_here")
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY environment variable is not set. "
+        "Generate one with `openssl rand -hex 32` and set it in .env."
+    )
+ALGORITHM = os.getenv("ALGORITHM") or "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES") or 30)
 
 # OAuth2 scheme for Swagger UI authentication with proper tokenUrl for the OpenAPI docs
 oauth2_scheme = OAuth2PasswordBearer(
