@@ -345,3 +345,6 @@ Thumbs.db
 # Specific Data & Credentials
 sample_data/concert_networks/*
 backend/application_default_credentials.json
+
+# No-Docker local runner state (scripts/local): pgdata, venv, logs, pidfiles
+.local/
