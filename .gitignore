@@ -348,3 +348,4 @@ backend/application_default_credentials.json
 
 # No-Docker local runner state (scripts/local): pgdata, venv, logs, pidfiles
 .local/
+.mcp.json
