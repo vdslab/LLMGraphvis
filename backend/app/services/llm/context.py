@@ -11,6 +11,9 @@ async def build_context_summary(network_id: int) -> str:
     try:
         # Fetch resources using a single session to reduce overhead
         async with mcp_client.session_scope() as session:
+            metadata = await mcp_client.get_resource(
+                f"network://{network_id}/metadata", session=session
+            )
             structure = await mcp_client.get_resource(
                 f"network://{network_id}/structure", session=session
             )
@@ -23,6 +26,14 @@ async def build_context_summary(network_id: int) -> str:
 
         summary_lines = ["[Current Network Context]"]
         summary_lines.append(f"Network ID: {network_id}")
+
+        if isinstance(metadata, dict):
+            name = metadata.get("name")
+            description = metadata.get("description")
+            if name:
+                summary_lines.append(f"Name: {name}")
+            if description:
+                summary_lines.append(f"Description: {description}")
 
         if structure:
             n_count = structure.get("node_count", "?")

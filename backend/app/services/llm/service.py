@@ -7,7 +7,7 @@ from common import models
 from app.core.logging import get_logger
 
 from . import engine, events, history, local_tools, mcp_client, context
-from .providers.types import LLMTextPart, UsageData
+from .providers.types import UsageData
 
 logger = get_logger(__name__)
 
@@ -40,15 +40,16 @@ async def process_chat(
         chat_history = history.build_history(chat_id, user_message, db)
 
         # --- Context Injection ---
+        # The summary is appended to the system prompt (see engine.process_turn)
+        # so the agent always knows the current network's contents, regardless
+        # of what the user asked.
+        context_summary = ""
         try:
             context_summary = await context.build_context_summary(network_id)
-            if context_summary and chat_history and chat_history[-1].role == "user":
-                last_parts = chat_history[-1].parts
-                if last_parts and isinstance(last_parts[0], LLMTextPart) and last_parts[0].text:
-                    last_parts[0].text = f"{context_summary}\n\n{last_parts[0].text}"
-                    logger.info("Injected Context Summary into User Prompt")
+            if context_summary:
+                logger.info("Injected Context Summary into System Prompt")
         except Exception as e:
-            logger.warning(f"Failed to inject context summary: {e}")
+            logger.warning(f"Failed to build context summary: {e}")
 
         # Notify thinking start
         await queue.put(
@@ -66,6 +67,7 @@ async def process_chat(
             queue=queue,
             chat_id=chat_id,
             network_id=network_id,
+            context_summary=context_summary,
         )
 
         return final_response_text, execution_log, total_usage, agent.provider_name, agent.provider.model_name

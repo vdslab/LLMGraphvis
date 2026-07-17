@@ -66,6 +66,9 @@ class GraphVisAgent:
         # the process-wide LLM_PROVIDER/GEMINI_MODEL/CLAUDE_MODEL env var defaults.
         self.provider_name = (provider_name or os.getenv("LLM_PROVIDER") or DEFAULT_PROVIDER).lower()
         self.provider = _create_provider(self.provider_name, model_name)
+        # Full system prompt for this turn. process_turn() appends the network
+        # context summary so it is always present regardless of the user prompt.
+        self.system_instruction = SYSTEM_INSTRUCTION
 
     async def _consume_stream(
         self,
@@ -139,6 +142,7 @@ class GraphVisAgent:
         queue: Any,
         chat_id: int,
         network_id: int,
+        context_summary: str = "",
     ) -> Tuple[str, List[Dict[str, Any]], UsageData]:
         """
         Orchestrates a single turn of the agent (User Input -> [Thoughts/Actions] -> Final Response).
@@ -149,6 +153,14 @@ class GraphVisAgent:
         """
         logger.info(f"Starting agent turn for Chat ID: {chat_id}, Network ID: {network_id}")
 
+        # Fix the system prompt for this turn: the network context summary is
+        # appended once here so every generate() call in the loop shares the
+        # exact same system instruction (keeps provider prompt caching intact).
+        if context_summary:
+            self.system_instruction = f"{SYSTEM_INSTRUCTION}\n\n---\n\n{context_summary}"
+        else:
+            self.system_instruction = SYSTEM_INSTRUCTION
+
         # 1. Prepare Tools
         all_tools = await self._get_all_tools()
 
@@ -156,7 +168,7 @@ class GraphVisAgent:
         self._log_history(history, iteration=0)
 
         # 2. Initial generation stream
-        initial_stream = self.provider.generate(history, all_tools, SYSTEM_INSTRUCTION)
+        initial_stream = self.provider.generate(history, all_tools, self.system_instruction)
 
         # 3. Enter Tool Execution Loop within Session Scope
         async with mcp_client.session_scope() as session:
@@ -220,7 +232,7 @@ class GraphVisAgent:
                     full_transcript, history, loop_context, queue, all_tools, session
                 ):
                     logger.info("Lazy Intent detected. Retrying generation...")
-                    current_stream = self.provider.generate(history, all_tools, SYSTEM_INSTRUCTION)
+                    current_stream = self.provider.generate(history, all_tools, self.system_instruction)
                     continue
 
                 has_text = bool(chunk_text.strip())
@@ -237,7 +249,7 @@ class GraphVisAgent:
                     history.append(LLMMessage(
                         role="user", parts=[LLMTextPart(text=summary_request)]
                     ))
-                    current_stream = self.provider.generate(history, all_tools, SYSTEM_INSTRUCTION)
+                    current_stream = self.provider.generate(history, all_tools, self.system_instruction)
                     continue
 
                 result_text = full_transcript
@@ -262,7 +274,7 @@ class GraphVisAgent:
             # Step E: Next Generation
             logger.info(f"--- LLM API Request (Iteration {iteration}) ---")
             self._log_history(history, iteration)
-            current_stream = self.provider.generate(history, all_tools, SYSTEM_INSTRUCTION)
+            current_stream = self.provider.generate(history, all_tools, self.system_instruction)
 
         if not full_transcript.strip():
             return (
@@ -543,7 +555,7 @@ async def execute_tool_loop(
 
     async with mcp_client.session_scope() as session:
         return await agent._execute_tool_loop(
-            initial_stream=agent.provider.generate(history, all_tools, SYSTEM_INSTRUCTION),
+            initial_stream=agent.provider.generate(history, all_tools, agent.system_instruction),
             history=history,
             all_tools=all_tools,
             queue=queue,
