@@ -15,7 +15,7 @@ def visualization_set_node_color(
     attribute: Annotated[str, Field(description="Node attribute name to use for coloring (e.g., 'community', 'degree_centrality', 'country').")],
     scale_type: Annotated[str, Field(description="Color scale type: 'CATEGORICAL' (for text/discrete values), 'LINEAR' (for numeric ranges), or 'RANKING' (top-N rules).")],
     mapping: Annotated[Optional[Dict[str, str]], Field(description="For CATEGORICAL: dict mapping attribute values to hex colors, e.g. {\"A\": \"#FF0000\"}. Auto-generated if omitted.")] = None,
-    gradient: Annotated[Optional[List[str]], Field(description="For LINEAR: list of [start_color, end_color] hex strings, e.g. [\"#blue\", \"#red\"].")] = None,
+    gradient: Annotated[Optional[List[str]], Field(description="For LINEAR: list of [start_color, end_color] hex strings, e.g. [\"#C6DBEF\", \"#08306B\"].")] = None,
     default_color: Annotated[str, Field(description="Fallback color for nodes with missing attribute values.")] = "#d3d3d3",
     fixed: Annotated[bool, Field(description="If True, only colors nodes whose value is in the mapping; others get default_color.")] = False
 ) -> dict:
@@ -27,7 +27,7 @@ def visualization_set_node_color(
 
     Examples:
     - Color by community: attribute='community', scale_type='CATEGORICAL'
-    - Color by centrality: attribute='betweenness_centrality', scale_type='LINEAR', gradient=['#lightblue', '#darkred']
+    - Color by centrality: attribute='betweenness_centrality', scale_type='LINEAR', gradient=['#C6DBEF', '#08306B']
     - Color by country: attribute='country', scale_type='CATEGORICAL'
 
     Returns:
