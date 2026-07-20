@@ -173,19 +173,31 @@ def get_top_nodes(
     network_id: int, metric: str, k: int, order: str, db: Session
 ) -> List[Dict[str, Any]]:
     """
-    Returns the top k nodes based on the specified centrality metric.
+    Returns the top k nodes based on an already-computed numeric node attribute.
+
+    `metric` is the exact saved attribute name (e.g. "degree_centrality",
+    "pagerank", "clustering") as reported by the analysis tool that computed
+    it — not the short internal centrality_type used by `calculate_centrality`.
     """
-    # Calculate centrality (this also saves to DB, which is fine)
-    # We reuse the existing logic.
-    centrality = calculate_centrality(network_id, metric, db)
+    values = load_node_attribute_values(network_id, metric, db)
+    if not values:
+        raise ValueError(
+            f"Attribute '{metric}' has not been computed for network {network_id} yet. "
+            "Run the relevant analysis tool first (e.g. analysis_degree_centrality, "
+            "analysis_pagerank) and use its exact saved attribute name."
+        )
 
-    # Determine reverse flag based on order
-    reverse = True
-    if order == "asc":
-        reverse = False
+    if k <= 0:
+        raise ValueError(f"n must be a positive integer, got {k}")
 
-    # Sort by score
-    sorted_nodes = sorted(centrality.items(), key=lambda item: item[1], reverse=reverse)
+    if order not in ("asc", "desc"):
+        raise ValueError(f"order must be 'asc' or 'desc', got '{order}'")
+    reverse = order == "desc"
+
+    # Sort by score, skipping non-numeric values defensively (e.g. a text attribute
+    # accidentally passed as `metric`).
+    numeric_items = [(node_id, score) for node_id, score in values.items() if isinstance(score, (int, float))]
+    sorted_nodes = sorted(numeric_items, key=lambda item: item[1], reverse=reverse)
 
     # Take top k
     top_nodes = sorted_nodes[:k]

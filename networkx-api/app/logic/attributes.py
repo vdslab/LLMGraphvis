@@ -118,26 +118,20 @@ def bulk_save_node_attributes(
         db.commit()
         return
 
-    # 3. Bulk Insert Mappings (NodeAttributeValue)
+    # 3. Bulk Insert Mappings (NodeAttributeValue), returning generated IDs directly
+    #    instead of a separate round-trip SELECT to fetch them back.
     nav_data = [
         {"node_id": node_id, "attribute_id": attr.id} for node_id in data_map.keys()
     ]
-    db.bulk_insert_mappings(models.NodeAttributeValue, nav_data)
-    db.commit()
-
-    # 4. Fetch back generated NodeAttributeValue IDs
-    #    We query by (attribute_id, node_id) which should be unique per attribute
-    all_navs = (
-        db.query(models.NodeAttributeValue)
-        .filter(
-            models.NodeAttributeValue.attribute_id == attr.id,
-            models.NodeAttributeValue.node_id.in_(data_map.keys()),
-        )
-        .all()
+    stmt = (
+        insert(models.NodeAttributeValue)
+        .values(nav_data)
+        .returning(models.NodeAttributeValue.id, models.NodeAttributeValue.node_id)
     )
+    result = db.execute(stmt)
 
     # Map db_node_id -> nav_id
-    nav_map = {nav.node_id: nav.id for nav in all_navs}
+    nav_map = {row.node_id: row.id for row in result}
 
     # 5. Bulk Insert Values (Float or Text)
     value_data = []

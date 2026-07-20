@@ -31,6 +31,9 @@ export const useChatConnection = (id, isAuthenticated) => {
             if (data.status === 'started') {
                 useChatStore.getState().setRunningTool({ name: data.tool, status: 'running' });
                 useChatStore.getState().setIsLoading(true);
+                // Clear the live thought preview so the next generation's thinking_stream
+                // chunks don't run on directly after this iteration's leftover text.
+                useChatStore.getState().setThinkingMessage(null);
             } else if (data.status === 'completed') {
                 useChatStore.getState().setRunningTool(null);
                 

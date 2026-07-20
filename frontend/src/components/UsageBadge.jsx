@@ -46,10 +46,14 @@ const UsageBadge = () => {
         border: '1px solid var(--border-color)',
         fontSize: '0.8rem',
         color: 'var(--text-secondary)',
-        whiteSpace: 'nowrap'
+        maxWidth: '100%',
+        minWidth: 0,
+        flexShrink: 1
       }}
     >
-      {formatTokenCount(totalTokens)} tokens · {formatCost(totalCost)}
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {formatTokenCount(totalTokens)} tokens · {formatCost(totalCost)}
+      </span>
     </div>
   );
 };

@@ -74,7 +74,7 @@ async def process_chat(
 
     except Exception as e:
         logger.exception(f"Error in process_chat: {e}")
-        await queue.put({"event": "error", "data": str(e)})
+        await queue.put({"event": "error", "data": json.dumps(str(e))})
 
         error_msg = _format_exception_message(e)
         return f"I encountered an error: {error_msg}", [], UsageData(), "", ""

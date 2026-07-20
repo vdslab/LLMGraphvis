@@ -67,7 +67,6 @@ const ThinkingBlock = ({ content, defaultOpen = false, isStreaming = false }) =>
           overflowY: 'auto'
         }}>
           {content}
-          {isStreaming && <span className="animate-pulse">_</span>}
         </div>
       )}
     </div>
@@ -166,9 +165,9 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
           <h3 style={{ margin: 0 }}>Chat</h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', minWidth: 0 }}>
             <ModelSelector />
             <UsageBadge />
           </div>
@@ -197,10 +196,13 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
           fontSize: '0.9rem',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          gap: '0.5rem'
         }}>
-          <span>Context: <strong>{contextNode.label}</strong> (ID: {contextNode.id})</span>
-          <button 
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+            Context: <strong>{contextNode.label}</strong> (ID: {contextNode.id})
+          </span>
+          <button
             onClick={onCancelContext}
             style={{
                 background: 'none',
@@ -208,7 +210,8 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
                 cursor: 'pointer',
                 fontSize: '1.2rem',
                 color: '#666',
-                padding: '0 0.5rem'
+                padding: '0 0.5rem',
+                flexShrink: 0
             }}
             title="Remove context"
           >
@@ -310,16 +313,17 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
 
              // Regular message bubble
              return (
-               <div key={partIdx} style={{ 
+               <div key={partIdx} className="markdown-content" style={{
                  backgroundColor: msg.role === 'user' ? 'var(--primary-color)' : 'var(--border-color)',
                  color: msg.role === 'user' ? 'white' : 'var(--text-primary)',
                  padding: '0.75rem 1rem',
                  borderRadius: '1rem',
                  borderTopLeftRadius: msg.role === 'user' ? '1rem' : '0',
                  borderTopRightRadius: msg.role === 'user' ? '0' : '1rem',
-                 boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                 boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+                 minWidth: 0
                }}>
-                 <ReactMarkdown 
+                 <ReactMarkdown
                    remarkPlugins={[remarkGfm, remarkBreaks, remarkColorPreview]}
                    components={{
                      a: ({node, href, children, ...props}) => {
@@ -486,6 +490,7 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
               flexDirection: 'column', 
               alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start',
               maxWidth: '85%',
+              minWidth: 0,
               alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
             }}>
               {renderedParts}

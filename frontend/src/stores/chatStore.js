@@ -122,7 +122,7 @@ export const useChatStore = create((set, get) => ({
 
   // Upload network file to chat
   uploadNetwork: async (chatId, file) => {
-    set({ isLoading: true, thinkingMessage: "Uploading..." });
+    set({ isLoading: true, thinkingMessage: "" });
     try {
       await uploadGraphML(chatId, file);
       // Response is 202 Accepted.
@@ -139,7 +139,7 @@ export const useChatStore = create((set, get) => ({
     const { chatId, messages } = get();
     // Optimistic update - add user message immediately
     const newMessage = { role: 'user', content, id: Date.now(), created_at: new Date().toISOString() };
-    set({ messages: [...messages, newMessage], isLoading: true, thinkingMessage: "Processing..." });
+    set({ messages: [...messages, newMessage], isLoading: true, thinkingMessage: "" });
 
     try {
       await processMessageAPI(chatId, content);

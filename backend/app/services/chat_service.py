@@ -7,6 +7,7 @@ from common import models
 from app.core import database
 from app.core.logging import get_logger
 from app.services import llm as llm_service
+from app.services.llm import context as llm_context
 from app.services.llm import mcp_client
 
 logger = get_logger(__name__)
@@ -15,7 +16,7 @@ logger = get_logger(__name__)
 async def _handle_background_error(chat_id: int, e: Exception, message: str) -> None:
     logger.exception(f"{message}: {e}")
     queue = await llm_service.get_event_queue(chat_id)
-    await queue.put({"event": "training_error" if "training" in message else "error", "data": str(e)})
+    await queue.put({"event": "training_error" if "training" in message else "error", "data": json.dumps(str(e))})
 
     # If it's a process error, persist to DB
     if "process" in message:
@@ -54,7 +55,7 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
         thoughts = []
         msg = "Importing GraphML data..."
         thoughts.append(msg)
-        await queue.put({"event": "thinking_stream", "data": {"content": msg + "\n"}})
+        await queue.put({"event": "thinking_stream", "data": json.dumps({"content": msg + "\n"})})
         
         import_result = await mcp_client.execute_tool(
             "network_import_graphml",
@@ -71,7 +72,7 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
         # Step 2: Layout
         msg = "Calculating ForceAtlas2 layout..."
         thoughts.append(msg)
-        await queue.put({"event": "thinking_stream", "data": {"content": msg + "\n"}})
+        await queue.put({"event": "thinking_stream", "data": json.dumps({"content": msg + "\n"})})
         
         layout_result = await mcp_client.execute_tool(
             "layout_forceatlas2",
@@ -85,7 +86,7 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
         # Step 3: Visualization
         msg = "Generating initial visualization..."
         thoughts.append(msg)
-        await queue.put({"event": "thinking_stream", "data": {"content": msg + "\n"}})
+        await queue.put({"event": "thinking_stream", "data": json.dumps({"content": msg + "\n"})})
         
         vis_data = await mcp_client.execute_tool(
             "visualization_generate",
@@ -95,6 +96,15 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
         # Check if vis_data is an error dict (though tool raises/returns dict usually)
         if isinstance(vis_data, dict) and "error" in vis_data:
              raise ValueError(f"Visualization failed: {vis_data['error']}")
+
+        # Step 4: Inspect the uploaded data (fixed step, not an LLM tool call).
+        # Reads the network's structure/attributes directly so the user can see
+        # what the data contains before sending their first message.
+        msg = "Inspecting uploaded data..."
+        thoughts.append(msg)
+        await queue.put({"event": "thinking_stream", "data": json.dumps({"content": msg + "\n"})})
+
+        data_overview = await llm_context.build_data_overview(final_network_id)
 
         # Update Chat record with new network_id (if changed) and visualization_state
         # Use a fresh session for this background operation
@@ -118,9 +128,17 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
                     chat.visualization_state = vis_data
                     logger.info(f"Saved initial visualization state for chat_id={chat_id}")
                 
-                # Persist the success message with thoughts
+                # Persist the success message with thoughts, including the data
+                # overview so the contents are visible before the first message.
                 full_thought = "\n".join(thoughts)
-                final_content = f"<thought>{full_thought}</thought>\n\nGraph uploaded and initialized successfully."
+                success_line = "Graph uploaded and initialized successfully."
+                if data_overview:
+                    final_content = (
+                        f"<thought>{full_thought}</thought>\n\n"
+                        f"{success_line}\n\n{data_overview}"
+                    )
+                else:
+                    final_content = f"<thought>{full_thought}</thought>\n\n{success_line}"
                 
                 db_msg = models.ChatMessage(
                     chat_id=chat_id,

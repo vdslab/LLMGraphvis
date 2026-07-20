@@ -50,9 +50,14 @@ def determine_layout_params(G, layout_name: str):
 
     elif layout_name == "forceatlas2":
         # Native NetworkX ForceAtlas2 optimization
-        # Dynamic iterations based on graph size
-        # Formula: max_iter = max(1000, min(5000, num_nodes * 2))
-        max_iter = max(1000, min(5000, num_nodes * 2))
+        # Dynamic iterations based on graph size.
+        # Each iteration is O(N^2) (dense pairwise force computation, no
+        # Barnes-Hut approximation), so iteration count directly dominates
+        # upload/layout latency for large graphs. Floor/cap kept well above
+        # networkx's own default (100) for layout quality, but far below the
+        # previous 1000-5000 range that made large uploads extremely slow.
+        # Formula: max_iter = max(200, min(2000, num_nodes))
+        max_iter = max(200, min(2000, num_nodes))
 
         # Dynamic Scaling Ratio for Overlap Reduction
         # Use Average Degree as a proxy for local density clumping

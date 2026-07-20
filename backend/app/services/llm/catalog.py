@@ -12,7 +12,7 @@ PROVIDER_CATALOG: List[Dict[str, Any]] = [
         "id": "google",
         "label": "Google Gemini",
         "models": [
-            {"id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash"},
+            {"id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash", "default": True},
             {"id": "gemini-2.5-pro", "label": "Gemini 2.5 Pro"},
         ],
     },

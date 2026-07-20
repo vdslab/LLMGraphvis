@@ -263,3 +263,32 @@ a:hover {
   animation: spin 1s linear infinite;
   display: inline-block;
 }
+
+/* Chat markdown content: LLM output can contain long unbroken tokens, code
+   blocks, or GFM tables that would otherwise force the chat panel wider
+   than its container instead of wrapping/scrolling within it. */
+.markdown-content {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.markdown-content pre {
+  overflow-x: auto;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.markdown-content pre code {
+  overflow-wrap: normal;
+  white-space: pre;
+}
+
+.markdown-content table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.markdown-content img {
+  max-width: 100%;
+}

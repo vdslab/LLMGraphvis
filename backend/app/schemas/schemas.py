@@ -60,6 +60,7 @@ class Chat(ChatBase):
 class LlmModelOption(BaseModel):
     id: str
     label: str
+    default: bool = False
 
 
 class LlmProviderOption(BaseModel):

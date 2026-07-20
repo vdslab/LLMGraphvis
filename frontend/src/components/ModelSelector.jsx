@@ -21,6 +21,11 @@ const ModelSelector = () => {
 
   const value = chatProvider && chatModel ? encodeValue(chatProvider, chatModel) : DEFAULT_VALUE;
 
+  const defaultModel = llmProviders
+    .flatMap((provider) => provider.models)
+    .find((model) => model.default);
+  const defaultLabel = defaultModel ? `Default (${defaultModel.label})` : 'Default';
+
   const handleChange = async (e) => {
     const raw = e.target.value;
     setIsSaving(true);
@@ -52,10 +57,13 @@ const ModelSelector = () => {
         color: 'var(--text-secondary)',
         fontSize: '0.8rem',
         cursor: isSaving ? 'wait' : 'pointer',
-        maxWidth: '180px'
+        maxWidth: '160px',
+        minWidth: 0,
+        flexShrink: 1,
+        textOverflow: 'ellipsis'
       }}
     >
-      <option value={DEFAULT_VALUE}>Default</option>
+      <option value={DEFAULT_VALUE}>{defaultLabel}</option>
       {llmProviders.map((provider) => (
         <optgroup key={provider.id} label={provider.label}>
           {provider.models.map((model) => (
