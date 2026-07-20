@@ -62,6 +62,14 @@ class GoogleGenAIProvider(LLMProvider):
         self.model_name = model_name or os.getenv("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
         self.thinking_budget = int(os.getenv("GEMINI_THINKING_BUDGET") or DEFAULT_THINKING_BUDGET)
 
+    @property
+    def supports_native_thinking(self) -> bool:
+        # Mirrors the thinking_config gate in _raw_generate: only "thinking" model
+        # variants get native thought parts from the SDK. Other Gemini models fall
+        # back to the literal <thought>-tag parsing state machine in _stream below,
+        # so they still need the prompt to hand-write those tags.
+        return "thinking" in self.model_name
+
     def _initialize_client(self) -> genai.Client:
         project_id = os.getenv("VERTEX_PROJECT_ID")
         location = os.getenv("VERTEX_LOCATION") or DEFAULT_VERTEX_LOCATION

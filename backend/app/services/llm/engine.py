@@ -11,7 +11,7 @@ from app.core.logging import get_logger
 
 from . import local_tools, mcp_client
 from .catalog import DEFAULT_PROVIDER
-from .prompts import SYSTEM_INSTRUCTION
+from .prompts import build_system_instruction
 from .providers.base import LLMProvider
 from .providers.types import (
     FunctionCallData,
@@ -68,7 +68,11 @@ class GraphVisAgent:
         self.provider = _create_provider(self.provider_name, model_name)
         # Full system prompt for this turn. process_turn() appends the network
         # context summary so it is always present regardless of the user prompt.
-        self.system_instruction = SYSTEM_INSTRUCTION
+        # The thinking protocol variant is chosen per the active provider/model's
+        # native-thinking support (see LLMProvider.supports_native_thinking) so
+        # providers with real thinking streams aren't also told to hand-write
+        # <thought> tags in their text — see prompts.build_system_instruction.
+        self.system_instruction = build_system_instruction(self.provider.supports_native_thinking)
 
     async def _consume_stream(
         self,
@@ -156,10 +160,11 @@ class GraphVisAgent:
         # Fix the system prompt for this turn: the network context summary is
         # appended once here so every generate() call in the loop shares the
         # exact same system instruction (keeps provider prompt caching intact).
+        base_instruction = build_system_instruction(self.provider.supports_native_thinking)
         if context_summary:
-            self.system_instruction = f"{SYSTEM_INSTRUCTION}\n\n---\n\n{context_summary}"
+            self.system_instruction = f"{base_instruction}\n\n---\n\n{context_summary}"
         else:
-            self.system_instruction = SYSTEM_INSTRUCTION
+            self.system_instruction = base_instruction
 
         # 1. Prepare Tools
         all_tools = await self._get_all_tools()

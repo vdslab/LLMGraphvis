@@ -64,6 +64,12 @@ class AnthropicProvider(LLMProvider):
         self.model_name = model_name or os.getenv("CLAUDE_MODEL") or DEFAULT_CLAUDE_MODEL
         self.max_tokens = int(os.getenv("ANTHROPIC_MAX_TOKENS") or DEFAULT_MAX_TOKENS)
 
+    @property
+    def supports_native_thinking(self) -> bool:
+        # `_stream` always requests thinking={"type": "adaptive"} below, so every
+        # Claude call on this provider yields real thinking_delta chunks.
+        return True
+
     def _initialize_client(self):
         import anthropic
         project_id = os.getenv("VERTEX_PROJECT_ID")
