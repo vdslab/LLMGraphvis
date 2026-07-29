@@ -1,5 +1,7 @@
+import sqlalchemy
 from sqlalchemy import (
     JSON,
+    Boolean,
     Column,
     DateTime,
     Float,
@@ -50,7 +52,7 @@ class Network(Base):
     last_node_label_config = Column(JSON, nullable=True)
 
 
-    parent_network_id = Column(Integer, ForeignKey("networks.id"), nullable=True)
+    parent_network_id = Column(Integer, ForeignKey("networks.id"), nullable=True, index=True)
 
     subgraphs = relationship("Network", back_populates="parent_network", cascade="all, delete-orphan")
     parent_network = relationship(
@@ -71,13 +73,15 @@ class Chat(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     network_id = Column(Integer, ForeignKey("networks.id"), nullable=False, unique=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     visualization_state = Column(JSON, nullable=True)
+    provider = Column(String, nullable=True)
+    model = Column(String, nullable=True)
 
     user = relationship("User", back_populates="chats")
     network = relationship("Network", back_populates="chat")
@@ -88,7 +92,7 @@ class ChatMessage(Base):
     __tablename__ = "chat_messages"
 
     id = Column(Integer, primary_key=True, index=True)
-    chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False)
+    chat_id = Column(Integer, ForeignKey("chats.id"), nullable=False, index=True)
     role = Column(String, nullable=False)
     content = Column(Text, nullable=False)
     meta_data = Column(JSON, nullable=True)
@@ -98,6 +102,26 @@ class ChatMessage(Base):
     )
 
     chat = relationship("Chat", back_populates="messages")
+    tool_executions = relationship("ToolExecution", back_populates="message", cascade="all, delete-orphan")
+    usage = relationship("LlmUsage", back_populates="message", uselist=False, cascade="all, delete-orphan")
+
+
+class ToolExecution(Base):
+    __tablename__ = "tool_executions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    message_id = Column(Integer, ForeignKey("chat_messages.id"), nullable=False, index=True)
+    tool_name = Column(String, nullable=False)
+    arguments = Column(JSON, nullable=True)
+    result = Column(JSON, nullable=True)
+    thought = Column(Text, nullable=True)
+    status = Column(String, nullable=False)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+    message = relationship("ChatMessage", back_populates="tool_executions")
 
 
 class Node(Base):
@@ -126,8 +150,8 @@ class Edge(Base):
     id = Column(Integer, primary_key=True, index=True)
     network_id = Column(Integer, ForeignKey("networks.id"), nullable=False)
     edge_id = Column(String, nullable=False)
-    source_node_id = Column(Integer, ForeignKey("nodes.id"), nullable=False)
-    target_node_id = Column(Integer, ForeignKey("nodes.id"), nullable=False)
+    source_node_id = Column(Integer, ForeignKey("nodes.id"), nullable=False, index=True)
+    target_node_id = Column(Integer, ForeignKey("nodes.id"), nullable=False, index=True)
     weight = Column(Float, default=1.0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
@@ -157,6 +181,13 @@ class NodeAttribute(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    # Derived-attribute / cache provenance metadata (populated by later stages)
+    is_derived = Column(Boolean, nullable=False, server_default=sqlalchemy.sql.false())
+    derived_from = Column(String, nullable=True)
+    computation_params = Column(JSON, nullable=True)
+    graph_state_hash = Column(String, nullable=True)
+    computed_at = Column(DateTime(timezone=True), nullable=True)
+
     network = relationship("Network", back_populates="node_attributes")
     values = relationship("NodeAttributeValue", back_populates="attribute", cascade="all, delete-orphan")
 
@@ -172,7 +203,7 @@ class NodeAttributeValue(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     node_id = Column(Integer, ForeignKey("nodes.id"), nullable=False)
-    attribute_id = Column(Integer, ForeignKey("node_attributes.id"), nullable=False)
+    attribute_id = Column(Integer, ForeignKey("node_attributes.id"), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -230,6 +261,13 @@ class EdgeAttribute(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    # Derived-attribute / cache provenance metadata (populated by later stages)
+    is_derived = Column(Boolean, nullable=False, server_default=sqlalchemy.sql.false())
+    derived_from = Column(String, nullable=True)
+    computation_params = Column(JSON, nullable=True)
+    graph_state_hash = Column(String, nullable=True)
+    computed_at = Column(DateTime(timezone=True), nullable=True)
+
     network = relationship("Network", back_populates="edge_attributes")
     values = relationship("EdgeAttributeValue", back_populates="attribute", cascade="all, delete-orphan")
 
@@ -245,7 +283,7 @@ class EdgeAttributeValue(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     edge_id = Column(Integer, ForeignKey("edges.id"), nullable=False)
-    attribute_id = Column(Integer, ForeignKey("edge_attributes.id"), nullable=False)
+    attribute_id = Column(Integer, ForeignKey("edge_attributes.id"), nullable=False, index=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -286,3 +324,20 @@ class EdgeFloatAttributeValue(Base):
     float_value = Column(Float)
 
     parent = relationship("EdgeAttributeValue", back_populates="float_value")
+
+
+class LlmUsage(Base):
+    __tablename__ = "llm_usages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    message_id = Column(Integer, ForeignKey("chat_messages.id"), nullable=False, unique=True)
+    provider = Column(String, nullable=False)          # "google" | "anthropic"
+    model = Column(String, nullable=False)               # e.g. "gemini-2.5-flash", "claude-opus-4-8"
+    input_tokens = Column(Integer, nullable=False, default=0)
+    output_tokens = Column(Integer, nullable=False, default=0)
+    cached_input_tokens = Column(Integer, nullable=False, default=0)
+    iteration_count = Column(Integer, nullable=False, default=1)
+    estimated_cost_usd = Column(Float, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    message = relationship("ChatMessage", back_populates="usage")

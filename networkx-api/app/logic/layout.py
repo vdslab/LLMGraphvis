@@ -8,6 +8,8 @@ from common import models
 from .attributes import delete_attribute_values, get_or_create_attribute
 from app.core.logging import get_logger
 
+logger = get_logger(__name__)
+
 
 
 def determine_layout_params(G, layout_name: str):
@@ -47,24 +49,32 @@ def determine_layout_params(G, layout_name: str):
         }
 
     elif layout_name == "forceatlas2":
-        # Native NetworkX ForceAtlas2
-        # Tuning for quality
+        # Native NetworkX ForceAtlas2 optimization
+        # Dynamic iterations based on graph size.
+        # Each iteration is O(N^2) (dense pairwise force computation, no
+        # Barnes-Hut approximation), so iteration count directly dominates
+        # upload/layout latency for large graphs. Floor/cap kept well above
+        # networkx's own default (100) for layout quality, but far below the
+        # previous 1000-5000 range that made large uploads extremely slow.
+        # Formula: max_iter = max(200, min(2000, num_nodes))
+        max_iter = max(200, min(2000, num_nodes))
+
+        # Dynamic Scaling Ratio for Overlap Reduction
+        # Use Average Degree as a proxy for local density clumping
+        num_edges = len(G.edges)
+        avg_degree = (2 * num_edges) / num_nodes if num_nodes > 0 else 0
         
-        # Iterations
-        if is_small:
-            max_iter = 2000 # Let it settle completely
-        elif is_medium:
-            max_iter = 1000
-        else: # Large
-            max_iter = 500 # Practical limit for interactive response
+        # If avg_degree is high, nodes are pulled tighter. We increase scaling to compensate.
+        # Base scaling is 2.0. Cap at 10.0.
+        # Formula: scaling_ratio = max(2.0, min(10.0, avg_degree * 0.5))
+        scaling_ratio = max(2.0, min(10.0, avg_degree * 0.5))
 
         # Force Constants
-        # gravity: Attracts to center. Too high = collapse, Too low = drift.
-        # scaling_ratio: Repulsion strength. High = more spread.
         params = {
             "max_iter": max_iter,
-            "scaling_ratio": 80.0, # Standard scaling
-            "gravity": 0.03,      # Gentle gravity to keep shape
+            "scaling_ratio": scaling_ratio, 
+            "gravity": 1.0,        # Standard gravity
+            "jitter_tolerance": 1.0, # Standard tolerance for better convergence
             "seed": 42
         }
 
@@ -75,9 +85,34 @@ def determine_layout_params(G, layout_name: str):
     return params
 
 
-def calculate_layout(network_id: int, layout_name: str, db: Session):
-    logger = get_logger(__name__)
-    
+# Per-layout allowlist of override keys accepted for the geometric layouts
+# (Step 6). Keeps the override-merge generic while ensuring a parameter that
+# a given networkx layout function doesn't actually support (e.g. `scale` on
+# `random_layout`, which has no such kwarg) never leaks through and blows up
+# the nx call, and never gets silently ignored after being advertised either
+# (see force_directed/geometric tool layer, which only exposes params that
+# are in these sets).
+GEOMETRIC_OVERRIDE_KEYS = {
+    "circular": {"scale", "center"},
+    "shell": {"scale", "center", "nlist"},
+    "spiral": {"scale", "center"},
+    # NOTE: nx.random_layout(G, center=None, dim=2, seed=None) has no `scale`
+    # parameter, unlike the other three geometric layouts.
+    "random": {"center"},
+}
+
+
+def calculate_layout(
+    network_id: int,
+    layout_name: str,
+    db: Session,
+    overrides: dict = None,
+    force: bool = False,
+):
+    # Normalize layout name up front (needed for both cache-check and compute paths)
+    if layout_name in ["forceatlas2_layout", "force-directed", "force_directed"]:
+        layout_name = "forceatlas2"
+
     # Reconstruct graph from DB
     from .utils.graph_builder import build_graph_from_db
     G = build_graph_from_db(network_id, db)
@@ -86,13 +121,56 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
     nodes_query = db.query(models.Node.id, models.Node.node_id).filter(models.Node.network_id == network_id).all()
     node_map = {row.node_id: row.id for row in nodes_query}
 
-    # Normalize layout name
-    if layout_name in ["forceatlas2_layout", "force-directed", "force_directed"]:
-        layout_name = "forceatlas2"
-        
     num_nodes = len(G.nodes)
     params = determine_layout_params(G, layout_name)
-    
+
+    # Merge caller-supplied overrides on top of the auto-computed params.
+    # `None` values in `overrides` mean "use the auto-default" and are filtered
+    # out; anything else wins. Tuple values (e.g. `center=(x, y)`) are converted
+    # to lists so the resulting dict is JSON-serializable — this same dict is
+    # reused below as (part of) `effective_params`/`computation_params`, and a
+    # tuple would silently become a list on DB round-trip, causing a spurious
+    # cache-miss on the very next call if we stored the tuple form.
+    sanitized_overrides = {
+        k: (list(v) if isinstance(v, tuple) else v)
+        for k, v in (overrides or {}).items()
+        if v is not None
+    }
+
+    if layout_name in GEOMETRIC_OVERRIDE_KEYS:
+        # circular / shell / spiral / random: params starts empty (these
+        # layouts have no auto-computed params today), so only accept the
+        # override keys each specific nx layout function actually supports.
+        allowed = GEOMETRIC_OVERRIDE_KEYS[layout_name]
+        params.update({k: v for k, v in sanitized_overrides.items() if k in allowed})
+    else:
+        # spring / forceatlas2 / kamada_kawai: the tool layer only ever builds
+        # an `overrides` dict containing keys relevant to the layout it calls,
+        # so a direct merge on top of the auto-computed params is sufficient.
+        params.update(sanitized_overrides)
+
+    # --- Cache check ---
+    from .utils.cache import compute_graph_state_hash
+    from .attributes import get_cached_attribute, is_cache_valid
+
+    current_hash = compute_graph_state_hash(network_id, db)
+    effective_params = {"layout_name": layout_name, **params}
+
+    if not force:
+        cached_x = get_cached_attribute(
+            network_id, f"{layout_name}_x", models.NodeAttribute, db
+        )
+        if is_cache_valid(cached_x, current_hash, effective_params):
+            logger.info(
+                f"Layout cache HIT for network {network_id}, layout='{layout_name}' "
+                f"(graph_state_hash={current_hash[:12]}...). Skipping recomputation."
+            )
+            return
+
+    logger.info(
+        f"Layout cache MISS for network {network_id}, layout='{layout_name}'. Recomputing."
+    )
+
     pos = None
 
     if layout_name == "spring" or layout_name == "fruchterman_reingold":
@@ -104,83 +182,73 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
         pos = nx.forceatlas2_layout(G, **params)
 
     elif layout_name == "circular" or layout_name == "circle":
-        pos = nx.circular_layout(G)
+        pos = nx.circular_layout(G, **params)
 
     elif layout_name == "kamada_kawai":
         pos = nx.kamada_kawai_layout(G, **params)
 
     elif layout_name == "shell":
-        pos = nx.shell_layout(G)
+        pos = nx.shell_layout(G, **params)
 
     elif layout_name == "spectral":
         pos = nx.spectral_layout(G)
 
     elif layout_name == "spiral":
-        pos = nx.spiral_layout(G)
+        pos = nx.spiral_layout(G, **params)
 
     elif layout_name == "random":
-        pos = nx.random_layout(G, seed=42)
+        pos = nx.random_layout(G, seed=42, **params)
 
     else:
         raise ValueError(f"Unknown layout algorithm: {layout_name}")
 
     # Save to DB - Bulk Update Strategy
-    # 1. Ensure attributes exist
-    attr_x = get_or_create_attribute(
-        network_id, f"{layout_name}_x", models.NodeAttribute, db, data_type="float"
-    )
-    attr_y = get_or_create_attribute(
-        network_id, f"{layout_name}_y", models.NodeAttribute, db, data_type="float"
-    )
-    print(f"DEBUG: layout.calculate_layout created attributes {attr_x.id}, {attr_y.id} for network {network_id}")
+    # We save two attributes: {layout_name}_x and {layout_name}_y
+    
+    # Prepare data maps
+    data_map_x = {}
+    data_map_y = {}
 
-
-    # 2. Delete existing values for these attributes (Clean slate)
-    delete_attribute_values(network_id, attr_x.id, models.NodeAttributeValue, db, commit=False)
-    delete_attribute_values(network_id, attr_y.id, models.NodeAttributeValue, db, commit=False)
-
-    # 3. Bulk Insert New Values
-    nav_data = []
-    for node_id in pos:
-        db_node_id = node_map[node_id]
-        nav_data.append({"node_id": db_node_id, "attribute_id": attr_x.id})
-        nav_data.append({"node_id": db_node_id, "attribute_id": attr_y.id})
-
-    if nav_data:
-        db.bulk_insert_mappings(models.NodeAttributeValue, nav_data)
-        db.commit()
-
-        # Fetch back IDs
-        all_navs = (
-            db.query(models.NodeAttributeValue)
-            .filter(
-                models.NodeAttributeValue.attribute_id.in_([attr_x.id, attr_y.id]),
-                models.NodeAttributeValue.node_id.in_(node_map.values()),
-            )
-            .all()
-        )
-
-        nav_map = {(nav.node_id, nav.attribute_id): nav.id for nav in all_navs}
-
-        float_vals = []
-        for node_id, (x, y) in pos.items():
+    for node_id, (x, y) in pos.items():
+        if node_id in node_map:
             db_node_id = node_map[node_id]
+            data_map_x[db_node_id] = float(x)
+            data_map_y[db_node_id] = float(y)
 
-            nav_x_id = nav_map.get((db_node_id, attr_x.id))
-            if nav_x_id:
-                float_vals.append(
-                    {"node_attribute_value_id": nav_x_id, "float_value": float(x)}
-                )
+    from .attributes import bulk_save_node_attributes, update_attribute_cache_metadata
 
-            nav_y_id = nav_map.get((db_node_id, attr_y.id))
-            if nav_y_id:
-                float_vals.append(
-                    {"node_attribute_value_id": nav_y_id, "float_value": float(y)}
-                )
+    # Save X
+    bulk_save_node_attributes(
+        network_id, f"{layout_name}_x", "float", data_map_x, db
+    )
 
-        if float_vals:
-            db.bulk_insert_mappings(models.NodeFloatAttributeValue, float_vals)
-        db.commit()
+    # Save Y
+    bulk_save_node_attributes(
+        network_id, f"{layout_name}_y", "float", data_map_y, db
+    )
+
+    # Stamp cache metadata on both x/y attributes so future calls can detect a cache hit
+    derived_from = f"layout:{layout_name}"
+    update_attribute_cache_metadata(
+        network_id,
+        f"{layout_name}_x",
+        models.NodeAttribute,
+        db,
+        graph_state_hash=current_hash,
+        computation_params=effective_params,
+        is_derived=True,
+        derived_from=derived_from,
+    )
+    update_attribute_cache_metadata(
+        network_id,
+        f"{layout_name}_y",
+        models.NodeAttribute,
+        db,
+        graph_state_hash=current_hash,
+        computation_params=effective_params,
+        is_derived=True,
+        derived_from=derived_from,
+    )
 
     # 4. Update Network Record with last layout name
     from sqlalchemy import text
@@ -193,5 +261,5 @@ def calculate_layout(network_id: int, layout_name: str, db: Session):
         db.commit()
     except Exception as e:
         db.rollback()
-        print(f"Warning: Failed to update last_layout_name: {e}")
+        logger.warning(f"Failed to update last_layout_name: {e}")
         # non-critical, proceed

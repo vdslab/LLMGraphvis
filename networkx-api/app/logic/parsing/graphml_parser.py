@@ -5,6 +5,10 @@ from typing import Dict, Optional, Tuple
 
 import networkx as nx
 
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
 
 @dataclass
 class ParsedGraphData:
@@ -45,7 +49,7 @@ class GraphMLParser:
             root = ET.fromstring(content)
             return self._extract_metadata(root, G)
         except Exception as e:
-            print(f"Warning: Failed to extract descriptions from GraphML XML: {e}")
+            logger.warning(f"Failed to extract descriptions from GraphML XML: {e}")
             # Return graph without extra metadata if XML parsing fails but NX succeeded
             return ParsedGraphData(graph=G)
 

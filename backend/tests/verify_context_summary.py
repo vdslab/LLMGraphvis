@@ -18,11 +18,20 @@ async def test_context_summary():
     }
 
     # Patch mcp_client.get_resource
-    with patch(
-        "app.services.llm.mcp_client.get_resource", new_callable=AsyncMock
-    ) as mock_get:
+    # Patch mcp_client.session_scope and get_resource
+    # We need to mock session_scope because build_context_summary uses it
+    from app.services.llm import context
 
-        def side_effect(uri):
+    # Mock context manager for session_scope
+    mock_session = AsyncMock()
+    mock_session_cm = AsyncMock()
+    mock_session_cm.__aenter__.return_value = mock_session
+    mock_session_cm.__aexit__.return_value = None
+
+    with patch("app.services.llm.mcp_client.session_scope", return_value=mock_session_cm), \
+         patch("app.services.llm.mcp_client.get_resource", new_callable=AsyncMock) as mock_get:
+
+        def side_effect(uri, session=None):
             if "structure" in uri:
                 return mock_structure
             if "attributes/nodes" in uri:
@@ -31,17 +40,8 @@ async def test_context_summary():
 
         mock_get.side_effect = side_effect
 
-        # Import the function (needs app context or loose import)
-        # We might need to mock other imports in service.py if they side-effect on import
-        # simple import should work if dependencies are installed
-        try:
-            from app.services.llm.service import _build_context_summary
-        except ImportError as e:
-            print(f"ImportError: {e}")
-            return
-
-        print("--- Testing Context Summary Generation ---")
-        summary = await _build_context_summary(1)
+        print("--- Testing Context Summary Generation (Refactored) ---")
+        summary = await context.build_context_summary(1)
 
         print("\nGenerated Summary:")
         print(summary)

@@ -44,7 +44,7 @@ def register(
         httponly=True,
         max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         samesite="lax",
-        secure=False,  # Set to True in production with HTTPS
+        secure=auth.COOKIE_SECURE,
     )
 
     return {"access_token": access_token, "token_type": "bearer"}
@@ -82,7 +82,7 @@ def login_for_access_token(
         httponly=True,
         max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         samesite="lax",
-        secure=False,  # Set to True in production with HTTPS
+        secure=auth.COOKIE_SECURE,
     )
 
     return {"access_token": access_token, "token_type": "bearer"}

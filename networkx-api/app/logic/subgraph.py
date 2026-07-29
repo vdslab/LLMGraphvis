@@ -13,20 +13,43 @@ from .utils.node_utils import resolve_node_id
 logger = get_logger(__name__)
 from .utils.graph_builder import build_graph_from_db
 
-# Standard set of topological attributes to exclude by default
-# These depend on the graph structure, so they become "stale" in a subgraph.
-TOPOLOGICAL_ATTRIBUTES = [
-    "degree",
-    "in_degree",
-    "out_degree",
-    "betweenness",
-    "closeness",
-    "eigenvector",
-    "pagerank",
-    "modularity_class",
-    "x",
-    "y",  # Layout depends on topology too
-]
+
+def _get_derived_attribute_names(source_network_id: int, db: Session) -> List[str]:
+    """
+    Returns the set of attribute names (node- and edge-side combined) on the SOURCE
+    network that are marked `is_derived=True` (layout coordinates, centrality scores,
+    community labels, etc.).
+
+    These are topology-dependent values that become stale once copied into a subgraph
+    (a different induced graph), so they are excluded by default when copying attributes
+    into a new subgraph network. This replaces a previously-hardcoded attribute-name list
+    that had drifted out of sync with the real attribute names actually produced by the
+    layout/centrality/community logic (e.g. "degree_centrality", "louvain_community").
+
+    Node and edge derived-attribute names are combined into a single exclusion list,
+    matching the existing `AttributeCopier.copy_attributes` contract, which applies one
+    `excluded_attributes` name list to both the node- and edge-attribute definition copy
+    steps.
+    """
+    node_names = [
+        r.attribute_name
+        for r in db.query(models.NodeAttribute.attribute_name)
+        .filter(
+            models.NodeAttribute.network_id == source_network_id,
+            models.NodeAttribute.is_derived == True,  # noqa: E712
+        )
+        .all()
+    ]
+    edge_names = [
+        r.attribute_name
+        for r in db.query(models.EdgeAttribute.attribute_name)
+        .filter(
+            models.EdgeAttribute.network_id == source_network_id,
+            models.EdgeAttribute.is_derived == True,  # noqa: E712
+        )
+        .all()
+    ]
+    return list(set(node_names) | set(edge_names))
 
 
 def create_subgraph_from_nodes(
@@ -80,6 +103,16 @@ def create_subgraph_from_nodes(
     new_network = models.Network(
         name=target_name, parent_network_id=source_network_id, description=description
     )
+    
+    # [FIX] Inherit visualization settings if preserving layout
+    if preserve_layout and source_network:
+         new_network.last_layout_name = source_network.last_layout_name
+         new_network.last_node_size_config = source_network.last_node_size_config
+         new_network.last_node_color_config = source_network.last_node_color_config
+         new_network.last_edge_width_config = source_network.last_edge_width_config
+         new_network.last_edge_color_config = source_network.last_edge_color_config
+         new_network.last_node_label_config = source_network.last_node_label_config
+
     db.add(new_network)
     db.commit()
     db.refresh(new_network)
@@ -95,15 +128,23 @@ def create_subgraph_from_nodes(
     logger.debug(f"Copied {len(edge_map)} edges")
 
     # 6. Copy Attributes Schema & Values
-    # Define exclusion list based on whether layout should be preserved
-    excluded_attrs = list(TOPOLOGICAL_ATTRIBUTES)
+    # Define exclusion list based on whether layout should be preserved.
+    # Dynamically derived from `is_derived=True` attributes on the source network,
+    # rather than a hardcoded name list (which drifts out of sync with real attribute
+    # names like "degree_centrality" / "louvain_community" / "clustering").
+    excluded_attrs = _get_derived_attribute_names(source_network_id, db)
 
-    if preserve_layout:
-        # If preserving layout, we DO want x and y, so remove them from exclusion list
-        if "x" in excluded_attrs:
-            excluded_attrs.remove("x")
-        if "y" in excluded_attrs:
-            excluded_attrs.remove("y")
+    if preserve_layout and source_network.last_layout_name:
+        # If preserving layout, we DO want the current layout's x/y coordinate
+        # attributes copied, so remove them from the exclusion set.
+        # (Real attribute names are "{layout_name}_x"/"{layout_name}_y", e.g.
+        # "forceatlas2_x" — not bare "x"/"y".)
+        layout_x = f"{source_network.last_layout_name}_x"
+        layout_y = f"{source_network.last_layout_name}_y"
+        if layout_x in excluded_attrs:
+            excluded_attrs.remove(layout_x)
+        if layout_y in excluded_attrs:
+            excluded_attrs.remove(layout_y)
 
     copier = AttributeCopier(db)
     copier.copy_attributes(
@@ -116,11 +157,14 @@ def create_subgraph_from_nodes(
 
     # 7. Calculate Initial Layout (only if NOT preserved)
     if not preserve_layout:
-        logger.info("Calculating initial layout (spring)...")
-        calculate_layout(new_network_id, "spring", db)
+        logger.info("Calculating initial layout (forceatlas2)...")
+        calculate_layout(new_network_id, "forceatlas2", db)
     else:
-        logger.info("Preserving existing layout (x, y copied).")
-
+        logger.info(f"Preserving existing layout (x, y copied) from {source_network.last_layout_name}.")
+        # Verify if the specific layout attributes exist?
+        # Ideally, AttributeCopier copied everything. 
+        # If source_network.last_layout_name was 'forceatlas2', then 'forceatlas2_x' should have been copied.
+        
     return {"new_network_id": new_network_id, "name": new_network.name}
 
 
@@ -348,6 +392,30 @@ def create_largest_component_subgraph(
         node_ids,
         db,
         suffix="Largest Component",
+        preserve_layout=preserve_layout,
+        description=description,
+    )
+
+
+def filter_nodes_by_degree(
+    source_network_id: int,
+    min_degree: int,
+    db: Session,
+    preserve_layout: bool = True,
+    description: str = None,
+) -> Dict[str, Any]:
+    logger.info(f"Filtering nodes by degree >= {min_degree} in network {source_network_id}")
+    G = build_graph_from_db(source_network_id, db)
+    node_ids = [n for n, d in G.degree() if d >= min_degree]
+    if not node_ids:
+        raise ValueError(f"No nodes found with degree >= {min_degree}")
+    if description is None:
+        description = f"Nodes with degree >= {min_degree}."
+    return create_subgraph_from_nodes(
+        source_network_id,
+        node_ids,
+        db,
+        suffix=f"HighDegree(k={min_degree})",
         preserve_layout=preserve_layout,
         description=description,
     )

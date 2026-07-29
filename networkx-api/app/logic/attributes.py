@@ -86,6 +86,79 @@ def clear_network_data(network_id: int, db: Session) -> None:
     db.commit()
 
 
+def bulk_save_node_attributes(
+    network_id: int,
+    attr_name: str,
+    attr_type: str,
+    data_map: Dict[int, Any],  # db_node_id -> value
+    db: Session,
+):
+    """
+    Helper function to bulk save node attributes.
+    Handles attribute creation, clearing old values, and bulk insertion.
+
+    Args:
+        network_id: The ID of the network.
+        attr_name: Name of the attribute to save (e.g., "degree_centrality").
+        attr_type: "float" or "string".
+        data_map: Dictionary mapping internal DB node ID to the value.
+        db: Database session.
+    """
+    # 1. Get or Create Attribute
+    attr = get_or_create_attribute(
+        network_id, attr_name, models.NodeAttribute, db, data_type=attr_type
+    )
+
+    # 2. Delete existing values
+    delete_attribute_values(
+        network_id, attr.id, models.NodeAttributeValue, db, commit=False
+    )
+
+    if not data_map:
+        db.commit()
+        return
+
+    # 3. Bulk Insert Mappings (NodeAttributeValue), returning generated IDs directly
+    #    instead of a separate round-trip SELECT to fetch them back.
+    nav_data = [
+        {"node_id": node_id, "attribute_id": attr.id} for node_id in data_map.keys()
+    ]
+    stmt = (
+        insert(models.NodeAttributeValue)
+        .values(nav_data)
+        .returning(models.NodeAttributeValue.id, models.NodeAttributeValue.node_id)
+    )
+    result = db.execute(stmt)
+
+    # Map db_node_id -> nav_id
+    nav_map = {row.node_id: row.id for row in result}
+
+    # 5. Bulk Insert Values (Float or Text)
+    value_data = []
+    
+    if attr_type == "float":
+        for node_id, value in data_map.items():
+            nav_id = nav_map.get(node_id)
+            if nav_id:
+                value_data.append(
+                    {"node_attribute_value_id": nav_id, "float_value": float(value)}
+                )
+        if value_data:
+            db.bulk_insert_mappings(models.NodeFloatAttributeValue, value_data)
+
+    elif attr_type == "string":
+        for node_id, value in data_map.items():
+            nav_id = nav_map.get(node_id)
+            if nav_id:
+                value_data.append(
+                    {"node_attribute_value_id": nav_id, "text_value": str(value)}
+                )
+        if value_data:
+            db.bulk_insert_mappings(models.NodeTextAttributeValue, value_data)
+    
+    db.commit()
+
+
 def ensure_attributes(
     network_id: int,
     attr_types: Dict[str, str],
@@ -165,6 +238,8 @@ def get_or_create_attribute(
     model_class: Type[models.Base],
     db: Session,
     data_type: str = "string",
+    is_derived: Optional[bool] = None,
+    derived_from: Optional[str] = None,
 ) -> models.Base:
     """
     Get an existing attribute or create a new one if it doesn't exist.
@@ -175,6 +250,12 @@ def get_or_create_attribute(
         model_class: The model class (NodeAttribute or EdgeAttribute).
         db: Database session.
         data_type: The data type of the attribute.
+        is_derived: If provided, tags the attribute as derived/not-derived at creation
+            time (only applied when the attribute is newly created; existing attributes
+            are left untouched here — use `update_attribute_cache_metadata` to update
+            provenance on an existing attribute).
+        derived_from: Optional provenance string (e.g. "layout:forceatlas2") to store
+            when the attribute is newly created.
 
     Returns:
         The attribute object.
@@ -188,13 +269,146 @@ def get_or_create_attribute(
     )
 
     if not attr:
-        attr = model_class(
-            network_id=network_id, attribute_name=name, data_type=data_type
-        )
+        kwargs = dict(network_id=network_id, attribute_name=name, data_type=data_type)
+        if is_derived is not None:
+            kwargs["is_derived"] = is_derived
+        if derived_from is not None:
+            kwargs["derived_from"] = derived_from
+        attr = model_class(**kwargs)
         db.add(attr)
         db.commit()
         db.refresh(attr)
     return attr
+
+
+def get_cached_attribute(
+    network_id: int, attr_name: str, model_class: Type[models.Base], db: Session
+) -> Optional[models.Base]:
+    """
+    Returns the NodeAttribute/EdgeAttribute row if it exists, else None.
+    Used to check cache validity before an expensive computation.
+    """
+    return (
+        db.query(model_class)
+        .filter(
+            model_class.network_id == network_id,
+            model_class.attribute_name == attr_name,
+        )
+        .first()
+    )
+
+
+def is_cache_valid(
+    cached_attr: Optional[models.Base],
+    current_hash: str,
+    current_params: Optional[dict],
+) -> bool:
+    """
+    True if the cached attribute's stored graph_state_hash and computation_params
+    match the current graph state / params, meaning the cached values are still valid
+    and recomputation can be skipped.
+    """
+    if cached_attr is None:
+        return False
+    if cached_attr.graph_state_hash != current_hash:
+        return False
+    # computation_params stored as JSON; compare as dicts (order-independent)
+    return (cached_attr.computation_params or {}) == (current_params or {})
+
+
+def update_attribute_cache_metadata(
+    network_id: int,
+    attr_name: str,
+    model_class: Type[models.Base],
+    db: Session,
+    *,
+    graph_state_hash: str,
+    computation_params: Optional[dict],
+    is_derived: bool = True,
+    derived_from: Optional[str] = None,
+) -> None:
+    """
+    Stamps cache metadata onto an existing NodeAttribute/EdgeAttribute row after
+    (re)computation. Call AFTER bulk_save_node_attributes/bulk_save_edge_attributes,
+    since that is what creates/refreshes the attribute row in the first place.
+    """
+    attr = get_cached_attribute(network_id, attr_name, model_class, db)
+    if attr is None:
+        return
+    attr.graph_state_hash = graph_state_hash
+    attr.computation_params = computation_params
+    attr.is_derived = is_derived
+    attr.derived_from = derived_from
+
+    from datetime import datetime, timezone
+
+    attr.computed_at = datetime.now(timezone.utc)
+    db.commit()
+
+
+def load_node_attribute_values(
+    network_id: int, attr_name: str, db: Session
+) -> Dict[str, Any]:
+    """
+    Loads existing computed values for a NodeAttribute back into a {node_id_str: value}
+    dict, matching the shape that calculate_centrality currently returns, so a
+    cache-hit path can return identically-shaped data to a cache-miss (freshly
+    computed) path.
+
+    Handles both float and text attribute value types. Uses the same bulk-join
+    query pattern as `fetch_attribute_values` to avoid an N+1 lazy-load per row.
+    """
+    attr = (
+        db.query(models.NodeAttribute)
+        .filter(
+            models.NodeAttribute.network_id == network_id,
+            models.NodeAttribute.attribute_name == attr_name,
+        )
+        .first()
+    )
+    if attr is None:
+        return {}
+
+    node_id_map = {
+        n.id: n.node_id
+        for n in db.query(models.Node.id, models.Node.node_id)
+        .filter(models.Node.network_id == network_id)
+        .all()
+    }
+
+    result: Dict[str, Any] = {}
+
+    q_float = (
+        db.query(models.NodeAttributeValue.node_id, models.NodeFloatAttributeValue.float_value)
+        .join(
+            models.NodeFloatAttributeValue,
+            models.NodeAttributeValue.id
+            == models.NodeFloatAttributeValue.node_attribute_value_id,
+        )
+        .filter(models.NodeAttributeValue.attribute_id == attr.id)
+        .all()
+    )
+    for node_pk, value in q_float:
+        node_id_str = node_id_map.get(node_pk)
+        if node_id_str is not None:
+            result[node_id_str] = value
+
+    q_text = (
+        db.query(models.NodeAttributeValue.node_id, models.NodeTextAttributeValue.text_value)
+        .join(
+            models.NodeTextAttributeValue,
+            models.NodeAttributeValue.id
+            == models.NodeTextAttributeValue.node_attribute_value_id,
+        )
+        .filter(models.NodeAttributeValue.attribute_id == attr.id)
+        .all()
+    )
+    for node_pk, value in q_text:
+        node_id_str = node_id_map.get(node_pk)
+        if node_id_str is not None:
+            result[node_id_str] = value
+
+    return result
 
 
 def delete_attribute_values(

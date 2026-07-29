@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
+// EventSource retries forever natively; cap consecutive failures so a dead
+// endpoint (401/404, backend down) doesn't hammer the server indefinitely.
+const MAX_CONSECUTIVE_FAILURES = 10;
+
 /**
  * Custom hook to manage Server-Sent Events (SSE) connection.
  * 
@@ -16,6 +20,7 @@ export const useNetworkRealtime = (url, { delay = 0, onMessage, onError, eventHa
   const [error, setError] = useState(null);
   const [lastMessage, setLastMessage] = useState(null);
   const eventSourceRef = useRef(null);
+  const failureCountRef = useRef(0);
 
   // Use refs for callbacks to avoid re-connecting when they change
   const onMessageRef = useRef(onMessage);
@@ -35,6 +40,7 @@ export const useNetworkRealtime = (url, { delay = 0, onMessage, onError, eventHa
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
     }
+    failureCountRef.current = 0;
 
     console.log(`Connecting to SSE: ${url}`);
     const es = new EventSource(url);
@@ -42,6 +48,7 @@ export const useNetworkRealtime = (url, { delay = 0, onMessage, onError, eventHa
 
     es.onopen = () => {
       console.log('SSE Connection Opened');
+      failureCountRef.current = 0;
       setIsConnected(true);
       setError(null);
     };
@@ -49,13 +56,19 @@ export const useNetworkRealtime = (url, { delay = 0, onMessage, onError, eventHa
     es.onerror = (e) => {
       console.error('SSE Connection Error', e);
       setIsConnected(false);
-      setError('Connection lost. Retrying...');
+      failureCountRef.current += 1;
+      if (failureCountRef.current >= MAX_CONSECUTIVE_FAILURES) {
+        es.close();
+        setError('Connection lost. Please reload the page to reconnect.');
+      } else {
+        setError('Connection lost. Retrying...');
+      }
       if (onErrorRef.current) onErrorRef.current(e);
     };
 
     es.onmessage = (event) => {
       try {
-        const data = JSON.parse(event.data);
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         setLastMessage(data);
         if (onMessageRef.current) onMessageRef.current(data);
       } catch (err) {
@@ -71,7 +84,7 @@ export const useNetworkRealtime = (url, { delay = 0, onMessage, onError, eventHa
       Object.keys(eventHandlersRef.current).forEach((type) => {
         es.addEventListener(type, (event) => {
           try {
-            const data = JSON.parse(event.data);
+            const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
             // Always call the latest handler
             if (eventHandlersRef.current && eventHandlersRef.current[type]) {
                 eventHandlersRef.current[type](data);

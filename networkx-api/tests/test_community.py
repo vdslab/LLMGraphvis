@@ -36,11 +36,12 @@ def test_calculate_community_greedy_modularity(db):
     setup_clique_network(db)
     
     attr_name = calculate_community(1, "greedy_modularity", db)
-    
-    assert attr_name == "community"
-    
+
+    # Attribute is named after the algorithm so multiple algorithms can coexist
+    assert attr_name == "greedy_modularity_community"
+
     # Verify DB
-    attr = db.query(models.NodeAttribute).filter_by(network_id=1, attribute_name="community").first()
+    attr = db.query(models.NodeAttribute).filter_by(network_id=1, attribute_name="greedy_modularity_community").first()
     assert attr is not None
     assert attr.data_type == "string"
     

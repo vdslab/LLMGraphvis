@@ -23,7 +23,11 @@ The graph visualization system consists of three main components:
     -   Propose visual mappings before applying them.
     -   Respect `visual_state` (don't override user's view without reason).
         -   **Check State First**: Before modifying visuals, always use `get_visualization_state` to know what the user is seeing.
-        -   **Partial Updates**: The `generate_visualization` tool preserves existing visual settings (color, size, etc.) if parameters are omitted. To change one aspect (e.g. layout) while keeping others (colors), simply omit the other parameters.
+        -   **Partial Updates**: Use specialized tools (`update_node_color`, `update_node_size`, `update_layout`) for precise visual adjustments. These are preferred over `generate_visualization` for simple interactions as they preserve other visual states implicitly.
+        -   **Full Resets**: Use `generate_visualization` when you need to change multiple aspects (color + size + layout) simultaneously or reset the view.
+    -   **Navigation**:
+        - Use `switch_to_network` to return to previous graphs (e.g., "Main graph"). This preserves their last seen state.
+        - **Layout Inheritance**: Subgraphs automatically inherit the parent's layout and visual settings by default (`preserve_layout=True`), ensuring visual continuity.
 
 4.  **Verification**:
     -   Agent is encouraged to run intermediate tools (e.g., `get_node_attributes`) to verify data existence before operations.

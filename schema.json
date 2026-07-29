@@ -1,0 +1,1018 @@
+{
+  "$defs": {
+    "Blob": {
+      "additionalProperties": false,
+      "description": "A content blob.\n\nA Blob contains data of a specific media type. It is used to represent images,\naudio, and video.",
+      "properties": {
+        "data": {
+          "anyOf": [
+            {
+              "format": "base64url",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required. The raw bytes of the data.",
+          "title": "Data"
+        },
+        "displayName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. The display name of the blob. Used to provide a label or filename to distinguish blobs. This field is only returned in `PromptMessage` for prompt management. It is used in the Gemini calls only when server-side tools (`code_execution`, `google_search`, and `url_context`) are enabled. This field is not supported in Gemini API.",
+          "title": "Displayname"
+        },
+        "mimeType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required. The IANA standard MIME type of the source data.",
+          "title": "Mimetype"
+        }
+      },
+      "title": "Blob",
+      "type": "object"
+    },
+    "CodeExecutionResult": {
+      "additionalProperties": false,
+      "description": "Result of executing the `ExecutableCode`.\n\nGenerated only when the `CodeExecution` tool is used.",
+      "properties": {
+        "outcome": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Outcome"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required. Outcome of the code execution."
+        },
+        "output": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. Contains stdout when code execution is successful, stderr or other description otherwise.",
+          "title": "Output"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The identifier of the `ExecutableCode` part this result is for. Only populated if the corresponding `ExecutableCode` has an id.",
+          "title": "Id"
+        }
+      },
+      "title": "CodeExecutionResult",
+      "type": "object"
+    },
+    "ExecutableCode": {
+      "additionalProperties": false,
+      "description": "Model-generated code executed server-side, results returned to the model.\n\nOnly generated when using the `CodeExecution` tool, in which the code will\nbe automatically executed, and a corresponding `CodeExecutionResult` will\nalso be generated.",
+      "properties": {
+        "code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required. The code to be executed.",
+          "title": "Code"
+        },
+        "language": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Language"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required. Programming language of the `code`."
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Unique identifier of the `ExecutableCode` part. The server returns the `CodeExecutionResult` with the matching `id`.",
+          "title": "Id"
+        }
+      },
+      "title": "ExecutableCode",
+      "type": "object"
+    },
+    "FileData": {
+      "additionalProperties": false,
+      "description": "URI-based data.\n\nA FileData message contains a URI pointing to data of a specific media type.\nIt is used to represent images, audio, and video stored in Google Cloud\nStorage.",
+      "properties": {
+        "displayName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. The display name of the file. Used to provide a label or filename to distinguish files. This field is only returned in `PromptMessage` for prompt management. It is used in the Gemini calls only when server side tools (`code_execution`, `google_search`, and `url_context`) are enabled. This field is not supported in Gemini API.",
+          "title": "Displayname"
+        },
+        "fileUri": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required. The URI of the file in Google Cloud Storage.",
+          "title": "Fileuri"
+        },
+        "mimeType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required. The IANA standard MIME type of the source data.",
+          "title": "Mimetype"
+        }
+      },
+      "title": "FileData",
+      "type": "object"
+    },
+    "FunctionCall": {
+      "additionalProperties": false,
+      "description": "A function call.",
+      "properties": {
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The unique id of the function call. If populated, the client to execute the\n   `function_call` and return the response with the matching `id`.",
+          "title": "Id"
+        },
+        "args": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. The function parameters and values in JSON object format. See [FunctionDeclaration.parameters] for parameter details.",
+          "title": "Args"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. The name of the function to call. Matches [FunctionDeclaration.name].",
+          "title": "Name"
+        },
+        "partialArgs": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/PartialArg"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. The partial argument value of the function call. If provided, represents the arguments/fields that are streamed incrementally. This field is not supported in Gemini API.",
+          "title": "Partialargs"
+        },
+        "willContinue": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. Whether this is the last part of the FunctionCall. If true, another partial message for the current FunctionCall is expected to follow. This field is not supported in Gemini API.",
+          "title": "Willcontinue"
+        }
+      },
+      "title": "FunctionCall",
+      "type": "object"
+    },
+    "FunctionResponse": {
+      "additionalProperties": false,
+      "description": "A function response.",
+      "properties": {
+        "willContinue": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Signals that function call continues, and more responses will be returned, turning the function call into a generator. Is only applicable to NON_BLOCKING function calls (see FunctionDeclaration.behavior for details), ignored otherwise. If false, the default, future responses will not be considered. Is only applicable to NON_BLOCKING function calls, is ignored otherwise. If set to false, future responses will not be considered. It is allowed to return empty `response` with `will_continue=False` to signal that the function call is finished.",
+          "title": "Willcontinue"
+        },
+        "scheduling": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FunctionResponseScheduling"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Specifies how the response should be scheduled in the conversation. Only applicable to NON_BLOCKING function calls, is ignored otherwise. Defaults to WHEN_IDLE."
+        },
+        "parts": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/FunctionResponsePart"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "List of parts that constitute a function response. Each part may\n      have a different IANA MIME type.",
+          "title": "Parts"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. The id of the function call this response is for. Populated by the client to match the corresponding function call `id`.",
+          "title": "Id"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required. The name of the function to call. Matches [FunctionDeclaration.name] and [FunctionCall.name].",
+          "title": "Name"
+        },
+        "response": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required. The function response in JSON object format. Use \"output\" key to specify function output and \"error\" key to specify error details (if any). If \"output\" and \"error\" keys are not specified, then whole \"response\" is treated as function output.",
+          "title": "Response"
+        }
+      },
+      "title": "FunctionResponse",
+      "type": "object"
+    },
+    "FunctionResponseBlob": {
+      "additionalProperties": false,
+      "description": "Raw media bytes for function response.\n\nText should not be sent as raw bytes, use the FunctionResponse.response\nfield.",
+      "properties": {
+        "mimeType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required. The IANA standard MIME type of the source data.",
+          "title": "Mimetype"
+        },
+        "data": {
+          "anyOf": [
+            {
+              "format": "base64url",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required. Inline media bytes.",
+          "title": "Data"
+        },
+        "displayName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. Display name of the blob.\n      Used to provide a label or filename to distinguish blobs.",
+          "title": "Displayname"
+        }
+      },
+      "title": "FunctionResponseBlob",
+      "type": "object"
+    },
+    "FunctionResponseFileData": {
+      "additionalProperties": false,
+      "description": "URI based data for function response.",
+      "properties": {
+        "fileUri": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required. URI.",
+          "title": "Fileuri"
+        },
+        "mimeType": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required. The IANA standard MIME type of the source data.",
+          "title": "Mimetype"
+        },
+        "displayName": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. Display name of the file.\n      Used to provide a label or filename to distinguish files.",
+          "title": "Displayname"
+        }
+      },
+      "title": "FunctionResponseFileData",
+      "type": "object"
+    },
+    "FunctionResponsePart": {
+      "additionalProperties": false,
+      "description": "A datatype containing media that is part of a `FunctionResponse` message.\n\nA `FunctionResponsePart` consists of data which has an associated datatype. A\n`FunctionResponsePart` can only contain one of the accepted types in\n`FunctionResponsePart.data`.\n\nA `FunctionResponsePart` must have a fixed IANA MIME type identifying the\ntype and subtype of the media if the `inline_data` field is filled with raw\nbytes.",
+      "properties": {
+        "inlineData": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FunctionResponseBlob"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. Inline media bytes."
+        },
+        "fileData": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FunctionResponseFileData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. URI based data."
+        }
+      },
+      "title": "FunctionResponsePart",
+      "type": "object"
+    },
+    "FunctionResponseScheduling": {
+      "description": "Specifies how the response should be scheduled in the conversation.",
+      "enum": [
+        "SCHEDULING_UNSPECIFIED",
+        "SILENT",
+        "WHEN_IDLE",
+        "INTERRUPT"
+      ],
+      "title": "FunctionResponseScheduling",
+      "type": "string"
+    },
+    "Language": {
+      "description": "Programming language of the `code`.",
+      "enum": [
+        "LANGUAGE_UNSPECIFIED",
+        "PYTHON"
+      ],
+      "title": "Language",
+      "type": "string"
+    },
+    "Outcome": {
+      "description": "Outcome of the code execution.",
+      "enum": [
+        "OUTCOME_UNSPECIFIED",
+        "OUTCOME_OK",
+        "OUTCOME_FAILED",
+        "OUTCOME_DEADLINE_EXCEEDED"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "Part": {
+      "additionalProperties": false,
+      "description": "A datatype containing media content.\n\nExactly one field within a Part should be set, representing the specific type\nof content being conveyed. Using multiple fields within the same `Part`\ninstance is considered invalid.",
+      "properties": {
+        "mediaResolution": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PartMediaResolution"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Media resolution for the input media.\n    "
+        },
+        "codeExecutionResult": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CodeExecutionResult"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. The result of executing the ExecutableCode."
+        },
+        "executableCode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ExecutableCode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. Code generated by the model that is intended to be executed."
+        },
+        "fileData": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FileData"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. The URI-based data of the part. This can be used to include files from Google Cloud Storage."
+        },
+        "functionCall": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FunctionCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. A predicted function call returned from the model. This contains the name of the function to call and the arguments to pass to the function."
+        },
+        "functionResponse": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FunctionResponse"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. The result of a function call. This is used to provide the model with the result of a function call that it predicted."
+        },
+        "inlineData": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Blob"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. The inline data content of the part. This can be used to include images, audio, or video in a request."
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. The text content of the part. When sent from the VSCode Gemini Code Assist extension, references to @mentioned items will be converted to markdown boldface text. For example `@my-repo` will be converted to and sent as `**my-repo**` by the IDE agent.",
+          "title": "Text"
+        },
+        "thought": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. Indicates whether the `part` represents the model's thought process or reasoning.",
+          "title": "Thought"
+        },
+        "thoughtSignature": {
+          "anyOf": [
+            {
+              "format": "base64url",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. An opaque signature for the thought so it can be reused in subsequent requests.",
+          "title": "Thoughtsignature"
+        },
+        "videoMetadata": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VideoMetadata"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. Video metadata. The metadata should only be specified while the video data is presented in inline_data or file_data."
+        },
+        "toolCall": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Server-side tool call. This field is populated when the model predicts a tool invocation that should be executed on the server. The client is expected to echo this message back to the API."
+        },
+        "toolResponse": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolResponse"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The output from a server-side ToolCall execution. This field is populated by the client with the results of executing the corresponding ToolCall."
+        },
+        "partMetadata": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Custom metadata associated with the Part. Agents using genai.Part as content representation may need to keep track of the additional information. For example it can be name of a file/source from which the Part originates or a way to multiplex multiple Part streams. This field is not supported in Vertex AI.",
+          "title": "Partmetadata"
+        }
+      },
+      "title": "Part",
+      "type": "object"
+    },
+    "PartMediaResolution": {
+      "additionalProperties": false,
+      "description": "Media resolution for the input media.",
+      "properties": {
+        "level": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PartMediaResolutionLevel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tokenization quality used for given media.\n    "
+        },
+        "numTokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Specifies the required sequence length for media tokenization.\n    ",
+          "title": "Numtokens"
+        }
+      },
+      "title": "PartMediaResolution",
+      "type": "object"
+    },
+    "PartMediaResolutionLevel": {
+      "description": "The tokenization quality used for given media.",
+      "enum": [
+        "MEDIA_RESOLUTION_UNSPECIFIED",
+        "MEDIA_RESOLUTION_LOW",
+        "MEDIA_RESOLUTION_MEDIUM",
+        "MEDIA_RESOLUTION_HIGH",
+        "MEDIA_RESOLUTION_ULTRA_HIGH"
+      ],
+      "title": "PartMediaResolutionLevel",
+      "type": "string"
+    },
+    "PartialArg": {
+      "additionalProperties": false,
+      "description": "Partial argument value of the function call.\n\nThis data type is not supported in Gemini API.",
+      "properties": {
+        "boolValue": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. Represents a boolean value.",
+          "title": "Boolvalue"
+        },
+        "jsonPath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Required. A JSON Path (RFC 9535) to the argument being streamed. https://datatracker.ietf.org/doc/html/rfc9535. e.g. \"$.foo.bar[0].data\".",
+          "title": "Jsonpath"
+        },
+        "nullValue": {
+          "anyOf": [
+            {
+              "const": "NULL_VALUE",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. Represents a null value.",
+          "title": "Nullvalue"
+        },
+        "numberValue": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. Represents a double value.",
+          "title": "Numbervalue"
+        },
+        "stringValue": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. Represents a string value.",
+          "title": "Stringvalue"
+        },
+        "willContinue": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. Whether this is not the last part of the same json_path. If true, another PartialArg message for the current json_path is expected to follow.",
+          "title": "Willcontinue"
+        }
+      },
+      "title": "PartialArg",
+      "type": "object"
+    },
+    "ToolCall": {
+      "additionalProperties": false,
+      "description": "A predicted server-side `ToolCall` returned from the model.\n\nThis message contains information about a tool that the model wants to invoke.\nThe client is NOT expected to execute this `ToolCall`. Instead, the\nclient should pass this `ToolCall` back to the API in a subsequent turn\nwithin a `Content` message, along with the corresponding `ToolResponse`.",
+      "properties": {
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Unique identifier of the tool call. The server returns the tool response with the matching `id`.",
+          "title": "Id"
+        },
+        "toolType": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The type of tool that was called."
+        },
+        "args": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool call arguments. Example: {\"arg1\": \"value1\", \"arg2\": \"value2\"}.",
+          "title": "Args"
+        }
+      },
+      "title": "ToolCall",
+      "type": "object"
+    },
+    "ToolResponse": {
+      "additionalProperties": false,
+      "description": "The output from a server-side `ToolCall` execution.\n\nThis message contains the results of a tool invocation that was initiated by a\n`ToolCall` from the model. The client should pass this `ToolResponse` back to\nthe API in a subsequent turn within a `Content` message, along with the\ncorresponding `ToolCall`.",
+      "properties": {
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The identifier of the tool call this response is for.",
+          "title": "Id"
+        },
+        "toolType": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The type of tool that was called, matching the tool_type in the corresponding ToolCall."
+        },
+        "response": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tool response.",
+          "title": "Response"
+        }
+      },
+      "title": "ToolResponse",
+      "type": "object"
+    },
+    "ToolType": {
+      "description": "The type of tool in the function call.",
+      "enum": [
+        "TOOL_TYPE_UNSPECIFIED",
+        "GOOGLE_SEARCH_WEB",
+        "GOOGLE_SEARCH_IMAGE",
+        "URL_CONTEXT",
+        "GOOGLE_MAPS",
+        "FILE_SEARCH"
+      ],
+      "title": "ToolType",
+      "type": "string"
+    },
+    "VideoMetadata": {
+      "additionalProperties": false,
+      "description": "Provides metadata for a video, including the start and end offsets for clipping and the frame rate.",
+      "properties": {
+        "endOffset": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. The end offset of the video.",
+          "title": "Endoffset"
+        },
+        "fps": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. The frame rate of the video sent to the model. If not specified, the default value is 1.0. The valid range is (0.0, 24.0].",
+          "title": "Fps"
+        },
+        "startOffset": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional. The start offset of the video.",
+          "title": "Startoffset"
+        }
+      },
+      "title": "VideoMetadata",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Contains the multi-part content of a message.",
+  "properties": {
+    "parts": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/Part"
+          },
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "List of parts that constitute a single message. Each part may have\n      a different IANA MIME type.",
+      "title": "Parts"
+    },
+    "role": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Optional. The producer of the content. Must be either 'user' or 'model'. If not set, the service will default to 'user'.",
+      "title": "Role"
+    }
+  },
+  "title": "Content",
+  "type": "object"
+}

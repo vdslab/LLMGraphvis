@@ -29,15 +29,15 @@ async def verify_mcp_tools():
     print(f"Found {len(tool_names)} tools: {tool_names}")
     
     expected_tools = [
-        "update_network_metadata", "initialize_network", 
+        "initialize_network", 
         "calculate_centrality", "calculate_community", "calculate_layout",
         "generate_visualization", "create_ego_network", 
         "create_subgraph_from_nodes", "create_path_subgraph",
         "create_k_core_subgraph", "create_largest_component_subgraph",
-        "create_component_containing_node", "search_nodes",
-        "get_node_details", "create_subgraph_by_attribute_filter",
-        "get_node_attributes", "get_edge_attributes", 
-        "get_network_structure", "get_top_centrality_nodes", "get_node_attribute_details"
+        "search_nodes",
+        "get_node_details", "create_subgraph_by_filter",
+        "list_node_attributes", "list_edge_attributes", 
+        "get_network_structure", "get_top_nodes"
     ]
     
     missing = [t for t in expected_tools if t not in tool_names]
@@ -91,9 +91,9 @@ async def test_tool_execution():
         res = await mcp.call_tool("get_network_structure", {"network_id": net_id})
         print(f"Result: {res}")
         
-        # Test get_node_attributes (new tool)
-        print(f"Testing get_node_attributes({net_id})...")
-        res = await mcp.call_tool("get_node_attributes", {"network_id": net_id})
+        # Test list_node_attributes (renamed from get_node_attributes)
+        print(f"Testing list_node_attributes({net_id})...")
+        res = await mcp.call_tool("list_node_attributes", {"network_id": net_id})
         print(f"Result: {res}")
         
         # Test update_network_metadata

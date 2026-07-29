@@ -58,7 +58,7 @@ const HomePage = () => {
       </div>
 
       <footer style={{ marginTop: 'auto', paddingTop: '4rem', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-        © {new Date().getFullYear()} GraphVisAgent. All rights reserved.
+        {/* © {new Date().getFullYear()} Takuma SHIRASHOJI. All rights reserved. */}
       </footer>
     </div>
   );

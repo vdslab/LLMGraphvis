@@ -7,6 +7,8 @@ const ChatList = ({ currentChatId, onClose }) => {
   const { fetchChats } = useChatStore();
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingChatId, setEditingChatId] = useState(null);
+  const [editName, setEditName] = useState("");
 
   useEffect(() => {
     const loadChats = async () => {
@@ -31,6 +33,35 @@ const ChatList = ({ currentChatId, onClose }) => {
     navigate('/chat/new');
     if (onClose) onClose();
   }
+
+
+
+  const handleEditClick = (e, chat) => {
+    e.stopPropagation();
+    setEditingChatId(chat.id);
+    setEditName(chat.name);
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.stopPropagation();
+    if (editingChatId && editName.trim()) {
+      try {
+        await useChatStore.getState().renameChat(editingChatId, editName.trim());
+        setChats(chats.map(c => c.id === editingChatId ? { ...c, name: editName.trim() } : c));
+        setEditingChatId(null);
+      } catch (error) {
+        console.error("Failed to rename chat:", error);
+      }
+    }
+  };
+
+  const handleEditKeyDown = (e) => {
+    if (e.key === 'Enter') {
+        handleEditSubmit(e);
+    } else if (e.key === 'Escape') {
+        setEditingChatId(null);
+    }
+  };
 
   if (loading) {
     return <div style={{ padding: '1rem', color: '#666' }}>Loading chats...</div>;
@@ -68,20 +99,66 @@ const ChatList = ({ currentChatId, onClose }) => {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  borderLeft: chat.id === currentChatId ? '3px solid var(--primary-color)' : '3px solid transparent'
+                  borderLeft: chat.id === currentChatId ? '3px solid var(--primary-color)' : '3px solid transparent',
+                  position: 'relative' // For absolute positioning if needed, or just flex context
                 }}
                 onMouseEnter={(e) => {
                     if (chat.id !== currentChatId) e.currentTarget.style.backgroundColor = 'var(--background-color)';
+                    // Show edit button
+                    const editBtn = e.currentTarget.querySelector('.edit-btn');
+                    if (editBtn) editBtn.style.opacity = '1';
                 }}
                 onMouseLeave={(e) => {
                     if (chat.id !== currentChatId) e.currentTarget.style.backgroundColor = 'transparent';
+                    // Hide edit button
+                    const editBtn = e.currentTarget.querySelector('.edit-btn');
+                    if (editBtn) editBtn.style.opacity = '0';
                 }}
               >
-                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
-                    <div style={{ fontWeight: chat.id === currentChatId ? '600' : '500', marginBottom: '0.25rem', color: 'var(--text-primary)' }}>{chat.name}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        {new Date(chat.updated_at).toLocaleDateString()}
-                    </div>
+                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    {editingChatId === chat.id ? (
+                        <input 
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            onKeyDown={handleEditKeyDown}
+                            onClick={(e) => e.stopPropagation()}
+                            onBlur={() => setEditingChatId(null)}
+                            autoFocus
+                            style={{
+                                width: '100%',
+                                padding: '0.25rem',
+                                border: '1px solid var(--primary-color)',
+                                borderRadius: '4px',
+                                outline: 'none'
+                            }}
+                        />
+                    ) : (
+                        <>
+                            <div style={{ overflow: 'hidden', flex: 1 }}>
+                                <div style={{ fontWeight: chat.id === currentChatId ? '600' : '500', marginBottom: '0.25rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{chat.name}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                    {new Date(chat.updated_at).toLocaleDateString()}
+                                </div>
+                            </div>
+                            <button
+                                className="edit-btn"
+                                onClick={(e) => handleEditClick(e, chat)}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    opacity: 0,
+                                    transition: 'opacity 0.2s',
+                                    padding: '0.25rem',
+                                    marginLeft: '0.5rem',
+                                    color: 'var(--text-secondary)'
+                                }}
+                                title="Rename chat"
+                            >
+                                ✏️
+                            </button>
+                        </>
+                    )}
                 </div>
               </li>
             ))}

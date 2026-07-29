@@ -1,6 +1,7 @@
 fastapi
 uvicorn
 sqlalchemy
+alembic
 psycopg2-binary
 pydantic
 python-jose[cryptography]
@@ -8,8 +9,10 @@ passlib[argon2]
 python-multipart
 httpx
 google-genai
+anthropic
 python-dotenv
 sse-starlette
 mcp
 pytest
 pytest-asyncio
+tenacity

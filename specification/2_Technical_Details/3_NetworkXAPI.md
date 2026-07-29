@@ -32,18 +32,35 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 | Tool Name | 説明 |
 |:---|:---|
-| `initialize_network` | GraphMLデータを受け取り、初期化を行う。**指定された`network_id`に既にデータ（ノード）が存在する場合は、上書きせずに新しい`network_id`を発行して新規ネットワークとして保存する。** 処理内容は、1.正規化、2.DB保存、3.初期レイアウト(Spring)計算、4.初期レンダリングデータ生成。レスポンスには最終的に使用された`network_id`が含まれる。 |
-| `update_network_metadata` | ネットワークの名前や説明（description）を更新する。LLMがネットワークのコンテキスト（例：「これは空手クラブの相関図です」）を理解・保持するために使用する。 |
-| `calculate_centrality` | 中心性指標を計算して永続化する。具体的には、まず属性の**定義**（例: 'degree_centrality'）が`node_attributes`に存在するか確認し、なければ`network_id`に紐付けて作成する。次に、各ノードの計算**値**を、定義のIDを参照して`node_attribute_values`に保存する。レスポンスは計算完了のステータスのみを返す。 |
-| `calculate_layout` | レイアウト座標を計算して永続化する。`layout_name`（例: 'forceatlas2', 'spiral'）を受け取り、`{layout_name}_x`, `{layout_name}_y` という属性として保存する。レスポンスは計算完了のステータスのみを返す。 |
-| `generate_visualization` | レイアウト、ノードサイズ、ノードカラー等の視覚的割り当てに関するすべてのパラメータを受け取り、最終的なレンダリングデータを動的に生成して返す。**パラメータが省略（None）された場合は、以前に適用された設定が維持される（Partial Update）。** **レイアウト計算は行わず、計算済みの座標データを使用する。新しいレイアウトを適用する場合や、中心性指標などを利用する場合は、事前に`calculate_layout`や`calculate_centrality`を呼び出す必要がある。** 指定された属性やレイアウトが存在しない場合はエラーを返す。サブグラフのオーバーレイ表示もサポートする。 |
-| `create_ego_network` | 指定されたノードを中心としたEgo Graph（指定ホップ数以内のノード群）を新しいネットワークとして作成する。**同じ条件（中心ノード、半径）で作成されたサブグラフが既に存在する場合は、新規作成せずに既存のネットワークを再利用する。レスポンスは辞書形式で、`network_id`を含む。** |
-| `create_subgraph_from_nodes` | 指定されたノードIDのリストからサブグラフを新しいネットワークとして作成する。**ノードリストに基づいて一意な名前（`Subgraph (A,B,...)`）を生成し、同名のサブグラフが存在する場合は再利用する。レスポンスは辞書形式で、`network_id`を含む。** |
-| `create_path_subgraph` | 指定された2ノード間の最短経路をサブグラフとして新しいネットワークとして作成する。**既存のパスサブグラフがある場合は再利用する。レスポンスは辞書形式で、`network_id`を含む。** |
-| `create_k_core_subgraph` | K-Core（次数k以上のノード群）を抽出し、新しいネットワークとして作成する。**同じk値のK-Coreサブグラフがある場合は再利用する。レスポンスは辞書形式で、`network_id`を含む。** |
-| `create_largest_component_subgraph` | 最大連結成分を抽出し、新しいネットワークとして作成する。**既に作成済みの場合は再利用する。レスポンスは辞書形式で、`network_id`を含む。** |
-| `create_component_containing_node` | 指定されたノードを含む連結成分を抽出し、新しいネットワークとして作成する。**既に作成済みの場合は再利用する。レスポンスは辞書形式で、`network_id`を含む。** |
-| `create_subgraph_by_attribute_filter` | ノード属性の条件（範囲、カテゴリ、複合）に基づいてフィルタリングを行い、一致するノード群でサブグラフを作成する。**レスポンスは辞書形式で、`network_id`を含む。** |
+| Tool Name | 説明 |
+|:---|:---|
+| `initialize_network` | GraphMLデータを受け取り、初期化（パース、DB保存、初期レイアウト計算、初期レンダリング）を行う。 |
+| `import_graphml` | GraphMLデータをDBにインポートするのみ。初期化プロセス（レイアウト計算等）は行わない。 |
+| `update_network_metadata` | ネットワークの名前や説明を更新する。 |
+| `update_node_label` | 特定のノードのラベルを更新する。 |
+| `calculate_centrality` | 中心性指標を計算して永続化する。 |
+| `calculate_community` | (Disabled) コミュニティ抽出は現在無効化されています。 |
+| `calculate_layout` | レイアウト座標を計算して永続化する（可視化データの更新は返さない）。 |
+| `update_layout` | レイアウトを計算し、即座に可視化データを返す。 |
+| `update_node_color` | ノードの色設定を更新し、即座に可視化データを返す。 |
+| `update_node_size` | ノードのサイズ設定を更新し、即座に可視化データを返す。 |
+| `generate_visualization` | 複合的な可視化設定（色、サイズ、エッジ等）を一括で適用・生成する。Full Resetや高度な設定に使用。 |
+| `get_visualization_state` | 現在の可視化設定（Config）を取得する。 |
+| `create_ego_network` | Ego Networkを作成する。 |
+| `create_subgraph_from_nodes` | 指定ノード群からサブグラフを作成する。 |
+| `create_path_subgraph` | 最短経路サブグラフを作成する。 |
+| `create_k_core_subgraph` | K-Coreサブグラフを作成する。 |
+| `create_largest_component_subgraph` | 最大連結成分サブグラフを作成する。 |
+
+| `create_subgraph_by_filter` | 属性条件に基づいてサブグラフを作成する（サーバーサイドフィルタリング）。 |
+| `switch_to_network` | コンテキストを指定IDに切り替え、そのネットワークの可視化を返す。 |
+| `get_subgraphs` | 親ネットワークから派生したサブグラフの一覧を取得する。 |
+| `filter_nodes` | 属性条件でノードを検索・フィルタリングする（リスト取得のみ、サブグラフ作成はしない）。 |
+| `get_top_nodes` | 中心性指標の上位ノードを取得する。 |
+| `search_nodes` | ノード名や属性で検索を行う。 |
+| `list_node_attributes` | 利用可能なノード属性一覧を取得する。 |
+| `list_edge_attributes` | 利用可能なエッジ属性一覧を取得する。 |
+| `get_network_structure` | ネットワークの基本構造統計を取得する。 |
 
 ## 3.3. MCPリソース一覧 (Resources)
 
@@ -77,8 +94,14 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 - **Description**: GraphMLデータを受け取り、初期化（パース、DB保存、初期レイアウト計算、初期レンダリングデータ生成）を行う。
 - **Arguments**:
   - `network_id`: int
-  - `graphml_data`: str
-- **Returns**: `{"network": dict, "network_id": int}`
+  - `graphml_data`: str (XML string)
+- **Returns**: `{"network_id": int, "network": dict, "content": str}`
+
+### `import_graphml`
+- **Description**: GraphMLデータをDBにインポートするのみ。初期化プロセス（レイアウト計算等）は行わない。
+- **Arguments**:
+  - `network_id`: int
+  - `graphml_data`: str (XML string)
 
 ### `update_network_metadata`
 - **Description**: ネットワークの名前や説明を更新する。
@@ -87,101 +110,176 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
   - `description`: str (Optional)
   - `name`: str (Optional)
 
+### `update_node_label`
+- **Description**: 特定のノードのラベルを更新する。
+- **Arguments**:
+  - `network_id`: int
+  - `node_id`: str
+  - `new_label`: str
+
 ### `calculate_centrality`
 - **Description**: 指定された中心性指標を計算し、ノード属性として保存する。
 - **Arguments**:
   - `network_id`: int
-  - `centrality_type`: str ("degree", "betweenness", "closeness", "eigenvector")
+  - `centrality_type`: str ("degree", "betweenness", "closeness", "eigenvector", "pagerank")
+
+### `calculate_community`
+### `calculate_community`
+- **Description**: (Disabled) コミュニティ抽出は現在実装上の理由により無効化されています。
+- **Arguments**:
+  - `network_id`: int
+  - `algorithm`: str (Optional)
 
 ### `calculate_layout`
 - **Description**: 指定されたレイアウトアルゴリズムで座標を計算し、ノード属性として保存する。
 - **Arguments**:
   - `network_id`: int
   - `layout_name`: str ("spring", "forceatlas2", "circular", "kamada_kawai", "shell", "spectral", "spiral")
+    - **Note**: `forceatlas2` uses dynamic iteration counts (1000-5000) based on graph size to ensure convergence.
+
+### `update_layout`
+- **Description**: レイアウトを計算し、即座に可視化データを返す。
+- **Arguments**:
+  - `network_id`: int
+  - `layout_name`: str
+
+### `update_node_color`
+- **Description**: ノードの色設定を更新し、即座に可視化データを返す。
+- **Arguments**:
+  - `network_id`: int
+  - `attribute`: str
+  - `scale_type`: str ("CATEGORICAL", "LINEAR", "RANKING")
+  - `mapping`: Dict[str, str] (Optional)
+  - `default_color`: str (Optional)
+  - `fixed`: bool (Optional)
+  - `gradient`: List[str] (Optional)
+
+### `update_node_size`
+- **Description**: ノードのサイズ設定を更新し、即座に可視化データを返す。
+- **Arguments**:
+  - `network_id`: int
+  - `attribute`: str
+  - `min_size`: float
+  - `max_size`: float
+
+### `generate_visualization`
+- **Description**: 複合的な可視化設定を一括で適用する。Full Resetや高度な設定に使用。
+- **Arguments**:
+  - `network_id`: int
+  - `node_color_config`: NodeColorConfig (Optional)
+  - `node_size_config`: NodeSizeConfig (Optional)
+  - `edge_width_attribute`: str (Optional, Description: "Attribute for edge width.")
+  - `context_config`: dict (Optional)
+  - `focus_config`: dict (Optional)
+  - `layout_name`: str (Optional)
+
+### `get_visualization_state`
+- **Description**: 現在の可視化設定（Config）を取得する。
+- **Arguments**:
+  - `network_id`: int
 
 ### `create_ego_network`
 - **Description**: 指定ノードを中心としたEgo Graphを作成する。
 - **Arguments**:
-  - `source_network_id`: int
+  - `network_id`: int
   - `center_node_id`: str
   - `radius`: int
-- **Returns**: `{"network_id": int, "name": str}`
+  - `preserve_layout`: bool (Default: True)
 
 ### `create_subgraph_from_nodes`
 - **Description**: ノードIDリストからサブグラフを作成する。
 - **Arguments**:
-  - `source_network_id`: int
+  - `network_id`: int
   - `node_ids`: List[str]
-- **Returns**: `{"network_id": int, "name": str}`
+  - `description`: str (Optional)
+  - `preserve_layout`: bool (Default: True)
 
 ### `create_path_subgraph`
 - **Description**: 最短経路のサブグラフを作成する。
 - **Arguments**:
-  - `source_network_id`: int
+  - `network_id`: int
   - `source_node_id`: str
   - `target_node_id`: str
-- **Returns**: `{"network_id": int, "name": str}`
+  - `preserve_layout`: bool (Default: True)
 
 ### `create_k_core_subgraph`
 - **Description**: K-Coreサブグラフを作成する。
 - **Arguments**:
-  - `source_network_id`: int
+  - `network_id`: int
   - `k`: int
-- **Returns**: `{"network_id": int, "name": str}`
+  - `new_name_suffix`: str (Default: "_k_core")
+  - `preserve_layout`: bool (Default: True)
 
 ### `create_largest_component_subgraph`
 - **Description**: 最大連結成分のサブグラフを作成する。
 - **Arguments**:
-  - `source_network_id`: int
-- **Returns**: `{"network_id": int, "name": str}`
+  - `network_id`: int
+  - `preserve_layout`: bool (Default: True)
 
-### `create_component_containing_node`
-- **Description**: 指定ノードを含む連結成分のサブグラフを作成する。
-- **Arguments**:
-  - `source_network_id`: int
-  - `node_id`: str
-- **Returns**: `{"network_id": int, "name": str}`
 
-### `create_subgraph_by_attribute_filter`
-- **Description**: 属性フィルタ条件に基づいてサブグラフを作成する。
+### `create_subgraph_by_filter`
+- **Description**: 属性フィルタ条件に基づいてサブグラフを作成する。サーバーサイドで処理されるため、大量のノードIDを渡す必要がない。条件はAND、値はOR結合。
 - **Arguments**:
   - `network_id`: int
-  - `conditions`: List[dict] (e.g., `[{"attribute_name": "Age", "ranges": [{"min": 10, "max": 20}]}, {"attribute_name": "Gender", "categories": ["F"]}]`)
-  - `suffix`: str (Optional)
-- **Returns**: `{"network_id": int, "name": str}`
+  - `conditions`: List[dict] (e.g. `[{'attribute': 'Country', 'categories': ['USA']}]`)
+  - `preserve_layout`: bool (Default: True)
+  - `description`: str (Optional)
 
-### `generate_visualization`
+### `get_subgraphs`
+- **Description**: 親ネットワークから派生したサブグラフの一覧を取得する。
 - **Arguments**:
   - `network_id`: int
-  - `focus_network_id`: int (Optional)
-  - `node_size_config`: dict (Optional)
-  - `node_color_config`: dict (Optional)
-  - `edge_width_config`: dict (Optional)
-  - `context_config`: dict (Optional)
-  - `focus_config`: dict (Optional)
-  - `node_label_config`: dict (Optional)
-  - `custom_node_colors`: list[dict] (Optional)
-  - **Note**: 各設定（Config）引数が省略（None）された場合、その設定項目については**以前の状態が維持**されます（Partial Update）。設定をリセットしたい場合は、空の辞書 `{}` を渡してください。
 
-**Config Pattern:** Keys correspond to the API implementation. Use `generate_visualization` carefully to create rich, meaningful visualizations.
+### `switch_to_network`
+- **Description**: コンテキストを指定されたネットワークIDに切り替え、そのネットワークの可視化データを取得する。
+- **Arguments**:
+  - `network_id`: int
 
-**Node Coloring Examples:**
-- **Categorical with map**: `node_color_config={"scale_type": "CATEGORICAL", "attribute": "Country", "color_map": {"USA": "blue", "Japan": "red"}}` (Others will be auto-colored)
-- **Categorical with map and fallback**: `node_color_config={"scale_type": "CATEGORICAL", "attribute": "Country", "color_map": {"USA": "blue"}, "default_color": "gray"}` (USA is blue, other top frequent values are auto-colored, remaining are gray)
+### `filter_nodes`
+### `filter_nodes`
+- **Description**: 属性条件でノードを検索・フィルタリングする。リスト取得のみで、サブグラフは作成しない。**注意: サブグラフ作成用ID取得には使用しないこと。**
+- **Arguments**:
+  - `network_id`: int
+  - `attribute_name`: str
+  - `value`: str (Optional, Exact match)
+  - `min_value`: float (Optional)
+  - `max_value`: float (Optional)
+  - `limit`: int
+
 ### `search_nodes`
-- **Description**: ノード名（ID、ラベル）または特定の属性値でノードを検索する。部分一致検索をサポートする。
+- **Description**: ノード名（ID、ラベル）または特定の属性値でノードを検索する。
 - **Arguments**:
   - `network_id`: int
-  - `query`: str (検索キーワード)
-  - `attribute`: str (Optional, 指定した属性のカラムのみを検索対象とする)
-- **Returns**: `List[{"id": str, "label": str, ...}]` (JSON string)
+  - `query`: str
+
+### `get_top_nodes`
+- **Description**: 中心性指標の上位ノードを取得する。
+- **Arguments**:
+  - `network_id`: int
+  - `metric`: str
+  - `n`: int (Default: 10)
+  - `order`: str ("desc" or "asc", Default: "desc")
+
+### `get_network_structure`
+- **Description**: ネットワークの基本構造統計（ノード数、エッジ数、密度）を取得する。
+- **Arguments**:
+  - `network_id`: int
+
+### `list_node_attributes`
+- **Description**: 利用可能なノード属性一覧を取得する。
+- **Arguments**:
+  - `network_id`: int
+
+### `list_edge_attributes`
+- **Description**: 利用可能なエッジ属性一覧を取得する。
+- **Arguments**:
+  - `network_id`: int
 
 ### `get_node_details`
 - **Description**: 特定のノードの全属性と詳細情報（description含む）を取得する。
 - **Arguments**:
   - `network_id`: int
   - `node_id`: str
-- **Returns**: `dict` (属性キーと値のペア)
 
 ## 3.6. REST API エンドポイント (MCP Feature Parity)
 
@@ -237,3 +335,13 @@ MCPツールと同等の機能をREST API経由でも利用可能にするため
 
 ### 3.7.3. NetworkService (`app.logic.network_service`)
 - **目的**: `mcp_server.py` に記述されていたビジネスロジック（メタデータ更新、構造取得、サブグラフ一覧取得など）を専用のサービス層に移動しました。これにより、MCPサーバーコードはルーティングとツール定義に集中できるようになりました。
+
+### 3.7.4. MCP Tools Package (`app.mcp.tools`)
+- **目的**: 巨大化した `tools.py` を機能ごとに分割し、パッケージ化しました。
+- **構造**:
+  - `initialization.py`: ネットワーク初期化・インポート関連 (`initialize_network`, `import_graphml`)
+  - `computation.py`: 計算処理 (`calculate_centrality`, `calculate_layout`, `calculate_community`)
+  - `subgraph.py`: サブグラフ作成・フィルタリング (`create_X_subgraph`, `filter_nodes`)
+  - `visualization.py`: 可視化生成・更新 (`generate_visualization`, `update_node_color`, etc.)
+  - `retrieval.py`: 情報検索・参照 (`search_nodes`, `get_top_nodes`, `list_attributes`)
+- **特徴**: `Annotated` と Pydantic (`Field`) を使用し、LLM向けの正確な JSON Schema を生成可能な定義スタイルに統一しました。

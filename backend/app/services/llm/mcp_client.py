@@ -1,92 +1,120 @@
 import json
 import os
 
-from google.genai import types
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 
 from app.core.logging import get_logger
+from .providers.types import ToolDefinition
 
 logger = get_logger(__name__)
 
-# NetworkX API Configuration
-NETWORKX_API_URL = os.getenv("NETWORKX_API_URL", "http://networkx-api:8000")
+# NetworkX API Configuration (networkx-api serves on port 8001; see networkx-api/Dockerfile)
+NETWORKX_API_URL = os.getenv("NETWORKX_API_URL") or "http://networkx-api:8001"
 SSE_ENDPOINT = f"{NETWORKX_API_URL}/mcp/sse"
 
 
 # Cache for tools
 _tools_cache = None
 
-async def get_tools_as_gemini_functions() -> list[types.Tool]:
+
+def _truncate_args_for_log(arguments: dict) -> dict:
+    """Truncate large string values (e.g. whole GraphML documents) before logging."""
+    log_args = arguments.copy()
+    for k, v in log_args.items():
+        if isinstance(v, str) and len(v) > 100:
+            log_args[k] = v[:100] + f"... ({len(v)} chars)"
+    return log_args
+
+async def get_tools() -> list[ToolDefinition]:
     """
     Connects to the NetworkXAPI MCP Server, discovers tools,
-    Converts MCP tools to Gemini function declarations.
+    and returns them as provider-agnostic ToolDefinition objects.
     """
     global _tools_cache
     if _tools_cache is not None:
         return _tools_cache
 
-    # Note: We use sse_client for HTTP/SSE connection
-    async with sse_client(SSE_ENDPOINT) as (read, write):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
+    async with session_scope() as session:
 
             # List tools from the MCP server
             result = await session.list_tools()
             tools = result.tools
 
-            gemini_tools_list = []
+            tool_list: list[ToolDefinition] = []
             for tool in tools:
-                fd = _convert_to_gemini(tool)
-                gemini_tools_list.append(types.Tool(function_declarations=[fd]))
+                tool_list.append(_mcp_to_tool_definition(tool))
 
-            # Add read_resource client-side tool
-            gemini_tools_list.append(
-                types.Tool(
-                    function_declarations=[
-                        types.FunctionDeclaration(
-                            name="read_resource",
-                            description="Reads a resource from the MCP server using its URI.",
-                            parameters={
-                                "type": "OBJECT",
-                                "properties": {
-                                    "uri": {
-                                        "type": "STRING",
-                                        "description": "The URI of the resource to read (e.g., network://1/attributes/nodes)",
-                                    }
-                                },
-                                "required": ["uri"],
+            # Add client-side MCP protocol tools
+            tool_list.extend([
+                ToolDefinition(
+                    name="read_resource",
+                    description="Reads a resource from the MCP server using its URI.",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "uri": {
+                                "type": "string",
+                                "description": "The URI of the resource to read (e.g., network://1/attributes/nodes)",
+                            }
+                        },
+                        "required": ["uri"],
+                    },
+                ),
+                ToolDefinition(
+                    name="list_resources",
+                    description="Lists all available resources on the MCP server.",
+                    parameters={
+                        "type": "object",
+                        "properties": {},
+                    },
+                ),
+                ToolDefinition(
+                    name="list_prompts",
+                    description="Lists all available prompts on the MCP server.",
+                    parameters={
+                        "type": "object",
+                        "properties": {},
+                    },
+                ),
+                ToolDefinition(
+                    name="get_prompt",
+                    description="Gets a prompt from the MCP server by name, with optional arguments.",
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "The name of the prompt to retrieve.",
                             },
-                        )
-                    ]
-                )
-            )
-            
-            _tools_cache = gemini_tools_list
-            return gemini_tools_list
+                            "arguments": {
+                                "type": "object",
+                                "description": "Arguments for the prompt template.",
+                            },
+                        },
+                        "required": ["name"],
+                    },
+                ),
+            ])
+
+            _tools_cache = tool_list
+            return tool_list
 
 
-def _convert_to_gemini(mcp_tool) -> types.FunctionDeclaration:
-    """
-    Converts an MCP Tool definition to a Gemini FunctionDeclaration.
-    """
+def _mcp_to_tool_definition(mcp_tool) -> ToolDefinition:
+    """Converts an MCP Tool definition to a provider-agnostic ToolDefinition."""
     tool_name = str(getattr(mcp_tool, "name", None) or mcp_tool.get("name"))
     tool_desc = str(
         getattr(mcp_tool, "description", None) or mcp_tool.get("description")
     )
     tool_schema = getattr(mcp_tool, "inputSchema", None) or mcp_tool.get("inputSchema")
 
-    # Sanitize schema: remove 'title' which can confuse some parsers
     if tool_schema:
-        # First resolve references ($ref) using $defs if present
         if "$defs" in tool_schema or "definitions" in tool_schema:
             tool_schema = _resolve_schema_refs(tool_schema, tool_schema)
-
         tool_schema = _sanitize_schema(tool_schema)
 
-    return types.FunctionDeclaration(
-        name=tool_name, description=tool_desc, parameters=tool_schema
-    )
+    return ToolDefinition(name=tool_name, description=tool_desc, parameters=tool_schema)
 
 
 def _resolve_schema_refs(schema: dict, root: dict) -> dict:
@@ -148,6 +176,14 @@ def _sanitize_schema(schema: dict) -> dict:
     if "$defs" in new_schema:
         del new_schema["$defs"]
 
+    # Pydantic renders Tuple[...] as a JSON Schema "prefixItems" tuple (draft 2020-12),
+    # which Gemini's Schema type rejects with extra_forbidden. Downgrade to a plain
+    # homogeneous "items" schema, keeping minItems/maxItems to preserve the length.
+    if "prefixItems" in new_schema:
+        prefix_items = new_schema.pop("prefixItems")
+        if "items" not in new_schema and prefix_items:
+            new_schema["items"] = prefix_items[0]
+
     for key, value in new_schema.items():
         if isinstance(value, dict):
             new_schema[key] = _sanitize_schema(value)
@@ -177,7 +213,19 @@ async def session_scope():
                 yield session
     except Exception as e:
         _log_exception_details(e, "MCP Session connection")
-        raise
+        raise _unwrap_exception(e) from e
+
+def _unwrap_exception(e: BaseException) -> BaseException:
+    """
+    Unwraps an ExceptionGroup if it contains only a single exception.
+    """
+    try:
+        if isinstance(e, BaseExceptionGroup):
+            if len(e.exceptions) == 1:
+                return _unwrap_exception(e.exceptions[0])
+    except NameError:
+        pass # Pre-3.11
+    return e
 
 async def execute_tool(tool_name: str, arguments: dict, session: ClientSession = None):
     """
@@ -185,13 +233,9 @@ async def execute_tool(tool_name: str, arguments: dict, session: ClientSession =
     If 'session' is provided, it uses the existing session.
     Otherwise, it creates a transient session (old behavior).
     """
-    # Sanitize arguments for logging (truncate large strings)
-    log_args = arguments.copy()
-    for k, v in log_args.items():
-        if isinstance(v, str) and len(v) > 100:
-            log_args[k] = v[:100] + "..."
-
-    logger.info(f"Executing tool: {tool_name} with arguments: {log_args}")
+    logger.info(
+        f"Executing tool: {tool_name} with arguments: {_truncate_args_for_log(arguments)}"
+    )
 
     if session:
         return await _execute_internal(session, tool_name, arguments)
@@ -203,15 +247,48 @@ async def execute_tool(tool_name: str, arguments: dict, session: ClientSession =
 async def _execute_internal(session: ClientSession, tool_name: str, arguments: dict):
     try:
         # Handle client-side tools
+        # Handle client-side tools
         if tool_name == "read_resource":
             uri = arguments.get("uri")
             result = await session.read_resource(uri)
-            # Resource content is a list of ReadResourceResult
-            # We assume text content for now
-            parsed_result = json.loads(result.contents[0].text)
-            if isinstance(parsed_result, list):
-                return {"result": parsed_result}
-            return parsed_result
+            # Inspect the first content item (assuming single file for now)
+            content_item = result.contents[0]
+            
+            # naive mimeType check
+            mime = getattr(content_item, "mimeType", None) or "text/plain"
+            
+            if "application/json" in mime:
+                 try:
+                    parsed_result = json.loads(content_item.text)
+                    if isinstance(parsed_result, list):
+                        return {"result": parsed_result}
+                    return parsed_result
+                 except json.JSONDecodeError:
+                    # Fallback to text if JSON parse fails despite mimeType
+                    return {"content": content_item.text, "error": "Invalid JSON"}
+            
+            # Default: Return as text wrapped in dict
+            return {"content": content_item.text}
+
+        if tool_name == "list_resources":
+            result = await session.list_resources()
+            # Convert Resource objects to dicts
+            resources = [{"uri": r.uri, "name": r.name, "description": r.description, "mimeType": r.mimeType} for r in result.resources]
+            return {"resources": resources}
+
+        if tool_name == "list_prompts":
+            result = await session.list_prompts()
+            # Convert Prompt objects to dicts
+            prompts = [{"name": p.name, "description": p.description, "arguments": [a.model_dump() for a in p.arguments] if p.arguments else []} for p in result.prompts]
+            return {"prompts": prompts}
+
+        if tool_name == "get_prompt":
+            name = arguments.get("name")
+            args = arguments.get("arguments", {})
+            result = await session.get_prompt(name, args)
+            # PromptResult has messages
+            messages = [{"role": m.role, "content": m.content.text} for m in result.messages]
+            return {"messages": messages}
 
         result = await session.call_tool(tool_name, arguments)
 
@@ -236,10 +313,11 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
             return {"content": output_text}
 
     except Exception as e:
-        import traceback
-        _log_exception_details(e, f"executing tool {tool_name} with args {arguments}")
-        traceback.print_exc()
-        raise
+        _log_exception_details(
+            e, f"executing tool {tool_name} with args {_truncate_args_for_log(arguments)}"
+        )
+        logger.exception(f"Tool execution raised: {tool_name}")
+        raise _unwrap_exception(e) from e
 
 
 async def get_resource(uri: str, session: ClientSession = None) -> dict:
@@ -259,10 +337,20 @@ async def get_resource(uri: str, session: ClientSession = None) -> dict:
 
 async def _read_resource_internal(session: ClientSession, uri: str) -> dict:
     result = await session.read_resource(uri)
-    # Resource content is a list of ReadResourceResult
-    # We assume text content for now
-    parsed_result = json.loads(result.contents[0].text)
-    return parsed_result
+    content_item = result.contents[0]
+    
+    mime = getattr(content_item, "mimeType", None) or "text/plain"
+    
+    if "application/json" in mime:
+         try:
+            return json.loads(content_item.text)
+         except Exception:
+            # Fallback
+            return {}
+            
+    # If not JSON, we might return empty or handle differently.
+    # For internal context usage, we expect dictionaries.
+    return {}
 
 
 def _log_exception_details(e: BaseException, context: str):

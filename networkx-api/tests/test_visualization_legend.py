@@ -1,6 +1,7 @@
 import pytest
 from app.logic.visualizer import generate_visualization_data
 from app.logic.visualization_builder import VisualizationBuilder
+from app.logic import layout
 from common import models
 
 @pytest.fixture
@@ -53,6 +54,9 @@ def test_generate_visualization_data_returns_legend(db, network, node_list):
         db.add(ntav)
     
     db.commit()
+    
+    # Pre-calculate layout
+    layout.calculate_layout(network.id, "forceatlas2", db)
 
     # 2. Call generate_visualization_data with a Categorical Config
     node_color_config = {

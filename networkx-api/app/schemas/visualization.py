@@ -37,10 +37,13 @@ class NodeSizeConfig(BaseModel):
     attribute: str = Field(
         ..., description="Name of the node attribute to map to size."
     )
-    min: Optional[float] = Field(None, description="Minimum node radius (default: 5).")
-    max: Optional[float] = Field(None, description="Maximum node radius (default: 20).")
+    min: Optional[float] = Field(None, description="Min node radius. Prefer leaving as None to allow adaptive sizing (recommended). Example range: 10-200.")
+    max: Optional[float] = Field(None, description="Max node radius. Prefer leaving as None to allow adaptive sizing (recommended). Example range: 20-400.")
     default: Optional[float] = Field(
-        None, description="Default radius if attribute is missing."
+        None, description="Default radius if attribute is missing. Defaults to adaptive value."
+    )
+    scaling_factor: float = Field(
+        1.0, description="Multiplier for node sizes (default 1.0)."
     )
 
 

@@ -51,8 +51,10 @@ api.interceptors.response.use(
     }
 
     if (error.response && error.response.status === 401) {
-      // Ignore 401 from checkAuth to allow non-logged in users to visit /register
-      if (error.config.url && error.config.url.includes('/auth/users/me')) {
+      // Auth endpoints handle their own 401s (wrong credentials, checkAuth for
+      // logged-out visitors). Redirecting here would reload the page and wipe
+      // the error message the form is about to show.
+      if (error.config.url && error.config.url.includes('/auth/')) {
         return Promise.reject(error);
       }
 
@@ -61,6 +63,16 @@ api.interceptors.response.use(
       // useAuthStore.getState().logout(); // Avoid circular dependency
       window.location.href = '/login';
     }
+    // Dispatch global error event for UI notification
+    const errorMessage = error.response?.data?.detail || error.message || 'Unknown error occurred';
+    window.dispatchEvent(new CustomEvent('api-error', { 
+        detail: { 
+            message: errorMessage,
+            status: error.response?.status,
+            url: error.config?.url
+        } 
+    }));
+
     return Promise.reject(error);
   }
 );
@@ -83,7 +95,14 @@ export const getNodeDetails = (networkId, nodeId) =>
   api.get(`/networks/${networkId}/nodes/${nodeId}`);
 
 // Create chat
-export const createChat = (name) => api.post('/chat', { name });
+export const createChat = (name, provider, model) =>
+  api.post('/chat', { name, provider, model });
+
+// Update chat (e.g. rename, or pin its LLM provider/model)
+export const updateChat = (chatId, data) => api.patch(`/chat/${chatId}`, data);
+
+// List available LLM providers/models a chat can be pinned to
+export const getLlmProviders = () => api.get('/chat/providers');
 
 // Process message
 export const processMessage = (chatId, content) =>

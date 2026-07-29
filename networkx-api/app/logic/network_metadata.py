@@ -107,3 +107,31 @@ def get_visualization_state(db: Session, network_id: int) -> Dict[str, Any]:
             "attribute": node_size_config.get("attribute") if node_size_config else None,
         }
     }
+
+
+def list_node_attributes(db: Session, network_id: int) -> List[Dict[str, Any]]:
+    """Lists available node attributes."""
+    from app.logic import attributes
+    stats = attributes.get_attribute_stats(
+        network_id,
+        models.NodeAttribute,
+        models.NodeAttributeValue,
+        models.NodeFloatAttributeValue,
+        models.NodeTextAttributeValue,
+        db
+    )
+    return stats
+
+
+def list_edge_attributes(db: Session, network_id: int) -> List[Dict[str, Any]]:
+    """Lists available edge attributes."""
+    from app.logic import attributes
+    stats = attributes.get_attribute_stats(
+        network_id,
+        models.EdgeAttribute,
+        models.EdgeAttributeValue,
+        models.EdgeFloatAttributeValue,
+        models.EdgeTextAttributeValue,
+        db
+    )
+    return stats

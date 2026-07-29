@@ -81,7 +81,7 @@ def get_top_nodes_resource(network_id: int, metric: str) -> str:
     """Returns the top 10 nodes based on a centrality metric."""
     db = database.SessionLocal()
     try:
-        return centrality.get_top_nodes(db, network_id, metric)
+        return centrality.get_top_nodes(network_id, metric, 10, "desc", db)
     except Exception as e:
         return {"error": str(e)}
     finally:

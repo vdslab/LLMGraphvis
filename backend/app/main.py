@@ -1,14 +1,20 @@
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+from fastapi.responses import JSONResponse
 
 from app.api.v1.endpoints import auth, chat, networks
-from common.models import Base
-from app.core.database import engine
+from app.core.logging import get_logger
 from app.middleware.logging import LoggingMiddleware
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+logger = get_logger(__name__)
+
+# Database schema is managed exclusively by Alembic (see backend/alembic/),
+# which runs via `alembic upgrade head` before this app starts (see
+# docker-compose.yml / backend/Dockerfile). Do not create tables here.
+# Base.metadata.create_all(bind=engine)
 
 # Create FastAPI app with Swagger UI configuration
 app = FastAPI(
@@ -29,11 +35,10 @@ app.add_middleware(LoggingMiddleware)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    print(f"Global exception handler caught: {exc}")
-    import traceback
-
-    traceback.print_exc()
-    return {"detail": "Internal Server Error"}
+    logger.exception(
+        f"Unhandled exception on {request.method} {request.url.path}: {exc}"
+    )
+    return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
 
 
 # Public endpoints that don't require authentication
@@ -91,10 +96,11 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-# CORS configuration
+# CORS configuration — comma-separated list, e.g. CORS_ORIGINS=http://localhost,http://localhost:5173
 origins = [
-    "http://localhost",
-    "http://localhost:5173",
+    o.strip()
+    for o in (os.getenv("CORS_ORIGINS") or "http://localhost,http://localhost:5173").split(",")
+    if o.strip()
 ]
 
 app.add_middleware(
