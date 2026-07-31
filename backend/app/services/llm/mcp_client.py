@@ -1,5 +1,6 @@
 import json
 import os
+import time
 
 from mcp import ClientSession
 from mcp.client.sse import sse_client
@@ -14,8 +15,32 @@ NETWORKX_API_URL = os.getenv("NETWORKX_API_URL") or "http://networkx-api:8001"
 SSE_ENDPOINT = f"{NETWORKX_API_URL}/mcp/sse"
 
 
-# Cache for tools
+# Discovered tool definitions, cached to avoid a list_tools() round trip per turn.
 _tools_cache = None
+_tools_cache_at = 0.0
+
+# Seconds before the cache is re-fetched. Without an expiry this was a
+# process-lifetime cache with no invalidation, so adding or renaming a tool on
+# networkx-api required restarting the backend to see it — painful during
+# development and a silent source of "tool not found" in production after a
+# one-sided deploy. 0 disables expiry.
+TOOLS_CACHE_TTL_SECONDS = float(os.getenv("MCP_TOOLS_CACHE_TTL") or 300)
+
+
+def invalidate_tools_cache() -> None:
+    """Force the next get_tools() to re-discover from the MCP server."""
+    global _tools_cache, _tools_cache_at
+    _tools_cache = None
+    _tools_cache_at = 0.0
+    logger.info("MCP tool cache invalidated")
+
+
+def _tools_cache_is_fresh() -> bool:
+    if _tools_cache is None:
+        return False
+    if TOOLS_CACHE_TTL_SECONDS <= 0:
+        return True
+    return (time.monotonic() - _tools_cache_at) < TOOLS_CACHE_TTL_SECONDS
 
 
 def _truncate_args_for_log(arguments: dict) -> dict:
@@ -31,8 +56,8 @@ async def get_tools() -> list[ToolDefinition]:
     Connects to the NetworkXAPI MCP Server, discovers tools,
     and returns them as provider-agnostic ToolDefinition objects.
     """
-    global _tools_cache
-    if _tools_cache is not None:
+    global _tools_cache, _tools_cache_at
+    if _tools_cache_is_fresh():
         return _tools_cache
 
     async with session_scope() as session:
@@ -98,6 +123,8 @@ async def get_tools() -> list[ToolDefinition]:
             ])
 
             _tools_cache = tool_list
+            _tools_cache_at = time.monotonic()
+            logger.info(f"Discovered {len(tool_list)} MCP tools")
             return tool_list
 
 
