@@ -1,19 +1,47 @@
 import { visit } from 'unist-util-visit';
 
 /**
- * Remarks plugin to detect hex color codes and wrap them in a custom link.
- * Transforms: "#e377c2" -> "[#e377c2](#color-preview)" or similar structure
- * so that a custom renderer can pick it up.
+ * Turn hex colour codes in the agent's prose into swatch markers.
+ *
+ * Each match becomes a link with the sentinel url `#color-preview` and a
+ * `data-color` property; the renderer in `components/chat/Markdown.jsx` draws
+ * the swatch. A link is used because it survives remark → rehype without the
+ * plugin needing to know anything about hast.
+ *
+ * Both `#1f77b4` and `` `#1f77b4` `` are matched. The backticked form is the
+ * one that matters in practice — the agent reports palettes as inline code, and
+ * an inlineCode node holds its own value rather than a child text node, so a
+ * text-only visitor silently misses every colour the app actually produces.
  */
+
+// 6- or 3-digit hex. 6 is tried first so `#1f77b4` is not read as `#1f7`.
+const COLOR_PATTERN = /#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g;
+
+const swatch = (color, { code = false } = {}) => ({
+  type: 'link',
+  title: null,
+  url: '#color-preview',
+  children: [{ type: code ? 'inlineCode' : 'text', value: color }],
+  data: { hProperties: { 'data-color': color } },
+});
+
 export default function remarkColorPreview() {
   return (tree) => {
-    visit(tree, 'text', (node, index, parent) => {
-      // Regex for hex color codes: # followed by 3, 4, 6, or 8 hex digits
-      // We'll stick to 6 or 3 for simplicity as per common use, or 6/8.
-      // Boundaries are important to avoid matching inside words.
-      const colorRegex = /#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g;
-      
-      if (!node.value || !colorRegex.test(node.value)) {
+    visit(tree, ['text', 'inlineCode'], (node, index, parent) => {
+      if (!parent || index === null || !node.value) return;
+
+      COLOR_PATTERN.lastIndex = 0;
+      if (!COLOR_PATTERN.test(node.value)) return;
+
+      // `#1f77b4` on its own: replace the node, keeping the code styling.
+      // Inline code holding anything else (a snippet that merely contains a
+      // colour) is left alone — splitting it would break the code run.
+      if (node.type === 'inlineCode') {
+        const trimmed = node.value.trim();
+        if (new RegExp(`^${COLOR_PATTERN.source}$`).test(trimmed)) {
+          parent.children.splice(index, 1, swatch(trimmed, { code: true }));
+          return index + 1;
+        }
         return;
       }
 
@@ -22,61 +50,21 @@ export default function remarkColorPreview() {
       let lastIndex = 0;
       let match;
 
-      colorRegex.lastIndex = 0; // Reset regex
-
-      while ((match = colorRegex.exec(value)) !== null) {
-        const start = match.index;
-        const end = match.index + match[0].length;
-        const color = match[0];
-
-        // Add text before the match
-        if (start > lastIndex) {
-          children.push({
-            type: 'text',
-            value: value.slice(lastIndex, start),
-          });
+      COLOR_PATTERN.lastIndex = 0;
+      while ((match = COLOR_PATTERN.exec(value)) !== null) {
+        if (match.index > lastIndex) {
+          children.push({ type: 'text', value: value.slice(lastIndex, match.index) });
         }
-
-        // Add the color preview "link"
-        // We use a link with a special href that our renderer will recognize
-        children.push({
-          type: 'link',
-          title: null,
-          url: '#color-preview', // Marker for our custom renderer
-          children: [
-            {
-              type: 'text',
-              value: color,
-            },
-          ],
-          data: {
-             hProperties: {
-                 'data-color': color // Pass color as data attribute for easier access if needed
-             }
-          }
-        });
-
-        lastIndex = end;
+        children.push(swatch(match[0]));
+        lastIndex = match.index + match[0].length;
       }
 
-      // Add remaining text
       if (lastIndex < value.length) {
-        children.push({
-          type: 'text',
-          value: value.slice(lastIndex),
-        });
+        children.push({ type: 'text', value: value.slice(lastIndex) });
       }
 
-      // Replace the current text node with the new children
       parent.children.splice(index, 1, ...children);
-      
-      // Since we modified the array while iterating, we might need to skip the new nodes?
-      // unist-util-visit handles array modification if we return the new index?
-      // Actually, 'visit' documentation says:
-      // "When a node is replaced, the visitor is called for the replacement."
-      // But we replaced one text node with multiple nodes (text, link, text).
-      // If we return 'index + children.length', we skip the newly added nodes?
-      // For safely, let's return index + children.length to continue after.
+      // Continue past the nodes just inserted; revisiting them would loop.
       return index + children.length;
     });
   };
