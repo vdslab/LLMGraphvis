@@ -8,7 +8,9 @@ python-multipart
 python-dotenv
 lxml
 scipy
-mcp
+# Pinned to 1.x: mcp 2.0 removed mcp.server.fastmcp (FastMCP) entirely in
+# favour of a rewritten server API. app/core/mcp.py targets the 1.x FastMCP.
+mcp>=1.28,<2
 requests
 pytest
 httpx
