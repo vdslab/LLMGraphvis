@@ -21,8 +21,12 @@ from app.logic.layout import (
 from common import models
 
 
-def setup_graph(db, network_id=1, n=6, weighted=False, attrs=None):
-    """A small path-plus-chord graph, optionally with weights and node attributes."""
+def setup_graph(db, network_id=1, n=6, weighted=False, attrs=None, weights=None):
+    """A small path-plus-chord graph, optionally with weights and node attributes.
+
+    `weights` gives one weight per edge explicitly (None entries stay NULL);
+    `weighted=True` is the shorthand for the varying weights 1.0 .. n-1.
+    """
     db.add(models.Network(id=network_id, name=f"Net {network_id}"))
     nodes = []
     for i in range(n):
@@ -33,13 +37,17 @@ def setup_graph(db, network_id=1, n=6, weighted=False, attrs=None):
 
     node_map = {node.node_id: node.id for node in nodes}
     for i in range(n - 1):
+        if weights is not None:
+            weight = weights[i]
+        else:
+            weight = float(i + 1) if weighted else None
         db.add(
             models.Edge(
                 network_id=network_id,
                 source_node_id=node_map[f"n{i}"],
                 target_node_id=node_map[f"n{i + 1}"],
                 edge_id=f"e{i}",
-                weight=(float(i + 1) if weighted else None),
+                weight=weight,
             )
         )
     db.commit()
@@ -146,38 +154,165 @@ class TestRandomSeedIsOverridable:
         assert load_layout_positions(1, "random", db) == first
 
 
+def add_edge_attribute(db, network_id, name, values):
+    """Attach a float edge attribute, `values` being one value per edge in order."""
+    attr = models.EdgeAttribute(
+        network_id=network_id, attribute_name=name, data_type="float"
+    )
+    db.add(attr)
+    db.commit()
+    edges = (
+        db.query(models.Edge)
+        .filter(models.Edge.network_id == network_id)
+        .order_by(models.Edge.id)
+        .all()
+    )
+    for edge, value in zip(edges, values):
+        eav = models.EdgeAttributeValue(edge_id=edge.id, attribute_id=attr.id)
+        db.add(eav)
+        db.commit()
+        db.add(
+            models.EdgeFloatAttributeValue(
+                edge_attribute_value_id=eav.id, float_value=float(value)
+            )
+        )
+    db.commit()
+
+
+def weights_seen_by(layout_name, nx_name, db, overrides=None, network_id=1):
+    """Run a layout and report the edge-attribute payload networkx actually saw."""
+    captured = {}
+    real = getattr(nx, nx_name)
+
+    def spy(G, **kwargs):
+        captured["edge_data"] = [d for _, _, d in G.edges(data=True)]
+        captured["weight_kwarg"] = kwargs.get("weight")
+        return real(G, **kwargs)
+
+    with patch(f"networkx.{nx_name}", side_effect=spy):
+        captured["info"] = calculate_layout(
+            network_id, layout_name, db, overrides=overrides
+        )
+    return captured
+
+
 class TestEdgeWeights:
     def test_weight_parameter_builds_a_weighted_graph(self, db):
         """Without this the graph carried no weight attribute, so nx's default
         weight='weight' silently degraded to unweighted."""
         setup_graph(db, weighted=True)
-        captured = {}
-        real = nx.spring_layout
+        seen = weights_seen_by("spring", "spring_layout", db, {"weight": "weight"})
+        assert all("weight" in d for d in seen["edge_data"])
 
-        def spy(G, **kwargs):
-            captured["has_weights"] = all(
-                "weight" in d for _, _, d in G.edges(data=True)
-            )
-            return real(G, **kwargs)
-
-        with patch("networkx.spring_layout", side_effect=spy):
-            calculate_layout(1, "spring", db, overrides={"weight": "weight"})
-        assert captured["has_weights"] is True
-
-    def test_omitting_weight_keeps_the_graph_unweighted(self, db):
+    def test_varying_weights_are_used_without_being_asked(self, db):
+        """The whole point: a weighted file is laid out weighted by default."""
         setup_graph(db, weighted=True)
-        captured = {}
-        real = nx.spring_layout
+        seen = weights_seen_by("spring", "spring_layout", db)
+        assert all(d["weight"] for d in seen["edge_data"])
+        assert seen["weight_kwarg"] == "weight"
+        assert "automatically" in seen["info"]["weight_note"]
 
-        def spy(G, **kwargs):
-            captured["has_weights"] = any(
-                "weight" in d for _, _, d in G.edges(data=True)
-            )
-            return real(G, **kwargs)
+    def test_forceatlas2_and_spectral_are_weighted_by_default_too(self, db):
+        setup_graph(db, weighted=True)
+        for layout_name, nx_name in (
+            ("forceatlas2", "forceatlas2_layout"),
+            ("spectral", "spectral_layout"),
+        ):
+            seen = weights_seen_by(layout_name, nx_name, db)
+            assert seen["weight_kwarg"] == "weight", layout_name
 
-        with patch("networkx.spring_layout", side_effect=spy):
-            calculate_layout(1, "spring", db)
-        assert captured["has_weights"] is False
+    def test_uniform_weights_are_left_alone(self, db):
+        """Every edge weighing the same lays out identically either way, so the
+        slower weighted path buys nothing."""
+        setup_graph(db, weights=[2.0] * 5)
+        seen = weights_seen_by("spring", "spring_layout", db)
+        assert all(d == {} for d in seen["edge_data"])
+        assert seen["info"]["weight_note"] == ""
+
+    def test_unweighted_network_stays_unweighted(self, db):
+        setup_graph(db)
+        seen = weights_seen_by("spring", "spring_layout", db)
+        assert all(d == {} for d in seen["edge_data"])
+
+    def test_non_positive_weights_are_not_used(self, db):
+        """A zero or negative weight has no meaning as attraction strength."""
+        setup_graph(db, weights=[0.0, 1.0, 2.0, 3.0, 4.0])
+        seen = weights_seen_by("spring", "spring_layout", db)
+        assert all(d == {} for d in seen["edge_data"])
+
+    def test_weight_none_opts_out(self, db):
+        setup_graph(db, weighted=True)
+        seen = weights_seen_by("spring", "spring_layout", db, {"weight": "none"})
+        assert all(d == {} for d in seen["edge_data"])
+        assert seen["weight_kwarg"] is None
+        assert "ignored" in seen["info"]["weight_note"]
+
+    def test_opting_out_is_not_served_from_the_weighted_cache(self, db):
+        """The resolved weight is part of the cache key, so the unweighted run
+        recomputes instead of returning the weighted coordinates."""
+        setup_graph(db, weighted=True)
+        calculate_layout(1, "spring", db)
+        weighted_pos = load_layout_positions(1, "spring", db)
+        calculate_layout(1, "spring", db, overrides={"weight": "none"})
+        assert load_layout_positions(1, "spring", db) != weighted_pos
+
+    def test_kamada_kawai_is_not_weighted_by_default(self, db):
+        """Its `weight` is a target distance, not a strength — enabling it
+        automatically would push strongly connected nodes apart."""
+        setup_graph(db, weighted=True)
+        seen = weights_seen_by("kamada_kawai", "kamada_kawai_layout", db)
+        assert seen["weight_kwarg"] is None
+        assert "distances" in seen["info"]["weight_note"]
+
+    def test_another_edge_attribute_can_be_the_weight(self, db):
+        setup_graph(db, weighted=True)
+        add_edge_attribute(db, 1, "strength", [9.0, 8.0, 7.0, 6.0, 5.0])
+        seen = weights_seen_by("spring", "spring_layout", db, {"weight": "strength"})
+        assert sorted(d["strength"] for d in seen["edge_data"]) == [5, 6, 7, 8, 9]
+        assert seen["weight_kwarg"] == "strength"
+
+    def test_unknown_weight_attribute_raises_instead_of_degrading(self, db):
+        setup_graph(db, weighted=True)
+        add_edge_attribute(db, 1, "strength", [9.0, 8.0, 7.0, 6.0, 5.0])
+        with pytest.raises(ValueError, match="no edge attribute 'nope'"):
+            calculate_layout(1, "spring", db, overrides={"weight": "nope"})
+
+    def test_geometric_layouts_never_weight(self, db):
+        """circular has no weight concept; resolution must not touch it."""
+        setup_graph(db, weighted=True)
+        seen = weights_seen_by("circular", "circular_layout", db)
+        assert all(d == {} for d in seen["edge_data"])
+        assert seen["info"]["weight_note"] == ""
+
+
+class TestEdgeWeightSummary:
+    def test_reports_the_range_of_varying_weights(self, db):
+        from app.logic.utils.graph_builder import summarize_edge_weights
+
+        setup_graph(db, weighted=True)
+        summary = summarize_edge_weights(1, db)
+        assert summary["is_informative"] is True
+        assert (summary["min"], summary["max"]) == (1.0, 5.0)
+        assert summary["distinct_values"] == 5
+
+    def test_null_weights_read_as_one(self, db):
+        """NULL becomes 1.0 at build time, so NULLs mixed with 3.0 do vary."""
+        from app.logic.utils.graph_builder import summarize_edge_weights
+
+        setup_graph(db, weights=[None, 3.0, 3.0, 3.0, 3.0])
+        assert summarize_edge_weights(1, db)["is_informative"] is True
+
+        setup_graph(db, network_id=2, weights=[None, 1.0, 1.0, 1.0, 1.0])
+        assert summarize_edge_weights(2, db)["is_informative"] is False
+
+    def test_empty_network_is_not_informative(self, db):
+        from app.logic.utils.graph_builder import summarize_edge_weights
+
+        db.add(models.Network(id=9, name="empty"))
+        db.commit()
+        summary = summarize_edge_weights(9, db)
+        assert summary["edge_count"] == 0
+        assert summary["is_informative"] is False
 
 
 # --------------------------------------------------------------------------

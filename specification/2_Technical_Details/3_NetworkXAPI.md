@@ -81,8 +81,16 @@ nx の `nodes` / `subset_key` に解決する）。
 **注意すべき仕様**:
 - レイアウトは座標を保存するだけで描画しない。`visualization_generate` を続けて呼ぶ。
 - `scale` / `center` は**視覚的に無効**。描画前に座標が [-1000, 1000] に再正規化されるため。
-- `weight` を明示的に渡さない限り**エッジ重みは無視される**。`build_graph_from_db` が
-  既定では weight 属性を載せないため、nx 側の既定値 `weight="weight"` が空振りする。
+- **エッジ重みは既定で使われる**。ネットワークの重みが変化に富み（全辺同値でなく）、
+  かつすべて正であれば、`spring` / `forceatlas2` / `spectral` は `weight` 引数なしで
+  重み付き計算になる（`layout.py` の `_resolve_weight` が判定し、`build_graph_from_db`
+  に属性名を渡す）。重みを無視させたい場合のみ `weight='none'` を渡す。
+  `kamada_kawai` は例外で既定は重みなし——この層では `weight` が「辺の目標距離」を
+  意味し、重い辺ほど遠くに配置されるため、意味が反転するので明示指定に限る。
+- 重みは `edges.weight` 列に入り、EdgeAttribute としては保存されない（importer が
+  `weight` キーを除外する）ため、属性一覧には現れない。重み付きか否かは
+  `network://{id}/structure` の `edge_weights` が唯一の情報源で、これがシステム
+  プロンプトの文脈行にもなる。
 - 結果は「グラフ構造ハッシュ + 実効パラメータ」でキャッシュされる。パラメータを
   変えれば自動的にキャッシュミスとなるため、`force_recompute` は利用者が明示的に
   再計算を求めた場合のみ使う。ノード数に比例する巨大なパラメータ（`pos`, `nodes`,

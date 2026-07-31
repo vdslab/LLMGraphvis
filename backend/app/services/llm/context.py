@@ -95,6 +95,27 @@ def _without_layout_coordinates(
     return [attr for attr in attrs_list if not is_coordinate(attr.get("name"))]
 
 
+def _weight_line(structure: Any) -> Optional[str]:
+    """Describe the network's edge weights, or None when there is nothing to say.
+
+    Edge weights are stored on the edge itself rather than as an edge attribute,
+    so they never appear in the attribute listing above — without this line the
+    agent has no way to know the uploaded file was weighted at all.
+    """
+    if not isinstance(structure, dict):
+        return None
+    weights = structure.get("edge_weights")
+    if not isinstance(weights, dict) or not weights.get("edge_count"):
+        return None
+    if not weights.get("is_informative"):
+        return None
+    return (
+        f"Edge weights: present, range {weights['min']:.3g}–{weights['max']:.3g} "
+        f"({weights['distinct_values']} distinct values). Force-directed and spectral "
+        f"layouts use them automatically."
+    )
+
+
 def _format_attr_stats(dtype: Optional[str], stats: Optional[Dict[str, Any]]) -> str:
     """Render an attribute's value range (floats) or top values (strings) as a suffix."""
     if not stats:
@@ -139,6 +160,9 @@ async def build_context_summary(network_id: int) -> str:
             n_count = structure.get("node_count", "?")
             e_count = structure.get("edge_count", "?")
             summary_lines.append(f"Stats: {n_count} Nodes, {e_count} Edges")
+            weight_line = _weight_line(structure)
+            if weight_line:
+                summary_lines.append(weight_line)
         else:
             summary_lines.append("Stats: unavailable (could not read the network)")
 
@@ -210,6 +234,11 @@ async def build_data_overview(network_id: int) -> str:
             n_count = structure.get("node_count", "?")
             e_count = structure.get("edge_count", "?")
             lines.append(f"- **Size:** {n_count} nodes, {e_count} edges")
+            weights = structure.get("edge_weights")
+            if isinstance(weights, dict) and weights.get("is_informative"):
+                lines.append(
+                    f"- **Edge weights:** {weights['min']:.3g}–{weights['max']:.3g}"
+                )
 
         def format_attrs_md(attrs: Any, label: str) -> None:
             if _failed(attrs):

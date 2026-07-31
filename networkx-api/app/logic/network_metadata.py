@@ -59,11 +59,18 @@ def get_network_structure(db: Session, network_id: int) -> Dict[str, Any]:
         possible_edges = node_count * (node_count - 1) / 2
         density = edge_count / possible_edges if possible_edges > 0 else 0
 
+    # Edge weights live on the edges table, not in the edge-attribute listing
+    # (see graph_builder.WEIGHT_COLUMN), so this is the only place a reader —
+    # including the agent's system-prompt context — can learn that the network
+    # is weighted at all.
+    from app.logic.utils.graph_builder import summarize_edge_weights
+
     return {
         "node_count": node_count,
         "edge_count": edge_count,
         "density": density,
         "is_directed": False,
+        "edge_weights": summarize_edge_weights(db=db, network_id=network_id),
     }
 
 

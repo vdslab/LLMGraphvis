@@ -21,10 +21,11 @@ _SEED_DESC = (
     "arrangement of the same graph."
 )
 _WEIGHT_DESC = (
-    "Name of the edge attribute to use as edge strength (usually 'weight'). "
-    "IMPORTANT: layouts ignore edge weights entirely unless this is passed — the graph is "
-    "built without weights otherwise. Pass this when the user wants stronger connections "
-    "drawn closer together."
+    "Edge attribute to use as connection strength. Leave this unset in almost every case: "
+    "when the network's edges carry varying weights they are used automatically, so the "
+    "default layout is already weighted and stronger connections are already drawn closer "
+    "together. Set it only to point at a different numeric edge attribute, or to 'none' to "
+    "force an unweighted layout because the user explicitly asked to ignore the weights."
 )
 _SCALE_CENTER_DESC = (
     "Accepted for completeness but has NO visible effect: the renderer normalizes all "
@@ -66,6 +67,9 @@ def layout_forceatlas2(
     Note that each iteration computes dense pairwise repulsion (O(N^2), no Barnes-Hut
     approximation), so `max_iter` dominates runtime on large graphs.
 
+    If the network's edges carry varying weights, they are used as attraction strength
+    automatically — no parameter needed. The returned message says when that happened.
+
     After calling this, use `visualization_generate` to render the result.
 
     Returns:
@@ -87,10 +91,14 @@ def layout_forceatlas2(
             "seed": seed,
             "init_from_layout": init_from_layout,
         }
-        layout.calculate_layout(
+        info = layout.calculate_layout(
             network_id, "forceatlas2", db, overrides=overrides, force=force_recompute
         )
-        return "ForceAtlas2 layout calculated. Call `visualization_generate` to render."
+        return layout.format_layout_result(
+            info,
+            "ForceAtlas2 layout calculated.",
+            "Call `visualization_generate` to render.",
+        )
 
 
 @mcp.tool()
@@ -118,6 +126,9 @@ def layout_spring(
     Best for: small-to-medium graphs (< 500 nodes) where high-quality convergence is needed.
     Slower than ForceAtlas2 on large graphs.
 
+    If the network's edges carry varying weights, they are used as attraction strength
+    automatically — no parameter needed.
+
     After calling this, use `visualization_generate` to render the result.
 
     Returns:
@@ -138,10 +149,14 @@ def layout_spring(
             "seed": seed,
             "init_from_layout": init_from_layout,
         }
-        layout.calculate_layout(
+        info = layout.calculate_layout(
             network_id, "spring", db, overrides=overrides, force=force_recompute
         )
-        return "Spring layout calculated. Call `visualization_generate` to render."
+        return layout.format_layout_result(
+            info,
+            "Spring layout calculated.",
+            "Call `visualization_generate` to render.",
+        )
 
 
 @mcp.tool()

@@ -46,7 +46,8 @@ def calculate_centrality(
             and "eigenvector". Not supported by "degree" (nx.degree_centrality
             has no weight concept) or "pagerank" (has its own weight handling,
             out of scope for this stage). When set, `build_graph_from_db` is
-            asked to load edge weights onto the graph.
+            asked to load that edge attribute onto the graph ("weight" being the
+            imported edge-weight column); it raises if no such attribute exists.
         normalized: Applies to "degree" (emulated manually — nx.degree_centrality
             has no `normalized` kwarg, so we scale by (n-1) ourselves when False)
             and "betweenness" (nx has a real `normalized` kwarg). NOTE:
@@ -98,9 +99,11 @@ def calculate_centrality(
 
     # Reconstruct graph (Optimized). Only ask for edge weights when a `weight`
     # attribute name was actually requested, so the default (fast) path is
-    # unaffected when no weight is requested.
+    # unaffected when no weight is requested. Passing the name through means a
+    # weight other than the imported `weight` column resolves to that edge
+    # attribute instead of silently producing an unweighted graph.
     from .utils.graph_builder import build_graph_from_db
-    G = build_graph_from_db(network_id, db, include_weights=(weight is not None))
+    G = build_graph_from_db(network_id, db, weight_attribute=weight)
 
     # Need node_map for saving results later (node_id -> db_id)
     # We can fetch this efficiently or reconstruct it.

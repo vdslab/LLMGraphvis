@@ -133,11 +133,27 @@ GEOMETRIC_OVERRIDE_KEYS = {
     name: LAYOUT_PARAM_KEYS[name] for name in ("circular", "shell", "spiral", "random")
 }
 
-# Layouts whose result depends on edge weights only if `weight` is passed.
-# build_graph_from_db() omits the `weight` edge attribute unless asked, which
-# means nx's own default of weight="weight" silently degrades to unweighted —
-# so the graph has to be rebuilt with weights when the caller wants them.
+# Layouts whose result depends on edge weights. build_graph_from_db() attaches
+# no weight attribute unless asked, which means nx's own default of
+# weight="weight" silently degrades to unweighted — so the graph has to be
+# rebuilt with weights for the parameter to mean anything at all.
 WEIGHT_AWARE_LAYOUTS = {"spring", "forceatlas2", "kamada_kawai", "spectral"}
+
+# Of those, the ones that are weighted BY DEFAULT whenever the network carries
+# informative weights (see summarize_edge_weights). All three read `weight` as
+# connection strength, so using it is what a weighted file already means; making
+# it opt-in threw that data away on every layout nobody thought to configure.
+#
+# kamada_kawai is deliberately excluded: its `weight` is the desired *distance*
+# between two endpoints, so defaulting it on would push strongly connected nodes
+# further apart — the opposite of what a weight normally means here. It stays
+# opt-in, and _resolve_weight says so when the network has weights.
+WEIGHT_AUTO_LAYOUTS = {"spring", "forceatlas2", "spectral"}
+
+# Values of `weight` that mean "lay this graph out unweighted", overriding the
+# automatic default. Now that weighted is the default, this is the only way for
+# a caller to ask for the unweighted result.
+WEIGHT_OPT_OUT = {"", "none", "no", "off", "false", "unweighted"}
 
 # Parameters that can hold one entry per node. Replaced by a digest before being
 # stored as cache metadata — see the cache_params construction below.
@@ -286,13 +302,62 @@ def _resolve_partition_params(
         overrides["subset_key"] = subset_attr
 
 
+def _resolve_weight(layout_name: str, requested, network_id: int, db: Session):
+    """Decide which edge attribute, if any, this layout should be weighted by.
+
+    Returns `(weight_attribute, note)`. `note` is a sentence for the tool's
+    return message: a caller that never asked for weights still has to be told
+    they were used, otherwise "weighted by default" is just another silent
+    behaviour — the mirror image of the bug this replaces.
+    """
+    from .utils.graph_builder import WEIGHT_COLUMN, summarize_edge_weights
+
+    if layout_name not in WEIGHT_AWARE_LAYOUTS:
+        return None, ""
+
+    if isinstance(requested, str) and requested.strip().lower() in WEIGHT_OPT_OUT:
+        return None, "Edge weights were ignored, as requested."
+
+    if requested:
+        return requested, f"Weighted by the '{requested}' edge attribute."
+
+    summary = summarize_edge_weights(network_id, db)
+    if not summary["is_informative"]:
+        return None, ""
+
+    span = f"{summary['min']:.3g}–{summary['max']:.3g}"
+    if layout_name not in WEIGHT_AUTO_LAYOUTS:
+        # kamada_kawai: weights mean distance here, so the choice is the user's.
+        return None, (
+            f"Note: this network has edge weights (range {span}), which this layout "
+            f"would read as target distances (heavier = further apart). It was "
+            f"computed unweighted; pass weight='weight' to use them as distances."
+        )
+
+    logger.info(
+        f"Layout '{layout_name}' on network {network_id}: using imported edge "
+        f"weights automatically (range {span}, "
+        f"{summary['distinct_values']} distinct values)."
+    )
+    return WEIGHT_COLUMN, (
+        f"Edge weights were used automatically (range {span}); "
+        f"pass weight='none' for an unweighted layout."
+    )
+
+
+def format_layout_result(info, headline: str, follow_up: str = "") -> str:
+    """Assemble a layout tool's return message, including any weight note."""
+    note = (info or {}).get("weight_note") or ""
+    return " ".join(part for part in (headline, note, follow_up) if part)
+
+
 def calculate_layout(
     network_id: int,
     layout_name: str,
     db: Session,
     overrides: dict = None,
     force: bool = False,
-):
+) -> dict:
     # Normalize layout name up front (needed for both cache-check and compute paths)
     if layout_name in ["forceatlas2_layout", "force-directed", "force_directed"]:
         layout_name = "forceatlas2"
@@ -303,17 +368,17 @@ def calculate_layout(
 
     raw_overrides = overrides or {}
 
-    # Only pull edge weights out of the DB when a weight-using layout was
-    # actually asked to use them. Without this the `weight` kwarg is accepted
-    # and passed to networkx, but the graph carries no weight attribute, so the
-    # result is identical to the unweighted one and the parameter is a lie.
-    include_weights = bool(
-        layout_name in WEIGHT_AWARE_LAYOUTS and raw_overrides.get("weight")
+    # Resolve weighting before anything else: it decides how the graph is built.
+    # Doing it here rather than in the tool layer means every entry point — the
+    # upload pipeline, subgraph extraction, the REST endpoint, the MCP tools —
+    # gets the same weighted-by-default behaviour.
+    weight_attribute, weight_note = _resolve_weight(
+        layout_name, raw_overrides.get("weight"), network_id, db
     )
 
     # Reconstruct graph from DB
     from .utils.graph_builder import build_graph_from_db
-    G = build_graph_from_db(network_id, db, include_weights=include_weights)
+    G = build_graph_from_db(network_id, db, weight_attribute=weight_attribute)
 
     # Need node_map for saving results (str_id -> db_id)
     nodes_query = db.query(models.Node.id, models.Node.node_id).filter(models.Node.network_id == network_id).all()
@@ -334,6 +399,15 @@ def calculate_layout(
         for k, v in raw_overrides.items()
         if v is not None
     }
+
+    # `weight` is no longer whatever the caller passed — it is what
+    # _resolve_weight decided, which is also the attribute name now present on
+    # the graph. Both the nx call and the cache key have to see the resolved
+    # value, or a weighted run would happily reuse an unweighted cached layout.
+    if weight_attribute:
+        sanitized_overrides["weight"] = weight_attribute
+    else:
+        sanitized_overrides.pop("weight", None)
 
     # `init_from_layout` is ours, not networkx's: it names a previously computed
     # layout whose stored coordinates become the starting positions. Resolved to
@@ -396,6 +470,12 @@ def calculate_layout(
         cache_params["init_from_layout"] = init_from
     effective_params = {"layout_name": layout_name, **cache_params}
 
+    result = {
+        "layout_name": layout_name,
+        "weight": weight_attribute,
+        "weight_note": weight_note,
+    }
+
     if not force:
         cached_x = get_cached_attribute(
             network_id, f"{layout_name}_x", models.NodeAttribute, db
@@ -405,7 +485,7 @@ def calculate_layout(
                 f"Layout cache HIT for network {network_id}, layout='{layout_name}' "
                 f"(graph_state_hash={current_hash[:12]}...). Skipping recomputation."
             )
-            return
+            return {**result, "cached": True}
 
     logger.info(
         f"Layout cache MISS for network {network_id}, layout='{layout_name}'. Recomputing."
@@ -536,3 +616,5 @@ def calculate_layout(
         db.rollback()
         logger.warning(f"Failed to update last_layout_name: {e}")
         # non-critical, proceed
+
+    return {**result, "cached": False}

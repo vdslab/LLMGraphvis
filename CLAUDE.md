@@ -117,9 +117,15 @@ adding a tool.
 - **Coordinates are renormalized to [-1000, 1000]** before drawing, which makes
   every layout's `scale`/`center` parameter visually inert. Say so rather than
   offering them as a way to zoom.
-- **Layouts ignore edge weights unless `weight` is passed.** `build_graph_from_db`
-  omits the attribute by default, so nx's own `weight="weight"` default silently
-  degrades to unweighted.
+- **Layouts are weighted by default.** `spring`, `forceatlas2` and `spectral` use
+  the imported edge weights whenever they vary and are positive — `_resolve_weight`
+  in `logic/layout.py` decides, and passes the attribute name to
+  `build_graph_from_db`, which is what actually puts weights on the graph (nx's own
+  `weight="weight"` default would otherwise silently degrade to unweighted).
+  `weight='none'` opts out; `kamada_kawai` is excluded because its `weight` means
+  target *distance*, so defaulting it on would invert the meaning. Weights live in
+  `edges.weight`, never as an EdgeAttribute, so `network://{id}/structure`'s
+  `edge_weights` is the only place their existence is visible.
 - **Styles persist and cannot be cleared by setting them.** Each
   `visualization_set_*` preserves the channels it was not given, and
   `_save_state` only writes non-`None`. `visualization_reset_style` is the only
@@ -158,8 +164,8 @@ kept so existing conversations do not break; do not use them in new code.
 docker compose up -d                 # db / backend:8000 / networkx-api:8001 / frontend:5173
 scripts/local/start.sh               # non-Docker macOS runner (state under .local/)
 
-cd backend       && pytest           # 193 tests
-cd networkx-api  && pytest tests     # 88 tests — run from this dir; there is no pytest.ini here
+cd backend       && pytest           # 196 tests
+cd networkx-api  && pytest tests     # 101 tests — run from this dir; there is no pytest.ini here
 cd frontend      && npm test && npm run lint
 ```
 

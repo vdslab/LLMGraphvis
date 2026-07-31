@@ -29,6 +29,17 @@ EDGE_ATTRS = [
 
 METADATA = {"id": 1, "name": "Concerts", "description": "Co-performance network"}
 STRUCTURE = {"node_count": 1144, "edge_count": 8608, "density": 0.013}
+# Edge weights live on the edge row, not in the edge-attribute listing, so the
+# structure resource is the only place they are visible.
+WEIGHTS = {
+    "edge_count": 8608,
+    "weighted_edge_count": 8608,
+    "distinct_values": 42,
+    "min": 1.0,
+    "max": 116.0,
+    "is_uniform": False,
+    "is_informative": True,
+}
 
 
 def _patch_resources(metadata=METADATA, structure=STRUCTURE, nodes=None, edges=None):
@@ -133,6 +144,36 @@ async def test_context_summary_keeps_layout_coordinates():
 
     assert "Stats: 1144 Nodes, 8608 Edges" in summary
     assert "forceatlas2_x" in summary
+
+
+@pytest.mark.asyncio
+async def test_context_summary_reports_edge_weights():
+    """Weights are invisible in the attribute listing, so without this line the
+    agent has no way to know the uploaded file was weighted."""
+    with _patch_resources(structure={**STRUCTURE, "edge_weights": WEIGHTS}):
+        summary = await context.build_context_summary(1)
+
+    assert "Edge weights: present, range 1–116 (42 distinct values)." in summary
+    assert "use them automatically" in summary
+
+
+@pytest.mark.asyncio
+async def test_context_summary_stays_silent_about_uniform_weights():
+    """All-equal weights change no layout, so mentioning them only invites the
+    agent to pass a parameter that does nothing."""
+    uniform = {**WEIGHTS, "is_uniform": True, "is_informative": False}
+    with _patch_resources(structure={**STRUCTURE, "edge_weights": uniform}):
+        summary = await context.build_context_summary(1)
+
+    assert "Edge weights" not in summary
+
+
+@pytest.mark.asyncio
+async def test_overview_reports_the_edge_weight_range():
+    with _patch_resources(structure={**STRUCTURE, "edge_weights": WEIGHTS}):
+        overview = await context.build_data_overview(1)
+
+    assert "- **Edge weights:** 1–116" in overview
 
 
 @pytest.mark.asyncio

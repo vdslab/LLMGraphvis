@@ -13,9 +13,8 @@ _FORCE_RECOMPUTE_DESC = (
     "when the user explicitly wants the same computation redone."
 )
 _WEIGHT_DESC = (
-    "Name of the edge attribute to use as edge strength (usually 'weight'). "
-    "IMPORTANT: layouts ignore edge weights entirely unless this is passed — the graph is "
-    "built without weights otherwise."
+    "Edge attribute to use as the numeric edge value (usually 'weight', the weight "
+    "imported with the file)."
 )
 _SCALE_CENTER_DESC = (
     "Accepted for completeness but has NO visible effect: the renderer normalizes all "
@@ -28,7 +27,7 @@ _SCALE_CENTER_DESC = (
 @handle_tool_errors
 def layout_kamada_kawai(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    weight: Annotated[Optional[str], Field(description=_WEIGHT_DESC + " Here weights are treated as distances along edges, so heavier edges place their endpoints further apart.")] = None,
+    weight: Annotated[Optional[str], Field(description=_WEIGHT_DESC + " Here a weight is treated as the target DISTANCE along an edge, so heavier edges place their endpoints further apart — the opposite of a connection-strength reading. Because of that this layout is the one layout that is NOT weighted by default: pass this only when the attribute really does mean distance or cost, not strength.")] = None,
     dist: Annotated[Optional[Dict[str, Dict[str, float]]], Field(description="Optional precomputed pairwise target distances as {source: {target: distance}}. Omit to use shortest-path distances, which is almost always what you want.")] = None,
     scale: Annotated[Optional[float], Field(description=_SCALE_CENTER_DESC)] = None,
     center: Annotated[Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)] = None,
@@ -60,17 +59,21 @@ def layout_kamada_kawai(
             "center": center,
             "init_from_layout": init_from_layout,
         }
-        layout.calculate_layout(
+        info = layout.calculate_layout(
             network_id, "kamada_kawai", db, overrides=overrides, force=force_recompute
         )
-        return "Kamada-Kawai layout calculated. Call `visualization_generate` to render."
+        return layout.format_layout_result(
+            info,
+            "Kamada-Kawai layout calculated.",
+            "Call `visualization_generate` to render.",
+        )
 
 
 @mcp.tool()
 @handle_tool_errors
 def layout_spectral(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    weight: Annotated[Optional[str], Field(description=_WEIGHT_DESC + " The Laplacian is built from the weighted adjacency matrix when this is set.")] = None,
+    weight: Annotated[Optional[str], Field(description=_WEIGHT_DESC + " The Laplacian is built from the weighted adjacency matrix. Leave unset: varying edge weights are used automatically. Pass 'none' to force an unweighted Laplacian, or another attribute name to use that one instead.")] = None,
     scale: Annotated[Optional[float], Field(description=_SCALE_CENTER_DESC)] = None,
     center: Annotated[Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
@@ -96,7 +99,11 @@ def layout_spectral(
     with get_db_context() as db:
         from app.logic import layout
         overrides = {"weight": weight, "scale": scale, "center": center}
-        layout.calculate_layout(
+        info = layout.calculate_layout(
             network_id, "spectral", db, overrides=overrides, force=force_recompute
         )
-        return "Spectral layout calculated. Call `visualization_generate` to render."
+        return layout.format_layout_result(
+            info,
+            "Spectral layout calculated.",
+            "Call `visualization_generate` to render.",
+        )

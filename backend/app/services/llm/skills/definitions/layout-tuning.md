@@ -52,13 +52,36 @@ default, so only override what the user actually asked about.
 | "pull it together", "詰めて", too sparse | The reverse: lower `scaling_ratio`, raise `gravity`, lower `k`. |
 | "the big nodes overlap" | ForceAtlas2 `node_size` — enables size-aware repulsion so large nodes push each other apart. |
 | "make it cleaner / converge better" | Raise `max_iter` (ForceAtlas2) or `iterations` (spring). Costs time roughly linearly. |
-| "use the edge weights" | Pass `weight='weight'` (or the actual edge attribute name). **Layouts ignore edge weights unless you pass this** — the graph is built unweighted otherwise. |
+| "use the edge weights", "重みを使って" | Nothing — already done. See "Edge weights" below. |
+| "ignore the weights", "重みは無視して" | Pass `weight='none'` on the force/spectral layout, then re-render. |
 | "same result every time", "再現性" | Pass an explicit `seed`. Force layouts start from random positions, so without a fixed seed successive runs differ. |
 | "try a different arrangement" | Change `seed`, with `force_recompute=True`. |
 | "emphasise the clusters more" | ForceAtlas2 `strong_gravity=True`, or `linlog=True` for a log attraction model that separates clusters more sharply. |
 | "keep the current shape but refine it" | `init_from_layout='<previous layout name>'` — warm-starts from stored coordinates instead of from random. |
 | "start the circle from the top" | `layout_shell`: `rotate`. |
 | "tighter/looser spiral" | `layout_spiral`: `resolution`; `equidistant=True` for even arc spacing. |
+
+## Edge weights
+
+`layout_forceatlas2`, `layout_spring` and `layout_spectral` are **weighted by
+default**: if the network's edges carry varying, positive weights, those weights
+are used as connection strength without any parameter. The tool's return message
+says so when it happened — pass that on to the user rather than claiming the
+layout ignored them.
+
+- Do **not** pass `weight='weight'` "to be safe". It is already the behaviour,
+  and a redundant parameter is one more thing to get wrong.
+- Pass `weight='<other attribute>'` only to use a *different* numeric edge
+  attribute as the strength.
+- Pass `weight='none'` when the user explicitly wants the structure alone.
+- `layout_kamada_kawai` is the exception and stays unweighted by default: there a
+  weight means the target *distance* between endpoints, so heavier edges would be
+  drawn further apart. Only pass `weight` there if the attribute really is a
+  distance or a cost.
+
+The edge weights, if any, are listed in the network context each turn — a network
+with no weights, or with the same weight on every edge, gets no such line and
+lays out identically either way.
 
 `scale` and `center` are accepted but have **no visible effect**: the renderer
 normalizes all coordinates to a fixed [-1000, 1000] extent before drawing. Do not
