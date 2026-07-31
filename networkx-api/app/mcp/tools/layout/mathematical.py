@@ -73,7 +73,7 @@ def layout_kamada_kawai(
 @handle_tool_errors
 def layout_spectral(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    weight: Annotated[Optional[str], Field(description=_WEIGHT_DESC + " The Laplacian is built from the weighted adjacency matrix. Leave unset: varying edge weights are used automatically. Pass 'none' to force an unweighted Laplacian, or another attribute name to use that one instead.")] = None,
+    weight: Annotated[Optional[str], Field(description=_WEIGHT_DESC + " The Laplacian is built from the weighted adjacency matrix, so a heavier edge pulls its endpoints together. Leave unset: the imported edge weights are used automatically when they vary, and the return message names any other numeric edge attribute available. Pass one of those names to use it instead, or 'none' to force an unweighted Laplacian.")] = None,
     scale: Annotated[Optional[float], Field(description=_SCALE_CENTER_DESC)] = None,
     center: Annotated[Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,

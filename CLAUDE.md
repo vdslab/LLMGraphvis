@@ -117,23 +117,31 @@ adding a tool.
 - **Coordinates are renormalized to [-1000, 1000]** before drawing, which makes
   every layout's `scale`/`center` parameter visually inert. Say so rather than
   offering them as a way to zoom.
-- **Layouts are weighted by default.** `spring`, `forceatlas2` and `spectral` use
-  the imported edge weights whenever they vary and are positive — `_resolve_weight`
-  in `logic/layout.py` decides, and passes the attribute name to
-  `build_graph_from_db`, which is what actually puts weights on the graph (nx's own
-  `weight="weight"` default would otherwise silently degrade to unweighted).
-  `weight='none'` opts out; `kamada_kawai` is excluded because its `weight` means
-  target *distance*, so defaulting it on would invert the meaning. Weights live in
-  `edges.weight`, never as an EdgeAttribute, so `network://{id}/structure`'s
-  `edge_weights` is the only place their existence is visible.
+- **Layouts are weighted by default, but only from the imported weight.** A
+  layout declares what a weight *means* to it (`WeightRole` in
+  `logic/layouts/base.py`): `STRENGTH` (spring, forceatlas2, spectral) is applied
+  automatically when `edges.weight` varies and is positive; `DISTANCE`
+  (kamada_kawai) never is, because heavier would mean *further apart*; `NONE` has
+  no weight parameter at all. Any *other* numeric edge attribute is only ever
+  offered, never chosen — it could be a cost, a year or an id. `logic/layouts/weights.py`
+  makes that call and returns the note that every layout tool appends to its
+  result. `weight='<name>'` picks a different attribute, `weight='none'` opts out.
+  Weights live in `edges.weight`, never as an EdgeAttribute (the importer skips
+  the key), so `network://{id}/structure`'s `edge_weights` is the only place their
+  existence is visible — which is why the agent never asked for them before.
 - **Styles persist and cannot be cleared by setting them.** Each
   `visualization_set_*` preserves the channels it was not given, and
   `_save_state` only writes non-`None`. `visualization_reset_style` is the only
   way back to uniform.
-- **`LAYOUT_PARAM_KEYS`** in `logic/layout.py` is the allowlist of parameters
-  that may reach each nx layout function. Exposing a new parameter means adding
-  it there *and* to the tool signature; `tests/test_layout_parameters.py`
-  cross-checks the allowlist against the installed networkx signatures.
+- **One layout, one declaration.** `logic/layouts/` holds a module per family
+  (mirroring `mcp/tools/layout/`), and each layout declares in one `@register`
+  its nx call, its parameter allowlist, its size-based tuning, its `WeightRole`
+  and any `prepare` step. `logic/layout.py` orchestrates (graph build, weight,
+  cache, persistence) and never branches on a layout name; `LAYOUT_PARAM_KEYS` is
+  derived from the registry. **Adding a layout** = one `@register`ed function
+  plus its MCP tool. `tests/test_layout_parameters.py` cross-checks the allowlist
+  against the installed networkx signatures, and the tool signatures against each
+  layout's `WeightRole`.
 - **Derived attribute names.** `analysis_detect_communities` saves to
   `{algorithm}_community`, layouts to `{layout}_x`/`{layout}_y`. Read the tool's
   return message for the exact name rather than assuming one.
@@ -164,8 +172,8 @@ kept so existing conversations do not break; do not use them in new code.
 docker compose up -d                 # db / backend:8000 / networkx-api:8001 / frontend:5173
 scripts/local/start.sh               # non-Docker macOS runner (state under .local/)
 
-cd backend       && pytest           # 196 tests
-cd networkx-api  && pytest tests     # 101 tests — run from this dir; there is no pytest.ini here
+cd backend       && pytest           # 197 tests
+cd networkx-api  && pytest tests     # 109 tests — run from this dir; there is no pytest.ini here
 cd frontend      && npm test && npm run lint
 ```
 

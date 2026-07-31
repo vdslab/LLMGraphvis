@@ -39,6 +39,7 @@ WEIGHTS = {
     "max": 116.0,
     "is_uniform": False,
     "is_informative": True,
+    "alternatives": [],
 }
 
 
@@ -166,6 +167,17 @@ async def test_context_summary_stays_silent_about_uniform_weights():
         summary = await context.build_context_summary(1)
 
     assert "Edge weights" not in summary
+
+
+@pytest.mark.asyncio
+async def test_context_summary_names_alternative_weight_attributes():
+    """A graph can carry several numeric edge attributes; only the imported
+    weight is used unasked, so the agent needs to know what else it may pick."""
+    weights = {**WEIGHTS, "alternatives": ["cooccurrence", "cost"]}
+    with _patch_resources(structure={**STRUCTURE, "edge_weights": weights}):
+        summary = await context.build_context_summary(1)
+
+    assert "weight=<name>: 'cooccurrence', 'cost'" in summary
 
 
 @pytest.mark.asyncio

@@ -18,6 +18,7 @@ from app.logic.layout import (
     calculate_layout,
     load_layout_positions,
 )
+from app.logic.layouts import SPECS, get_spec
 from common import models
 
 
@@ -115,6 +116,48 @@ class TestLayoutParamKeys:
         # `gravity` is a forceatlas2/spring parameter; circular has no such kwarg.
         calculate_layout(1, "circular", db, overrides={"gravity": 5.0})
         assert stored_layouts(db, 1, "circular") is not None
+
+
+class TestRegistry:
+    """The registry is the single declaration of each layout; these check that
+    nothing that used to be a parallel list has drifted from it."""
+
+    def test_every_layout_is_callable_and_declares_parameters(self):
+        for name, spec in SPECS.items():
+            assert callable(spec.compute), name
+            assert spec.params, f"{name}: empty parameter allowlist"
+            assert spec.name == name
+
+    def test_weight_is_allowlisted_exactly_for_weight_aware_layouts(self):
+        """A layout that takes a weight must be able to pass it to networkx, and
+        one that does not must not advertise it."""
+        for name, spec in SPECS.items():
+            assert spec.accepts_weight == ("weight" in spec.params), name
+
+    def test_aliases_resolve_to_a_registered_layout(self):
+        for alias, expected in (
+            ("fruchterman_reingold", "spring"),
+            ("force_directed", "forceatlas2"),
+            ("forceatlas2_layout", "forceatlas2"),
+            ("circle", "circular"),
+        ):
+            assert get_spec(alias).name == expected
+
+    def test_unknown_layout_names_the_supported_ones(self):
+        with pytest.raises(ValueError, match="Unknown layout algorithm"):
+            get_spec("no_such_layout")
+
+    def test_mcp_tools_expose_weight_exactly_where_the_layout_takes_one(self):
+        """The tool signature is prompt surface: offering `weight` on a layout
+        that ignores it, or hiding it on one that uses it, misleads the model."""
+        from app.mcp.tools import layout as layout_tools
+
+        for name, spec in SPECS.items():
+            tool = getattr(layout_tools, f"layout_{name}", None)
+            if tool is None:  # not every layout has its own tool
+                continue
+            has_param = "weight" in inspect.signature(tool).parameters
+            assert has_param == spec.accepts_weight, name
 
 
 # --------------------------------------------------------------------------
@@ -262,7 +305,8 @@ class TestEdgeWeights:
         setup_graph(db, weighted=True)
         seen = weights_seen_by("kamada_kawai", "kamada_kawai_layout", db)
         assert seen["weight_kwarg"] is None
-        assert "distances" in seen["info"]["weight_note"]
+        assert "target distance" in seen["info"]["weight_note"]
+        assert "weight='weight'" in seen["info"]["weight_note"]
 
     def test_another_edge_attribute_can_be_the_weight(self, db):
         setup_graph(db, weighted=True)
@@ -270,6 +314,32 @@ class TestEdgeWeights:
         seen = weights_seen_by("spring", "spring_layout", db, {"weight": "strength"})
         assert sorted(d["strength"] for d in seen["edge_data"]) == [5, 6, 7, 8, 9]
         assert seen["weight_kwarg"] == "strength"
+
+    def test_other_numeric_attributes_are_offered_never_chosen(self, db):
+        """A second numeric edge attribute could be a distance, a year or an id.
+        Only the imported weight has a known meaning, so the rest are named in
+        the message and left to the caller."""
+        setup_graph(db, weighted=True)
+        add_edge_attribute(db, 1, "cooccurrence", [9.0, 8.0, 7.0, 6.0, 5.0])
+        seen = weights_seen_by("spring", "spring_layout", db)
+
+        assert seen["weight_kwarg"] == "weight"
+        assert "'cooccurrence'" in seen["info"]["weight_note"]
+
+    def test_candidates_are_offered_when_there_is_no_usable_weight(self, db):
+        """Uniform imported weights, but the file carries a numeric attribute:
+        the layout stays unweighted and says what could be used instead."""
+        setup_graph(db, weights=[1.0] * 5)
+        add_edge_attribute(db, 1, "cost", [4.0, 3.0, 2.0, 1.0, 5.0])
+        seen = weights_seen_by("spring", "spring_layout", db)
+
+        assert all(d == {} for d in seen["edge_data"])
+        assert "'cost'" in seen["info"]["weight_note"]
+
+    def test_nothing_is_said_when_there_is_nothing_to_offer(self, db):
+        setup_graph(db)
+        seen = weights_seen_by("spring", "spring_layout", db)
+        assert seen["info"]["weight_note"] == ""
 
     def test_unknown_weight_attribute_raises_instead_of_degrading(self, db):
         setup_graph(db, weighted=True)

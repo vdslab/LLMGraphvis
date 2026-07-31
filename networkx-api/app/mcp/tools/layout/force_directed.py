@@ -21,11 +21,12 @@ _SEED_DESC = (
     "arrangement of the same graph."
 )
 _WEIGHT_DESC = (
-    "Edge attribute to use as connection strength. Leave this unset in almost every case: "
-    "when the network's edges carry varying weights they are used automatically, so the "
-    "default layout is already weighted and stronger connections are already drawn closer "
-    "together. Set it only to point at a different numeric edge attribute, or to 'none' to "
-    "force an unweighted layout because the user explicitly asked to ignore the weights."
+    "Edge attribute to use as connection strength (heavier = drawn closer together). "
+    "Leave unset by default: the network's own imported edge weights are used "
+    "automatically whenever they vary, so the layout is already weighted, and the return "
+    "message names any other numeric edge attribute that could be used instead. Set this "
+    "to one of those names when the user wants a different quantity to drive the layout "
+    "(a graph can carry several), or to 'none' to ignore weights entirely."
 )
 _SCALE_CENTER_DESC = (
     "Accepted for completeness but has NO visible effect: the renderer normalizes all "

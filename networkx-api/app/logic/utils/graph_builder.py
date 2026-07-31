@@ -25,6 +25,11 @@ def summarize_edge_weights(network_id: int, db: Session) -> Dict[str, Any]:
     False there and callers can take the cheaper unweighted path. Non-positive
     weights are reported as uninformative too — force-directed layouts read a
     weight as attraction strength, where zero or negative has no meaning.
+
+    `alternatives` lists the network's other numeric edge attributes. They are
+    never chosen automatically — one could be a distance, a year or an id, and
+    only the caller knows which — but naming them is what lets a caller pick a
+    different weight when a graph carries more than one kind.
     """
     total, non_null, distinct_count, min_w, max_w = (
         db.query(
@@ -54,6 +59,7 @@ def summarize_edge_weights(network_id: int, db: Session) -> Dict[str, Any]:
         "max": float(max_w) if max_w is not None else None,
         "is_uniform": bool(is_uniform),
         "is_informative": bool(not is_uniform and not has_non_positive),
+        "alternatives": numeric_edge_attribute_names(network_id, db),
     }
     if is_uniform:
         summary["reason"] = "every edge carries the same weight"

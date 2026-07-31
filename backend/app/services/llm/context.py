@@ -109,11 +109,21 @@ def _weight_line(structure: Any) -> Optional[str]:
         return None
     if not weights.get("is_informative"):
         return None
-    return (
+    line = (
         f"Edge weights: present, range {weights['min']:.3g}–{weights['max']:.3g} "
         f"({weights['distinct_values']} distinct values). Force-directed and spectral "
         f"layouts use them automatically."
     )
+    # A graph can carry several numeric edge attributes. Only the imported weight
+    # is used without being asked; the rest are the agent's to choose from.
+    alternatives = weights.get("alternatives") or []
+    if alternatives:
+        listed = ", ".join(f"'{name}'" for name in alternatives)
+        line += (
+            f" Other numeric edge attributes can be used instead by passing "
+            f"weight=<name>: {listed}."
+        )
+    return line
 
 
 def _format_attr_stats(dtype: Optional[str], stats: Optional[Dict[str, Any]]) -> str:

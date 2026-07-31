@@ -53,6 +53,7 @@ default, so only override what the user actually asked about.
 | "the big nodes overlap" | ForceAtlas2 `node_size` — enables size-aware repulsion so large nodes push each other apart. |
 | "make it cleaner / converge better" | Raise `max_iter` (ForceAtlas2) or `iterations` (spring). Costs time roughly linearly. |
 | "use the edge weights", "重みを使って" | Nothing — already done. See "Edge weights" below. |
+| "use <attribute> as the weight", "<属性>で重み付け" | Pass `weight='<attribute>'`. It must be a numeric edge attribute. |
 | "ignore the weights", "重みは無視して" | Pass `weight='none'` on the force/spectral layout, then re-render. |
 | "same result every time", "再現性" | Pass an explicit `seed`. Force layouts start from random positions, so without a fixed seed successive runs differ. |
 | "try a different arrangement" | Change `seed`, with `force_recompute=True`. |
@@ -64,24 +65,29 @@ default, so only override what the user actually asked about.
 ## Edge weights
 
 `layout_forceatlas2`, `layout_spring` and `layout_spectral` are **weighted by
-default**: if the network's edges carry varying, positive weights, those weights
+default**: if the network's own imported edge weights vary and are positive, they
 are used as connection strength without any parameter. The tool's return message
-says so when it happened — pass that on to the user rather than claiming the
-layout ignored them.
+says what it did and what else was available — read it, and pass it on rather
+than claiming the layout ignored the weights.
 
 - Do **not** pass `weight='weight'` "to be safe". It is already the behaviour,
   and a redundant parameter is one more thing to get wrong.
-- Pass `weight='<other attribute>'` only to use a *different* numeric edge
-  attribute as the strength.
+- **A graph can carry several numeric edge quantities.** Only the imported weight
+  is used unasked; anything else (`cost`, `distance`, `year`, a similarity score)
+  is *offered* in the return message and in the network context, never chosen for
+  you. Pass `weight='<name>'` when the user wants that quantity to drive the
+  layout, or when they say what the edges mean and one attribute obviously is it.
 - Pass `weight='none'` when the user explicitly wants the structure alone.
-- `layout_kamada_kawai` is the exception and stays unweighted by default: there a
-  weight means the target *distance* between endpoints, so heavier edges would be
-  drawn further apart. Only pass `weight` there if the attribute really is a
-  distance or a cost.
+- `layout_kamada_kawai` is the exception and is never weighted by default: there
+  a weight is the target *distance* between endpoints, so a strength-like weight
+  would draw the most strongly connected nodes furthest apart. Pass `weight`
+  there only when the attribute really is a distance or a cost.
 
-The edge weights, if any, are listed in the network context each turn — a network
-with no weights, or with the same weight on every edge, gets no such line and
-lays out identically either way.
+Weighting is decided per call, so it costs nothing to change later: the initial
+layout is already weighted, and switching to a different weight is one re-call of
+the same tool plus `visualization_generate`. Report which quantity is driving the
+layout when it is not the plain imported weight — the user cannot see it
+otherwise.
 
 `scale` and `center` are accepted but have **no visible effect**: the renderer
 normalizes all coordinates to a fixed [-1000, 1000] extent before drawing. Do not
