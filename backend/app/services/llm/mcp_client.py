@@ -347,7 +347,7 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
         raise _unwrap_exception(e) from e
 
 
-async def get_resource(uri: str, session: ClientSession = None) -> dict:
+async def get_resource(uri: str, session: ClientSession = None) -> dict | list:
     """
     Directly reads a resource from the MCP server.
     Useful for internal context validation.
@@ -362,22 +362,27 @@ async def get_resource(uri: str, session: ClientSession = None) -> dict:
         _log_exception_details(e, f"reading resource {uri}")
         return {}
 
-async def _read_resource_internal(session: ClientSession, uri: str) -> dict:
+async def _read_resource_internal(session: ClientSession, uri: str) -> dict | list:
     result = await session.read_resource(uri)
     content_item = result.contents[0]
-    
-    mime = getattr(content_item, "mimeType", None) or "text/plain"
-    
-    if "application/json" in mime:
-         try:
-            return json.loads(content_item.text)
-         except Exception:
-            # Fallback
-            return {}
-            
-    # If not JSON, we might return empty or handle differently.
-    # For internal context usage, we expect dictionaries.
-    return {}
+
+    text = getattr(content_item, "text", None)
+    if not text:
+        return {}
+
+    # Parse by content, not by declared mime type. FastMCP labels a resource
+    # text/plain unless the server passes mime_type explicitly, and trusting the
+    # label meant a JSON body was silently discarded — the network context and
+    # the post-upload overview then reported "no attributes" for every graph.
+    try:
+        return json.loads(text)
+    except ValueError:
+        mime = getattr(content_item, "mimeType", None) or "text/plain"
+        logger.warning(
+            f"Resource {uri} returned unparseable content (mimeType={mime}); "
+            "expected a JSON object"
+        )
+        return {}
 
 
 def _log_exception_details(e: BaseException, context: str):

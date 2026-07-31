@@ -132,6 +132,20 @@ adding a tool.
   `{algorithm}_community`, layouts to `{layout}_x`/`{layout}_y`. Read the tool's
   return message for the exact name rather than assuming one.
 
+### MCP resources
+
+`networkx-api/app/mcp/resources.py` serves the `network://…` resources that the
+backend reads directly (not via the LLM) to build the system-prompt context and
+the post-upload overview in `backend/app/services/llm/context.py`.
+
+- Every resource must pass **`mime_type="application/json"`**. FastMCP labels a
+  resource template `text/plain` otherwise, and a client that trusts the label
+  discards the body. `tests/test_mcp_integration.py` enforces this.
+- Resources swallow exceptions into `{"error": ...}`, so a resource pointed at a
+  renamed logic helper fails **silently** — it looks like an empty network.
+  `test_resources_return_data_not_errors` executes each one against a real DB
+  for that reason; mocking the logic layer would not catch it.
+
 ### Deprecated but retained
 
 `network_initialize` (bundles import + a hardcoded layout + render) and
@@ -144,8 +158,8 @@ kept so existing conversations do not break; do not use them in new code.
 docker compose up -d                 # db / backend:8000 / networkx-api:8001 / frontend:5173
 scripts/local/start.sh               # non-Docker macOS runner (state under .local/)
 
-cd backend       && pytest           # 143 tests
-cd networkx-api  && pytest           # 86 tests — run from this dir; there is no pytest.ini here
+cd backend       && pytest           # 193 tests
+cd networkx-api  && pytest tests     # 88 tests — run from this dir; there is no pytest.ini here
 cd frontend      && npm test && npm run lint
 ```
 

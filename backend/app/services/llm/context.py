@@ -26,6 +26,23 @@ async def _fetch_network_resources(
     return metadata, structure, node_attrs, edge_attrs
 
 
+def _failed(resource: Any) -> bool:
+    """True when a resource could not be read (server-side error, or empty body).
+
+    Distinguishing this from "read fine, contains nothing" matters: reporting an
+    unreadable resource as "no attributes" tells the user something false about
+    their own data.
+    """
+    if resource is None:
+        return True
+    if isinstance(resource, dict):
+        # get_resource() returns {} when the read fails; the server wraps its own
+        # failures as {"error": ...}. An empty *list*, by contrast, is a valid
+        # answer meaning "this network has no attributes".
+        return not resource or "error" in resource
+    return False
+
+
 def _normalize_attrs(attrs: Any) -> List[Dict[str, Any]]:
     """Normalize an attributes resource (list, or dict wrapping a list) to a list."""
     if isinstance(attrs, dict) and "attributes" in attrs:
@@ -33,6 +50,49 @@ def _normalize_attrs(attrs: Any) -> List[Dict[str, Any]]:
     if isinstance(attrs, list):
         return attrs
     return []
+
+
+# Ceilings for the user-facing upload overview only. The system-prompt summary
+# stays verbose — the agent needs the detail, the user needs a glance.
+DESCRIPTION_LIMIT = 120
+ATTR_NAME_LIMIT = 25
+
+
+def _shorten(text: Optional[str]) -> str:
+    """First line of `text`, cut to DESCRIPTION_LIMIT characters.
+
+    GraphML descriptions in this project run to several lines of provenance
+    ("Node type: …", "Source: …"), which buries the rest of the overview.
+    """
+    if not text:
+        return ""
+    first_line = text.strip().splitlines()[0].strip()
+    if len(first_line) <= DESCRIPTION_LIMIT:
+        # Trailing lines were dropped, so say so rather than implying the
+        # description ended here.
+        return first_line if first_line == text.strip() else f"{first_line} …"
+    return first_line[:DESCRIPTION_LIMIT].rstrip() + "…"
+
+
+def _without_layout_coordinates(
+    attrs_list: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Drop `{layout}_x`/`{layout}_y` pairs written by the layout step.
+
+    The upload pipeline computes a layout before this overview is built, so the
+    coordinates it stores would otherwise be listed as attributes of the file
+    the user just uploaded. The system-prompt summary keeps them — the agent
+    needs to know which layouts have been computed.
+    """
+    names = {attr.get("name") for attr in attrs_list}
+
+    def is_coordinate(name: Optional[str]) -> bool:
+        if not name or len(name) < 3 or name[-2:] not in ("_x", "_y"):
+            return False
+        base = name[:-2]
+        return f"{base}_x" in names and f"{base}_y" in names
+
+    return [attr for attr in attrs_list if not is_coordinate(attr.get("name"))]
 
 
 def _format_attr_stats(dtype: Optional[str], stats: Optional[Dict[str, Any]]) -> str:
@@ -75,12 +135,17 @@ async def build_context_summary(network_id: int) -> str:
             if description:
                 summary_lines.append(f"Description: {description}")
 
-        if structure:
+        if not _failed(structure):
             n_count = structure.get("node_count", "?")
             e_count = structure.get("edge_count", "?")
             summary_lines.append(f"Stats: {n_count} Nodes, {e_count} Edges")
+        else:
+            summary_lines.append("Stats: unavailable (could not read the network)")
 
         def format_attrs(attrs: Any, label: str) -> None:
+            if _failed(attrs):
+                summary_lines.append(f"{label}: unavailable (could not be read)")
+                return
             attrs_list = _normalize_attrs(attrs)
             if not attrs_list:
                 summary_lines.append(f"{label}: None")
@@ -118,37 +183,49 @@ async def build_data_overview(network_id: int) -> str:
             network_id
         )
 
+        if all(
+            _failed(resource)
+            for resource in (metadata, structure, node_attrs, edge_attrs)
+        ):
+            # Nothing could be read. An overview built from this would state, in
+            # confident Markdown, that the graph has no name, no size and no
+            # attributes — so print no overview at all instead.
+            logger.error(
+                f"No resources readable for network {network_id}; "
+                "skipping the upload overview"
+            )
+            return ""
+
         lines: List[str] = ["**Uploaded network overview**", ""]
 
         if isinstance(metadata, dict):
             name = metadata.get("name")
-            description = metadata.get("description")
+            description = _shorten(metadata.get("description"))
             if name:
                 lines.append(f"- **Name:** {name}")
             if description:
                 lines.append(f"- **Description:** {description}")
 
-        if structure:
+        if not _failed(structure):
             n_count = structure.get("node_count", "?")
             e_count = structure.get("edge_count", "?")
             lines.append(f"- **Size:** {n_count} nodes, {e_count} edges")
 
         def format_attrs_md(attrs: Any, label: str) -> None:
-            attrs_list = _normalize_attrs(attrs)
-            lines.append("")
-            if not attrs_list:
-                lines.append(f"**{label}:** none")
+            if _failed(attrs):
+                lines.append(f"- **{label}:** could not be read")
                 return
-            lines.append(f"**{label}:**")
-            limit = 15
-            for i, attr in enumerate(attrs_list):
-                if i >= limit:
-                    lines.append(f"- ... and {len(attrs_list) - limit} more")
-                    break
-                name = attr.get("name")
-                dtype = attr.get("data_type")
-                stats_str = _format_attr_stats(dtype, attr.get("stats"))
-                lines.append(f"- `{name}` ({dtype}){stats_str}")
+            attrs_list = _without_layout_coordinates(_normalize_attrs(attrs))
+            if not attrs_list:
+                lines.append(f"- **{label}:** none")
+                return
+            # Names only. Types and value ranges stay one question away in chat,
+            # and the agent already has them in its own context every turn.
+            names = [attr.get("name") for attr in attrs_list if attr.get("name")]
+            shown = [f"`{n}`" for n in names[:ATTR_NAME_LIMIT]]
+            if len(names) > ATTR_NAME_LIMIT:
+                shown.append(f"... and {len(names) - ATTR_NAME_LIMIT} more")
+            lines.append(f"- **{label} ({len(names)}):** {', '.join(shown)}")
 
         format_attrs_md(node_attrs, "Node attributes")
         format_attrs_md(edge_attrs, "Edge attributes")
