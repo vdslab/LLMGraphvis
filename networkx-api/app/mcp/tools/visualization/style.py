@@ -1,4 +1,4 @@
-from typing import Annotated, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 from pydantic import Field
 from app.core.mcp import mcp
 from app.core.database import get_db_context
@@ -14,9 +14,10 @@ def visualization_set_node_color(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     attribute: Annotated[str, Field(description="Node attribute name to use for coloring (e.g., 'community', 'degree_centrality', 'country').")],
     scale_type: Annotated[str, Field(description="Color scale type: 'CATEGORICAL' (for text/discrete values), 'LINEAR' (for numeric ranges), or 'RANKING' (top-N rules).")],
-    mapping: Annotated[Optional[Dict[str, str]], Field(description="For CATEGORICAL: dict mapping attribute values to hex colors, e.g. {\"A\": \"#FF0000\"}. Auto-generated if omitted.")] = None,
-    gradient: Annotated[Optional[List[str]], Field(description="For LINEAR: list of [start_color, end_color] hex strings, e.g. [\"#C6DBEF\", \"#08306B\"].")] = None,
-    default_color: Annotated[str, Field(description="Fallback color for nodes with missing attribute values.")] = "#d3d3d3",
+    mapping: Annotated[Optional[Dict[str, str]], Field(description="For CATEGORICAL: dict mapping attribute values to hex colors, e.g. {\"A\": \"#FF0000\"}. Auto-generated from a 20-color palette if omitted.")] = None,
+    gradient: Annotated[Optional[List[str]], Field(description="For LINEAR: list of hex strings ordered from low value to high, e.g. [\"#C6DBEF\", \"#6BAED6\", \"#08306B\"].")] = None,
+    ranking_rules: Annotated[Optional[List[Dict[str, Any]]], Field(description="For RANKING: list of rules applied in order, each {\"top\": N, \"color\": \"#RRGGBB\"} — e.g. [{\"top\": 10, \"color\": \"#e15759\"}, {\"top\": 50, \"color\": \"#f28e2b\"}] colors the 10 highest-valued nodes red and the next 40 orange. Everything unmatched gets default_color. Use this for 'highlight the top N' requests, where position in the ordering matters more than the value itself.")] = None,
+    default_color: Annotated[str, Field(description="Fallback color for nodes with missing attribute values, or unmatched by any RANKING rule.")] = "#d3d3d3",
     fixed: Annotated[bool, Field(description="If True, only colors nodes whose value is in the mapping; others get default_color.")] = False
 ) -> dict:
     """
@@ -26,9 +27,13 @@ def visualization_set_node_color(
     Call `analysis_detect_communities` or `analysis_degree_centrality` first if needed.
 
     Examples:
-    - Color by community: attribute='community', scale_type='CATEGORICAL'
+    - Color by community: attribute='louvain_community', scale_type='CATEGORICAL'
     - Color by centrality: attribute='betweenness_centrality', scale_type='LINEAR', gradient=['#C6DBEF', '#08306B']
-    - Color by country: attribute='country', scale_type='CATEGORICAL'
+    - Highlight the top 10: attribute='pagerank', scale_type='RANKING', ranking_rules=[{'top': 10, 'color': '#e15759'}]
+
+    Report the returned `legend` mapping to the user using its exact hex codes.
+    To return colors to uniform, use `visualization_reset_style(target='node_color')` —
+    passing an empty mapping here does not clear anything.
 
     Returns:
         dict: The updated visualization object (nodes, links, legend).
@@ -41,6 +46,7 @@ def visualization_set_node_color(
             attribute=attribute,
             scale_type=scale_type.upper(),
             color_map=mapping,
+            ranking_rules=ranking_rules,
             default_color=default_color or "#d3d3d3",
             fixed_mapping=fixed,
             gradient=gradient

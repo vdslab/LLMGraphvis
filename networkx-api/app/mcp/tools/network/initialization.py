@@ -17,8 +17,11 @@ def network_import_graphml(
 ) -> dict:
     """
     Parses raw GraphML content and saves it to the database for the given network ID.
-    Does NOT generate a layout or visualization.
-    To get a usable visualization afterward, call `layout_forceatlas2` then `visualization_apply_layout`.
+
+    This is the import primitive: it does NOT compute a layout or render anything.
+    For a usable visualization, follow it with `layout_forceatlas2` (or any other
+    `layout_*` tool) and then `visualization_generate`. Keeping the three steps separate
+    lets you choose the layout and its parameters instead of taking a fixed default.
 
     Returns:
         dict: {"network_id": int, "content": str}
@@ -36,9 +39,20 @@ def network_initialize(
     graphml_data: Annotated[str, Field(description="The **raw XML string content** of the GraphML file (not a file path).")]
 ) -> dict:
     """
-    Initializes a network from GraphML data with a default ForceAtlas2 layout.
-    This is the recommended entry point: parses the GraphML, saves it to the DB,
-    calculates the default layout, and returns the initial visualization.
+    DEPRECATED — prefer the three explicit steps below.
+
+    Bundles three separate concerns into one call: parses and saves the GraphML, computes a
+    hardcoded ForceAtlas2 layout with no way to pass parameters, and renders. Because the
+    layout is fixed, a caller who wants any other layout pays for ForceAtlas2 first and
+    then recomputes.
+
+    Use instead:
+      1. `network_import_graphml(network_id, graphml_data)`
+      2. any `layout_*` tool, with whatever parameters suit the graph
+      3. `visualization_generate(network_id)`
+
+    Retained so existing callers keep working. The application's own upload pipeline
+    already uses the three-step form.
 
     Returns:
         dict: {"network_id": int, "network": dict, "content": str}

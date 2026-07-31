@@ -25,7 +25,7 @@ def recommend_visualization_prompt(network_id: int) -> str:
     return f"""Based on the data in network {network_id}, recommend a suitable visualization.
 
 1. Inspect the available data with `network_list_node_attributes` and `network_list_edge_attributes` (or the `network://{network_id}/attributes/nodes` resource).
-2. Choose a layout: `layout_forceatlas2` is a good default for revealing structure, especially on larger graphs; consider `layout_circular` or `layout_kamada_kawai` for small or highly structured graphs. Apply it with `visualization_apply_layout`.
+2. Choose a layout: `layout_forceatlas2` is a good default for revealing structure, especially on larger graphs; consider `layout_circular` or `layout_kamada_kawai` for small or highly structured graphs. Render it with `visualization_generate`.
 3. Propose meaningful encodings — e.g. color by a categorical attribute with `visualization_set_node_color`, size by a centrality attribute with `visualization_set_node_size` — and explain the reasoning before applying.
 """
 

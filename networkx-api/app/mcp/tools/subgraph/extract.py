@@ -21,13 +21,13 @@ def subgraph_ego_network(
     Ego networks are useful for exploring the local context of an important node
     (e.g., "show me everyone connected to node X within 2 hops").
     Use `node_search` first to find the center node ID.
-    After creation, call `visualization_switch_network(new_network_id)` to display.
+    The new subgraph becomes the active view automatically.
 
     Returns:
-        dict: {"network_id": int, "network": dict, "content": str}
+        dict: {"new_network_id": int, "content": str}
     """
     with get_db_context() as db:
-        from app.logic import subgraph, visualization_builder
+        from app.logic import subgraph
         result = subgraph.create_ego_network(
             source_network_id=network_id,
             center_node_id=center_node_id,
@@ -37,10 +37,8 @@ def subgraph_ego_network(
             description=f"Ego network of '{center_node_id}' (radius={radius})."
         )
         new_id = result["new_network_id"]
-        vis_data = visualization_builder.build_visualization(db, new_id)
         return {
-            "network_id": new_id,
-            "network": vis_data,
+            "new_network_id": new_id,
             "content": f"Ego network created (ID: {new_id}) centered on '{center_node_id}' (radius={radius})."
         }
 
@@ -60,13 +58,13 @@ def subgraph_community(
     by `analysis_detect_communities` (e.g. 'louvain_community', 'greedy_modularity_community') —
     it is NOT a fixed attribute called 'community'. The community_id corresponds to values
     of that attribute.
-    After creation, call `visualization_switch_network(new_network_id)` to display.
+    The new subgraph becomes the active view automatically.
 
     Returns:
-        dict: {"network_id": int, "network": dict, "content": str}
+        dict: {"new_network_id": int, "content": str}
     """
     with get_db_context() as db:
-        from app.logic import visualization_builder, filter as filter_logic
+        from app.logic import filter as filter_logic
         from app.schemas.filter import AttributeCondition
 
         condition = AttributeCondition(
@@ -82,10 +80,8 @@ def subgraph_community(
             description=f"Community '{community_id}' subgraph (attribute='{community_attribute}')."
         )
         new_id = result["new_network_id"]
-        vis_data = visualization_builder.build_visualization(db, new_id)
         return {
-            "network_id": new_id,
-            "network": vis_data,
+            "new_network_id": new_id,
             "content": f"Community subgraph created (ID: {new_id}) for community '{community_id}'."
         }
 
@@ -103,23 +99,21 @@ def subgraph_k_core(
     The k-core is the largest subgraph where every node has at least k connections to other nodes
     in the subgraph. Higher k = more tightly connected core. Useful for finding the most
     interconnected part of a network (e.g., the "inner circle" of a social network).
-    After creation, call `visualization_switch_network(new_network_id)` to display.
+    The new subgraph becomes the active view automatically.
 
     Returns:
-        dict: {"network_id": int, "network": dict, "content": str}
+        dict: {"new_network_id": int, "content": str}
     """
     with get_db_context() as db:
-        from app.logic import subgraph, visualization_builder
+        from app.logic import subgraph
         result = subgraph.create_k_core_subgraph(
             source_network_id=network_id,
             k=k,
             db=db,
             preserve_layout=preserve_layout
         )
-        vis_data = visualization_builder.build_visualization(db, result["new_network_id"])
         return {
-            "network_id": result["new_network_id"],
-            "network": vis_data,
+            "new_network_id": result["new_network_id"],
             "content": f"K-core subgraph created (ID: {result['new_network_id']}, k={k})."
         }
 
@@ -135,13 +129,13 @@ def subgraph_largest_component(
     Many real-world networks have isolated nodes or small disconnected islands.
     This tool filters them out, keeping only the main connected portion for analysis.
     Useful as a preprocessing step before running algorithms that require connectivity.
-    After creation, call `visualization_switch_network(new_network_id)` to display.
+    The new subgraph becomes the active view automatically.
 
     Returns:
-        dict: {"network_id": int, "network": dict, "content": str}
+        dict: {"new_network_id": int, "content": str}
     """
     with get_db_context() as db:
-        from app.logic import subgraph, visualization_builder
+        from app.logic import subgraph
         result = subgraph.create_largest_component_subgraph(
             source_network_id=network_id,
             db=db,
@@ -149,10 +143,8 @@ def subgraph_largest_component(
             description="Largest connected component of the network."
         )
         new_id = result["new_network_id"]
-        vis_data = visualization_builder.build_visualization(db, new_id)
         return {
-            "network_id": new_id,
-            "network": vis_data,
+            "new_network_id": new_id,
             "content": f"Largest component subgraph created (ID: {new_id})."
         }
 
@@ -169,13 +161,13 @@ def subgraph_high_degree_nodes(
     Useful for focusing on the most connected/active nodes in a network
     (e.g., "show only nodes with at least 5 connections"). Removes peripheral,
     low-degree nodes to reveal the backbone of the network.
-    After creation, call `visualization_switch_network(new_network_id)` to display.
+    The new subgraph becomes the active view automatically.
 
     Returns:
-        dict: {"network_id": int, "network": dict, "content": str}
+        dict: {"new_network_id": int, "content": str}
     """
     with get_db_context() as db:
-        from app.logic import subgraph, visualization_builder
+        from app.logic import subgraph
         result = subgraph.filter_nodes_by_degree(
             source_network_id=network_id,
             min_degree=min_degree,
@@ -184,9 +176,7 @@ def subgraph_high_degree_nodes(
             description=f"Nodes with degree >= {min_degree}."
         )
         new_id = result["new_network_id"]
-        vis_data = visualization_builder.build_visualization(db, new_id)
         return {
-            "network_id": new_id,
-            "network": vis_data,
+            "new_network_id": new_id,
             "content": f"High-degree subgraph created (ID: {new_id}, min_degree={min_degree})."
         }

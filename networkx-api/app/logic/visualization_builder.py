@@ -657,6 +657,49 @@ def get_current_visualization(db: Session, network_id: int) -> Dict[str, Any]:
 
 
 
+# Style channels that can be reset, mapped to the column holding their config.
+RESETTABLE_STYLE_TARGETS = {
+    "node_color": "last_node_color_config",
+    "node_size": "last_node_size_config",
+    "node_label": "last_node_label_config",
+    "edge_color": "last_edge_color_config",
+    "edge_width": "last_edge_width_config",
+}
+
+
+def reset_style(db: Session, network_id: int, targets: List[str]) -> List[str]:
+    """Clear the stored configuration for the named style channels.
+
+    Needed because the preserve-state mechanism is one-way: `_save_state` only
+    writes a config when it is not None and `validate_and_prepare` reloads any
+    config the caller omitted, so there is no argument to any `visualization_set_*`
+    tool that returns a channel to its default. The column has to be NULLed.
+
+    Returns the channels that were actually cleared (i.e. had a config set).
+    """
+    network = db.query(models.Network).filter(models.Network.id == network_id).first()
+    if not network:
+        raise ValueError(f"Network {network_id} not found.")
+
+    unknown = [t for t in targets if t not in RESETTABLE_STYLE_TARGETS]
+    if unknown:
+        raise ValueError(
+            f"Unknown style target(s): {', '.join(unknown)}. "
+            f"Valid targets: {', '.join(sorted(RESETTABLE_STYLE_TARGETS))}."
+        )
+
+    cleared = []
+    for target in targets:
+        column = RESETTABLE_STYLE_TARGETS[target]
+        if getattr(network, column) is not None:
+            setattr(network, column, None)
+            cleared.append(target)
+
+    if cleared:
+        db.commit()
+    return cleared
+
+
 def build_visualization(
     db: Session,
     network_id: int,
