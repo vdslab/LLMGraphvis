@@ -6,10 +6,9 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 
-from common import models
 from app.core.logging import get_logger
 
-from . import local_tools, mcp_client
+from . import emitters, hooks, local_tools, mcp_client
 from .catalog import DEFAULT_PROVIDER
 from .prompts import build_system_instruction
 from .providers.base import LLMProvider
@@ -29,6 +28,12 @@ load_dotenv()
 
 # Max ReAct loop iterations per turn (each iteration = one LLM generate() call).
 AGENT_MAX_ITERATIONS = int(os.getenv("AGENT_MAX_ITERATIONS") or 10)
+
+# Register the builtin hooks once per process. Behaviour that used to be
+# hardcoded in this module (auto-rendering, network switching, network_id
+# injection, the stalled-intent nudge, the forced summary) now lives in
+# hooks/builtin/ and is dispatched from the loop below.
+hooks.load_builtin_hooks()
 
 
 def _truncate_tool_result(result: Any, max_list_items: int = 15) -> Any:
@@ -107,39 +112,6 @@ class GraphVisAgent:
 
         return text_content, thought_content, function_calls, usage
 
-    async def _check_and_handle_lazy_intent(
-        self,
-        text_content: str,
-        history: List[LLMMessage],
-        loop_context: Dict[str, Any],
-        queue: Any,
-        all_tools: List[ToolDefinition],
-        session: Any,
-    ) -> bool:
-        """
-        Detects if the model expressed intent to use a tool but didn't call it.
-        If so, injects a user prompt to force the tool call.
-        """
-        keywords = ["visualize", "calculate", "import", "update", "change"]
-        lower_text = text_content.lower()
-
-        intent_detected = any(
-            kw in lower_text and ("will" in lower_text or "let me" in lower_text)
-            for kw in keywords
-        )
-
-        if intent_detected:
-            logger.info(f"Lazy intent detected in text: '{text_content[:50]}...'")
-            model_text = text_content if text_content else "I will now proceed."
-            history.append(LLMMessage(role="model", parts=[LLMTextPart(text=model_text)]))
-            history.append(LLMMessage(
-                role="user",
-                parts=[LLMTextPart(text="Please proceed with the action you described.")],
-            ))
-            return True
-
-        return False
-
     async def process_turn(
         self,
         history: List[LLMMessage],
@@ -147,6 +119,7 @@ class GraphVisAgent:
         chat_id: int,
         network_id: int,
         context_summary: str = "",
+        user_text: str = "",
     ) -> Tuple[str, List[Dict[str, Any]], UsageData]:
         """
         Orchestrates a single turn of the agent (User Input -> [Thoughts/Actions] -> Final Response).
@@ -157,14 +130,33 @@ class GraphVisAgent:
         """
         logger.info(f"Starting agent turn for Chat ID: {chat_id}, Network ID: {network_id}")
 
-        # Fix the system prompt for this turn: the network context summary is
-        # appended once here so every generate() call in the loop shares the
-        # exact same system instruction (keeps provider prompt caching intact).
+        # Per-turn state shared by every hook in this turn (counters, abort flag,
+        # the active network id). Created once here and threaded through.
+        turn_state = hooks.new_turn_state(AGENT_MAX_ITERATIONS)
+        turn_state["network_id"] = network_id
+
+        # Fix the system prompt for this turn: the network context summary and
+        # any hook-contributed blocks are appended once here so every generate()
+        # call in the loop shares the exact same system instruction (keeps
+        # provider prompt caching intact).
         base_instruction = build_system_instruction(self.provider.supports_native_thinking)
+
+        start_ctx = hooks.build_context(
+            hooks.HookEvent.TURN_START,
+            chat_id=chat_id,
+            network_id=network_id,
+            turn_state=turn_state,
+            db=self.db,
+            queue=queue,
+            user_text=user_text,
+        )
+        hook_blocks = await hooks.registry.run_turn_start(start_ctx)
+
+        sections = [base_instruction]
         if context_summary:
-            self.system_instruction = f"{base_instruction}\n\n---\n\n{context_summary}"
-        else:
-            self.system_instruction = base_instruction
+            sections.append(context_summary)
+        sections.extend(hook_blocks)
+        self.system_instruction = "\n\n---\n\n".join(sections)
 
         # 1. Prepare Tools
         all_tools = await self._get_all_tools()
@@ -185,8 +177,20 @@ class GraphVisAgent:
                 chat_id=chat_id,
                 network_id=network_id,
                 session=session,
+                turn_state=turn_state,
             )
-            return final_text, execution_log, total_usage
+
+        end_ctx = hooks.build_context(
+            hooks.HookEvent.TURN_END,
+            chat_id=chat_id,
+            network_id=turn_state.get("network_id") or network_id,
+            turn_state=turn_state,
+            db=self.db,
+            queue=queue,
+        )
+        await hooks.registry.run_turn_end(end_ctx)
+
+        return final_text, execution_log, total_usage
 
     async def _execute_tool_loop(
         self,
@@ -197,21 +201,26 @@ class GraphVisAgent:
         chat_id: int,
         network_id: int,
         session: Any,
+        turn_state: Optional[Dict[str, Any]] = None,
     ) -> Tuple[str, List[Dict[str, Any]], UsageData]:
         """Manages the ReAct loop: Consumption -> Execution -> Observation -> Next Generation."""
         current_stream = initial_stream
         max_iterations = AGENT_MAX_ITERATIONS
         iteration = 0
 
+        if turn_state is None:
+            turn_state = hooks.new_turn_state(max_iterations)
+            turn_state["network_id"] = network_id
+
         full_transcript = ""
         execution_log = []
-        loop_context = {"network_id": network_id, "tools_executed": False}
         tool_call_counter = 0
         total_usage = UsageData()
         provider_name = self.provider_name
 
         while iteration < max_iterations:
             iteration += 1
+            turn_state["iteration"] = iteration
 
             # Step A: Consume Stream
             chunk_text, chunk_thought, function_calls, iter_usage = await self._consume_stream(
@@ -233,26 +242,36 @@ class GraphVisAgent:
 
             # Step B: Check for Completion or Tool Calls
             if not function_calls:
-                if await self._check_and_handle_lazy_intent(
-                    full_transcript, history, loop_context, queue, all_tools, session
-                ):
-                    logger.info("Lazy Intent detected. Retrying generation...")
-                    current_stream = self.provider.generate(history, all_tools, self.system_instruction)
-                    continue
+                # The turn is about to end. Hooks get one chance to say it should
+                # not: an announced-but-unexecuted action, or tool work with no
+                # closing report. See hooks/builtin/intent.py.
+                no_call_ctx = hooks.build_context(
+                    hooks.HookEvent.NO_TOOL_CALLS,
+                    chat_id=chat_id,
+                    network_id=turn_state.get("network_id") or network_id,
+                    turn_state=turn_state,
+                    db=self.db,
+                    queue=queue,
+                    session=session,
+                    assistant_text=chunk_text,
+                    thought_text=chunk_thought,
+                )
+                continuation = await hooks.registry.run_no_tool_calls(no_call_ctx)
 
-                has_text = bool(chunk_text.strip())
-
-                if loop_context.get("tools_executed", False) and not has_text:
-                    logger.info("Tools executed but no final text. Forcing summary generation.")
-                    model_text = f"<thought>{chunk_thought}</thought>" if chunk_thought else "I have executed the tools."
-                    history.append(LLMMessage(role="model", parts=[LLMTextPart(text=model_text)]))
-                    summary_request = (
-                        "The actions have been completed. Please provide a concise final report "
-                        "summarizing what was done (e.g., 'Layout updated', 'Metrics calculated') "
-                        "and any relevant findings."
+                if continuation:
+                    turn_state["continuation"] = None
+                    turn_state["continuations_granted"] = (
+                        turn_state.get("continuations_granted", 0) + 1
+                    )
+                    logger.info(
+                        f"Continuation requested by {continuation.get('requested_by')}; regenerating"
                     )
                     history.append(LLMMessage(
-                        role="user", parts=[LLMTextPart(text=summary_request)]
+                        role="model",
+                        parts=[LLMTextPart(text=continuation["model_text"] or "I will now proceed.")],
+                    ))
+                    history.append(LLMMessage(
+                        role="user", parts=[LLMTextPart(text=continuation["prompt"])]
                     ))
                     current_stream = self.provider.generate(history, all_tools, self.system_instruction)
                     continue
@@ -264,7 +283,7 @@ class GraphVisAgent:
 
             # Step C: Execute Tools (Parallelized)
             step_log = await self._execute_tools_and_update_history(
-                function_calls, chunk_text, chunk_thought, history, queue, chat_id, loop_context, session
+                function_calls, chunk_text, chunk_thought, history, queue, chat_id, turn_state, session
             )
             execution_log.append(step_log)
 
@@ -276,7 +295,18 @@ class GraphVisAgent:
                     await self._emit_message_chunk(queue, marker)
                     tool_call_counter += 1
 
-            # Step E: Next Generation
+            # Step E: Honour an abort requested by a hook (e.g. repeated failures
+            # of the same tool) before spending another generate() call.
+            if turn_state.get("should_abort"):
+                reason = turn_state.get("abort_reason") or "the agent stopped early"
+                logger.warning(f"Turn aborted after iteration {iteration}: {reason}")
+                abort_note = (
+                    f"\n\nI stopped before completing the request: {reason}"
+                )
+                await self._emit_message_chunk(queue, abort_note)
+                return full_transcript + abort_note, execution_log, total_usage
+
+            # Step F: Next Generation
             logger.info(f"--- LLM API Request (Iteration {iteration}) ---")
             self._log_history(history, iteration)
             current_stream = self.provider.generate(history, all_tools, self.system_instruction)
@@ -298,11 +328,10 @@ class GraphVisAgent:
         history: List[LLMMessage],
         queue: Any,
         chat_id: int,
-        loop_context: Dict[str, Any],
+        turn_state: Dict[str, Any],
         session: Any,
     ) -> Dict[str, Any]:
         """Executes tools in PARALLEL, updates history, and returns a step log."""
-        from datetime import datetime
 
         # Model turn parts: optional text/thought prefix followed by function call parts
         model_parts = []
@@ -321,9 +350,6 @@ class GraphVisAgent:
             "tool_calls": [],
         }
 
-        if function_calls:
-            loop_context["tools_executed"] = True
-
         # Build model parts and task list
         tasks = []
         for fc in function_calls:
@@ -331,7 +357,7 @@ class GraphVisAgent:
             step_record["tool_calls"].append({"name": fc.name, "args": fc.args})
             tasks.append(
                 self._run_tool_with_events(
-                    fc.name, fc.args, chat_id, loop_context["network_id"], session, queue
+                    fc.name, fc.args, chat_id, session, queue, turn_state
                 )
             )
 
@@ -343,10 +369,25 @@ class GraphVisAgent:
         for i, (result, status, error_msg, feature_name, started_at, completed_at) in enumerate(results):
             call_id = function_calls[i].call_id
 
-            if status == "completed":
-                await self._handle_side_effects(
-                    feature_name, result, chat_id, queue, loop_context, session
-                )
+            # POST_TOOL / TOOL_ERROR run sequentially here, after every tool in
+            # this batch has returned, so a hook that switches the active network
+            # cannot race the other calls of the same batch.
+            event = (
+                hooks.HookEvent.POST_TOOL
+                if status == "completed"
+                else hooks.HookEvent.TOOL_ERROR
+            )
+            await self._dispatch_tool_hooks(
+                event,
+                tool_name=feature_name,
+                args=function_calls[i].args,
+                result=result,
+                error=error_msg,
+                chat_id=chat_id,
+                session=session,
+                queue=queue,
+                turn_state=turn_state,
+            )
 
             truncated_result = _truncate_tool_result(result)
 
@@ -368,16 +409,51 @@ class GraphVisAgent:
 
         return step_record
 
+    async def _dispatch_tool_hooks(
+        self,
+        event: "hooks.HookEvent",
+        *,
+        tool_name: str,
+        args: Dict[str, Any],
+        chat_id: int,
+        session: Any,
+        queue: Any,
+        turn_state: Dict[str, Any],
+        result: Any = None,
+        error: Optional[str] = None,
+    ) -> Any:
+        """Build a HookContext for a tool-scoped event and run the matching hooks."""
+        ctx = hooks.build_context(
+            event,
+            chat_id=chat_id,
+            network_id=turn_state.get("network_id") or 0,
+            turn_state=turn_state,
+            db=self.db,
+            queue=queue,
+            session=session,
+            tool_name=tool_name,
+            args=args,
+            result=result,
+            error=error,
+        )
+        if event is hooks.HookEvent.PRE_TOOL:
+            return await hooks.registry.run_pre_tool(ctx)
+        if event is hooks.HookEvent.POST_TOOL:
+            return await hooks.registry.run_post_tool(ctx)
+        if event is hooks.HookEvent.TOOL_ERROR:
+            return await hooks.registry.run_tool_error(ctx)
+        raise ValueError(f"{event} is not a tool-scoped hook event")
+
     async def _run_tool_with_events(
         self,
         feature_name: str,
         args: Dict[str, Any],
         chat_id: int,
-        network_id: int,
         session: Any,
         queue: Any,
+        turn_state: Dict[str, Any],
     ) -> Tuple[Any, str, Optional[str], str, Any, Any]:
-        """Wrapper to emit events and execute a single tool.
+        """Run PRE_TOOL hooks, then the tool, emitting SSE events around it.
         Returns (result, status, error_msg, feature_name, started_at, completed_at).
         """
         from datetime import datetime, timezone
@@ -385,9 +461,51 @@ class GraphVisAgent:
         started_at = datetime.now(timezone.utc)
         await self._emit_tool_event(queue, feature_name, "started", args)
 
-        result, status, error_msg = await self._run_tool(
-            feature_name, args, chat_id, network_id, session
+        decision = await self._dispatch_tool_hooks(
+            hooks.HookEvent.PRE_TOOL,
+            tool_name=feature_name,
+            args=dict(args),
+            chat_id=chat_id,
+            session=session,
+            queue=queue,
+            turn_state=turn_state,
         )
+
+        if decision.action == "deny":
+            # Not an exception: the refusal is handed back as the tool result so
+            # the model reads the reason and can correct itself next iteration.
+            turn_state["tools_blocked"] = turn_state.get("tools_blocked", 0) + 1
+            reason = decision.reason or "This call was blocked by a policy hook."
+            logger.info(f"Tool '{feature_name}' blocked by {decision.hook_name}: {reason}")
+            completed_at = datetime.now(timezone.utc)
+            await self._emit_tool_event(queue, feature_name, "failed", reason)
+            return (
+                {"error": reason, "blocked_by": decision.hook_name},
+                "failed",
+                reason,
+                feature_name,
+                started_at,
+                completed_at,
+            )
+
+        effective_args = args
+        modification_note = None
+        if decision.action == "modify" and decision.args is not None:
+            turn_state["tools_modified"] = turn_state.get("tools_modified", 0) + 1
+            effective_args = decision.args
+            modification_note = decision.reason
+
+        result, status, error_msg = await self._run_tool(
+            feature_name, effective_args, chat_id, session, turn_state
+        )
+
+        # Tell the model when its arguments were adjusted, so it reports what
+        # actually ran rather than what it asked for.
+        if modification_note and status == "completed":
+            if isinstance(result, dict):
+                result = {**result, "_adjusted_arguments": modification_note}
+            else:
+                result = {"result": result, "_adjusted_arguments": modification_note}
 
         completed_at = datetime.now(timezone.utc)
         await self._emit_tool_event(queue, feature_name, status, error_msg)
@@ -399,17 +517,19 @@ class GraphVisAgent:
         function_name: str,
         args: Dict[str, Any],
         chat_id: int,
-        network_id: int,
         session: Any,
+        turn_state: Optional[Dict[str, Any]] = None,
     ) -> Tuple[Any, str, Optional[str]]:
-        """Actual execution wrapper."""
+        """Actual execution wrapper.
+
+        `network_id` defaulting used to happen here; it is now the
+        `normalize_network_id` PRE_TOOL hook.
+        """
         try:
-            if function_name in ["switch_to_main_network", "switch_to_parent_network"]:
-                context = {"chat_id": chat_id, "db": self.db}
+            if local_tools.is_local_tool(function_name):
+                context = {"chat_id": chat_id, "db": self.db, "turn_state": turn_state or {}}
                 result = await local_tools.execute_local_tool(function_name, args, context)
             else:
-                if "network_id" not in args and network_id:
-                    args["network_id"] = network_id
                 result = await mcp_client.execute_tool(function_name, args, session=session)
 
             return result, "completed", None
@@ -417,112 +537,29 @@ class GraphVisAgent:
             logger.exception(f"Tool execution failed: {e}")
             return {"error": str(e)}, "failed", str(e)
 
-    async def _handle_side_effects(
-        self,
-        function_name: str,
-        result: Any,
-        chat_id: int,
-        queue: Any,
-        loop_context: Dict[str, Any],
-        session: Any,
-    ):
-        """Handles visualization updates and network ID switching."""
-        if not isinstance(result, dict):
-            return
-
-        current_network_id = loop_context["network_id"]
-
-        if "new_network_id" in result and result["new_network_id"] != current_network_id:
-            new_id = result["new_network_id"]
-            logger.info(f"Context switch: {current_network_id} -> {new_id}")
-            vis_data = await self._auto_generate_visualization(new_id, queue, session)
-            self._update_chat_state(chat_id, network_id=new_id, vis_data=vis_data)
-            loop_context["network_id"] = new_id
-            return
-
-        if function_name in ["node_update_label"]:
-            await self._auto_generate_visualization(current_network_id, queue, session)
-            return
-
-        vis_data = None
-        if isinstance(result, dict):
-            if "nodes" in result and "links" in result:
-                vis_data = result
-            elif function_name == "initialize_network" and "network" in result:
-                vis_data = result["network"]
-
-        if vis_data:
-            await self._emit_render_update(queue, vis_data)
-            self._update_chat_state(chat_id, vis_data=vis_data)
-
-    async def _auto_generate_visualization(self, network_id: int, queue: Any, session: Any) -> Optional[Dict]:
-        """Triggers visualization generation for a new network context."""
-        try:
-            vis_data = await mcp_client.execute_tool(
-                "visualization_generate", {"network_id": network_id}, session=session
-            )
-            if isinstance(vis_data, dict) and "nodes" in vis_data:
-                await self._emit_render_update(queue, vis_data)
-                return vis_data
-        except Exception as e:
-            logger.error(f"Auto-vis failed for {network_id}: {e}")
-            return None
-
     async def _get_all_tools(self) -> List[ToolDefinition]:
         mcp_tools = await mcp_client.get_tools()
         local_tool_defs = local_tools.get_local_tools()
         return mcp_tools + local_tool_defs
 
+    # Emission is shared with the hooks (which have a queue but no agent
+    # instance), so the event shapes live in emitters.py. These stay as methods
+    # because the loop reads more clearly with them.
+
     async def _emit_message_chunk(self, queue: Any, text: str):
-        await queue.put(
-            {"event": "message_chunk", "data": json.dumps({"content": text})}
-        )
+        await emitters.emit_message_chunk(queue, text)
 
     async def _emit_thinking_chunk(self, queue: Any, text: str):
-        await queue.put(
-            {"event": "thinking_stream", "data": json.dumps({"content": text})}
-        )
+        await emitters.emit_thinking_chunk(queue, text)
 
     async def _emit_tool_event(self, queue: Any, tool: str, status: str, args_or_error: Any):
-        data = {"tool": tool, "status": status}
-        if status == "started":
-            data["args"] = args_or_error
-        else:
-            data["error"] = args_or_error
-        await queue.put({"event": "tool_execution", "data": json.dumps(data)})
+        await emitters.emit_tool_event(queue, tool, status, args_or_error)
 
     async def _emit_render_update(self, queue: Any, vis_data: Dict):
-        await queue.put({"event": "render_update", "data": json.dumps(vis_data)})
+        await emitters.emit_render_update(queue, vis_data)
 
     async def _emit_usage_update(self, queue: Any, usage: UsageData, provider_name: str, model_name: str):
-        from .pricing import estimate_cost_usd
-        cost = estimate_cost_usd(
-            model_name,
-            usage.input_tokens,
-            usage.output_tokens,
-            usage.cached_input_tokens,
-            provider=provider_name,
-        )
-        await queue.put({"event": "usage_update", "data": json.dumps({
-            "input_tokens": usage.input_tokens,
-            "output_tokens": usage.output_tokens,
-            "cached_input_tokens": usage.cached_input_tokens,
-            "estimated_cost_usd": cost,
-            "provider": provider_name,
-            "model": model_name,
-        })})
-
-    def _update_chat_state(self, chat_id: int, network_id: int = None, vis_data: Dict = None):
-        """Helper to update chat state in DB."""
-        if not self.db:
-            return
-        chat = self.db.query(models.Chat).filter(models.Chat.id == chat_id).first()
-        if chat:
-            if network_id is not None:
-                chat.network_id = network_id
-            if vis_data is not None:
-                chat.visualization_state = vis_data
-            self.db.commit()
+        await emitters.emit_usage_update(queue, usage, provider_name, model_name)
 
     def _log_history(self, history: List[LLMMessage], iteration: int):
         """Helper to log the exact data being sent to the LLM context.

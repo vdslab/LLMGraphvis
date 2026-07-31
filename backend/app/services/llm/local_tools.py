@@ -87,6 +87,67 @@ async def switch_to_parent_network(chat_id: int, db: Session) -> dict:
         return {"content": f"Failed to switch to parent network: {str(e)}"}
 
 
+async def skill_load(name: str, turn_state: dict) -> dict:
+    """
+    Loads the full text of a skill (a stored procedure for one kind of task).
+
+    The system prompt lists only skill names and one-line descriptions; the
+    procedures themselves are fetched through this tool so a turn only pays for
+    what it actually needs.
+    """
+    from .skills import registry as skill_registry
+
+    skill = skill_registry.get(name)
+    if not skill:
+        available = ", ".join(skill_registry.names()) or "(none)"
+        return {
+            "error": f"No skill named '{name}'. Available skills: {available}.",
+        }
+
+    loaded = turn_state.setdefault("skills_loaded", [])
+    if skill.name not in loaded:
+        loaded.append(skill.name)
+
+    logger.info(f"Skill loaded: {skill.name}")
+    return {
+        "skill": skill.name,
+        "description": skill.description,
+        "related_tools": skill.related_tools,
+        "content": skill.body,
+    }
+
+
+def _skill_load_definition() -> ToolDefinition:
+    """Build the tool schema, naming the real skills in the description.
+
+    Enumerating them here means the model sees valid values in the schema
+    itself, not only in the prompt's index block.
+    """
+    from .skills import registry as skill_registry
+
+    names = skill_registry.names()
+    listed = ", ".join(names) if names else "none loaded"
+    return ToolDefinition(
+        name="skill_load",
+        description=(
+            "Load the full procedure for a stored skill before carrying out that kind of "
+            "task. Returns Markdown instructions you must then follow. "
+            f"Available skills: {listed}."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "description": "The skill name, exactly as listed in the Skills index.",
+                    **({"enum": names} if names else {}),
+                }
+            },
+            "required": ["name"],
+        },
+    )
+
+
 def get_local_tools() -> list[ToolDefinition]:
     """Returns the list of local tools as provider-agnostic ToolDefinitions."""
     return [
@@ -100,7 +161,18 @@ def get_local_tools() -> list[ToolDefinition]:
             description="Switches the chat context to the parent network of the current subgraph. Use this when the user wants to go up one level in the hierarchy.",
             parameters={"type": "object", "properties": {}, "required": []},
         ),
+        _skill_load_definition(),
     ]
+
+
+# Tools handled in-process rather than over MCP. The engine routes on this.
+LOCAL_TOOL_NAMES = frozenset(
+    {"switch_to_main_network", "switch_to_parent_network", "skill_load"}
+)
+
+
+def is_local_tool(tool_name: str) -> bool:
+    return tool_name in LOCAL_TOOL_NAMES
 
 
 async def execute_local_tool(tool_name: str, arguments: dict, context: dict):
@@ -112,5 +184,7 @@ async def execute_local_tool(tool_name: str, arguments: dict, context: dict):
         return await switch_to_main_network(chat_id, db)
     elif tool_name == "switch_to_parent_network":
         return await switch_to_parent_network(chat_id, db)
+    elif tool_name == "skill_load":
+        return await skill_load(arguments.get("name", ""), context.get("turn_state") or {})
     else:
         raise ValueError(f"Unknown local tool: {tool_name}")

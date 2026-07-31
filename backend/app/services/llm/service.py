@@ -68,6 +68,7 @@ async def process_chat(
             chat_id=chat_id,
             network_id=network_id,
             context_summary=context_summary,
+            user_text=user_message,
         )
 
         return final_response_text, execution_log, total_usage, agent.provider_name, agent.provider.model_name
