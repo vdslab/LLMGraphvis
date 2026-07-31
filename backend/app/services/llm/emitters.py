@@ -17,7 +17,28 @@ async def emit_message_chunk(queue: Any, text: str) -> None:
 
 
 async def emit_thinking_chunk(queue: Any, text: str) -> None:
+    """Model reasoning, and only that.
+
+    The frontend renders this stream under a "Thinking" heading, so anything
+    that is not the model reasoning — a fixed pipeline step, a status line —
+    must go through emit_progress instead. See PROGRESS_BLOCK_TAG.
+    """
     await queue.put({"event": "thinking_stream", "data": json.dumps({"content": text})})
+
+
+async def emit_progress(queue: Any, label: str, status: str = "running") -> None:
+    """Report a step of work the backend is doing on the user's behalf.
+
+    `status` is "running" or "done"; a new "running" step implicitly completes
+    the previous one. This is deliberately not thinking_stream: these labels are
+    written by us, not by the model.
+    """
+    await queue.put(
+        {
+            "event": "progress",
+            "data": json.dumps({"label": label, "status": status}),
+        }
+    )
 
 
 async def emit_tool_event(

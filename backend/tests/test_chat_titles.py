@@ -230,7 +230,7 @@ async def test_upload_names_chat_after_the_file(
         "app.core.database.SessionLocal"
     ) as mock_session_cls:
         mock_exec.return_value = {"network_id": network_id, "nodes": [], "links": []}
-        mock_overview.return_value = ""
+        mock_overview.return_value = ("", "")
         mock_queue = AsyncMock()
         mock_get_queue.return_value = mock_queue
 
@@ -241,7 +241,20 @@ async def test_upload_names_chat_after_the_file(
         mock_chat.network_id = network_id
         mock_chat.name = initial_name
         mock_chat.name_is_custom = name_is_custom
-        mock_db.query.return_value.filter.return_value.first.return_value = mock_chat
+        # The upload names the network as well as the chat, so the two rows
+        # must be told apart — one shared mock would let the network rename
+        # satisfy the chat's placeholder check.
+        mock_network = MagicMock()
+        mock_network.name = f"{initial_name} Network"
+
+        def route_query(model):
+            query = MagicMock()
+            query.filter.return_value.first.return_value = (
+                mock_network if model is models.Network else mock_chat
+            )
+            return query
+
+        mock_db.query.side_effect = route_query
 
         await chat_service.handle_upload_background(
             chat_id, network_id, "<graphml></graphml>", "karate_club.graphml"

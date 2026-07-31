@@ -8,6 +8,8 @@ from app.core import database
 from app.core.logging import get_logger
 from app.services import llm as llm_service
 from app.services.llm import context as llm_context
+from app.services.llm import emitters
+from app.services.llm import markup
 from app.services.llm import mcp_client
 from app.services.llm import titles
 
@@ -76,6 +78,38 @@ async def _maybe_autoname_chat(
         logger.warning(f"Failed to auto-name chat {chat_id}: {e}")
 
 
+def _name_network_after_file(network_id: int, filename: Optional[str]) -> None:
+    """Replace a network's placeholder name with one taken from the upload.
+
+    A network is created as "<chat name> Network" before anything is uploaded
+    to it, so an untouched chat leaves it called "New Chat Network" — a name
+    that then reads, in the overview and in the agent's context, as though it
+    were the graph's own. Only that placeholder shape is overwritten.
+    """
+    file_name = titles.name_from_filename(filename)
+    if not file_name:
+        return
+
+    db = database.SessionLocal()
+    try:
+        network = (
+            db.query(models.Network).filter(models.Network.id == network_id).first()
+        )
+        if not network:
+            return
+        current = (network.name or "").removesuffix(" Network")
+        if not titles.is_placeholder_name(current):
+            return
+        network.name = file_name
+        db.commit()
+        logger.info(f"Named network {network_id} after the upload: {file_name!r}")
+    except Exception as e:
+        logger.warning(f"Could not name network {network_id}: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
 async def _handle_background_error(chat_id: int, e: Exception, message: str) -> None:
     logger.exception(f"{message}: {e}")
     queue = await llm_service.get_event_queue(chat_id)
@@ -117,14 +151,20 @@ async def handle_upload_background(
     )
     
     queue = await llm_service.get_event_queue(chat_id)
-    
+
+    # Fixed pipeline steps, reported as `progress` events rather than
+    # `thinking_stream`: no model reasoning happens during an upload, and
+    # labelling these as the agent's thoughts is simply untrue.
+    steps: list[str] = []
+
+    async def step(label: str) -> None:
+        steps.append(label)
+        await emitters.emit_progress(queue, label, status="running")
+
     try:
         # Step 1: Import
-        thoughts = []
-        msg = "Importing GraphML data..."
-        thoughts.append(msg)
-        await queue.put({"event": "thinking_stream", "data": json.dumps({"content": msg + "\n"})})
-        
+        await step("Importing GraphML data")
+
         import_result = await mcp_client.execute_tool(
             "network_import_graphml",
             {"network_id": network_id, "graphml_data": graphml_data},
@@ -137,11 +177,13 @@ async def handle_upload_background(
         if final_network_id is None:
              raise ValueError("Import tool did not return a valid network_id")
 
+        # Before the overview is built, so it reports the file's name and not
+        # the placeholder the network was created with.
+        _name_network_after_file(final_network_id, filename)
+
         # Step 2: Layout
-        msg = "Calculating ForceAtlas2 layout..."
-        thoughts.append(msg)
-        await queue.put({"event": "thinking_stream", "data": json.dumps({"content": msg + "\n"})})
-        
+        await step("Calculating ForceAtlas2 layout")
+
         layout_result = await mcp_client.execute_tool(
             "layout_forceatlas2",
             {"network_id": final_network_id}
@@ -152,10 +194,8 @@ async def handle_upload_background(
              raise ValueError(layout_result)
 
         # Step 3: Visualization
-        msg = "Generating initial visualization..."
-        thoughts.append(msg)
-        await queue.put({"event": "thinking_stream", "data": json.dumps({"content": msg + "\n"})})
-        
+        await step("Generating initial visualization")
+
         vis_data = await mcp_client.execute_tool(
             "visualization_generate",
             {"network_id": final_network_id}
@@ -168,11 +208,13 @@ async def handle_upload_background(
         # Step 4: Inspect the uploaded data (fixed step, not an LLM tool call).
         # Reads the network's structure/attributes directly so the user can see
         # what the data contains before sending their first message.
-        msg = "Inspecting uploaded data..."
-        thoughts.append(msg)
-        await queue.put({"event": "thinking_stream", "data": json.dumps({"content": msg + "\n"})})
+        await step("Inspecting uploaded data")
 
-        data_overview = await llm_context.build_data_overview(final_network_id)
+        overview_title, data_overview = await llm_context.build_data_overview(
+            final_network_id
+        )
+
+        await emitters.emit_progress(queue, steps[-1], status="done")
 
         # Update Chat record with new network_id (if changed) and visualization_state
         # Use a fresh session for this background operation
@@ -206,18 +248,17 @@ async def handle_upload_background(
                         chat.name = file_name
                         renamed_to = file_name
 
-                # Persist the success message with thoughts, including the data
-                # overview so the contents are visible before the first message.
-                full_thought = "\n".join(thoughts)
-                success_line = "Graph uploaded and initialized successfully."
+                # Persist the success message with the step log, plus the data
+                # overview folded behind a one-line summary so the contents are
+                # available before the first message without filling the panel.
+                parts = [
+                    markup.steps_block(steps),
+                    "Graph uploaded and initialized successfully.",
+                ]
                 if data_overview:
-                    final_content = (
-                        f"<thought>{full_thought}</thought>\n\n"
-                        f"{success_line}\n\n{data_overview}"
-                    )
-                else:
-                    final_content = f"<thought>{full_thought}</thought>\n\n{success_line}"
-                
+                    parts.append(markup.collapsible(overview_title, data_overview))
+                final_content = "\n\n".join(part for part in parts if part)
+
                 db_msg = models.ChatMessage(
                     chat_id=chat_id,
                     role="model",

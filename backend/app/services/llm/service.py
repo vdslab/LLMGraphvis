@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from common import models
 from app.core.logging import get_logger
 
-from . import engine, events, history, local_tools, mcp_client, context
+from . import engine, emitters, events, history, local_tools, mcp_client, context
 from .providers.types import UsageData
 
 logger = get_logger(__name__)
@@ -51,13 +51,9 @@ async def process_chat(
         except Exception as e:
             logger.warning(f"Failed to build context summary: {e}")
 
-        # Notify thinking start
-        await queue.put(
-            {
-                "event": "thinking_stream",
-                "data": json.dumps({"content": "Analyzing your request..."}),
-            }
-        )
+        # Tell the UI the turn has started. This is our status line, not the
+        # model's reasoning, so it goes out as `progress` — see emitters.py.
+        await emitters.emit_progress(queue, "Analyzing your request")
 
         # 2. Delegate to GraphVisAgent, honoring this chat's pinned provider/model (if any)
         agent = engine.GraphVisAgent(db, provider_name=chat.provider, model_name=chat.model)

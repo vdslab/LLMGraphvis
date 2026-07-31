@@ -56,49 +56,77 @@ def _patch_resources(metadata=METADATA, structure=STRUCTURE, nodes=None, edges=N
 @pytest.mark.asyncio
 async def test_overview_reports_name_size_and_attributes():
     with _patch_resources():
-        overview = await context.build_data_overview(1)
+        title, body = await context.build_data_overview(1)
 
-    assert "**Name:** Concerts" in overview
-    assert "**Size:** 1144 nodes, 8608 edges" in overview
-    assert "**Node attributes (2):** `composer`, `birthYear`" in overview
-    assert "**Edge attributes (1):** `weight`" in overview
-    assert "none" not in overview
+    assert title == "Uploaded network — Concerts — 1144 nodes, 8608 edges"
+    assert "**Name:** Concerts" in body
+    assert "**Size:** 1144 nodes, 8608 edges" in body
+    assert "**Node attributes (2):**" in body
+    assert "`composer`" in body and "`birthYear`" in body
+    assert "**Edge attributes (1):**" in body
 
 
 @pytest.mark.asyncio
-async def test_overview_stays_short():
-    """The overview is a glance before the first message, not a data dictionary."""
-    with _patch_resources():
-        overview = await context.build_data_overview(1)
+async def test_overview_title_carries_the_size_without_a_name():
+    """The title is the only part shown while the section is folded."""
+    with _patch_resources(metadata={}):
+        title, _ = await context.build_data_overview(1)
 
-    lines = overview.splitlines()
-    assert len(lines) <= 8, overview
-    assert all(len(line) <= 200 for line in lines), overview
-    # Per-attribute types and value ranges belong in the agent's context only.
-    assert "(float)" not in overview
-    assert "min: 1659" not in overview
+    assert title == "Uploaded network — 1144 nodes, 8608 edges"
+
+
+@pytest.mark.asyncio
+async def test_overview_details_attribute_types_and_ranges():
+    """The body is collapsed by default, so it can afford the detail that the
+    old always-visible overview had to leave out."""
+    with _patch_resources():
+        _, body = await context.build_data_overview(1)
+
+    assert "`birthYear` (float) [min: 1659.00, max: 1977.00]" in body
+    assert "`composer` (string) [values: 'Mozart']" in body
+
+
+@pytest.mark.asyncio
+async def test_overview_reports_density_and_average_degree():
+    with _patch_resources():
+        _, body = await context.build_data_overview(1)
+
+    assert "average degree 15.0" in body
+    assert "**Density:** 0.013 (undirected)" in body
+
+
+@pytest.mark.asyncio
+async def test_overview_states_what_the_upload_already_did():
+    """Otherwise the user cannot tell which of what they see came from their
+    file and which the pipeline chose for them."""
+    with _patch_resources():
+        _, body = await context.build_data_overview(1)
+
+    assert "ForceAtlas2 layout" in body
 
 
 @pytest.mark.asyncio
 async def test_overview_truncates_multiline_description():
     long_desc = "Co-performance network.\nNode type: musical_work\nSource: yearbook"
     with _patch_resources(metadata={"name": "Concerts", "description": long_desc}):
-        overview = await context.build_data_overview(1)
+        _, body = await context.build_data_overview(1)
 
-    assert "- **Description:** Co-performance network. …" in overview
-    assert "Node type" not in overview
+    assert "- **Description:** Co-performance network. …" in body
+    assert "Node type" not in body
 
 
 @pytest.mark.asyncio
 async def test_overview_caps_the_attribute_name_list():
     many = [{"name": f"attr{i}", "data_type": "float"} for i in range(40)]
     with _patch_resources(nodes=many):
-        overview = await context.build_data_overview(1)
+        _, body = await context.build_data_overview(1)
 
-    assert "**Node attributes (40):**" in overview
-    assert "`attr24`" in overview
-    assert "`attr25`" not in overview
-    assert "... and 15 more" in overview
+    assert "**Node attributes (40):**" in body
+    # The first few in full, the rest as bare names, and then a count.
+    assert "`attr0` (float)" in body
+    assert "`attr32`" in body
+    assert "`attr33`" not in body
+    assert "... and 7 more" in body
 
 
 @pytest.mark.asyncio
@@ -106,19 +134,19 @@ async def test_overview_hides_generated_layout_coordinates():
     """The upload pipeline lays out the graph before this runs; those coordinates
     are not attributes of the file the user uploaded."""
     with _patch_resources():
-        overview = await context.build_data_overview(1)
+        _, body = await context.build_data_overview(1)
 
-    assert "forceatlas2_x" not in overview
-    assert "forceatlas2_y" not in overview
+    assert "forceatlas2_x" not in body
+    assert "forceatlas2_y" not in body
 
 
 @pytest.mark.asyncio
 async def test_overview_distinguishes_unreadable_from_empty():
     with _patch_resources(nodes={}, edges=[]):
-        overview = await context.build_data_overview(1)
+        _, body = await context.build_data_overview(1)
 
-    assert "**Node attributes:** could not be read" in overview
-    assert "**Edge attributes:** none" in overview
+    assert "**Node attributes:** could not be read" in body
+    assert "**Edge attributes:** none" in body
 
 
 @pytest.mark.asyncio
@@ -134,7 +162,7 @@ async def test_context_summary_keeps_attribute_types_and_ranges():
 @pytest.mark.asyncio
 async def test_overview_is_omitted_when_nothing_can_be_read():
     with _patch_resources(metadata={}, structure={}, nodes={}, edges={}):
-        assert await context.build_data_overview(1) == ""
+        assert await context.build_data_overview(1) == ("", "")
 
 
 @pytest.mark.asyncio
@@ -183,9 +211,9 @@ async def test_context_summary_names_alternative_weight_attributes():
 @pytest.mark.asyncio
 async def test_overview_reports_the_edge_weight_range():
     with _patch_resources(structure={**STRUCTURE, "edge_weights": WEIGHTS}):
-        overview = await context.build_data_overview(1)
+        _, body = await context.build_data_overview(1)
 
-    assert "- **Edge weights:** 1–116" in overview
+    assert "- **Edge weights:** 1–116, 42 distinct values" in body
 
 
 @pytest.mark.asyncio

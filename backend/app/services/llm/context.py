@@ -53,9 +53,15 @@ def _normalize_attrs(attrs: Any) -> List[Dict[str, Any]]:
 
 
 # Ceilings for the user-facing upload overview only. The system-prompt summary
-# stays verbose — the agent needs the detail, the user needs a glance.
+# stays verbose — the agent needs everything, the user needs it to stay finite.
+# The overview itself is folded behind a one-line title in the chat, so it can
+# afford per-attribute detail; these caps only stop a 200-attribute graph from
+# producing 200 lines.
 DESCRIPTION_LIMIT = 120
 ATTR_NAME_LIMIT = 25
+# Attributes listed one-per-line with their type and range, before the rest are
+# summarised as a plain name list.
+ATTR_DETAIL_LIMIT = 8
 
 
 def _shorten(text: Optional[str]) -> str:
@@ -205,12 +211,42 @@ async def build_context_summary(network_id: int) -> str:
         return ""
 
 
-async def build_data_overview(network_id: int) -> str:
-    """Build a user-facing Markdown overview of the uploaded network's contents.
+def _overview_title(metadata: Any, structure: Any) -> str:
+    """One line naming the network and its size — the only part always visible.
 
-    Used at upload time to show what the data contains before the user sends
-    their first message. Like build_context_summary, this reads MCP resources
-    directly from the backend — it does not rely on the LLM calling any tool.
+    The rest of the overview sits behind it in a collapsible, so this has to
+    carry enough for the user to decide whether to open it.
+    """
+    name = metadata.get("name") if isinstance(metadata, dict) else None
+    size = ""
+    if not _failed(structure):
+        n_count = structure.get("node_count", "?")
+        e_count = structure.get("edge_count", "?")
+        size = f"{n_count} nodes, {e_count} edges"
+    parts = [part for part in (name, size) if part]
+    return " — ".join(["Uploaded network"] + parts) if parts else "Uploaded network"
+
+
+def _attr_detail(attr: Dict[str, Any]) -> str:
+    """`name` (type) with its range or most common values, as one bullet."""
+    name = attr.get("name")
+    dtype = attr.get("data_type")
+    stats = _format_attr_stats(dtype, attr.get("stats")).strip()
+    head = f"  - `{name}`" + (f" ({dtype})" if dtype else "")
+    return f"{head} {stats}" if stats else head
+
+
+async def build_data_overview(network_id: int) -> Tuple[str, str]:
+    """Build the user-facing overview of an uploaded network, as (title, body).
+
+    Shown at upload time so the user can see what the file contains before
+    sending their first message. The caller folds `body` behind `title` (see
+    `markup.collapsible`), which is why the body can afford to be detailed:
+    nothing here costs panel space until it is opened.
+
+    Like build_context_summary, this reads MCP resources directly from the
+    backend — it does not rely on the LLM calling any tool. Returns ("", "")
+    when nothing could be read.
     """
     try:
         metadata, structure, node_attrs, edge_attrs = await _fetch_network_resources(
@@ -228,9 +264,9 @@ async def build_data_overview(network_id: int) -> str:
                 f"No resources readable for network {network_id}; "
                 "skipping the upload overview"
             )
-            return ""
+            return "", ""
 
-        lines: List[str] = ["**Uploaded network overview**", ""]
+        lines: List[str] = []
 
         if isinstance(metadata, dict):
             name = metadata.get("name")
@@ -243,33 +279,60 @@ async def build_data_overview(network_id: int) -> str:
         if not _failed(structure):
             n_count = structure.get("node_count", "?")
             e_count = structure.get("edge_count", "?")
-            lines.append(f"- **Size:** {n_count} nodes, {e_count} edges")
+            size_line = f"- **Size:** {n_count} nodes, {e_count} edges"
+            if isinstance(n_count, int) and isinstance(e_count, int) and n_count:
+                size_line += f" (average degree {2 * e_count / n_count:.1f})"
+            lines.append(size_line)
+
+            density = structure.get("density")
+            kind = "directed" if structure.get("is_directed") else "undirected"
+            if isinstance(density, (int, float)):
+                lines.append(f"- **Density:** {density:.3g} ({kind})")
+            else:
+                lines.append(f"- **Type:** {kind}")
+
             weights = structure.get("edge_weights")
             if isinstance(weights, dict) and weights.get("is_informative"):
-                lines.append(
+                weight_line = (
                     f"- **Edge weights:** {weights['min']:.3g}–{weights['max']:.3g}"
                 )
+                distinct = weights.get("distinct_values")
+                if distinct:
+                    weight_line += f", {distinct} distinct values"
+                weight_line += " — used by force-directed layouts by default"
+                lines.append(weight_line)
 
         def format_attrs_md(attrs: Any, label: str) -> None:
             if _failed(attrs):
                 lines.append(f"- **{label}:** could not be read")
                 return
             attrs_list = _without_layout_coordinates(_normalize_attrs(attrs))
+            attrs_list = [attr for attr in attrs_list if attr.get("name")]
             if not attrs_list:
                 lines.append(f"- **{label}:** none")
                 return
-            # Names only. Types and value ranges stay one question away in chat,
-            # and the agent already has them in its own context every turn.
-            names = [attr.get("name") for attr in attrs_list if attr.get("name")]
-            shown = [f"`{n}`" for n in names[:ATTR_NAME_LIMIT]]
-            if len(names) > ATTR_NAME_LIMIT:
-                shown.append(f"... and {len(names) - ATTR_NAME_LIMIT} more")
-            lines.append(f"- **{label} ({len(names)}):** {', '.join(shown)}")
+
+            lines.append(f"- **{label} ({len(attrs_list)}):**")
+            for attr in attrs_list[:ATTR_DETAIL_LIMIT]:
+                lines.append(_attr_detail(attr))
+
+            # Past the detail limit, names only — a long tail of ranges helps
+            # nobody, but knowing the columns exist does.
+            rest = [attr["name"] for attr in attrs_list[ATTR_DETAIL_LIMIT:]]
+            if rest:
+                shown = [f"`{n}`" for n in rest[:ATTR_NAME_LIMIT]]
+                if len(rest) > ATTR_NAME_LIMIT:
+                    shown.append(f"... and {len(rest) - ATTR_NAME_LIMIT} more")
+                lines.append(f"  - also: {', '.join(shown)}")
 
         format_attrs_md(node_attrs, "Node attributes")
         format_attrs_md(edge_attrs, "Edge attributes")
 
-        return "\n".join(lines)
+        lines.append(
+            "- **Already applied:** ForceAtlas2 layout, uniform node size and colour"
+        )
+
+        return _overview_title(metadata, structure), "\n".join(lines)
     except Exception as e:
         logger.error(f"Error building data overview: {e}")
-        return ""
+        return "", ""
