@@ -89,6 +89,24 @@ Note: `app.services.llm.hooks.registry` resolves to the `HookRegistry` *instance
 exported by the package `__init__`, which shadows the same-named submodule.
 Import `load_builtin_hooks` from the package, not the module.
 
+### What the chat panel is told, and how
+
+Two contracts run between the backend and the chat panel. Both are one-sided —
+the backend writes, the frontend reads — so they change together.
+
+**SSE events** are emitted from `llm/emitters.py` and consumed in
+`frontend/src/hooks/useChatConnection.js`. `thinking_stream` means *model
+reasoning* and nothing else: the panel renders it under a "Thinking" heading, so
+a fixed pipeline step or a status line goes through `emit_progress` instead.
+Only a terminal event (`message`, `message_complete`, `error`) ends a turn and
+calls `chatStore.endTurn()`; `render_update` fires mid-turn and must not.
+
+**In-band markup** is what survives into the stored message. `llm/markup.py`
+lists the tags and `frontend/src/utils/parseMessageContent.js` parses them:
+`<steps>` for a pipeline log, `<collapsible title="…">` for a foldable section,
+`<tool_execution_marker index="N"/>` for where a tool ran, and `<thought>` —
+written by `engine.py` around model reasoning, and by nothing else.
+
 ## MCP tools
 
 52 tools, auto-discovered from `@mcp.tool()`-decorated functions in
