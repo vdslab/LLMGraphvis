@@ -7,28 +7,43 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+_FORCE_RECOMPUTE_DESC = (
+    "If True, bypasses the cache and always recomputes. The cache key already includes "
+    "every parameter below, so changing a parameter recomputes on its own — set this only "
+    "when the user explicitly wants the same computation redone."
+)
+
+# All four geometric layouts share this: the renderer normalizes coordinates, so
+# scale/center are inert. Saying so in the schema stops the model from offering
+# them as a way to zoom, and from claiming they worked.
+_SCALE_DESC = (
+    "Radius scale factor. NOTE: has no visible effect — the renderer normalizes all "
+    "coordinates to a fixed [-1000, 1000] extent before drawing, so this is only "
+    "observable in the raw stored layout attribute values. Do not use it to zoom."
+)
+_CENTER_DESC = (
+    "(x, y) coordinate to center the layout on. NOTE: has no visible effect — the "
+    "renderer normalizes all coordinates before drawing. Do not use it to reposition "
+    "the view."
+)
+
 
 @mcp.tool()
 @handle_tool_errors
 def layout_circular(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    scale: Annotated[Optional[float], Field(description="Scale factor for the layout radius. Defaults to networkx's own default (1.0) if not specified.")] = None,
-    center: Annotated[Optional[Tuple[float, float]], Field(description="(x, y) coordinate to center the layout on. Defaults to the origin if not specified.")] = None,
-    force_recompute: Annotated[bool, Field(description="If True, bypasses the cache and always recomputes, even if a valid cached result exists for this exact graph state and parameters. Default False preserves current auto-caching behavior.")] = False
+    scale: Annotated[Optional[float], Field(description=_SCALE_DESC)] = None,
+    center: Annotated[Optional[Tuple[float, float]], Field(description=_CENTER_DESC)] = None,
+    force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
     Calculates a circular layout — all nodes equally spaced around a single circle.
 
     Best for: small graphs where you want to clearly see all connections,
-    bipartite graphs, or ring-like structures. Avoids edge crossings at the cost
-    of not reflecting graph topology.
+    bipartite graphs, or ring-like structures. Guarantees no node overlap, at the cost
+    of not reflecting graph topology at all.
 
-    After calling this, use `visualization_apply_layout` to render the result.
-
-    Note: the final rendered visualization normalizes all layout coordinates to a
-    fixed [-1000, 1000] range, so `scale`/`center` overrides are only observable
-    in the raw stored layout attribute values (via `network_list_node_attributes`
-    or direct inspection), not in the final on-screen pixel positions.
+    After calling this, use `visualization_generate` to render the result.
 
     Returns:
         str: Status message.
@@ -39,103 +54,105 @@ def layout_circular(
         layout.calculate_layout(
             network_id, "circular", db, overrides=overrides, force=force_recompute
         )
-        return "Circular layout calculated. Call `visualization_apply_layout` to render."
+        return "Circular layout calculated. Call `visualization_generate` to render."
 
 
 @mcp.tool()
 @handle_tool_errors
 def layout_shell(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    scale: Annotated[Optional[float], Field(description="Scale factor for the layout radius. Defaults to networkx's own default (1.0) if not specified.")] = None,
-    center: Annotated[Optional[Tuple[float, float]], Field(description="(x, y) coordinate to center the layout on. Defaults to the origin if not specified.")] = None,
-    nlist: Annotated[Optional[List[List[str]]], Field(description="List of lists of node IDs, one inner list per concentric shell (innermost first). Node IDs must match the graph's node IDs. Defaults to a single automatic shell containing all nodes if not specified.")] = None,
-    force_recompute: Annotated[bool, Field(description="If True, bypasses the cache and always recomputes, even if a valid cached result exists for this exact graph state and parameters. Default False preserves current auto-caching behavior.")] = False
+    nlist: Annotated[Optional[List[List[str]]], Field(description="List of lists of node IDs, one inner list per concentric shell (innermost first). Node IDs must match the graph's node IDs. This is the parameter that makes the layout meaningful: use it to place a grouping (e.g. one shell per community, or core nodes inside and periphery outside). Defaults to a single shell containing all nodes, which is identical to a circular layout.")] = None,
+    rotate: Annotated[Optional[float], Field(description="Angle in radians by which each successive shell is rotated relative to the previous one. Reduces radial alignment of nodes across shells, which can make edges easier to follow.")] = None,
+    scale: Annotated[Optional[float], Field(description=_SCALE_DESC)] = None,
+    center: Annotated[Optional[Tuple[float, float]], Field(description=_CENTER_DESC)] = None,
+    force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
     Calculates a shell layout — nodes arranged in concentric circles (shells).
 
     Best for: hierarchical or layered graphs where group membership matters.
-    Nodes are distributed across multiple concentric rings rather than a single circle.
+    Without `nlist` this produces exactly a circular layout, so supply `nlist` when the
+    grouping is the point.
 
-    After calling this, use `visualization_apply_layout` to render the result.
-
-    Note: the final rendered visualization normalizes all layout coordinates to a
-    fixed [-1000, 1000] range, so `scale`/`center` overrides are only observable
-    in the raw stored layout attribute values (via `network_list_node_attributes`
-    or direct inspection), not in the final on-screen pixel positions.
+    After calling this, use `visualization_generate` to render the result.
 
     Returns:
         str: Status message.
     """
     with get_db_context() as db:
         from app.logic import layout
-        overrides = {"scale": scale, "center": center, "nlist": nlist}
+        overrides = {
+            "nlist": nlist,
+            "rotate": rotate,
+            "scale": scale,
+            "center": center,
+        }
         layout.calculate_layout(
             network_id, "shell", db, overrides=overrides, force=force_recompute
         )
-        return "Shell layout calculated. Call `visualization_apply_layout` to render."
+        return "Shell layout calculated. Call `visualization_generate` to render."
 
 
 @mcp.tool()
 @handle_tool_errors
 def layout_spiral(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    scale: Annotated[Optional[float], Field(description="Scale factor for the layout radius. Defaults to networkx's own default (1.0) if not specified.")] = None,
-    center: Annotated[Optional[Tuple[float, float]], Field(description="(x, y) coordinate to center the layout on. Defaults to the origin if not specified.")] = None,
-    force_recompute: Annotated[bool, Field(description="If True, bypasses the cache and always recomputes, even if a valid cached result exists for this exact graph state and parameters. Default False preserves current auto-caching behavior.")] = False
+    resolution: Annotated[Optional[float], Field(description="Compactness of the spiral: the angle between successive nodes. Lower values wind the spiral more tightly (more turns); higher values make it looser.")] = None,
+    equidistant: Annotated[Optional[bool], Field(description="If True, nodes are spaced at equal arc distance along the spiral instead of at equal angles, which keeps outer nodes from spreading further apart than inner ones.")] = None,
+    scale: Annotated[Optional[float], Field(description=_SCALE_DESC)] = None,
+    center: Annotated[Optional[Tuple[float, float]], Field(description=_CENTER_DESC)] = None,
+    force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
     Calculates a spiral layout — nodes arranged along an outward spiral.
 
     Best for: ordered sequences or timelines where you want to see all nodes
-    without overlap in a compact, visually distinctive arrangement.
+    without overlap in a compact, visually distinctive arrangement. Node order follows
+    the graph's node insertion order.
 
-    After calling this, use `visualization_apply_layout` to render the result.
-
-    Note: the final rendered visualization normalizes all layout coordinates to a
-    fixed [-1000, 1000] range, so `scale`/`center` overrides are only observable
-    in the raw stored layout attribute values (via `network_list_node_attributes`
-    or direct inspection), not in the final on-screen pixel positions.
+    After calling this, use `visualization_generate` to render the result.
 
     Returns:
         str: Status message.
     """
     with get_db_context() as db:
         from app.logic import layout
-        overrides = {"scale": scale, "center": center}
+        overrides = {
+            "resolution": resolution,
+            "equidistant": equidistant,
+            "scale": scale,
+            "center": center,
+        }
         layout.calculate_layout(
             network_id, "spiral", db, overrides=overrides, force=force_recompute
         )
-        return "Spiral layout calculated. Call `visualization_apply_layout` to render."
+        return "Spiral layout calculated. Call `visualization_generate` to render."
 
 
 @mcp.tool()
 @handle_tool_errors
 def layout_random(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    center: Annotated[Optional[Tuple[float, float]], Field(description="(x, y) coordinate to center the layout on. Defaults to the origin if not specified. NOTE: unlike the other geometric layouts, networkx's random_layout has no `scale` parameter, so no `scale` override is offered here.")] = None,
-    force_recompute: Annotated[bool, Field(description="If True, bypasses the cache and always recomputes, even if a valid cached result exists for this exact graph state and parameters. Default False preserves current auto-caching behavior.")] = False
+    seed: Annotated[Optional[int], Field(description="Random seed. Defaults to 42, so the result is reproducible; pass a different value for a different arrangement.")] = None,
+    center: Annotated[Optional[Tuple[float, float]], Field(description=_CENTER_DESC + " NOTE: unlike the other geometric layouts, networkx's random_layout has no `scale` parameter, so none is offered here.")] = None,
+    force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
-    Calculates a random layout — nodes placed at random positions (with fixed seed for reproducibility).
+    Calculates a random layout — nodes placed at uniformly random positions.
 
-    Best for: quick sanity checks, or as a starting point before running a more
-    expensive force-directed algorithm. Not useful for analytical purposes.
+    Best for: a baseline to compare against, or as an explicit starting point for a
+    force-directed layout via its `init_from_layout` parameter. Not useful for
+    analysis on its own.
 
-    After calling this, use `visualization_apply_layout` to render the result.
-
-    Note: the final rendered visualization normalizes all layout coordinates to a
-    fixed [-1000, 1000] range, so a `center` override is only observable in the
-    raw stored layout attribute values (via `network_list_node_attributes` or
-    direct inspection), not in the final on-screen pixel positions.
+    After calling this, use `visualization_generate` to render the result.
 
     Returns:
         str: Status message.
     """
     with get_db_context() as db:
         from app.logic import layout
-        overrides = {"center": center}
+        overrides = {"seed": seed, "center": center}
         layout.calculate_layout(
             network_id, "random", db, overrides=overrides, force=force_recompute
         )
-        return "Random layout calculated. Call `visualization_apply_layout` to render."
+        return "Random layout calculated. Call `visualization_generate` to render."
