@@ -14,6 +14,7 @@ import {
 
 export const useChatStore = create((set, get) => ({
   chatId: null,
+  chatName: null,
   messages: [],
   isLoading: false,
   thinkingMessage: null,
@@ -53,7 +54,11 @@ export const useChatStore = create((set, get) => ({
        useNetworkStore.getState().setNetworkId(res.data.network_id);
     }
 
-    set({ chatProvider: res.data.provider ?? null, chatModel: res.data.model ?? null });
+    set({
+      chatName: res.data.name ?? null,
+      chatProvider: res.data.provider ?? null,
+      chatModel: res.data.model ?? null,
+    });
 
     return res.data;
   },
@@ -106,19 +111,23 @@ export const useChatStore = create((set, get) => ({
   // Create a new chat
   createChat: async (name) => {
     const res = await createChatAPI(name);
-    set({ chatId: res.data.id, messages: [] });
+    set({ chatId: res.data.id, chatName: res.data.name ?? null, messages: [] });
     useNetworkStore.getState().setNetworkId(res.data.network_id);
     return res.data;
   },
 
-  // Rename a chat
+  // Rename a chat. The backend marks any name sent from here as user-chosen, so
+  // auto-naming (upload filename / generated title) stops touching this chat.
   renameChat: async (chatId, name) => {
-    const res = await import('../services/api').then(module => module.updateChat(chatId, { name }));
-    // We don't strictly manage the chats list in store but since ChatList calls fetchChats on mount, and we might want to update it.
-    // Ideally we should just return success and let component handle or update list if we had one.
-    // Let's just return data. The component can optimistically update or refetch.
+    const res = await updateChatAPI(chatId, { name });
+    if (get().chatId === chatId) {
+      set({ chatName: res.data.name ?? null });
+    }
     return res.data;
   },
+
+  // Name assigned by the backend (chat_renamed SSE event)
+  setChatName: (name) => set({ chatName: name }),
 
   // Upload network file to chat
   uploadNetwork: async (chatId, file) => {

@@ -97,6 +97,7 @@ async def get_chat(
             "network_id": chat.network_id,
             "provider": chat.provider,
             "model": chat.model,
+            "name_is_custom": chat.name_is_custom,
             "created_at": chat.created_at,
             "updated_at": chat.updated_at,
             "network": vis_data,
@@ -112,6 +113,7 @@ async def get_chat(
             "network_id": chat.network_id,
             "provider": chat.provider,
             "model": chat.model,
+            "name_is_custom": chat.name_is_custom,
             "created_at": chat.created_at,
             "updated_at": chat.updated_at,
             "network": None,
@@ -239,7 +241,11 @@ async def upload_network(
 
     # Start background task utilizing the Service Layer
     background_tasks.add_task(
-        chat_service.handle_upload_background, chat_id, chat.network_id, graphml_data
+        chat_service.handle_upload_background,
+        chat_id,
+        chat.network_id,
+        graphml_data,
+        file.filename,
     )
 
     return {"status": "accepted"}
@@ -300,6 +306,12 @@ def update_chat(
     update_data = chat_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(chat, field, value)
+
+    # A name the user typed is final: pin it so neither the upload-filename nor
+    # the LLM-generated title can overwrite it later.
+    if update_data.get("name"):
+        chat.name_is_custom = True
+
     db.commit()
     db.refresh(chat)
 

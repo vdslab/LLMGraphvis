@@ -5,6 +5,9 @@ import { useChatStore } from '../stores/chatStore';
 const ChatList = ({ currentChatId, onClose }) => {
   const navigate = useNavigate();
   const { fetchChats } = useChatStore();
+  // The open chat can be renamed while this list is mounted (auto-naming arrives
+  // over SSE), so track the store's copy of its name rather than only the fetch.
+  const chatName = useChatStore((state) => state.chatName);
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingChatId, setEditingChatId] = useState(null);
@@ -23,6 +26,13 @@ const ChatList = ({ currentChatId, onClose }) => {
     };
     loadChats();
   }, [fetchChats]);
+
+  useEffect(() => {
+    if (!chatName || !currentChatId) return;
+    setChats((prev) =>
+      prev.map((c) => (c.id === currentChatId ? { ...c, name: chatName } : c))
+    );
+  }, [chatName, currentChatId]);
 
   const handleChatClick = (chatId) => {
     navigate(`/chat/${chatId}`);

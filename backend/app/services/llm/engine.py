@@ -59,6 +59,19 @@ def _create_provider(provider_name: str, model_name: Optional[str] = None) -> LL
         return GoogleGenAIProvider(model_name=model_name)
 
 
+def resolve_provider_name(provider_name: Optional[str] = None) -> str:
+    """Resolve a chat's provider pin against the process-wide default."""
+    return (provider_name or os.getenv("LLM_PROVIDER") or DEFAULT_PROVIDER).lower()
+
+
+def create_provider(
+    provider_name: Optional[str] = None, model_name: Optional[str] = None
+) -> LLMProvider:
+    """Build a provider the way the agent does, for callers outside the ReAct loop
+    (e.g. the one-shot title generation in titles.py)."""
+    return _create_provider(resolve_provider_name(provider_name), model_name)
+
+
 class GraphVisAgent:
     """
     Agent service for Graph Visualization (Single Agent Mode).
@@ -69,7 +82,7 @@ class GraphVisAgent:
         self.db = db
         # provider_name/model_name let a chat pin its own provider/model, overriding
         # the process-wide LLM_PROVIDER/GEMINI_MODEL/CLAUDE_MODEL env var defaults.
-        self.provider_name = (provider_name or os.getenv("LLM_PROVIDER") or DEFAULT_PROVIDER).lower()
+        self.provider_name = resolve_provider_name(provider_name)
         self.provider = _create_provider(self.provider_name, model_name)
         # Full system prompt for this turn. process_turn() appends the network
         # context summary so it is always present regardless of the user prompt.

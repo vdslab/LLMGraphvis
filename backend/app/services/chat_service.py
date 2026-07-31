@@ -9,8 +9,71 @@ from app.core.logging import get_logger
 from app.services import llm as llm_service
 from app.services.llm import context as llm_context
 from app.services.llm import mcp_client
+from app.services.llm import titles
 
 logger = get_logger(__name__)
+
+
+async def _apply_chat_name(db: Session, chat: models.Chat, name: str) -> None:
+    """Persist an auto-generated chat name and tell the open UI about it.
+
+    Only ever called for chats the user has not renamed themselves — the
+    `name_is_custom` check belongs to the caller, which already holds the row.
+    """
+    chat.name = name
+    db.commit()
+
+    queue = await llm_service.get_event_queue(chat.id)
+    await queue.put(
+        {
+            "event": "chat_renamed",
+            "data": json.dumps({"chat_id": chat.id, "name": name}),
+        }
+    )
+    logger.info(f"Auto-named chat {chat.id}: {name!r}")
+
+
+async def _maybe_autoname_chat(
+    db: Session,
+    chat_id: int,
+    user_message: str,
+    assistant_message: str,
+    provider_name: str,
+    model_name: str,
+) -> None:
+    """Title the chat from its first exchange.
+
+    Runs at most once per chat — it requires the chat to still have exactly one
+    user message — and never touches a chat the user has renamed. Any failure is
+    logged and dropped: the turn itself has already succeeded.
+    """
+    try:
+        chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
+        if not chat or chat.name_is_custom:
+            return
+
+        user_message_count = (
+            db.query(models.ChatMessage)
+            .filter(
+                models.ChatMessage.chat_id == chat_id,
+                models.ChatMessage.role == "user",
+            )
+            .count()
+        )
+        if user_message_count != 1:
+            return
+
+        title = await titles.generate_chat_title(
+            user_message=user_message,
+            assistant_message=assistant_message,
+            provider_name=provider_name or None,
+            model_name=model_name or None,
+            current_name=chat.name,
+        )
+        if title and title != chat.name:
+            await _apply_chat_name(db, chat, title)
+    except Exception as e:
+        logger.warning(f"Failed to auto-name chat {chat_id}: {e}")
 
 
 async def _handle_background_error(chat_id: int, e: Exception, message: str) -> None:
@@ -39,7 +102,12 @@ async def _handle_background_error(chat_id: int, e: Exception, message: str) -> 
         finally:
             db_error.close()
 
-async def handle_upload_background(chat_id: int, network_id: int, graphml_data: str) -> None:
+async def handle_upload_background(
+    chat_id: int,
+    network_id: int,
+    graphml_data: str,
+    filename: Optional[str] = None,
+) -> None:
     """
     Background task to handle network upload and initialization.
     Executes the initialization steps granularly to provide progress updates.
@@ -127,7 +195,17 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
                 if vis_data:
                     chat.visualization_state = vis_data
                     logger.info(f"Saved initial visualization state for chat_id={chat_id}")
-                
+
+                # Provisional name from the uploaded file, so the chat stops
+                # being "New Chat" before the first message is even sent. The
+                # LLM title generated after the first exchange supersedes it.
+                renamed_to = None
+                if not chat.name_is_custom and titles.is_placeholder_name(chat.name):
+                    file_name = titles.name_from_filename(filename)
+                    if file_name:
+                        chat.name = file_name
+                        renamed_to = file_name
+
                 # Persist the success message with thoughts, including the data
                 # overview so the contents are visible before the first message.
                 full_thought = "\n".join(thoughts)
@@ -149,6 +227,13 @@ async def handle_upload_background(chat_id: int, network_id: int, graphml_data: 
                 db_session.commit()
                 db_session.refresh(db_msg)
                 
+                if renamed_to:
+                    logger.info(f"Named chat {chat_id} after upload: {renamed_to!r}")
+                    await queue.put({
+                        "event": "chat_renamed",
+                        "data": json.dumps({"chat_id": chat_id, "name": renamed_to}),
+                    })
+
                 # Broadcast message event (replaces system_message)
                 # We send role="assistant" for frontend consistency
                 await queue.put({
@@ -275,6 +360,13 @@ async def handle_process_background(chat_id: int, user_message: str) -> None:
                         "tool_executions": tool_executions_data
                     })
                 }
+            )
+
+            # Name the chat from what it turned out to be about. Runs after the
+            # turn is already reported as complete, so a slow or failing title
+            # call cannot delay the answer.
+            await _maybe_autoname_chat(
+                db, chat_id, user_message, final_response_text, provider_name, model_name
             )
         else:
             # Even an empty response must emit a terminal event, otherwise the

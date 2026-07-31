@@ -79,6 +79,13 @@ export const useChatConnection = (id, isAuthenticated) => {
         usage_update: (data) => {
             useChatStore.getState().setCurrentTurnUsage(data);
         },
+        // The backend named the chat for us (from the uploaded filename, or from
+        // the first exchange). Never fires for a chat the user renamed by hand.
+        chat_renamed: (data) => {
+            if (data && data.name) {
+                useChatStore.getState().setChatName(data.name);
+            }
+        },
         system_message: (data) => {
             console.log("System:", data);
         },

@@ -50,6 +50,8 @@ class Chat(ChatBase):
     network_id: int
     provider: Optional[str] = None
     model: Optional[str] = None
+    # Read-only: set by PATCH /chat/{id} whenever the client sends a name.
+    name_is_custom: bool = False
     created_at: datetime
     updated_at: datetime
 

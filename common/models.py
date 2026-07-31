@@ -82,6 +82,11 @@ class Chat(Base):
     visualization_state = Column(JSON, nullable=True)
     provider = Column(String, nullable=True)
     model = Column(String, nullable=True)
+    # True once the user has renamed the chat themselves. Auto-naming (upload
+    # filename, then the LLM-generated title) never touches a chat with this set.
+    name_is_custom = Column(
+        Boolean, nullable=False, server_default=sqlalchemy.text("false"), default=False
+    )
 
     user = relationship("User", back_populates="chats")
     network = relationship("Network", back_populates="chat")

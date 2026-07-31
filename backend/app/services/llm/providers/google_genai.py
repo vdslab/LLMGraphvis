@@ -123,14 +123,20 @@ class GoogleGenAIProvider(LLMProvider):
         before_sleep=before_sleep_log(logger, logging.WARNING),
     )
     async def _raw_generate(self, gemini_history, gemini_tools, system_instruction):
-        tool_config = types.ToolConfig(
-            function_calling_config=types.FunctionCallingConfig(mode="AUTO")
+        # A tool_config without tools is rejected by the API, and tool-less
+        # generations are a real case here (the one-shot chat title in titles.py).
+        tool_config = (
+            types.ToolConfig(
+                function_calling_config=types.FunctionCallingConfig(mode="AUTO")
+            )
+            if gemini_tools
+            else None
         )
         return await self.client.aio.models.generate_content_stream(
             model=self.model_name,
             contents=gemini_history,
             config=types.GenerateContentConfig(
-                tools=gemini_tools,
+                tools=gemini_tools or None,
                 tool_config=tool_config,
                 system_instruction=system_instruction,
                 thinking_config=types.ThinkingConfig(thinking_budget=self.thinking_budget)
