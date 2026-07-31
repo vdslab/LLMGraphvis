@@ -20,6 +20,12 @@ export const useChatStore = create((set, get) => ({
   thinkingMessage: null,
   streamingMessageId: null,
   runningTool: null,
+  // Backend pipeline steps for the turn in progress. Kept apart from
+  // thinkingMessage on purpose: these are our labels, not model reasoning.
+  progressSteps: [],
+  // Tool results that finished before the assistant message they belong to
+  // existed; adopted by appendMessageChunk when it creates that message.
+  pendingToolExecutions: [],
 
   // Per-chat LLM provider/model pin (null means "use server default")
   chatProvider: null,
@@ -131,36 +137,130 @@ export const useChatStore = create((set, get) => ({
 
   // Upload network file to chat
   uploadNetwork: async (chatId, file) => {
-    set({ isLoading: true, thinkingMessage: "" });
+    get().beginTurn();
     try {
       await uploadGraphML(chatId, file);
       // Response is 202 Accepted.
       // SSE will handle the rest.
     } catch (error) {
       console.error("Failed to upload network:", error);
-      set({ isLoading: false, thinkingMessage: null });
+      get().endTurn();
       throw error;
     }
   },
 
-  // Send message to process
-  sendMessage: async (content) => {
-    const { chatId, messages } = get();
-    // Optimistic update - add user message immediately
-    const newMessage = { role: 'user', content, id: Date.now(), created_at: new Date().toISOString() };
-    set({ messages: [...messages, newMessage], isLoading: true, thinkingMessage: "" });
+  // --- Turn lifecycle -------------------------------------------------------
+  // A turn is one POST that the backend answers 202 to, followed by SSE events
+  // until a terminal one (message / message_complete / error). Everything that
+  // is only true *during* a turn is set and cleared here, in one place, so a
+  // mid-turn event like render_update can no longer half-end the turn.
+
+  beginTurn: () => set({
+    isLoading: true,
+    thinkingMessage: null,
+    progressSteps: [],
+    runningTool: null,
+    pendingToolExecutions: [],
+  }),
+
+  endTurn: () => {
+    set({
+      isLoading: false,
+      thinkingMessage: null,
+      progressSteps: [],
+      runningTool: null,
+      streamingMessageId: null,
+      pendingToolExecutions: [],
+    });
+    // A message the user wrote while this turn was running goes out now.
+    get().dispatchQueued();
+  },
+
+  // A new running step implicitly finishes the previous one, so the backend
+  // only has to name what it is starting.
+  setProgress: ({ label, status }) => set((state) => {
+    const steps = state.progressSteps.map((step) => ({ ...step, status: 'done' }));
+    const existing = steps.findIndex((step) => step.label === label);
+    if (existing !== -1) {
+      steps[existing].status = status;
+      return { progressSteps: steps, isLoading: true };
+    }
+    return { progressSteps: [...steps, { label, status }], isLoading: true };
+  }),
+
+  // --- Sending --------------------------------------------------------------
+
+  setMessageStatus: (localId, status) => set((state) => ({
+    messages: state.messages.map((message) =>
+      message.localId === localId ? { ...message, status } : message
+    ),
+  })),
+
+  /**
+   * Post a queued message and open a turn for it.
+   *
+   * The user message is already on screen at this point — it is added the
+   * instant the user hits send, and only its status changes here.
+   */
+  dispatchMessage: async (localId) => {
+    const message = get().messages.find((m) => m.localId === localId);
+    if (!message) return;
+
+    get().beginTurn();
+    get().setMessageStatus(localId, 'sending');
 
     try {
-      await processMessageAPI(chatId, content);
-      // Response is 202 Accepted.
-      // SSE will handle the rest.
+      await processMessageAPI(get().chatId, message.content);
+      // 202 Accepted; SSE carries the rest of the turn.
+      get().setMessageStatus(localId, 'sent');
     } catch (error) {
       console.error("Failed to send message:", error);
-      set({ isLoading: false, thinkingMessage: null });
-      throw error;
+      get().setMessageStatus(localId, 'failed');
+      set({ isLoading: false, thinkingMessage: null, progressSteps: [] });
     }
   },
-  
+
+  /**
+   * Show the user's message immediately, then send it.
+   *
+   * Sending during a turn is allowed: the message is parked with status
+   * 'queued' and dispatched by endTurn(). One turn at a time is a backend
+   * constraint (a turn reads the chat history it is about to extend), not a
+   * reason to take the keyboard away from the user.
+   */
+  sendMessage: async (content) => {
+    const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const busy = get().isLoading;
+
+    set((state) => ({
+      messages: [...state.messages, {
+        id: localId,
+        localId,
+        role: 'user',
+        content,
+        created_at: new Date().toISOString(),
+        status: busy ? 'queued' : 'sending',
+      }],
+    }));
+
+    if (busy) return;
+    await get().dispatchMessage(localId);
+  },
+
+  dispatchQueued: () => {
+    if (get().isLoading) return;
+    const next = get().messages.find((message) => message.status === 'queued');
+    if (next) get().dispatchMessage(next.localId);
+  },
+
+  retryMessage: async (message) => {
+    if (get().isLoading) {
+      get().setMessageStatus(message.localId, 'queued');
+      return;
+    }
+    await get().dispatchMessage(message.localId);
+  },
+
   // Export network as GraphML
   exportNetworkAsGraphML: async (chatId = null) => {
     const id = chatId || get().chatId;
@@ -182,9 +282,9 @@ export const useChatStore = create((set, get) => ({
     set((state) => {
       // Deduplicate: Check if message with same ID already exists
       if (state.messages.some(m => m.id === message.id)) {
-        return { isLoading: false, thinkingMessage: null };
+        return {};
       }
-      
+
       // Also check if we have a streaming message that needs to be replaced/merged
       // This handles the race condition where `message` event arrives but we have a `isStreaming` placeholder
       
@@ -201,20 +301,14 @@ export const useChatStore = create((set, get) => ({
             }
             return m;
          });
-         return { 
-            messages: updatedMessages, 
-            isLoading: false, 
-            thinkingMessage: null,
-            streamingMessageId: null 
-         };
+         return { messages: updatedMessages };
       }
 
-      return { 
-        messages: [...state.messages, message],
-        isLoading: false,
-        thinkingMessage: null
-      };
+      return { messages: [...state.messages, message] };
     });
+    // `message` is terminal for the turn that produced it (the upload
+    // pipeline's only output, or an assistant reply delivered whole).
+    get().endTurn();
   },
 
   appendMessageChunk: (content) => {
@@ -242,7 +336,8 @@ export const useChatStore = create((set, get) => ({
           thinkingMessage: null 
         };
       } else {
-        // Create new
+        // Create new, adopting any tool results that finished before there was
+        // a message to hold them.
         const newId = Date.now();
         const newMessage = {
           role: 'assistant',
@@ -250,12 +345,13 @@ export const useChatStore = create((set, get) => ({
           id: newId,
           created_at: new Date().toISOString(),
           isStreaming: true,
-          tool_executions: []
+          tool_executions: state.pendingToolExecutions
         };
-        return { 
+        return {
           messages: [...messages, newMessage],
           thinkingMessage: null,
-          streamingMessageId: newId
+          streamingMessageId: newId,
+          pendingToolExecutions: []
         };
       }
     });
@@ -263,7 +359,14 @@ export const useChatStore = create((set, get) => ({
 
   addToolExecutionToStreamingMessage: (toolData) => {
       set((state) => {
-          if (!state.streamingMessageId) return {};
+          // A tool can finish before the assistant has emitted any text, so
+          // there is no message to attach it to yet. Hold it: the transcript
+          // marker that refers to it by index arrives moments later, and
+          // dropping it here left that marker rendering as a tool stuck on
+          // "running" for the rest of the turn.
+          if (!state.streamingMessageId) {
+              return { pendingToolExecutions: [...state.pendingToolExecutions, toolData] };
+          }
 
           const messages = [...state.messages];
           const idx = messages.findIndex(m => m.id === state.streamingMessageId);
@@ -299,8 +402,9 @@ export const useChatStore = create((set, get) => ({
             messages[idx].tool_executions = tool_executions;
         }
       }
-      return { messages, isLoading: false, thinkingMessage: null, streamingMessageId: null };
+      return { messages };
     });
+    get().endTurn();
   },
 
   setThinkingMessage: (msg) => set({ thinkingMessage: msg }),
