@@ -9,15 +9,27 @@ This document contains rules and guidelines for the Gemini AI agent working on t
 ## 2. Development Guidelines
 
 ### 2.1. Adding New Tools
-1. Define endpoint in `networkx-api/app/api/v1/endpoints/`.
-2. Add logic in `networkx-api/app/logic/`.
-3. Define tool schema in `backend/app/services/llm_service.py`.
-4. Update `SYSTEM_INSTRUCTION` in `llm_service.py` if necessary.
+Tools are MCP tools, auto-discovered from decorated functions. There is **no**
+schema to register by hand, and no `llm_service.py` (that file no longer exists).
+
+1. Add the algorithm in `networkx-api/app/logic/`.
+2. Add a `@mcp.tool()` + `@handle_tool_errors` function in
+   `networkx-api/app/mcp/tools/{domain}/`, and export it from that package's
+   `__init__.py`. The docstring and each `Field(description=...)` are sent to the
+   model verbatim — write them as prompt text.
+3. Restart the backend, or wait out `MCP_TOOLS_CACHE_TTL` (default 300s), so the
+   backend re-discovers the tool list.
+4. Only if the tool needs *procedural* guidance (when to reach for it, how to
+   combine it): add or edit a skill in
+   `backend/app/services/llm/skills/definitions/`. Do not add it to the system
+   prompt — `prompts.py` holds only always-true policy.
+5. Only if the tool needs *enforcement* (an argument to validate, a side effect
+   to trigger): add a hook in `backend/app/services/llm/hooks/builtin/`.
 
 ### 2.2. Modifying Workflows
 1. Update `specification/2_Technical_Details/6_Core_Workflows.md` first.
-2. Update `chat.py` and `llm_service.py`.
-3. Update Frontend event listeners.
+2. Update `chat.py`, `services/llm/service.py`, and `services/llm/engine.py`.
+3. Update Frontend event listeners (`frontend/src/hooks/useChatConnection.js`).
 
 ## 3. General Behavior
 - **Task Management**: Always use `task_boundary` to track progress.

@@ -183,6 +183,98 @@ Available Node Attributes:
 - tenure (integer)
 ```
 
+### 1.3.2. Skills (手続き知識の外部化)
+
+エージェントの振る舞いに関する指示は、性質によって置き場所を分ける。
+
+| 種別 | 置き場所 | 適用 |
+|:---|:---|:---|
+| 常に真である方針（役割・最小主義・ユーザー主体性・ツール実行規則） | `app/services/llm/prompts.py` | 毎ターン |
+| 手続き知識（分析の進め方・可視化の割り当て方・レイアウト調整・エラー回復） | `app/services/llm/skills/definitions/*.md` | 必要時のみ |
+
+**動機**: 以前は `prompts.py` が「部分グラフ作成戦略」「レイアウトのチューニング
+パラメータ一覧」といった手続き書を、リクエストの内容に関係なく全量注入していた。
+ノード数を尋ねるだけの質問でも全ての手順書が送られていた。
+
+**プログレッシブ・ディスクロージャ**:
+1. システムプロンプトにはスキルの**索引**（名前と1行説明）のみを載せる。
+2. モデルは `skill_load(name)` ツールで必要な手順書の本文を取得する。
+3. `TURN_START` フックがユーザー発話とスキルの `triggers` を突き合わせ、
+   関連しそうなスキル名を1行だけ示唆する。索引は常に存在するので、キーワードが
+   外れてもモデルは自力で選べる（示唆は誘導であって門番ではない）。
+
+**効果**: 常時プロンプトが 16,217 → 7,496 文字（53.8% 削減）。一方で手順書は
+合計 23,358 文字と以前より充実し、必要なターンでのみ読み込まれる。
+
+**スキルの定義形式**: Markdown + 最小限の frontmatter（`name`, `description`,
+`triggers`, `related_tools`）。`definitions/` に置けば自動的に検出される。
+`triggers` には**日英両方**のキーワードを必ず含める。本アプリの利用者は日本語を
+書くため、英語のみの trigger リストは日本語リクエストから不可視になる
+（`tests/test_skills_loader.py` がこれを検査する）。
+
+現在のスキル: `conversation-flow`, `analysis-planning`, `visual-encoding`,
+`layout-tuning`, `subgraph-workflow`, `error-recovery`。
+
+### 1.3.3. Hooks (実行時の強制と副作用)
+
+プロンプトの文章は無視され得る。安全上の制約と副作用は、エージェントループの
+各点で発火する**登録式フック**として機構化する（`app/services/llm/hooks/`）。
+
+| イベント | 発火点 | できること |
+|:---|:---|:---|
+| `TURN_START` | 最初の generate() 前に1回 | システムプロンプトへのブロック追加 |
+| `PRE_TOOL` | 全ツール呼び出しの直前 | **許可 / 引数の修正 / 拒否** |
+| `POST_TOOL` | 呼び出し成功後 | 描画、表示ネットワークの切替 |
+| `TOOL_ERROR` | 失敗または拒否の後 | ターンの中断 |
+| `NO_TOOL_CALLS` | ツールを呼ばずに終わろうとした時 | もう1周の要求 |
+| `TURN_END` | ループ終了後に1回 | ターン集計のログ出力 |
+
+**優先度帯**（昇順に実行）:
+
+```
+10-39  normalize     引数の書き換え
+40-69  guards        検証と拒否（修正後の引数を見る）
+90-100 audit         集計とログ
+```
+
+順序は本質的である。ガードは正規化後の引数を検証しなければならない。
+
+**拒否の意味論**: `PRE_TOOL` が `deny` を返した場合、エンジンはツールを呼ばず、
+`{"error": 理由, "blocked_by": フック名}` を**通常のツール結果として履歴に積む**。
+モデルは理由を読んで次のイテレーションで自己修正できる。例外ではないため会話は
+継続し、かつプロンプトの指示と違って迂回できない。
+
+**フックは fail-open**: 例外を投げたフックはログと集計に記録された上で「意見なし」
+として扱う。1つのガードのバグが全ツール呼び出しを止めることを防ぐため。
+
+**組み込みフック**:
+
+| フック | イベント | 役割 |
+|:---|:---|:---|
+| `normalize_network_id` | PRE | 現在のネットワークIDを補完（以前は `engine.py` に直書き） |
+| `normalize_attribute_case` | PRE | 大文字小文字のみの差異を補正。曖昧な場合は補正せずガードに委ねる |
+| `normalize_numeric_params` | PRE | 範囲外の数値をクランプし、補正内容を結果に注記する |
+| `guard_repeat_call` | PRE | 同一ツール・同一引数の反復を拒否 |
+| `guard_expensive_computation` | PRE | 閾値超のグラフに対する超線形計算を拒否し、代替を提示 |
+| `guard_attribute_exists` | PRE | 存在しない属性名での呼び出しを拒否し、実在する候補を列挙 |
+| `guard_consecutive_failures` | ERROR | 同一ツールの連続失敗でターンを中断 |
+| `on_new_network_id` / `on_view_switch` / `on_label_update` / `on_visualization_payload` | POST | 描画と表示切替（以前の `_handle_side_effects` の if/elif を置換） |
+| `nudge_stalled_intent` / `force_final_summary` | NO_TOOL_CALLS | 宣言のみで終わったターンの継続要求 |
+| `inject_skill_index` / `inject_skill_suggestions` / `inject_iteration_budget` | START | プロンプトへの文脈追加 |
+
+**`guard_expensive_computation` の意義**: ツール実行経路にはタイムアウトが一切
+存在しない。大規模グラフへの媒介中心性計算はリクエストを占有し続け、利用者には
+チャットのハングとして現れる。このガードは実行前に拒否し、近似パラメータ（`k`）
+や代替指標を案内する。環境変数 `AGENT_EXPENSIVE_NODE_THRESHOLD`（既定 2000）と
+`AGENT_EXPENSIVE_GUARD_ENABLED` で調整・無効化できる。
+
+**`nudge_stalled_intent` について**: 「次に…します」と宣言してツールを呼ばずに
+終わるケースを検出する。以前の実装は `will` / `let me` という英語キーワードのみを
+見ており、本アプリの主要 UX 言語である日本語では**一度も機能していなかった**。
+現在は日英双方のパターンを持つ。ただし本質的にヒューリスティックであり、
+「提案して承認を待つ」のは `conversation-flow` が求める正当な完結ターンなので、
+疑問形・選択肢提示を検出した場合は発火しない。継続はターンあたり1回まで。
+
 ## 1.4. 主要なデータモデル (Pydantic Schemas)
 
 APIで送受信される主要なデータ構造です。
@@ -274,6 +366,17 @@ APIは、エラー発生時にHTTPステータスコードと、詳細情報を�
 - **目的**: 複雑化していたツール実行ループとストリーミング処理を整理するため、`execute_tool_loop` 関数を機能単位で分割しました。
 - **構成**:
   - `_consume_stream`: LLMからのストリーミングレスポンスを消費し、テキストチャンクの送信と関数呼び出しの集約を行う。
-  - `_handle_tool_execution`: ツール（Local/MCP）の実行とエラーハンドリングを行う。
-  - `_handle_visualization_update`: ツール実行結果に基づくコンテキスト切り替え、可視化データの保存、フロントエンドへの更新通知を行う。
-  - `execute_tool_loop`: 上記関数をオーケストレーションするメインループ。
+  - `_execute_tool_loop`: ReAct ループ本体。イテレーションごとにストリーム消費 → ツール並列実行 → 次の生成を行う。
+  - `_run_tool_with_events`: 1ツール分のラッパー。`PRE_TOOL` フックの実行、拒否時の短絡、SSEイベントの送出を担う。
+  - `_dispatch_tool_hooks`: ツール単位イベント（PRE / POST / ERROR）の `HookContext` 構築とディスパッチ。
+  - `_run_tool`: Local ツールと MCP ツールの振り分けのみを行う。
+- **フックへ移譲された処理**: 以前この層に直書きされていた副作用（自動描画・
+  ネットワーク切替・`network_id` 補完・宣言のみで終わったターンの検出・強制
+  サマリ生成）は全て `app.services.llm.hooks.builtin` に移設された。1.3.3 を参照。
+- **ターン状態**: `hooks.new_turn_state()` が生成する辞書を1ターン通して共有し、
+  反復呼び出しカウント・失敗カウント・中断フラグ・現在のネットワークIDを保持する。
+
+### 1.7.2. Emitters (`app.services.llm.emitters`)
+SSEイベントの送出関数群。フックはキューを持つがエージェントのインスタンスを
+持たないため、エンジンとフックが同一のイベント形状を送れるよう切り出されている。
+フロントエンド側の契約は `frontend/src/hooks/useChatConnection.js` を参照。
