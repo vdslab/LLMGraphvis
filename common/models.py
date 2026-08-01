@@ -336,7 +336,7 @@ class LlmUsage(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     message_id = Column(Integer, ForeignKey("chat_messages.id"), nullable=False, unique=True)
-    provider = Column(String, nullable=False)          # "google" | "anthropic"
+    provider = Column(String, nullable=False)  # "google" | "anthropic" | "openai"
     model = Column(String, nullable=False)               # e.g. "gemini-2.5-flash", "claude-opus-4-8"
     input_tokens = Column(Integer, nullable=False, default=0)
     output_tokens = Column(Integer, nullable=False, default=0)

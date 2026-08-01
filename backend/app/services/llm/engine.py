@@ -54,9 +54,13 @@ def _create_provider(provider_name: str, model_name: Optional[str] = None) -> LL
     if provider_name == "anthropic":
         from .providers.anthropic_provider import AnthropicProvider
         return AnthropicProvider(model_name=model_name)
-    else:
+    if provider_name == "openai":
+        from .providers.openai_provider import OpenAIProvider
+        return OpenAIProvider(model_name=model_name)
+    if provider_name == "google":
         from .providers.google_genai import GoogleGenAIProvider
         return GoogleGenAIProvider(model_name=model_name)
+    raise ValueError(f"Unsupported LLM provider: {provider_name}")
 
 
 def resolve_provider_name(provider_name: Optional[str] = None) -> str:
@@ -81,7 +85,7 @@ class GraphVisAgent:
     def __init__(self, db: Any = None, provider_name: Optional[str] = None, model_name: Optional[str] = None):
         self.db = db
         # provider_name/model_name let a chat pin its own provider/model, overriding
-        # the process-wide LLM_PROVIDER/GEMINI_MODEL/CLAUDE_MODEL env var defaults.
+        # the process-wide provider-specific model environment variable defaults.
         self.provider_name = resolve_provider_name(provider_name)
         self.provider = _create_provider(self.provider_name, model_name)
         # Full system prompt for this turn. process_turn() appends the network

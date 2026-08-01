@@ -21,7 +21,7 @@ from app.core import database
 from app.core.logging import get_logger
 from app.services import llm as llm_service
 from app.services.llm import mcp_client
-from app.services.llm.catalog import PROVIDER_CATALOG
+from app.services.llm.catalog import get_available_provider_catalog
 from app.services import chat_service
 
 logger = get_logger(__name__)
@@ -48,7 +48,7 @@ def list_llm_providers(
     current_user: models.User = Depends(get_current_user),
 ):
     """List the LLM providers/models a chat can be pinned to."""
-    return PROVIDER_CATALOG
+    return get_available_provider_catalog()
 
 
 @router.get("", response_model=List[schemas.Chat])

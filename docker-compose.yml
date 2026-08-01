@@ -53,6 +53,8 @@ services:
       - GEMINI_MODEL=${GEMINI_MODEL:-}
       - CLAUDE_MODEL=${CLAUDE_MODEL:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-}
       # Region fallback chain (ANTHROPIC_VERTEX_REGION -> VERTEX_LOCATION -> code default)
       # is resolved in the provider code; no default here so .env stays authoritative.
       - ANTHROPIC_VERTEX_REGION=${ANTHROPIC_VERTEX_REGION:-}

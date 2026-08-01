@@ -30,13 +30,17 @@ MODEL_PRICING = {
     # GEMINI_MODEL default) plus adjacent tier.
     "gemini-2.5-flash": {"input": 0.30, "output": 2.50, "cached_input": 0.075},
     "gemini-2.5-pro": {"input": 1.25, "output": 10.00, "cached_input": 0.31},
+    # OpenAI — prices published for the GPT-5.6 family.
+    "gpt-5.6-sol": {"input": 5.00, "output": 30.00, "cached_input": 0.50},
+    "gpt-5.6-terra": {"input": 2.50, "output": 15.00, "cached_input": 0.25},
+    "gpt-5.6-luna": {"input": 1.00, "output": 6.00, "cached_input": 0.10},
 }
 DEFAULT_PRICING = {"input": 0.0, "output": 0.0, "cached_input": 0.0}
 
 
 # Providers whose reported input_tokens already include the cached tokens,
 # so the cached portion must be subtracted before applying the full input rate.
-PROVIDERS_WITH_CACHED_IN_INPUT = {"google"}
+PROVIDERS_WITH_CACHED_IN_INPUT = {"google", "openai"}
 
 
 def estimate_cost_usd(
