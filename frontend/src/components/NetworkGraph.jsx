@@ -185,7 +185,11 @@ const NetworkGraph = memo(({ nodes, links, showLabels = false, onNodeClick, onBa
   }, [nodes, links, showLabels, dimensions]); // Dependencies updated to exclude callbacks
 
   return (
-    <div ref={containerRef} style={{ width: '100%', height: '100%', position: 'relative' }}>
+    <div
+      ref={containerRef}
+      data-testid="network-graph"
+      style={{ width: '100%', height: '100%', position: 'relative' }}
+    >
       <svg ref={svgRef} style={{ width: '100%', height: '100%', display: 'block' }}></svg>
     </div>
   );

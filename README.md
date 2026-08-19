@@ -213,6 +213,21 @@ When the backend runs directly on the host, it connects to
 Studio is served elsewhere. Models with native tool-use support give the most
 reliable graph-agent behavior.
 
+### Exploratory prompt evaluation with Cline
+
+To have Cline freely design conversations that evaluate the current system
+prompt, Skills, and MCP descriptions against a real isolated GraphVisAgent:
+
+```bash
+scripts/evaluate \
+  --target "GraphVisAgentのシステムプロンプトとSkillsの有効性を評価する"
+```
+
+This workflow does not use Git diffs or stored test scenarios. It pins Cline and
+GraphVisAgent to `google/gemma-4-e4b`, records tool/Skill/state/PNG evidence, and
+writes recommendation-only JSON and Markdown reports. See
+[`evaluation/README.md`](evaluation/README.md) for setup and architecture.
+
 ## 🌐 API Endpoints
 
 ### Authentication

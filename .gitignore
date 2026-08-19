@@ -66,6 +66,9 @@ dmypy.json
 .ruff_cache/
 .flymake*
 
+# Local prompt-evaluation runs (reports, transcripts, screenshots)
+.evaluation/
+
 # Translations
 *.mo
 *.pot
