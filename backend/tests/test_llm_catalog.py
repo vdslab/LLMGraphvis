@@ -1,8 +1,13 @@
+from unittest.mock import patch
+
 from app.services.llm.catalog import get_available_provider_catalog
 
 
 def _provider_ids():
-    return [provider["id"] for provider in get_available_provider_catalog()]
+    with patch(
+        "app.services.llm.catalog.list_lmstudio_model_ids", return_value=[]
+    ):
+        return [provider["id"] for provider in get_available_provider_catalog()]
 
 
 def test_openai_is_hidden_without_api_key(monkeypatch):
@@ -30,20 +35,38 @@ def test_other_providers_are_not_affected(monkeypatch):
     assert _provider_ids() == ["google", "anthropic"]
 
 
-def test_lmstudio_is_hidden_without_configured_model(monkeypatch):
-    monkeypatch.delenv("LM_STUDIO_MODEL", raising=False)
+def test_lmstudio_is_hidden_when_server_has_no_models():
+    with patch(
+        "app.services.llm.catalog.list_lmstudio_model_ids", return_value=[]
+    ):
+        assert "lmstudio" not in [
+            provider["id"] for provider in get_available_provider_catalog()
+        ]
 
-    assert "lmstudio" not in _provider_ids()
 
-
-def test_lmstudio_uses_configured_model(monkeypatch):
+def test_lmstudio_uses_discovered_models(monkeypatch):
     monkeypatch.setenv("LM_STUDIO_MODEL", "qwen/qwen3-8b")
 
-    providers = get_available_provider_catalog()
+    with patch(
+        "app.services.llm.catalog.list_lmstudio_model_ids",
+        return_value=["qwen/qwen3-8b", "openai/gpt-oss-20b"],
+    ):
+        providers = get_available_provider_catalog()
     lmstudio = next(provider for provider in providers if provider["id"] == "lmstudio")
 
     assert lmstudio == {
         "id": "lmstudio",
         "label": "LM Studio (Local)",
-        "models": [{"id": "qwen/qwen3-8b", "label": "qwen/qwen3-8b"}],
+        "models": [
+            {
+                "id": "qwen/qwen3-8b",
+                "label": "qwen/qwen3-8b",
+                "default": True,
+            },
+            {
+                "id": "openai/gpt-oss-20b",
+                "label": "openai/gpt-oss-20b",
+                "default": False,
+            },
+        ],
     }

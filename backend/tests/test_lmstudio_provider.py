@@ -1,10 +1,12 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
+import httpx
 import pytest
 
 from app.services.llm.providers.lmstudio_provider import (
     DEFAULT_LM_STUDIO_BASE_URL,
     LMStudioProvider,
+    list_lmstudio_model_ids,
 )
 
 
@@ -41,5 +43,53 @@ def test_accepts_custom_endpoint_token_and_pinned_model(monkeypatch):
 def test_requires_a_model_identifier(monkeypatch):
     monkeypatch.delenv("LM_STUDIO_MODEL", raising=False)
 
-    with pytest.raises(ValueError, match="LM_STUDIO_MODEL"):
-        LMStudioProvider()
+    with patch(
+        "app.services.llm.providers.lmstudio_provider.list_lmstudio_model_ids",
+        return_value=[],
+    ):
+        with pytest.raises(ValueError, match="no available model"):
+            LMStudioProvider()
+
+
+def test_uses_first_discovered_model_when_no_default_is_configured(monkeypatch):
+    monkeypatch.delenv("LM_STUDIO_MODEL", raising=False)
+
+    with (
+        patch("openai.AsyncOpenAI"),
+        patch(
+            "app.services.llm.providers.lmstudio_provider.list_lmstudio_model_ids",
+            return_value=["first-model", "second-model"],
+        ),
+    ):
+        provider = LMStudioProvider()
+
+    assert provider.model_name == "first-model"
+
+
+def test_discovers_models_from_openai_compatible_endpoint(monkeypatch):
+    monkeypatch.setenv("LM_STUDIO_BASE_URL", "http://localhost:1234/v1/")
+    monkeypatch.setenv("LM_STUDIO_API_KEY", "local-token")
+    response = Mock()
+    response.json.return_value = {
+        "data": [
+            {"id": "qwen/qwen3-8b"},
+            {"id": "openai/gpt-oss-20b"},
+            {"id": "qwen/qwen3-8b"},
+        ]
+    }
+
+    with patch("httpx.get", return_value=response) as get:
+        models = list_lmstudio_model_ids()
+
+    get.assert_called_once_with(
+        "http://localhost:1234/v1/models",
+        headers={"Authorization": "Bearer local-token"},
+        timeout=2.0,
+    )
+    response.raise_for_status.assert_called_once_with()
+    assert models == ["qwen/qwen3-8b", "openai/gpt-oss-20b"]
+
+
+def test_model_discovery_failure_returns_empty_list():
+    with patch("httpx.get", side_effect=httpx.ConnectError("offline")):
+        assert list_lmstudio_model_ids() == []

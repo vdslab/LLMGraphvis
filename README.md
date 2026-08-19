@@ -192,17 +192,20 @@ including streaming and tool calls.
 
 1. In LM Studio, load a model with tool-use support and start the server from
    the **Developer** tab (the default port is `1234`).
-2. Find the loaded model id with `curl http://localhost:1234/v1/models`.
-3. Add the model id to the root `.env` file:
+2. Restart the backend and open the model selector. GraphVisAgent reads
+   `GET /v1/models` and lists the models currently available in LM Studio.
+3. Optionally set a model to use when a chat has no pinned model:
 
    ```env
-   LM_STUDIO_MODEL=your-loaded-model-id
+   # Optional LM Studio default; the selector does not require this setting.
+   LM_STUDIO_MODEL=your-default-model-id
    # Optional when LM Studio server authentication is enabled:
    # LM_STUDIO_API_KEY=your-lm-studio-token
    ```
 
-4. Restart the backend. Select **LM Studio (Local)** in the chat model selector,
-   or set `LLM_PROVIDER=lmstudio` to make it the process-wide default.
+4. Select **LM Studio (Local)** and the desired model in each chat. Set
+   `LLM_PROVIDER=lmstudio` only when LM Studio should be the process-wide
+   default provider; multiple providers remain available in the selector.
 
 When the backend runs directly on the host, it connects to
 `http://localhost:1234/v1`. Docker Compose automatically uses
