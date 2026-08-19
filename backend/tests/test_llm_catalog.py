@@ -25,5 +25,25 @@ def test_openai_is_available_with_api_key(monkeypatch):
 
 def test_other_providers_are_not_affected(monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("LM_STUDIO_MODEL", raising=False)
 
     assert _provider_ids() == ["google", "anthropic"]
+
+
+def test_lmstudio_is_hidden_without_configured_model(monkeypatch):
+    monkeypatch.delenv("LM_STUDIO_MODEL", raising=False)
+
+    assert "lmstudio" not in _provider_ids()
+
+
+def test_lmstudio_uses_configured_model(monkeypatch):
+    monkeypatch.setenv("LM_STUDIO_MODEL", "qwen/qwen3-8b")
+
+    providers = get_available_provider_catalog()
+    lmstudio = next(provider for provider in providers if provider["id"] == "lmstudio")
+
+    assert lmstudio == {
+        "id": "lmstudio",
+        "label": "LM Studio (Local)",
+        "models": [{"id": "qwen/qwen3-8b", "label": "qwen/qwen3-8b"}],
+    }

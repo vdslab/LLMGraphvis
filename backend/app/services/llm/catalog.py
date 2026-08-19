@@ -3,7 +3,8 @@
 Model ids here must stay in sync with the defaults in the provider adapters and
 with pricing.py's MODEL_PRICING keys (unknown models just default to $0.0
 estimated cost rather than erroring, so drift here degrades gracefully but
-should still be avoided).
+should still be avoided). LM Studio is added dynamically because its model id is
+chosen by the user in LM Studio rather than by this application.
 """
 import os
 from typing import Any, Dict, List
@@ -44,13 +45,25 @@ def is_provider_available(provider_id: str) -> bool:
     """Return whether the provider has the credentials required to be used."""
     if provider_id == "openai":
         return bool((os.getenv("OPENAI_API_KEY") or "").strip())
+    if provider_id == "lmstudio":
+        return bool((os.getenv("LM_STUDIO_MODEL") or "").strip())
     return True
 
 
 def get_available_provider_catalog() -> List[Dict[str, Any]]:
     """Return only providers that are usable in the current environment."""
-    return [
+    providers = [
         provider
         for provider in PROVIDER_CATALOG
         if is_provider_available(provider["id"])
     ]
+    lmstudio_model = (os.getenv("LM_STUDIO_MODEL") or "").strip()
+    if lmstudio_model:
+        providers.append(
+            {
+                "id": "lmstudio",
+                "label": "LM Studio (Local)",
+                "models": [{"id": lmstudio_model, "label": lmstudio_model}],
+            }
+        )
+    return providers

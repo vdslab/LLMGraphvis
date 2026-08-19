@@ -57,6 +57,9 @@ def _create_provider(provider_name: str, model_name: Optional[str] = None) -> LL
     if provider_name == "openai":
         from .providers.openai_provider import OpenAIProvider
         return OpenAIProvider(model_name=model_name)
+    if provider_name == "lmstudio":
+        from .providers.lmstudio_provider import LMStudioProvider
+        return LMStudioProvider(model_name=model_name)
     if provider_name == "google":
         from .providers.google_genai import GoogleGenAIProvider
         return GoogleGenAIProvider(model_name=model_name)

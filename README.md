@@ -185,6 +185,31 @@ npm install
 npm run dev
 ```
 
+### Using a local model with LM Studio
+
+GraphVisAgent can use LM Studio's OpenAI-compatible Chat Completions endpoint,
+including streaming and tool calls.
+
+1. In LM Studio, load a model with tool-use support and start the server from
+   the **Developer** tab (the default port is `1234`).
+2. Find the loaded model id with `curl http://localhost:1234/v1/models`.
+3. Add the model id to the root `.env` file:
+
+   ```env
+   LM_STUDIO_MODEL=your-loaded-model-id
+   # Optional when LM Studio server authentication is enabled:
+   # LM_STUDIO_API_KEY=your-lm-studio-token
+   ```
+
+4. Restart the backend. Select **LM Studio (Local)** in the chat model selector,
+   or set `LLM_PROVIDER=lmstudio` to make it the process-wide default.
+
+When the backend runs directly on the host, it connects to
+`http://localhost:1234/v1`. Docker Compose automatically uses
+`http://host.docker.internal:1234/v1`; override `LM_STUDIO_BASE_URL` if LM
+Studio is served elsewhere. Models with native tool-use support give the most
+reliable graph-agent behavior.
+
 ## 🌐 API Endpoints
 
 ### Authentication
