@@ -55,6 +55,10 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=${OPENAI_MODEL:-}
+      # LM Studio runs on the host. Override this for a remote LM Studio server.
+      - LM_STUDIO_BASE_URL=${LM_STUDIO_BASE_URL:-http://host.docker.internal:1234/v1}
+      - LM_STUDIO_MODEL=${LM_STUDIO_MODEL:-}
+      - LM_STUDIO_API_KEY=${LM_STUDIO_API_KEY:-}
       # Region fallback chain (ANTHROPIC_VERTEX_REGION -> VERTEX_LOCATION -> code default)
       # is resolved in the provider code; no default here so .env stays authoritative.
       - ANTHROPIC_VERTEX_REGION=${ANTHROPIC_VERTEX_REGION:-}
@@ -77,6 +81,8 @@ services:
       timeout: 5s
       retries: 5
     restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./backend:/app
       - ./common:/app/common
