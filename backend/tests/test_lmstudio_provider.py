@@ -71,10 +71,11 @@ def test_discovers_models_from_openai_compatible_endpoint(monkeypatch):
     monkeypatch.setenv("LM_STUDIO_API_KEY", "local-token")
     response = Mock()
     response.json.return_value = {
-        "data": [
-            {"id": "qwen/qwen3-8b"},
-            {"id": "openai/gpt-oss-20b"},
-            {"id": "qwen/qwen3-8b"},
+        "models": [
+            {"type": "llm", "key": "qwen/qwen3-8b"},
+            {"type": "llm", "key": "openai/gpt-oss-20b"},
+            {"type": "llm", "key": "qwen/qwen3-8b"},
+            {"type": "embedding", "key": "nomic-embed-text"},
         ]
     }
 
@@ -82,7 +83,7 @@ def test_discovers_models_from_openai_compatible_endpoint(monkeypatch):
         models = list_lmstudio_model_ids()
 
     get.assert_called_once_with(
-        "http://localhost:1234/v1/models",
+        "http://localhost:1234/api/v1/models",
         headers={"Authorization": "Bearer local-token"},
         timeout=2.0,
     )

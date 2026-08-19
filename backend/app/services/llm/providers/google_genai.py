@@ -16,6 +16,7 @@ from tenacity import (
 from app.core.logging import get_logger
 
 from .base import LLMProvider
+from .defaults import DEFAULT_GEMINI_MODEL
 from .types import (
     FunctionCallData,
     LLMFunctionCallPart,
@@ -49,7 +50,6 @@ def _is_retryable_error(exception) -> bool:
     return False
 
 
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 DEFAULT_VERTEX_LOCATION = "us-central1"
 DEFAULT_THINKING_BUDGET = 2048
 

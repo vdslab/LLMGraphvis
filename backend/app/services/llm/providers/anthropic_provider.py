@@ -5,6 +5,7 @@ from typing import AsyncIterator, List, Optional
 from app.core.logging import get_logger
 
 from .base import LLMProvider
+from .defaults import DEFAULT_CLAUDE_MODEL
 from .types import (
     FunctionCallData,
     LLMFunctionCallPart,
@@ -51,7 +52,6 @@ def _lowercase_schema_types(schema) -> dict:
     return result
 
 
-DEFAULT_CLAUDE_MODEL = "claude-opus-4-8"
 DEFAULT_ANTHROPIC_VERTEX_REGION = "us-east5"
 DEFAULT_MAX_TOKENS = 16000
 

@@ -5,6 +5,7 @@ from typing import AsyncIterator, List, Optional
 from app.core.logging import get_logger
 
 from .base import LLMProvider
+from .defaults import DEFAULT_OPENAI_MODEL
 from .types import (
     FunctionCallData,
     LLMFunctionCallPart,
@@ -17,9 +18,6 @@ from .types import (
 )
 
 logger = get_logger(__name__)
-
-DEFAULT_OPENAI_MODEL = "gpt-5.6-sol"
-
 
 class OpenAIProvider(LLMProvider):
     """OpenAI Chat Completions adapter for the provider-agnostic agent loop."""

@@ -45,6 +45,7 @@ def test_lmstudio_is_hidden_when_server_has_no_models():
 
 
 def test_lmstudio_uses_discovered_models(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "lmstudio")
     monkeypatch.setenv("LM_STUDIO_MODEL", "qwen/qwen3-8b")
 
     with patch(
@@ -70,3 +71,35 @@ def test_lmstudio_uses_discovered_models(monkeypatch):
             },
         ],
     }
+
+
+def test_google_is_the_default_when_provider_is_not_configured(monkeypatch):
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+
+    with patch(
+        "app.services.llm.catalog.list_lmstudio_model_ids", return_value=[]
+    ):
+        providers = get_available_provider_catalog()
+
+    defaults = [
+        (provider["id"], model["id"])
+        for provider in providers
+        for model in provider["models"]
+        if model["default"]
+    ]
+    assert defaults == [("google", "gemini-2.5-flash")]
+
+
+def test_lmstudio_first_model_is_default_when_not_explicitly_configured(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "lmstudio")
+    monkeypatch.delenv("LM_STUDIO_MODEL", raising=False)
+
+    with patch(
+        "app.services.llm.catalog.list_lmstudio_model_ids",
+        return_value=["first-model", "second-model"],
+    ):
+        providers = get_available_provider_catalog()
+
+    lmstudio = next(provider for provider in providers if provider["id"] == "lmstudio")
+    assert [model["default"] for model in lmstudio["models"]] == [True, False]

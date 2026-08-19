@@ -193,7 +193,7 @@ including streaming and tool calls.
 1. In LM Studio, load a model with tool-use support and start the server from
    the **Developer** tab (the default port is `1234`).
 2. Restart the backend and open the model selector. GraphVisAgent reads
-   `GET /v1/models` and lists the models currently available in LM Studio.
+   `GET /api/v1/models` and lists the chat-capable models available in LM Studio.
 3. Optionally set a model to use when a chat has no pinned model:
 
    ```env

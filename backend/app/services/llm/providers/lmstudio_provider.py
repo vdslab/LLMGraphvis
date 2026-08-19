@@ -20,8 +20,14 @@ def get_lmstudio_base_url() -> str:
     ).rstrip("/")
 
 
+def get_lmstudio_server_url() -> str:
+    """Return the LM Studio server root used by its native management API."""
+    base_url = get_lmstudio_base_url()
+    return base_url[:-3] if base_url.endswith("/v1") else base_url
+
+
 def list_lmstudio_model_ids() -> List[str]:
-    """Return model ids advertised by LM Studio's OpenAI-compatible API.
+    """Return chat-capable model ids advertised by LM Studio's native API.
 
     An unavailable local server is an expected state, so discovery failures
     produce an empty list instead of breaking the provider catalog endpoint.
@@ -31,13 +37,13 @@ def list_lmstudio_model_ids() -> List[str]:
 
     try:
         response = httpx.get(
-            f"{get_lmstudio_base_url()}/models",
+            f"{get_lmstudio_server_url()}/api/v1/models",
             headers=headers,
             timeout=LM_STUDIO_DISCOVERY_TIMEOUT,
         )
         response.raise_for_status()
         payload = response.json()
-        data = payload.get("data", []) if isinstance(payload, dict) else []
+        data = payload.get("models", []) if isinstance(payload, dict) else []
     except (httpx.HTTPError, TypeError, ValueError) as exc:
         logger.debug("LM Studio model discovery unavailable: %s", exc)
         return []
@@ -45,7 +51,9 @@ def list_lmstudio_model_ids() -> List[str]:
     model_ids = []
     seen = set()
     for model in data if isinstance(data, list) else []:
-        model_id = model.get("id") if isinstance(model, dict) else None
+        if not isinstance(model, dict) or model.get("type") != "llm":
+            continue
+        model_id = model.get("key")
         if not isinstance(model_id, str):
             continue
         model_id = model_id.strip()

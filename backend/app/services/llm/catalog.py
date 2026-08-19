@@ -9,6 +9,11 @@ chosen by the user in LM Studio rather than by this application.
 import os
 from typing import Any, Dict, List
 
+from .providers.defaults import (
+    DEFAULT_CLAUDE_MODEL,
+    DEFAULT_GEMINI_MODEL,
+    DEFAULT_OPENAI_MODEL,
+)
 from .providers.lmstudio_provider import list_lmstudio_model_ids
 
 PROVIDER_CATALOG: List[Dict[str, Any]] = [
@@ -16,7 +21,7 @@ PROVIDER_CATALOG: List[Dict[str, Any]] = [
         "id": "google",
         "label": "Google Gemini",
         "models": [
-            {"id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash", "default": True},
+            {"id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash"},
             {"id": "gemini-2.5-pro", "label": "Gemini 2.5 Pro"},
         ],
     },
@@ -33,7 +38,7 @@ PROVIDER_CATALOG: List[Dict[str, Any]] = [
         "id": "openai",
         "label": "OpenAI ChatGPT",
         "models": [
-            {"id": "gpt-5.6-sol", "label": "GPT-5.6 Sol", "default": True},
+            {"id": "gpt-5.6-sol", "label": "GPT-5.6 Sol"},
             {"id": "gpt-5.6-terra", "label": "GPT-5.6 Terra"},
             {"id": "gpt-5.6-luna", "label": "GPT-5.6 Luna"},
         ],
@@ -41,6 +46,33 @@ PROVIDER_CATALOG: List[Dict[str, Any]] = [
 ]
 
 DEFAULT_PROVIDER = "google"
+
+PROVIDER_MODEL_DEFAULTS = {
+    "google": ("GEMINI_MODEL", DEFAULT_GEMINI_MODEL),
+    "anthropic": ("CLAUDE_MODEL", DEFAULT_CLAUDE_MODEL),
+    "openai": ("OPENAI_MODEL", DEFAULT_OPENAI_MODEL),
+}
+
+
+def resolve_default_provider() -> str:
+    """Return the process-wide provider used by chats without a provider pin."""
+    configured = (os.getenv("LLM_PROVIDER") or "").strip().lower()
+    return configured or DEFAULT_PROVIDER
+
+
+def resolve_default_model(
+    provider_id: str, lmstudio_models: List[str]
+) -> str:
+    """Resolve the model an unpinned chat will actually use for a provider."""
+    if provider_id == "lmstudio":
+        configured = (os.getenv("LM_STUDIO_MODEL") or "").strip()
+        return configured or (lmstudio_models[0] if lmstudio_models else "")
+
+    provider_default = PROVIDER_MODEL_DEFAULTS.get(provider_id)
+    if provider_default is None:
+        return ""
+    env_name, fallback = provider_default
+    return (os.getenv(env_name) or "").strip() or fallback
 
 
 def is_provider_available(provider_id: str) -> bool:
@@ -54,26 +86,39 @@ def is_provider_available(provider_id: str) -> bool:
 
 def get_available_provider_catalog() -> List[Dict[str, Any]]:
     """Return only providers that are usable in the current environment."""
+    lmstudio_models = list_lmstudio_model_ids()
     providers = [
         provider
         for provider in PROVIDER_CATALOG
         if is_provider_available(provider["id"])
     ]
-    lmstudio_models = list_lmstudio_model_ids()
-    configured_default = (os.getenv("LM_STUDIO_MODEL") or "").strip()
     if lmstudio_models:
         providers.append(
             {
                 "id": "lmstudio",
                 "label": "LM Studio (Local)",
                 "models": [
-                    {
-                        "id": model_id,
-                        "label": model_id,
-                        "default": model_id == configured_default,
-                    }
+                    {"id": model_id, "label": model_id}
                     for model_id in lmstudio_models
                 ],
             }
         )
-    return providers
+
+    default_provider = resolve_default_provider()
+    default_model = resolve_default_model(default_provider, lmstudio_models)
+    return [
+        {
+            **provider,
+            "models": [
+                {
+                    **model,
+                    "default": (
+                        provider["id"] == default_provider
+                        and model["id"] == default_model
+                    ),
+                }
+                for model in provider["models"]
+            ],
+        }
+        for provider in providers
+    ]
