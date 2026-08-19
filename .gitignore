@@ -277,6 +277,7 @@ activemq-data/
 .envrc
 .env.*
 !.env.example
+!.env.sample
 .env*.local
 
 # Virtual Environments (Python)
