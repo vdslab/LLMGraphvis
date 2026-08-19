@@ -9,6 +9,8 @@ chosen by the user in LM Studio rather than by this application.
 import os
 from typing import Any, Dict, List
 
+from .providers.lmstudio_provider import list_lmstudio_model_ids
+
 PROVIDER_CATALOG: List[Dict[str, Any]] = [
     {
         "id": "google",
@@ -46,7 +48,7 @@ def is_provider_available(provider_id: str) -> bool:
     if provider_id == "openai":
         return bool((os.getenv("OPENAI_API_KEY") or "").strip())
     if provider_id == "lmstudio":
-        return bool((os.getenv("LM_STUDIO_MODEL") or "").strip())
+        return bool(list_lmstudio_model_ids())
     return True
 
 
@@ -57,13 +59,21 @@ def get_available_provider_catalog() -> List[Dict[str, Any]]:
         for provider in PROVIDER_CATALOG
         if is_provider_available(provider["id"])
     ]
-    lmstudio_model = (os.getenv("LM_STUDIO_MODEL") or "").strip()
-    if lmstudio_model:
+    lmstudio_models = list_lmstudio_model_ids()
+    configured_default = (os.getenv("LM_STUDIO_MODEL") or "").strip()
+    if lmstudio_models:
         providers.append(
             {
                 "id": "lmstudio",
                 "label": "LM Studio (Local)",
-                "models": [{"id": lmstudio_model, "label": lmstudio_model}],
+                "models": [
+                    {
+                        "id": model_id,
+                        "label": model_id,
+                        "default": model_id == configured_default,
+                    }
+                    for model_id in lmstudio_models
+                ],
             }
         )
     return providers
