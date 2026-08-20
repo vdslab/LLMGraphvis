@@ -1,14 +1,14 @@
 # GraphVisAgent
 
-A web application for interactive network visualization powered by LLM (Gemini API). Users can upload GraphML files, visualize networks, and interact with them using natural language.
+A web application for interactive network visualization driven by an LLM agent. Users upload GraphML files and drive all analysis and visual encoding through conversation.
 
 ## 🚀 Quick Start
 
-**Get started in 5 minutes!** See [QUICKSTART.md](QUICKSTART.md) for detailed setup instructions.
+See [QUICKSTART.md](QUICKSTART.md) for full setup instructions.
 
 ```bash
-# 1. Set your Gemini API key
-export GOOGLE_API_KEY="your-api-key-here"
+# 1. Configure your environment (set SECRET_KEY, LLM_PROVIDER and its API key)
+cp .env.sample .env
 
 # 2. Start all services
 docker compose up -d
@@ -22,7 +22,7 @@ docker compose up -d
 
 - 🔐 **User Authentication** - Secure login and registration
 - 📤 **GraphML Upload** - Import network data from GraphML files
-- 🤖 **LLM-Powered Chat** - Natural language interaction using Gemini API
+- 🤖 **LLM-Powered Chat** - Natural language interaction; swap between cloud and local models per chat
 - 📊 **Interactive Visualization** - Real-time network visualization
 - 🎯 **Smart Analysis** - Automatic centrality calculation and visual mapping
 - 🔄 **Real-time Updates** - Server-Sent Events for live feedback
@@ -51,28 +51,29 @@ docker compose up -d
                            ▲
                            │
                     ┌─────────────┐
-                    │ Gemini API  │
+                    │  LLM (any)  │
                     └─────────────┘
 ```
 
 ### Components
 
 - **Frontend**: React + Vite, D3.js for visualization
-- **Backend**: FastAPI with Gemini API integration
+- **Backend**: FastAPI, agent loop over a pluggable LLM provider
 - **NetworkX API**: Network analysis and centrality calculations
 - **Database**: PostgreSQL for data persistence
 
 ## 📚 Documentation
 
-- **[Quick Start Guide](QUICKSTART.md)** - Get up and running in minutes
-- **[Implementation Guide](IMPLEMENTATION_GUIDE.md)** - Detailed architecture and API documentation
-- **[Specification](specification/README.md)** - Complete system specification (Japanese)
+- **[Quick Start Guide](QUICKSTART.md)** - Setup, usage, and troubleshooting
+- **[AGENTS.md](AGENTS.md)** - How the repository is organised and how to change it
+- **[Specification](specification/README.md)** - The design decisions behind the system (Japanese)
+- **API reference** - http://localhost:8000/docs once the backend is running
 
 ## 🛠️ Technology Stack
 
 ### Backend
 - FastAPI (Python web framework)
-- Google GenAI SDK (`google-genai`) for Gemini API
+- Pluggable LLM providers: Google Gemini, Anthropic Claude, OpenAI, and LM Studio (local)
 - SQLAlchemy (ORM)
 - PostgreSQL (Database)
 - NetworkX (Graph analysis)
@@ -86,17 +87,22 @@ docker compose up -d
 
 ## 🔑 Key Features Explained
 
-### LLM Integration (Gemini API)
+### LLM Integration
 
-The system uses **Gemini 2.5 Flash** with **function calling** to understand user requests and execute appropriate network analysis tools:
+The agent uses **tool calling** to turn a request into network analysis. Providers
+are pluggable — Google Gemini, Anthropic Claude, OpenAI, and LM Studio for local
+models — and the provider and model are remembered per chat.
 
-```python
-# Example: User says "Show people with many friends as larger"
-# LLM automatically:
-1. Calls calculate_centrality(network_id, "degree")
-2. Calls generate_visualization(node_size_attribute="degree_centrality")
-3. Returns a friendly response
 ```
+# User: "Show people with many friends as larger"
+# The agent:
+1. analysis_degree_centrality(...)      # compute and store the metric
+2. visualization_generate(...)          # map it to node size and render
+3. Explains what it did, and why
+```
+
+Tools are served over MCP by the NetworkX API service and discovered
+automatically; see [AGENTS.md](AGENTS.md).
 
 ### Real-time Updates (SSE)
 
@@ -116,9 +122,10 @@ Available centrality metrics:
 
 ## 🧪 Testing
 
-### Automated Test
 ```bash
-python test_complete_flow.py
+cd backend       && pytest
+cd networkx-api  && pytest tests
+cd frontend      && npm test && npm run lint
 ```
 
 ### Manual Testing
@@ -141,23 +148,15 @@ The `sample_data/` directory contains example networks:
 
 ### Prerequisites
 - Docker and Docker Compose
-- Python 3.11+
-- Node.js 18+
-- Google Gemini API key
+- An API key for one LLM provider, or LM Studio running locally
 
 ### Environment Variables
 
-Create a `.env` file:
-```env
-GOOGLE_API_KEY=your-gemini-api-key
-DATABASE_URL=postgresql://postgres:postgres@db:5432/graphvisagent
-SECRET_KEY=your-secret-key
-NETWORKX_API_URL=http://networkx-api:8001
+Copy `.env.sample` to `.env` and fill it in — it documents every variable,
+including the provider keys and the container egress switches.
 
-# Optional: Vertex AI Configuration (overrides GOOGLE_API_KEY)
-# VERTEX_PROJECT_ID=your-project-id
-# VERTEX_LOCATION=us-central1
-# GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/credentials.json
+```bash
+cp .env.sample .env
 ```
 
 ### Running Locally
@@ -167,23 +166,8 @@ NETWORKX_API_URL=http://networkx-api:8001
 docker compose up -d
 ```
 
-**Without Docker:**
-```bash
-# Terminal 1: Backend
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-
-# Terminal 2: NetworkX API
-cd networkx-api
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8001
-
-# Terminal 3: Frontend
-cd frontend
-npm install
-npm run dev
-```
+**Without Docker:** `scripts/local/start.sh` runs the whole stack on macOS. To
+run one service at a time, see [QUICKSTART.md](QUICKSTART.md#running-without-docker).
 
 ### Using a local model with LM Studio
 
@@ -227,7 +211,8 @@ reliable graph-agent behavior.
 - `POST /api/chat/{id}/process` - Process message
 - `GET /api/chat/{id}/stream` - SSE stream
 
-See [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) for complete API documentation.
+The complete, always-current reference is the OpenAPI schema at
+http://localhost:8000/docs.
 
 ## 🤝 Contributing
 
@@ -242,17 +227,12 @@ See [IMPLEMENTATION_GUIDE.md](IMPLEMENTATION_GUIDE.md) for complete API document
 
 ## 🙏 Acknowledgments
 
-- Built with [Gemini API](https://ai.google.dev/gemini-api/docs)
+- Tools exposed over the [Model Context Protocol](https://modelcontextprotocol.io/)
 - Network analysis powered by [NetworkX](https://networkx.org/)
 - Visualization using [D3.js](https://d3js.org/)
 
 ## 📞 Support
 
 For issues or questions:
-1. Check the [Implementation Guide](IMPLEMENTATION_GUIDE.md)
-2. Review the [Quick Start Guide](QUICKSTART.md)
-3. Check the logs: `docker compose logs`
-
----
-
-**Made with ❤️ using Gemini API**
+1. Review the [Quick Start Guide](QUICKSTART.md)
+2. Check the logs: `docker compose logs`
