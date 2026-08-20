@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Wrench, Check, X, Loader2 } from 'lucide-react';
+import { Wrench, Check, X, Loader2, Brain } from 'lucide-react';
+import { parseMessageContent } from '../../utils/parseMessageContent';
+import Disclosure from './Disclosure';
 
 const formatDuration = (startedAt, completedAt) => {
   if (!startedAt || !completedAt) return null;
@@ -23,6 +25,20 @@ const formatArgs = (args) => {
 // Marking each underscore as one keeps the name whole and readable.
 const breakable = (name) => (name || '').replace(/_/g, '_​');
 
+// Older OpenAI-compatible responses stored the complete textual protocol in
+// ToolExecution.thought, including the literal <thought> wrapper. Newer/native
+// providers store only its body. Accept both shapes so existing chats render
+// the same as new ones.
+const thoughtBody = (thought) => {
+  if (!thought) return '';
+  const blocks = parseMessageContent(String(thought));
+  const taggedThoughts = blocks
+    .filter((block) => block.type === 'thought')
+    .map((block) => block.content)
+    .filter(Boolean);
+  return taggedThoughts.length ? taggedThoughts.join('\n\n') : String(thought).trim();
+};
+
 const STATUS_ICON = {
   failed: <X size={12} aria-hidden />,
   running: <Loader2 size={12} className="spin" aria-hidden />,
@@ -42,6 +58,7 @@ const ToolCall = ({ execution }) => {
   const status = execution.status || 'completed';
   const duration = formatDuration(execution.started_at, execution.completed_at);
   const args = formatArgs(execution.arguments);
+  const thought = thoughtBody(execution.thought);
 
   return (
     <div className={`toolcall toolcall--${status}`}>
@@ -56,7 +73,17 @@ const ToolCall = ({ execution }) => {
         </span>
       </div>
 
-      {execution.thought && <p className="toolcall__thought">{execution.thought}</p>}
+      {thought && (
+        <div className="toolcall__thought">
+          <Disclosure
+            icon={<Brain size={13} aria-hidden />}
+            label="Thinking"
+            tone="thought"
+          >
+            <pre className="thought__text">{thought}</pre>
+          </Disclosure>
+        </div>
+      )}
 
       {execution.error && <p className="toolcall__error">{execution.error}</p>}
 

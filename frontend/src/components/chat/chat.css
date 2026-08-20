@@ -318,11 +318,7 @@
 .toolcall__status--running { color: var(--warning-color); }
 
 .toolcall__thought {
-  margin: 0.25rem 0 0;
-  font-size: 0.75rem;
-  font-style: italic;
-  color: var(--text-secondary);
-  overflow-wrap: break-word;
+  margin-top: 0.375rem;
 }
 
 .toolcall__error {

@@ -127,4 +127,30 @@ describe('ChatInterface', () => {
 
         expect(screen.getByText('Thinking')).toBeInTheDocument();
     });
+
+    it('folds thought markup attached to a tool execution', () => {
+        setStore({
+            messages: [{
+                id: 1,
+                role: 'assistant',
+                content: '<tool_execution_marker index="0"/>The result is ready.',
+                tool_executions: [{
+                    tool_name: 'analysis_degree_centrality',
+                    status: 'completed',
+                    thought: '<thought>I should compute centrality</thought>',
+                }],
+            }],
+        });
+        render(<ChatInterface />);
+
+        expect(screen.getByTitle('analysis_degree_centrality')).toBeInTheDocument();
+        const toggle = screen.getByRole('button', { name: 'Thinking' });
+        expect(toggle).toHaveAttribute('aria-expanded', 'false');
+        expect(screen.queryByText('I should compute centrality')).not.toBeInTheDocument();
+        expect(screen.queryByText(/<\/?thought>/)).not.toBeInTheDocument();
+
+        fireEvent.click(toggle);
+        expect(toggle).toHaveAttribute('aria-expanded', 'true');
+        expect(screen.getByText('I should compute centrality')).toBeInTheDocument();
+    });
 });

@@ -20,6 +20,17 @@ describe('parseMessageContent', () => {
     });
   });
 
+  it('recognizes escaped or loosely formatted thought tags', () => {
+    const blocks = parseMessageContent(
+      '&lt; Thought &gt;private plan&lt; /Thought &gt;answer',
+    );
+
+    expect(blocks).toEqual([
+      { type: 'thought', content: 'private plan', complete: true },
+      { type: 'text', content: 'answer' },
+    ]);
+  });
+
   it('marks an unclosed block incomplete rather than dropping it', () => {
     // Messages stream in, so the closing tag may simply not have arrived yet.
     const [block] = parseMessageContent('<thought>still writ');

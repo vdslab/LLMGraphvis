@@ -22,8 +22,16 @@ const BLOCK_PATTERN = new RegExp(
     '<collapsible([^>]*)>([\\s\\S]*?)(<\\/collapsible>|$)',
     '<tool_execution_marker\\s+index="(\\d+)"\\s*\\/>',
   ].join('|'),
-  'g',
+  'gi',
 );
+
+// Some OpenAI-compatible models vary the reserved tag's casing/spacing, and
+// some gateways HTML-escape it before it reaches the browser. Canonicalise
+// only this engine-owned tag before parsing so none of those forms leaks into
+// the visible Markdown response.
+const normalizeThoughtTags = (content) => content
+  .replace(/&lt;\s*(\/?)\s*thought\s*&gt;/gi, '<$1thought>')
+  .replace(/<\s*(\/?)\s*thought\s*>/gi, '<$1thought>');
 
 const attribute = (attrs, name) => {
   const match = new RegExp(`${name}="([^"]*)"`).exec(attrs || '');
@@ -37,6 +45,8 @@ const attribute = (attrs, name) => {
 export function parseMessageContent(content) {
   if (!content) return [];
 
+  const normalizedContent = normalizeThoughtTags(content);
+
   const blocks = [];
   let lastIndex = 0;
   let match;
@@ -46,7 +56,7 @@ export function parseMessageContent(content) {
   };
 
   BLOCK_PATTERN.lastIndex = 0;
-  while ((match = BLOCK_PATTERN.exec(content)) !== null) {
+  while ((match = BLOCK_PATTERN.exec(normalizedContent)) !== null) {
     const [
       full,
       thought,
@@ -59,7 +69,7 @@ export function parseMessageContent(content) {
       toolIndex,
     ] = match;
 
-    pushText(content.slice(lastIndex, match.index));
+    pushText(normalizedContent.slice(lastIndex, match.index));
     lastIndex = match.index + full.length;
 
     if (thought !== undefined) {
@@ -90,7 +100,7 @@ export function parseMessageContent(content) {
     }
   }
 
-  pushText(content.slice(lastIndex));
+  pushText(normalizedContent.slice(lastIndex));
   return blocks;
 }
 
