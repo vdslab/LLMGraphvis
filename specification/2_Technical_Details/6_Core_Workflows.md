@@ -35,7 +35,7 @@ sequenceDiagram
     DB-->>B: chat_id
     B->>DB: 2. `chats`に紐づく空の`networks`レコードを作成
     DB-->>B: network_id
-    B-->>F: 201 Created (chat_id, network_id)
+    B-->>F: 作成応答 (chat_id, network_id)
 
     %% Step 2: Frontend navigates and user uploads a file
     F->>F: チャットページ(`/chat/{chat_id}`)へ遷移
@@ -46,7 +46,7 @@ sequenceDiagram
     %% Step 3: Backend accepts the request and starts background task
     B-->>F: 202 Accepted
     note right of B: FastAPIのBackgroundTasksを使い、<br/>後続の重い処理をバックグラウンドで実行
-    B->>N: Call MCP Tool: initialize_network (network_id, graphml_data)
+    B->>N: Call MCP Tool: network_initialize (network_id, graphml_data)
     note right of B: ネットワークの初期化と<br/>初期レンダリングデータ生成を要求
 
     %% Step 4: Frontend waits for SSE event
@@ -57,7 +57,7 @@ sequenceDiagram
     N->>N: 1. GraphMLを正規化<br/>(属性型の推論とdata_typeの決定)
     N->>DB: 2. ノードとエッジをDBに保存<br/>(値は型別のテーブルへ)
     DB-->>N: 保存成功
-    N->>N: 3. 初期レイアウト(Spring)を計算
+    N->>N: 3. 初期レイアウト(ForceAtlas2)を計算
     N->>DB: 4. 計算したx, y座標を属性として保存
     DB-->>N: 保存成功
     N->>N: 5. デフォルトスタイルを適用した<br/>初期レンダリングデータを生成
@@ -85,7 +85,7 @@ sequenceDiagram
     participant U as ユーザー
     participant F as Frontend
     participant B as API Service (Backend)
-    participant LLM as LLM Service (Gemini 2.5 Flash)
+    participant LLM as LLM Service
     participant N as NetworkXAPI (MCP Server)
     participant DB as Database
 
@@ -113,13 +113,13 @@ sequenceDiagram
 
     %% Step 3: Backend continues planning with LLM
     B->>LLM: 属性リストをツール実行結果として送信
-    LLM-->>B: ツール呼び出し要求 (2. calculate_centrality)
+    LLM-->>B: ツール呼び出し要求 (2. analysis_degree_centrality)
 
-    %% Step 4: Backend executes calculate_centrality
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "started" })
-    B->>N: Call MCP Tool: calculate_centrality
+    %% Step 4: Backend executes analysis_degree_centrality
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "analysis_degree_centrality", status: "started" })
+    B->>N: Call MCP Tool: analysis_degree_centrality
     N-->>B: 計算完了
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "completed" })
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "analysis_degree_centrality", status: "completed" })
     
     B->>LLM: ツール実行結果（成功）を送信
     LLM-->>B: ツール呼び出し要求 (3. read_resource)
@@ -131,23 +131,22 @@ sequenceDiagram
     B-->>F: SSEイベント (event: tool_execution, data: { tool: "read_resource", status: "completed" })
 
     B->>LLM: ツール実行結果（成功）を送信
-    B->>LLM: ツール実行結果（成功）を送信
-    LLM-->>B: ツール呼び出し要求 (4. calculate_layout)
+    LLM-->>B: ツール呼び出し要求 (4. layout_forceatlas2)
 
-    %% Step 6: Backend executes calculate_layout (Strict Requirement)
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_layout", status: "started" })
-    B->>N: Call MCP Tool: calculate_layout
+    %% Step 6: Backend executes layout_forceatlas2 (Strict Requirement)
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "layout_forceatlas2", status: "started" })
+    B->>N: Call MCP Tool: layout_forceatlas2
     N-->>B: 計算完了
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_layout", status: "completed" })
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "layout_forceatlas2", status: "completed" })
 
     B->>LLM: ツール実行結果（成功）を送信
-    LLM-->>B: ツール呼び出し要求 (5. generate_visualization)
+    LLM-->>B: ツール呼び出し要求 (5. visualization_generate)
 
-    %% Step 7: Backend executes generate_visualization
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "generate_visualization", status: "started" })
-    B->>N: Call MCP Tool: generate_visualization
+    %% Step 7: Backend executes visualization_generate
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "visualization_generate", status: "started" })
+    B->>N: Call MCP Tool: visualization_generate
     N-->>B: 最終レンダリングデータ { nodes: [...], links: [...] }
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "generate_visualization", status: "completed" })
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "visualization_generate", status: "completed" })
 
     %% Step 7: Backend sends final data and text response via SSE
     B-->>F: SSEイベント (event: render_update, data: { nodes, links })
@@ -171,11 +170,11 @@ sequenceDiagram
     - Backendは`POST /chat/{id}/process`のリクエストを受け取ると、メッセージをDBに保存し、即座に`202 Accepted`を返す。これにより、フロントエンドはブロックされない。
 
 2.  **LLMによるプランニングとツールの実行**:
-    - LLMの思考プロセスや、`read_resource`、`calculate_centrality`、`calculate_layout`、`generate_visualization`といったツールの実行状況は、`thinking_stream`や`tool_execution`といった専用のSSEイベントを通じて逐一フロントエンドに通知される。
-    - **重要**: LLMは計算を実行した後、必ず再度`read_resource`を呼び出して、新しい属性が利用可能になったことを確認してから`generate_visualization`を呼び出す。また、**「name」や「label」などの属性が存在する場合、それを識別可能なラベルとして自動的に選択する。**
+    - LLMの思考プロセスや、`read_resource`、`analysis_degree_centrality`、`layout_forceatlas2`、`visualization_generate`といったツールの実行状況は、`thinking_stream`や`tool_execution`といった専用のSSEイベントを通じて逐一フロントエンドに通知される。
+    - **重要**: LLMは計算を実行した後、必ず再度`read_resource`を呼び出して、新しい属性が利用可能になったことを確認してから`visualization_generate`を呼び出す。また、**「name」や「label」などの属性が存在する場合、それを識別可能なラベルとして自動的に選択する。**
 
 3.  **最終的な結果の通知**:
-    - `generate_visualization`が完了すると、Backendは2つの重要な情報をSSEで送信する。
+    - `visualization_generate`が完了すると、Backendは2つの重要な情報をSSEで送信する。
         1.  `render_update`イベント: NetworkXAPIが生成した最終的なレンダリングデータ（`{nodes, links}`）を送信する。フロントエンドはこれを受けてグラフを再描画する。
         2.  `message`イベント: LLMが生成した最終的なテキスト応答（例：「次数中心性を計算し、ノードのサイズに反映しました。これにより、ネットワーク内で最も影響力のあるノードが視覚的に強調されます。」）を送信する。ここには、**なぜその計算を行ったのか、なぜその可視化設定を選んだのかという理由**が含まれるべきである。また、**ユーザーが入力した言語と同じ言語で応答する**ことが必須である。フロントエンドはこれを受けてチャット履歴を更新する。
 
@@ -201,13 +200,13 @@ sequenceDiagram
     B-->>F: 202 Accepted
 
     B->>LLM: ユーザーの指示を送信
-    LLM-->>B: ツール呼び出しを要求 (calculate_centrality, centrality_type:"betweenness")
+    LLM-->>B: ツール呼び出しを要求 (analysis_betweenness_centrality)
 
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "started" })
-    B->>N: Call MCP Tool: calculate_centrality (network_id, centrality_type:"betweenness")
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "analysis_betweenness_centrality", status: "started" })
+    B->>N: Call MCP Tool: analysis_betweenness_centrality (network_id)
     note over N: 計算エラー発生（例：メモリ不足）
     N-->>B: 実行失敗の応答 (エラーメッセージ)
-    B-->>F: SSEイベント (event: tool_execution, data: { tool: "calculate_centrality", status: "failed", error: "..." })
+    B-->>F: SSEイベント (event: tool_execution, data: { tool: "analysis_betweenness_centrality", status: "failed", error: "..." })
 
     B->>LLM: ツールの実行結果（失敗）を送信
     note right of LLM: LLMは失敗を認識し、<br/>ユーザーへの説明と代替案を生成する。
@@ -232,15 +231,15 @@ sequenceDiagram
     participant DB
 
     User->>LLM: "次数中心性が高い上位2ノードのサブグラフを作って"
-    LLM->>Backend: get_top_nodes(metric="degree", k=2)
-    Backend->>NetworkXAPI: Call MCP Tool: get_top_nodes
+    LLM->>Backend: node_get_top_ranked(metric="degree", k=2)
+    Backend->>NetworkXAPI: Call MCP Tool: node_get_top_ranked
     NetworkXAPI->>DB: Calculate & Query
     DB-->>NetworkXAPI: Top Nodes List
     NetworkXAPI-->>Backend: [{"node_id": "n1", ...}, {"node_id": "n2", ...}]
     Backend-->>LLM: Top Nodes Data
 
-    LLM->>Backend: create_subgraph_from_nodes(node_ids=["n1", "n2"])
-    Backend->>NetworkXAPI: Call MCP Tool: create_subgraph_from_nodes
+    LLM->>Backend: subgraph_create_from_nodes(node_ids=["n1", "n2"])
+    Backend->>NetworkXAPI: Call MCP Tool: subgraph_create_from_nodes
     NetworkXAPI->>DB: Check if same subgraph exists
     DB-->>NetworkXAPI: Existing ID (if found) or None
     alt Subgraph Exists
@@ -255,11 +254,17 @@ sequenceDiagram
     Backend->>DB: Update Chat.network_id
     Backend-->>LLM: Success Message w/ Context Switch Info
 
-    LLM->>Backend: generate_visualization(focus_network_id=...)
+    LLM->>Backend: visualization_generate(focus_network_id=...)
     Backend-->>User: Render Update
 ```
 
 ## 6.6. パスサブグラフ作成フロー
+
+**目的:** 「Node A と Node B の最短経路のサブグラフを作って」という指示を、2 つのツールの組み合わせで実現するフローを定義します。
+
+**設計判断: 経路サブグラフの専用 MCP ツールは用意しない。** 最短経路の算出と、ノード列からのサブグラフ作成は、それぞれ独立して有用な操作である。両者を束ねた専用ツールを作ると、「経路は見たいがサブグラフは要らない」場合に使えるものがなくなる。エージェントは 2 ステップを組み立てられるので、ツールの側で束ねる必要がない。
+
+なお、フロントエンドからの直接操作のために REST 側には経路サブグラフの生成が存在する。エージェント経由と直接操作で入口が異なる例である（[3_NetworkXAPI.md](./3_NetworkXAPI.md) 3.6）。
 
 ```mermaid
 sequenceDiagram
@@ -270,19 +275,24 @@ sequenceDiagram
     participant DB
 
     User->>LLM: "Node AとNode Bの最短経路のサブグラフを作って"
-    LLM->>Backend: create_path_subgraph(source="A", target="B")
-    Backend->>NetworkXAPI: Call MCP Tool: create_path_subgraph
-    NetworkXAPI->>NetworkXAPI: Calculate Shortest Path
-    NetworkXAPI->>DB: Create Subgraph
-    NetworkXAPI-->>Backend: Subgraph Info
 
-    note right of Backend: Backend Automatically Updates Chat Context
-    Backend->>DB: Update Chat.network_id
-    
-    Backend-->>LLM: Success Message
-    LLM-->>B: 最終応答メッセージ
+    LLM->>Backend: analysis_shortest_path(source="A", target="B")
+    Backend->>NetworkXAPI: Call MCP Tool: analysis_shortest_path
+    NetworkXAPI->>NetworkXAPI: 最短経路を算出
+    NetworkXAPI-->>Backend: 経路上のノードID列
+
+    LLM->>Backend: subgraph_create_from_nodes(node_ids=経路上のノード)
+    Backend->>NetworkXAPI: Call MCP Tool: subgraph_create_from_nodes
+    NetworkXAPI->>DB: サブグラフを作成
+    NetworkXAPI-->>Backend: new_network_id を含む結果
+
+    note right of Backend: POST_TOOL フックが new_network_id を検出し、<br/>描画と表示ネットワークの切替を行う
+    Backend->>DB: チャットのネットワーク参照を更新
+
+    Backend-->>LLM: 成功メッセージ
+    LLM-->>Backend: 最終応答メッセージ
 ```
-    
+
 ## 6.7. ランキングに基づく可視化フロー
 
 **目的:** 「次数が高い上位3ノードを赤くして」といった指示に対し、LLMがランキングルールを構築し、NetworkXAPIがそれを解釈して動的に色を割り当てるフローです。
@@ -296,8 +306,8 @@ sequenceDiagram
     participant DB
 
     User->>LLM: "次数が高い上位3ノードを赤くして"
-    LLM->>Backend: calculate_centrality(type="degree")
-    Backend->>NetworkXAPI: Call MCP Tool: calculate_centrality
+    LLM->>Backend: analysis_degree_centrality()
+    Backend->>NetworkXAPI: Call MCP Tool: analysis_degree_centrality
     NetworkXAPI->>DB: Save Centrality Values
     NetworkXAPI-->>Backend: Success
     Backend-->>LLM: Success
@@ -305,8 +315,8 @@ sequenceDiagram
     Backend-->>LLM: Success
 
     note right of LLM: Layout calculation must be ensured if not already done
-    LLM->>Backend: generate_visualization(node_color_config={scale_type="RANKING", ranking_rules=[{top:3, color:"red"}]})
-    Backend->>NetworkXAPI: Call MCP Tool: generate_visualization
+    LLM->>Backend: visualization_generate(node_color_config={scale_type="RANKING", ranking_rules=[{top:3, color:"red"}]})
+    Backend->>NetworkXAPI: Call MCP Tool: visualization_generate
     NetworkXAPI->>DB: Fetch Node Values
     NetworkXAPI->>NetworkXAPI: Sort & Apply Colors
     NetworkXAPI-->>Backend: Render Data
@@ -328,24 +338,24 @@ sequenceDiagram
     User->>LLM: "次数中心性でサイズを決め、上位1人を青、その周辺（サブグラフ）を水色、それ以外をグレーにして"
     
     note right of LLM: 1. 次数中心性を計算
-    LLM->>Backend: calculate_centrality(type="degree")
-    Backend->>NetworkXAPI: Call MCP Tool: calculate_centrality
+    LLM->>Backend: analysis_degree_centrality()
+    Backend->>NetworkXAPI: Call MCP Tool: analysis_degree_centrality
     NetworkXAPI-->>Backend: Success
     
     note right of LLM: 2. 上位ノードを特定
-    LLM->>Backend: get_top_nodes(metric="degree", k=1)
-    Backend->>NetworkXAPI: Call MCP Tool: get_top_nodes
+    LLM->>Backend: node_get_top_ranked(metric="degree", k=1)
+    Backend->>NetworkXAPI: Call MCP Tool: node_get_top_ranked
     NetworkXAPI-->>Backend: [{"node_id": "n1", ...}]
     
     note right of LLM: 3. Ego Networkを作成
-    LLM->>Backend: create_ego_network(center="n1", radius=1)
-    Backend->>NetworkXAPI: Call MCP Tool: create_ego_network
+    LLM->>Backend: subgraph_ego_network(center="n1", radius=1)
+    Backend->>NetworkXAPI: Call MCP Tool: subgraph_ego_network
     NetworkXAPI-->>Backend: subgraph_id (e.g., 999)
     note right of Backend: Context Switch -> 999
 
     note right of LLM: 4. 複合ルールで可視化生成 (Pattern 2: Contextual Subgraph)
-    LLM->>Backend: generate_visualization({<br/>  network_id: 12345,<br/>  focus_network_id: 999,<br/>  node_size_config: {attribute: "degree_centrality"},<br/>  node_label_config: {attribute: "name"},<br/>  context_config: {color: "gray", opacity: 0.3},<br/>  focus_config: {node_color_config: {static_color: "lightblue"}},<br/>  custom_node_colors: [{node_id: "n1", color: "blue"}]<br/>})
-    Backend->>NetworkXAPI: Call MCP Tool: generate_visualization
+    LLM->>Backend: visualization_generate({<br/>  network_id: 12345,<br/>  focus_network_id: 999,<br/>  node_size_config: {attribute: "degree_centrality"},<br/>  node_label_config: {attribute: "name"},<br/>  context_config: {color: "gray", opacity: 0.3},<br/>  focus_config: {node_color_config: {static_color: "lightblue"}},<br/>  custom_node_colors: [{node_id: "n1", color: "blue"}]<br/>})
+    Backend->>NetworkXAPI: Call MCP Tool: visualization_generate
     
     note right of NetworkXAPI: 優先順位に従い色を決定:<br/>1. Custom (Blue)<br/>2. Focus Config (Lightblue)<br/>3. Context Config (Gray)
     NetworkXAPI-->>Backend: Render Data
@@ -369,8 +379,8 @@ sequenceDiagram
     note right of LLM: コンテキストにあるサブグラフIDを特定
     
     note right of LLM: network_id をサブグラフIDに切り替えて可視化を要求 (Pattern 3: Isolated Subgraph)
-    LLM->>Backend: generate_visualization({<br/>  network_id: 999, <br/>  focus_network_id: null <br/>})
-    Backend->>NetworkXAPI: Call MCP Tool: generate_visualization
+    LLM->>Backend: visualization_generate({<br/>  network_id: 999, <br/>  focus_network_id: null <br/>})
+    Backend->>NetworkXAPI: Call MCP Tool: visualization_generate
     
     note right of Backend: Explicit Network Switch -> 999
     Backend->>DB: Update Chat.network_id
@@ -392,8 +402,8 @@ sequenceDiagram
     participant DB
 
     User->>LLM: "元のグラフに戻って"
-    LLM->>Backend: switch_to_network(network_id=Root ID)
-    Backend->>NetworkXAPI: Call MCP Tool: switch_to_network(network_id)
+    LLM->>Backend: visualization_switch_network(network_id=Root ID)
+    Backend->>NetworkXAPI: Call MCP Tool: visualization_switch_network(network_id)
     
     note right of Backend: Update Context
     Backend->>DB: Chat.network_id = Root ID
@@ -402,26 +412,26 @@ sequenceDiagram
     NetworkXAPI-->>Backend: Visualization Data (Main Graph)
     
     Backend-->>User: Render Update (Main Graph)
+```
 
-### 6.10.1. 親ネットワークへの切り替え (switch_to_parent_network)
+### 6.10.1. 親ネットワークへの切り替え
 
 **目的:** 現在のサブグラフから、一つ上の階層（親ネットワーク）に戻るフローです。
+
+**設計判断: 相対的な移動はバックエンド内のローカルツールが担う。** 「一つ上に戻る」「最初のグラフに戻る」は、移動先の ID をモデルが知っている必要がない操作である。ID を要求すると、モデルは親を調べるための呼び出しを 1 回余分に行うことになり、しかも取り違える余地が生まれる。そのためこれらは NetworkXAPI のツールではなく、バックエンドのプロセス内ツール（`switch_to_parent_network` / `switch_to_main_network`）として提供する。移動先の解決はチャットの状態を持つバックエンドが行う。
 
 ```mermaid
 sequenceDiagram
     participant User
     participant LLM
     participant Backend
-    participant NetworkXAPI
     participant DB
 
     User->>LLM: "一つ上の階層に戻って"
-    LLM->>Backend: switch_to_network(network_id=Parent ID)
-    Backend->>NetworkXAPI: Call MCP Tool: switch_to_network
-    
-    Backend->>DB: Chat.network_id = Parent ID
-    
-    NetworkXAPI-->>Backend: Visualization Data
+    LLM->>Backend: switch_to_parent_network()
+    note right of Backend: 移動先はバックエンドが解決する
+    Backend->>DB: 現在のネットワークの親を取得
+    Backend->>DB: チャットのネットワーク参照を親へ更新
     Backend-->>User: Render Update
 ```
 
@@ -445,8 +455,8 @@ sequenceDiagram
     NetworkXAPI-->>Backend: [Age (float), Gender (string)]
     
     note right of LLM: 2. 条件を構築して実行
-    LLM->>Backend: create_subgraph_by_filter(<br/>  conditions=[<br/>    {attribute: "Age", ranges: [{min: 20, max: 29}]},<br/>    {attribute: "Gender", categories: ["Female"]}<br/>  ]<br/>)
-    Backend->>NetworkXAPI: Call MCP Tool: create_subgraph_by_filter
+    LLM->>Backend: subgraph_create_by_filter(<br/>  conditions=[<br/>    {attribute: "Age", ranges: [{min: 20, max: 29}]},<br/>    {attribute: "Gender", categories: ["Female"]}<br/>  ]<br/>)
+    Backend->>NetworkXAPI: Call MCP Tool: subgraph_create_by_filter
     NetworkXAPI->>DB: Query Nodes Matching Conditions (AND/OR Logic)
     NetworkXAPI->>DB: Create Subgraph Network
     NetworkXAPI-->>Backend: Subgraph Info (new_network_id)
@@ -455,7 +465,7 @@ sequenceDiagram
     Backend->>DB: Update Chat.network_id
     
     Backend-->>LLM: Success
-    LLM->>Backend: generate_visualization(network_id={new_network_id})
+    LLM->>Backend: visualization_generate(network_id={new_network_id})
     Backend-->>User: Render Update
 ```
 
@@ -479,81 +489,79 @@ sequenceDiagram
     end
 
     critical Phase 2: Action (計算)
-        LLM->>Backend: calculate_centrality(type="degree")
-        Backend->>NetworkXAPI: Call MCP Tool: calculate_centrality
+        LLM->>Backend: analysis_degree_centrality()
+        Backend->>NetworkXAPI: Call MCP Tool: analysis_degree_centrality
         NetworkXAPI-->>Backend: Success
     end
 
     critical Phase 3: Finalization (可視化)
-        LLM->>Backend: generate_visualization(node_color_config={attribute: "degree"})
-        Backend->>NetworkXAPI: Call MCP Tool: generate_visualization
+        LLM->>Backend: visualization_generate(node_color_config={attribute: "degree"})
+        Backend->>NetworkXAPI: Call MCP Tool: visualization_generate
         NetworkXAPI-->>Backend: Render Data
     end
 ```
 
-## 6.13. LLMツール実行ループとコンテキスト管理詳細 (Engine Architecture)
+## 6.13. ツール実行ループとコンテキスト切り替え
 
-**目的:** `backend/app/services/llm/engine.py` に実装されている `execute_tool_loop` の内部ロジック、特に**自動コンテキスト切り替え**と**イベントストリーミング**のメカニズムを詳細に定義します。
+**目的:** ReAct ループの内部、特に **表示ネットワークの自動切り替え** の仕組みを定義します。
 
-### 6.13.1. 実行ループの基本ロジック
+### 6.13.1. 実行ループの構造
 
-LLMサービスは、ユーザーの入力に対して最大N回（デフォルト10回）のツール実行ループを回します。
+ループは 1 イテレーションあたり「生成 → ツール実行 → 結果を履歴へ追加」を行い、最終応答が得られるか上限回数に達するまで繰り返す。
 
-1.  **Thinking Stream**: LLMが思考を出力した場合、即座に `thinking_stream` イベントとしてフロントエンドにプッシュします。
-2.  **Tool Handling**: `function_call` を検出すると、以下の処理を行います。
-    *   `tool_execution` (started) イベントを送信。
-    *   ローカルツール (`switch_to_main_network` 等) か MCPツールかを判定して実行。
-    *   **Context Injection**: ツール引数に `network_id` が不足している場合、現在のコンテキスト（`network_id`）を自動的に注入します。
-3.  **Context Switching (重要)**: ツールの実行結果に `new_network_id` が含まれている場合、以下の処理を自動的に行います。
-    *   **DB更新**: チャットのコンテキスト（DB上の `network_id`）を更新します。
-    *   **Auto-Visualization**: 自動的に `generate_visualization` ツールを実行し、新しいサブグラフの可視化データを取得します。
-    *   **Render Update**: 取得した可視化データを `render_update` イベントとして送信し、画面を即座に更新します。
-4.  **Render Update**: （通常のツール実行時）ツールが可視化データを含む結果を返した場合、`render_update` イベントを送信します。
-5.  **History Update**: 実行結果をチャット履歴に追加し、次のLLM生成ステップへ進みます。
-6.  **Loop Continuation**: 最大回数（デフォルト10回）まで、またはLLMが最終回答を生成するまで、ステップ1に戻ります。
+**ループ本体は分岐を持たない。** ツールごとの前処理・後処理・制約は、すべてフックとして登録される（[1_Backend.md](./1_Backend.md) 1.3.3、1.7.1）。以下はいずれもフックであり、エンジンに直書きされているものではない。
 
-### 6.13.2. シーケンス図: サブグラフ作成時の自動コンテキスト切り替え
+| 挙動 | 担当するフックの帯 |
+| :--- | :--- |
+| 引数に現在のネットワーク ID を補完する | PRE / 正規化 |
+| 高コストな計算や存在しない属性を拒否する | PRE / ガード |
+| 新しいネットワークが生まれたら表示を切り替えて描画する | POST |
+| 可視化データを含む結果を描画する | POST |
+| ツールを呼ばずに終わろうとしたターンを継続させる | NO_TOOL_CALLS |
 
-ユーザーが「最大連結成分を作成して、それを赤く塗って」と指示した場合の内部フローです。
+**新しい挙動を追加するときは、フックとして登録する。** ループ本体に条件を書き足してはならない。この制約の根拠は [1_Backend.md](./1_Backend.md) 1.7.1 を参照。
+
+### 6.13.2. サブグラフ作成時の自動コンテキスト切り替え
+
+サブグラフを作成するツールは、描画も表示切替も行わない。**結果に新しいネットワーク ID を含めるだけである。** それを検出して副作用を起こすのは POST フックの役割である。
+
+この分離により、サブグラフを作るツールが何種類あっても、切り替えと描画の実装は 1 箇所で済む。
 
 ```mermaid
 sequenceDiagram
-    participant Engine as execute_tool_loop
-    participant LLM as Gemini Model
+    participant Engine as ReAct ループ
+    participant LLM as LLM
+    participant Hook as POST フック
     participant Queue as SSE Queue
     participant MCP as NetworkXAPI
     participant DB as Database
-    
-    Note over Engine: ループ開始 (初期 network_id = 1)
+
+    Note over Engine: ループ開始（現在のネットワーク = 親）
 
     Engine->>LLM: 会話履歴を送信
-    LLM-->>Engine: ツール呼び出し要求: 最大連結成分の作成<br/>(create_largest_component_subgraph)
+    LLM-->>Engine: ツール呼び出し要求: subgraph_largest_component
 
+    Note over Engine: PRE フックが network_id を補完
     Engine->>Queue: SSE送信 "tool_execution" (開始)
-    
-    Note over Engine: network_id=1 を引数に自動注入
-    Engine->>MCP: ツール実行: 最大連結成分の作成<br/>(args: {network_id: 1})
+    Engine->>MCP: ツール実行
     MCP->>DB: サブグラフを作成・保存
-    DB-->>MCP: 新しいネットワークID (例: 2)
-    MCP-->>Engine: 実行結果: { "new_network_id": 2, "name": "最大連結成分" }
+    MCP-->>Engine: 実行結果 { "new_network_id": ... }
 
-    Note over Engine, DB: ★ コンテキスト切り替えを検知 ★
-    Engine->>Engine: "new_network_id": 2 を確認
-    Engine->>DB: Chat.network_id を 2 に更新
-    Engine->>Engine: ローカル変数 network_id を 2 に更新
-    
-    Note over Engine: ★ 自動可視化トリガー ★
-    Engine->>MCP: ツール実行: 可視化生成 (自動)<br/>(args: {network_id: 2})
-    MCP-->>Engine: 実行結果: { "nodes": [...], "links": [...] }
-    Engine->>Queue: SSE送信 "render_update" (サブグラフID 2 のデータ)
+    Note over Engine, Hook: ★ POST フックが new_network_id を検出 ★
+    Engine->>Hook: POST_TOOL ディスパッチ
+    Hook->>DB: チャットのネットワーク参照を更新
+    Hook->>MCP: visualization_generate（新しいネットワークに対して）
+    MCP-->>Hook: レンダリングデータ
+    Hook->>Queue: SSE送信 "render_update"
 
     Engine->>Queue: SSE送信 "tool_execution" (完了)
     Engine->>Engine: 結果を履歴に追加
 
-    Note over Engine: 次のループ (network_id = 2)
+    Note over Engine: 次のイテレーション（現在のネットワーク = サブグラフ）
 
-    Engine->>LLM: 会話履歴(結果含む)を送信
-    LLM-->>Engine: テキスト応答 "サブグラフを作成しました。"
-    
-    Engine->>Queue: SSE送信 "message"
+    Engine->>LLM: 会話履歴（結果含む）を送信
+    LLM-->>Engine: 最終応答
+    Engine->>Queue: SSE送信（終端イベント）
 ```
+
+**この図が示す最も重要な点**: サブグラフ作成の直後、ユーザーの後続の指示（「それを赤く塗って」）は、明示的な指定なしに新しいサブグラフへ適用される。表示中のネットワークが会話の状態として保持されているためである（[1_Backend.md](./1_Backend.md) 1.4.1）。

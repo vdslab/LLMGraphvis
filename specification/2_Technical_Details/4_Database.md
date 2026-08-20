@@ -20,12 +20,15 @@
     ネットワークの属性（計算結果や元データ由来）は永続的なデータとして扱います。データ型別・要素別に分離したテーブル構造（サブタイプモデル）を採用し、型安全性を確保します。
 
 4.  **属性メタデータの充実化**:
-    属性には詳細な説明を付与し、LLMの属性選択精度を向上させます。
+    属性には詳細な説明を付与し、LLMの属性選択精度を向上させます。属性が計算による派生であるかどうか、およびその計算条件も属性定義側に保持します（4.5）。
 
-5.  **複数データベースのサポート**:
+5.  **エージェントの実行履歴の保存**:
+    ツールの呼び出しと結果は、メッセージ本文とは独立したレコードとして保存します（4.8）。会話に用いた LLM のプロバイダとモデルもチャットに保持します。
+
+6.  **複数データベースのサポート**:
     SQLAlchemy ORMを使用することで、PostgreSQLとMySQLの両方に対応可能なデータベース設計とします。具体的なDDLは、SQLAlchemyのマイグレーションツール（例: Alembic）によって各データベースに最適化された形で生成されます。
 
-6.  **柔軟なデータ検証と型安全性**:
+7.  **柔軟なデータ検証と型安全性**:
     属性定義（`NodeAttribute` / `EdgeAttribute`）に「期待されるデータ型（`data_type`）」を保持します。一方で、実際の値は型別のテーブル（`NodeFloatAttributeValue` / `NodeTextAttributeValue`）に格納します。
     これにより、以下のメリットを享受します：
     - **柔軟性**: インポート時に型不一致があってもエラーとせず、テキストとして保存することでデータの消失を防ぎます（例: 数値属性に "N/A" が混入した場合）。
@@ -38,6 +41,7 @@ erDiagram
     networks ||--|| chats : "is"
     networks |o--o{ networks : "parent of"
     chats ||--o{ chat_messages : "contains"
+    chat_messages ||--o{ tool_executions : "records"
 
     networks ||--o{ nodes : "contains"
     
@@ -68,6 +72,8 @@ erDiagram
         VARCHAR name
         INTEGER user_id FK
         INTEGER network_id FK, UK
+        VARCHAR provider
+        VARCHAR model
         JSON visualization_state
     }
     chat_messages {
@@ -76,6 +82,15 @@ erDiagram
         VARCHAR role
         TEXT content
         JSON meta_data
+    }
+    tool_executions {
+        INTEGER id PK
+        INTEGER message_id FK
+        VARCHAR tool_name
+        JSON arguments
+        JSON result
+        TEXT thought
+        VARCHAR status
     }
     networks {
         INTEGER id PK
@@ -146,224 +161,60 @@ erDiagram
     }
 ```
 
-### テーブル定義
-(テーブル定義のリストはER図とSQLから自明なため省略)
+## 4.3. テーブル定義について
 
-## 4.3. 基本テーブル
+**列定義は `common/models.py` が唯一の情報源である。** SQLAlchemy ORM が両サービスから共有されており、そこに書かれた型・制約・関連がそのまま実体である。この文書に DDL を転記していた時期は、実装との乖離が最も早く進んだ箇所であった。
 
-**補足:** 以下のテーブル定義は概念的なものであり、SQLAlchemy ORMを通じて定義されます。`id`カラムの自動採番（`AUTOINCREMENT`相当）は、SQLAlchemyが各データベースの適切な機能（PostgreSQLの`SERIAL`や`IDENTITY`、MySQLの`AUTO_INCREMENT`など）を利用して管理します。
+以下では、モデル定義を読んだだけでは意図が分からない設計判断を述べる。
 
-### 4.3.1. `users`
-```sql
-CREATE TABLE users (
-    id INTEGER PRIMARY KEY,
-    username VARCHAR(255) NOT NULL UNIQUE,
-    hashed_password VARCHAR(255) NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
+## 4.4. 属性のサブタイプ階層
 
-### 4.3.2. `networks`
-```sql
-CREATE TABLE networks (
-    id INTEGER PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    parent_network_id INTEGER,
-    
-    last_layout_name VARCHAR(255),
-    last_node_size_config JSON,
-    last_node_color_config JSON,
-    last_edge_width_config JSON,
-    last_edge_color_config JSON,
-    last_node_label_config JSON,
+属性は「定義」と「値」を分け、値はさらに型別のテーブルに分離する。
 
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    FOREIGN KEY (parent_network_id) REFERENCES networks(id)
-);
-```
+### 4.4.1. なぜ定義と値を分けるのか
 
-### 4.3.3. networks (ネットワーク)
+属性の定義（名前・データ型・説明・由来）はネットワークに 1 つだが、値はノードの数だけ存在する。分離することで、**エージェントは値を一切読まずに「どんな属性が使えるか」を把握できる。** 属性一覧のリソースが軽量であることは、システムプロンプトの文脈に含められるかどうかを左右する。
 
-| カラム名 | データ型 | 制約 | 説明 |
-| :--- | :--- | :--- | :--- |
-| `id` | `INTEGER` | `PRIMARY KEY` | ネットワークの一意識別子 |
-| `name` | `VARCHAR` | `NOT NULL` | ネットワーク名 |
-| `description` | `TEXT` | `NULLABLE` | ネットワークの説明・メタデータ |
-| `parent_network_id` | `INTEGER` | `FOREIGN KEY` | 親ネットワークのID（サブグラフの場合） |
-| `last_layout_name` | `VARCHAR` | `NULLABLE` | 最後に適用されたレイアウト名 |
-| `last_node_size_config` | `JSON` | `NULLABLE` | ノードサイズの視覚設定 |
-| `last_node_color_config` | `JSON` | `NULLABLE` | ノード色の視覚設定 |
-| `last_edge_width_config` | `JSON` | `NULLABLE` | エッジ幅の視覚設定 |
-| `last_edge_color_config` | `JSON` | `NULLABLE` | エッジ色の視覚設定 |
-| `last_node_label_config` | `JSON` | `NULLABLE` | ノードラベルの視覚設定 |
-| `graphml_content` | `TEXT` | `NULLABLE` | アップロードされたGraphMLの生データ（未使用） |
+### 4.4.2. なぜ値を型別のテーブルに分けるのか
 
+宣言された型と実際の格納先を分離することで、**インポート時の型不一致をエラーにせずに済む**。数値属性のはずの列に "N/A" が混入していても、その値はテキストとして保存され、データは失われない。
 
-- **説明**: グラフデータ全体を管理するテーブルです。
-- **リレーション**:
-    - `chats` テーブルと1対1の関係を持ちます。
-    - `nodes`, `edges`, `node_attributes`, `edge_attributes` と1対多の関係を持ちます。
-    - 自分自身 (`networks`) と1対多の関係を持ちます（サブグラフの階層構造）。
+同時に、宣言された型と実際の格納テーブルを突き合わせれば、後から型不一致のデータを特定できる。**寛容にインポートし、厳密に検証する**という方針を、スキーマの形で表現したものである。
 
-### 4.3.4. `chats`
-```sql
-CREATE TABLE chats (
-    id INTEGER PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    user_id INTEGER NOT NULL,
-    network_id INTEGER NOT NULL UNIQUE,
-    visualization_state JSON,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (network_id) REFERENCES networks(id)
-);
-```
+厳密な型を強制する設計を採らなかったのは、対象が研究者の手元にある実データだからである。取り込めないファイルがあることは、多少の型の揺れよりも重い問題になる。
 
-### 4.3.5. chats (チャット)
+## 4.5. 派生属性のキャッシュ
 
-| カラム名 | データ型 | 制約 | 説明 |
-| :--- | :--- | :--- | :--- |
-| `id` | `INTEGER` | `PRIMARY KEY` | チャット引用ID |
-| `name` | `VARCHAR` | `NOT NULL` | チャット名 |
-| `user_id` | `INTEGER` | `FOREIGN KEY` | 所有ユーザーID |
-| `network_id` | `INTEGER` | `FOREIGN KEY` | 関連するネットワークID |
-| `visualization_state` | `JSON` | `NULLABLE` | フロントエンドの最後の可視化状態（位置、色など）のキャッシュ |
+計算によって生成された属性（中心性、コミュニティ、レイアウト座標）は、元データ由来の属性と**同じテーブルに**格納する。ただし、派生であること・何から計算されたか・どのパラメータで計算されたか・計算時点のグラフ構造は、属性定義側に記録する。
 
-### 4.3.6. `chat_messages`
-```sql
-CREATE TABLE chat_messages (
-    id INTEGER PRIMARY KEY,
-    chat_id INTEGER NOT NULL,
-    role VARCHAR(50) NOT NULL,
-    content TEXT NOT NULL,
-    meta_data JSON,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    FOREIGN KEY (chat_id) REFERENCES chats(id)
-);
-```
+### 4.5.1. 同じテーブルに置く理由
 
-### 4.3.7. `nodes`
-```sql
-CREATE TABLE nodes (
-    id INTEGER PRIMARY KEY,
-    network_id INTEGER NOT NULL,
-    node_id VARCHAR(255) NOT NULL,
-    label VARCHAR(255),
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    FOREIGN KEY (network_id) REFERENCES networks(id),
-    UNIQUE(network_id, node_id)
-);
-```
+エージェントから見れば、「元データにあった `department`」と「計算した媒介中心性」は同じ *ノードの属性* であり、色やサイズに割り当てられる同じ種類のものである。格納場所を分けると、可視化ツールは両方を照会しなければならなくなり、その分岐が全ツールに波及する。
 
-### 4.3.8. `edges`
-```sql
-CREATE TABLE edges (
-    id INTEGER PRIMARY KEY,
-    network_id INTEGER NOT NULL,
-    edge_id VARCHAR(255) NOT NULL,
-    source_node_id INTEGER NOT NULL,
-    target_node_id INTEGER NOT NULL,
-    weight FLOAT DEFAULT 1.0,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    FOREIGN KEY (network_id) REFERENCES networks(id),
-    FOREIGN KEY (source_node_id) REFERENCES nodes(id),
-    FOREIGN KEY (target_node_id) REFERENCES nodes(id),
-    UNIQUE(network_id, edge_id)
-);
-```
+### 4.5.2. グラフ構造のハッシュを持つ理由
 
-## 4.4. 属性テーブル（サブタイプ階層）
+派生属性は入力となるグラフ構造に依存する。**サブグラフを作れば、同じ名前の中心性でも値は変わる。** 計算時のグラフ構造をハッシュとして保持することで、キャッシュが現在の構造に対して有効かどうかを判定できる。
 
-### `node_attributes` (基底)
-```sql
-CREATE TABLE node_attributes (
-    id INTEGER PRIMARY KEY,
-    network_id INTEGER NOT NULL,
-    attribute_name VARCHAR(255) NOT NULL,
-    data_type VARCHAR(50), -- Expected type: "float", "string", etc.
-    description TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    FOREIGN KEY (network_id) REFERENCES networks(id),
-    UNIQUE(network_id, attribute_name)
-);
-```
-(Note: `node_text_attributes` and `node_float_attributes` definition tables are removed. Values are stored in `node_attribute_values` subtypes.)
-### `edge_attributes` (基底)
-```sql
-CREATE TABLE edge_attributes (
-    id INTEGER PRIMARY KEY,
-    network_id INTEGER NOT NULL,
-    attribute_name VARCHAR(255) NOT NULL,
-    data_type VARCHAR(50), -- Expected type: "float", "string", etc.
-    description TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    FOREIGN KEY (network_id) REFERENCES networks(id),
-    UNIQUE(network_id, attribute_name)
-);
-```
-(Note: `edge_text_attributes` and `edge_float_attributes` definition tables are removed.)
-## 4.5. 属性値テーブル（サブタイプ階層）
+パラメータも同様に記録するため、**異なるパラメータでの再計算は自動的にキャッシュミスになる**。明示的な再計算フラグは、利用者が「同じ条件でもう一度計算せよ」と求めた場合のためだけに存在する。
 
-### `node_attribute_values` (基底)
-```sql
-CREATE TABLE node_attribute_values (
-    id INTEGER PRIMARY KEY,
-    node_id INTEGER NOT NULL,
-    attribute_id INTEGER NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    FOREIGN KEY (node_id) REFERENCES nodes(id),
-    FOREIGN KEY (attribute_id) REFERENCES node_attributes(id),
-    UNIQUE(node_id, attribute_id)
-);
-```
-```sql
-CREATE TABLE node_text_attribute_values (
-    node_attribute_value_id INTEGER PRIMARY KEY,
-    text_value TEXT,
-    FOREIGN KEY (node_attribute_value_id) REFERENCES node_attribute_values(id)
-);
-```
-```sql
-CREATE TABLE node_float_attribute_values (
-    node_attribute_value_id INTEGER PRIMARY KEY,
-    float_value FLOAT,
-    FOREIGN KEY (node_attribute_value_id) REFERENCES node_attribute_values(id)
-);
-```
+## 4.6. ネットワークの親子関係
 
-### `edge_attribute_values` (基底)
-```sql
-CREATE TABLE edge_attribute_values (
-    id INTEGER PRIMARY KEY,
-    edge_id INTEGER NOT NULL,
-    attribute_id INTEGER NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    FOREIGN KEY (edge_id) REFERENCES edges(id),
-    FOREIGN KEY (attribute_id) REFERENCES edge_attributes(id),
-    UNIQUE(edge_id, attribute_id)
-);
-```
-```sql
-CREATE TABLE edge_text_attribute_values (
-    edge_attribute_value_id INTEGER PRIMARY KEY,
-    text_value TEXT,
-    FOREIGN KEY (edge_attribute_value_id) REFERENCES edge_attribute_values(id)
-);
-```
-```sql
-CREATE TABLE edge_float_attribute_values (
-    edge_attribute_value_id INTEGER PRIMARY KEY,
-    float_value FLOAT,
-    FOREIGN KEY (edge_attribute_value_id) REFERENCES edge_attribute_values(id)
-);
-```
+ネットワークは自分自身への親参照を持ち、サブグラフは親を指す。**サブグラフは独立したネットワークとして格納され、親のノード・エッジを参照するのではなく複製する。**
+
+**根拠**: サブグラフに対して計算された派生属性は、そのサブグラフの構造に対する値であり、親の同名属性とは別物である（4.5.2）。参照で表現すると、どちらの構造に対する値なのかを属性側で区別しなければならなくなる。複製のコストを払う代わりに、「1 つのネットワーク = 1 つの構造 = 1 組の属性」という単純な関係を保っている。
+
+親をたどれる構造は、認可（[1_Backend.md](./1_Backend.md) 1.2.1）と、表示を親に戻す操作の双方で使われる。
+
+## 4.7. チャットとネットワークの対応
+
+チャットはネットワークと 1 対 1 で対応するが、この参照は**会話の中で移動する**。サブグラフを作れば参照はサブグラフを指し、親に戻れば巻き戻る。設計上の含意は [1_Backend.md](./1_Backend.md) 1.4.1 を参照。
+
+## 4.8. ツール実行の記録
+
+エージェントによるツール呼び出しは、メッセージとは独立したレコードとして保存する。呼び出し名・引数・結果・思考・状態・開始と終了の時刻を持つ。
+
+**根拠**: これはエージェントの振る舞いを評価するための一次データである。メッセージ本文の表示形式が変わっても、この記録の形は変わってはならない。メッセージの拡張用メタデータに埋め込む設計を採らなかったのはこのためである。
+
+## 4.9. 複数データベースへの対応
+
+SQLAlchemy ORM を介することで、特定の RDBMS の方言に依存しない。DDL はマイグレーションツールが各データベース向けに生成する。この文書に手書きの `CREATE TABLE` を置かないのは、それが特定方言の写しにしかならないためでもある。
