@@ -17,7 +17,7 @@
 
 **目的:** ユーザーが新しい分析サイクルを開始するフローを、**チャット作成**と**ネットワークデータ初期化**の2段階に分離して定義します。これにより、責務が明確になり、よりRESTfulな設計を実現します。
 
-**方針:** ネットワークデータの処理は時間がかかる可能性があるため、**非同期処理**を維持します。Backendはアップロードリクエストを即座に受け付け、バックグラウンドでNetworkXAPIを呼び出します。NetworkXAPIは、データのパース、DBへの保存、初期レイアウト計算、デフォルトスタイル適用済みのレンダリングデータ生成までを一貫して行い、完了後にBackend経由でSSEを通じてクライアントに通知します。
+**方針:** ネットワークデータの処理は時間がかかる可能性があるため、**非同期処理**を維持します。入力はユーザーのGraphMLファイルと同梱サンプルの二つを認めますが、どちらもBackendでGraphML文字列へ解決した後は同じ処理へ合流させます。これにより、入力方法によって属性型推論、初期レイアウト、概要表示が変わることを防ぎます。Backendはリクエストを即座に受け付け、バックグラウンドでNetworkXAPIを呼び出します。完了後はSSEを通じてクライアントに通知します。
 
 ```mermaid
 sequenceDiagram
@@ -37,17 +37,22 @@ sequenceDiagram
     DB-->>B: network_id
     B-->>F: 作成応答 (chat_id, network_id)
 
-    %% Step 2: Frontend navigates and user uploads a file
+    %% Step 2: Frontend navigates and user chooses an input
     F->>F: チャットページ(`/chat/{chat_id}`)へ遷移
-    note right of F: ファイルアップロードUIを表示
-    U->>F: GraphMLファイルをアップロード
-    F->>B: POST /chat/{chat_id}/upload (GraphMLデータ)
+    note right of F: アップロードとサンプル選択を表示
+    U->>F: GraphMLファイルまたは同梱サンプルを選択
+    alt GraphMLファイル
+        F->>B: GraphMLデータを送信
+    else 同梱サンプル
+        F->>B: サンプルIDを送信
+        B->>B: 許可リストから同梱GraphMLを解決
+    end
 
     %% Step 3: Backend accepts the request and starts background task
     B-->>F: 202 Accepted
     note right of B: FastAPIのBackgroundTasksを使い、<br/>後続の重い処理をバックグラウンドで実行
-    B->>N: Call MCP Tool: network_initialize (network_id, graphml_data)
-    note right of B: ネットワークの初期化と<br/>初期レンダリングデータ生成を要求
+    B->>N: GraphMLのインポート、レイアウト、描画を順次要求
+    note right of B: 両入力で同じ初期化処理を使用
 
     %% Step 4: Frontend waits for SSE event
     F->>B: GET /chat/{chat_id}/stream

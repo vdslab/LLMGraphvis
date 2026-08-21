@@ -14,6 +14,17 @@ const api = axios.create({
 const RETRY_COUNT = 3;
 const RETRY_DELAY = 1000; // 1 second
 
+export const getApiErrorMessage = (error) => {
+  const detail = error.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail.map((item) => item?.msg).filter(Boolean);
+    if (messages.length > 0) return messages.join(', ');
+  }
+  if (detail && typeof detail.message === 'string') return detail.message;
+  return error.message || 'Unknown error occurred';
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -64,7 +75,7 @@ api.interceptors.response.use(
       window.location.href = '/login';
     }
     // Dispatch global error event for UI notification
-    const errorMessage = error.response?.data?.detail || error.message || 'Unknown error occurred';
+    const errorMessage = getApiErrorMessage(error);
     window.dispatchEvent(new CustomEvent('api-error', { 
         detail: { 
             message: errorMessage,
@@ -103,6 +114,12 @@ export const updateChat = (chatId, data) => api.patch(`/chat/${chatId}`, data);
 
 // List available LLM providers/models a chat can be pinned to
 export const getLlmProviders = () => api.get('/chat/providers');
+
+// List and load the bundled sample networks
+export const getSampleNetworks = () => api.get('/chat/samples');
+
+export const loadSampleNetwork = (chatId, sampleId) =>
+  api.post(`/chat/${chatId}/samples/${sampleId}`);
 
 // Process message
 export const processMessage = (chatId, content) =>

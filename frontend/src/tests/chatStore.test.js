@@ -10,6 +10,7 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 describe('chatStore sending', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    api.getApiErrorMessage.mockImplementation((error) => error.message);
     useChatStore.setState({
       chatId: 1,
       messages: [],
@@ -159,5 +160,49 @@ describe('chatStore tool executions', () => {
 
     expect(state().messages[0].tool_executions).toHaveLength(1);
     expect(state().pendingToolExecutions).toEqual([]);
+  });
+});
+
+describe('chatStore sample networks', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.getApiErrorMessage.mockImplementation((error) => error.message);
+    useChatStore.setState({
+      sampleNetworks: [],
+      sampleNetworksStatus: 'idle',
+      sampleNetworksError: null,
+      isLoading: false,
+    });
+  });
+
+  it('loads the sample catalog from the backend', async () => {
+    const samples = [{ id: 'karate-club', name: "Zachary's Karate Club" }];
+    api.getSampleNetworks.mockResolvedValue({ data: samples });
+
+    await state().fetchSampleNetworks();
+
+    expect(api.getSampleNetworks).toHaveBeenCalledOnce();
+    expect(state()).toMatchObject({
+      sampleNetworks: samples,
+      sampleNetworksStatus: 'success',
+      sampleNetworksError: null,
+    });
+  });
+
+  it('keeps the turn open after a sample request is accepted', async () => {
+    api.loadSampleNetwork.mockResolvedValue({ status: 202 });
+
+    await state().loadSampleNetwork(1, 'karate-club');
+
+    expect(api.loadSampleNetwork).toHaveBeenCalledWith(1, 'karate-club');
+    expect(state().isLoading).toBe(true);
+  });
+
+  it('closes the turn if a sample request fails', async () => {
+    api.loadSampleNetwork.mockRejectedValue(new Error('offline'));
+
+    await expect(state().loadSampleNetwork(1, 'karate-club')).rejects.toThrow('offline');
+
+    expect(state().isLoading).toBe(false);
   });
 });

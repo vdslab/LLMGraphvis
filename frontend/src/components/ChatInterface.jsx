@@ -109,7 +109,7 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
             <div className="chat__empty">
               {nodes.length > 0
                 ? 'Ask about this network — its communities, its central nodes, or how it should be drawn.'
-                : 'Upload a GraphML file to get started.'}
+                : 'Upload a GraphML file or choose a sample network to get started.'}
             </div>
           )}
 

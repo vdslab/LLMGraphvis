@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useChatStore } from '../stores/chatStore';
 import { useNetworkStore } from '../stores/networkStore';
@@ -9,6 +9,7 @@ import LegendPanel from '../components/LegendPanel';
 import ChatInterface from '../components/ChatInterface';
 import NodeDetailsPanel from '../components/NodeDetailsPanel';
 import ChatList from '../components/ChatList';
+import NetworkDataChooser from '../components/NetworkDataChooser';
 import * as api from '../services/api';
 
 const NetworkChatPage = () => {
@@ -19,11 +20,18 @@ const NetworkChatPage = () => {
     setChatId,
     fetchMessages,
     uploadNetwork,
-    createChat
+    createChat,
+    isLoading,
+    sampleNetworks,
+    sampleNetworksStatus,
+    sampleNetworksError,
+    fetchSampleNetworks,
+    loadSampleNetwork,
   } = useChatStore();
-  const { nodes, links, networkId } = useNetworkStore();
+  const { nodes, links } = useNetworkStore();
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [loadingSampleId, setLoadingSampleId] = useState(null);
   
   // Sidebar Logic
   const [showChatList, setShowChatList] = useState(false);
@@ -79,6 +87,18 @@ const NetworkChatPage = () => {
       loadData();
     }
   }, [id, fetchMessages, isAuthenticated, navigate, setChatId]);
+
+  useEffect(() => {
+    if (id && id !== 'new' && isAuthenticated) {
+      fetchSampleNetworks().catch((error) => {
+        console.error('Failed to load sample network catalog:', error);
+      });
+    }
+  }, [id, isAuthenticated, fetchSampleNetworks]);
+
+  useEffect(() => {
+    if (!isLoading) setLoadingSampleId(null);
+  }, [isLoading]);
 
   // --- Real-time Connection Logic (Refactored) ---
   const { sseError } = useChatConnection(id, isAuthenticated);
@@ -141,7 +161,7 @@ const NetworkChatPage = () => {
     } catch (e) {
         console.error("Error in node click handler:", e);
     }
-  }, []); // networkId is accessed via getState(), so we don't need it in dependency. Stable callback.
+  }, [id]);
 
   const handleCloseNodeDetails = useCallback(() => {
       setNodeDetailsPanelOpen(false);
@@ -189,6 +209,16 @@ const NetworkChatPage = () => {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleSampleSelect = async (sampleId) => {
+    setLoadingSampleId(sampleId);
+    try {
+      await loadSampleNetwork(id, sampleId);
+    } catch (error) {
+      console.error('Sample network load failed:', error);
+      setLoadingSampleId(null);
     }
   };
 
@@ -338,32 +368,20 @@ const NetworkChatPage = () => {
               top: '50%',
               left: '50%',
               transform: 'translate(-50%, -50%)',
-              textAlign: 'center'
+              width: '100%',
+              display: 'flex',
+              justifyContent: 'center'
             }}>
-              <h3>No network data</h3>
-              <p>Upload a GraphML file to get started</p>
-              <input
-                type="file"
-                accept=".graphml,.xml"
-                onChange={handleFileUpload}
-                style={{ display: 'none' }}
-                ref={fileInputRef}
+              <NetworkDataChooser
+                samples={sampleNetworks}
+                catalogStatus={sampleNetworksStatus}
+                catalogError={sampleNetworksError}
+                busy={isUploading || isLoading}
+                loadingSampleId={loadingSampleId}
+                onUpload={handleFileUpload}
+                onSelectSample={handleSampleSelect}
+                fileInputRef={fileInputRef}
               />
-              <button
-                onClick={() => fileInputRef.current.click()}
-                disabled={isUploading}
-                style={{
-                  padding: '10px 20px',
-                  fontSize: '16px',
-                  cursor: 'pointer',
-                  backgroundColor: '#4CAF50',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px'
-                }}
-              >
-                {isUploading ? 'Uploading...' : 'Upload GraphML'}
-              </button>
             </div>
           )}
         </div>

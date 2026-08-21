@@ -9,7 +9,10 @@ import {
   updateChat as updateChatAPI,
   processMessage as processMessageAPI,
   uploadGraphML,
-  getLlmProviders
+  getLlmProviders,
+  getSampleNetworks,
+  loadSampleNetwork as loadSampleNetworkAPI,
+  getApiErrorMessage,
 } from '../services/api';
 
 export const useChatStore = create((set, get) => ({
@@ -31,6 +34,12 @@ export const useChatStore = create((set, get) => ({
   chatProvider: null,
   chatModel: null,
   llmProviders: [],
+
+  // Bundled starter data, loaded from the backend so the UI never hardcodes
+  // which samples are installed.
+  sampleNetworks: [],
+  sampleNetworksStatus: 'idle',
+  sampleNetworksError: null,
 
   // Token/cost usage tracking (Stage 7)
   chatUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0 },   // lifetime total for this chat session (client-side accumulation across turns)
@@ -75,6 +84,23 @@ export const useChatStore = create((set, get) => ({
     const res = await getLlmProviders();
     set({ llmProviders: res.data });
     return res.data;
+  },
+
+  fetchSampleNetworks: async () => {
+    if (get().sampleNetworksStatus === 'success') return get().sampleNetworks;
+
+    set({ sampleNetworksStatus: 'loading', sampleNetworksError: null });
+    try {
+      const res = await getSampleNetworks();
+      set({ sampleNetworks: res.data, sampleNetworksStatus: 'success' });
+      return res.data;
+    } catch (error) {
+      set({
+        sampleNetworksStatus: 'error',
+        sampleNetworksError: getApiErrorMessage(error),
+      });
+      throw error;
+    }
   },
 
   // Pin (or clear, with null) this chat's provider/model
@@ -144,6 +170,18 @@ export const useChatStore = create((set, get) => ({
       // SSE will handle the rest.
     } catch (error) {
       console.error("Failed to upload network:", error);
+      get().endTurn();
+      throw error;
+    }
+  },
+
+  loadSampleNetwork: async (chatId, sampleId) => {
+    get().beginTurn();
+    try {
+      await loadSampleNetworkAPI(chatId, sampleId);
+      // Response is 202 Accepted; SSE completes the shared import pipeline.
+    } catch (error) {
+      console.error("Failed to load sample network:", error);
       get().endTurn();
       throw error;
     }
