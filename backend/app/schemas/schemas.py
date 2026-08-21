@@ -71,6 +71,15 @@ class LlmProviderOption(BaseModel):
     models: List[LlmModelOption]
 
 
+class SampleNetworkOption(BaseModel):
+    id: str
+    name: str
+    description: str
+    node_count: int
+    edge_count: int
+    source_url: str
+
+
 class Network(BaseModel):
     id: int
     name: str

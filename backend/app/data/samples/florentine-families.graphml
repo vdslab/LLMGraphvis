@@ -1,0 +1,70 @@
+<?xml version='1.0' encoding='utf-8'?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd"><key id="label" for="node" attr.name="label" attr.type="string"/>
+<key id="name" for="graph" attr.name="name" attr.type="string"/>
+<graph edgedefault="undirected"><data key="name">Florentine Families</data>
+<node id="Acciaiuoli">
+  <data key="label">Acciaiuoli</data>
+</node>
+<node id="Medici">
+  <data key="label">Medici</data>
+</node>
+<node id="Castellani">
+  <data key="label">Castellani</data>
+</node>
+<node id="Peruzzi">
+  <data key="label">Peruzzi</data>
+</node>
+<node id="Strozzi">
+  <data key="label">Strozzi</data>
+</node>
+<node id="Barbadori">
+  <data key="label">Barbadori</data>
+</node>
+<node id="Ridolfi">
+  <data key="label">Ridolfi</data>
+</node>
+<node id="Tornabuoni">
+  <data key="label">Tornabuoni</data>
+</node>
+<node id="Albizzi">
+  <data key="label">Albizzi</data>
+</node>
+<node id="Salviati">
+  <data key="label">Salviati</data>
+</node>
+<node id="Pazzi">
+  <data key="label">Pazzi</data>
+</node>
+<node id="Bischeri">
+  <data key="label">Bischeri</data>
+</node>
+<node id="Guadagni">
+  <data key="label">Guadagni</data>
+</node>
+<node id="Ginori">
+  <data key="label">Ginori</data>
+</node>
+<node id="Lamberteschi">
+  <data key="label">Lamberteschi</data>
+</node>
+<edge source="Acciaiuoli" target="Medici"/>
+<edge source="Medici" target="Barbadori"/>
+<edge source="Medici" target="Ridolfi"/>
+<edge source="Medici" target="Tornabuoni"/>
+<edge source="Medici" target="Albizzi"/>
+<edge source="Medici" target="Salviati"/>
+<edge source="Castellani" target="Peruzzi"/>
+<edge source="Castellani" target="Strozzi"/>
+<edge source="Castellani" target="Barbadori"/>
+<edge source="Peruzzi" target="Strozzi"/>
+<edge source="Peruzzi" target="Bischeri"/>
+<edge source="Strozzi" target="Ridolfi"/>
+<edge source="Strozzi" target="Bischeri"/>
+<edge source="Ridolfi" target="Tornabuoni"/>
+<edge source="Tornabuoni" target="Guadagni"/>
+<edge source="Albizzi" target="Ginori"/>
+<edge source="Albizzi" target="Guadagni"/>
+<edge source="Salviati" target="Pazzi"/>
+<edge source="Bischeri" target="Guadagni"/>
+<edge source="Guadagni" target="Lamberteschi"/>
+</graph></graphml>

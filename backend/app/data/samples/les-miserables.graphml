@@ -1,0 +1,999 @@
+<?xml version='1.0' encoding='utf-8'?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd"><key id="weight" for="edge" attr.name="weight" attr.type="long"/>
+<key id="label" for="node" attr.name="label" attr.type="string"/>
+<key id="name" for="graph" attr.name="name" attr.type="string"/>
+<graph edgedefault="undirected"><data key="name">Les Miserables</data>
+<node id="Napoleon">
+  <data key="label">Napoleon</data>
+</node>
+<node id="Myriel">
+  <data key="label">Myriel</data>
+</node>
+<node id="MlleBaptistine">
+  <data key="label">MlleBaptistine</data>
+</node>
+<node id="MmeMagloire">
+  <data key="label">MmeMagloire</data>
+</node>
+<node id="CountessDeLo">
+  <data key="label">CountessDeLo</data>
+</node>
+<node id="Geborand">
+  <data key="label">Geborand</data>
+</node>
+<node id="Champtercier">
+  <data key="label">Champtercier</data>
+</node>
+<node id="Cravatte">
+  <data key="label">Cravatte</data>
+</node>
+<node id="Count">
+  <data key="label">Count</data>
+</node>
+<node id="OldMan">
+  <data key="label">OldMan</data>
+</node>
+<node id="Valjean">
+  <data key="label">Valjean</data>
+</node>
+<node id="Labarre">
+  <data key="label">Labarre</data>
+</node>
+<node id="Marguerite">
+  <data key="label">Marguerite</data>
+</node>
+<node id="MmeDeR">
+  <data key="label">MmeDeR</data>
+</node>
+<node id="Isabeau">
+  <data key="label">Isabeau</data>
+</node>
+<node id="Gervais">
+  <data key="label">Gervais</data>
+</node>
+<node id="Listolier">
+  <data key="label">Listolier</data>
+</node>
+<node id="Tholomyes">
+  <data key="label">Tholomyes</data>
+</node>
+<node id="Fameuil">
+  <data key="label">Fameuil</data>
+</node>
+<node id="Blacheville">
+  <data key="label">Blacheville</data>
+</node>
+<node id="Favourite">
+  <data key="label">Favourite</data>
+</node>
+<node id="Dahlia">
+  <data key="label">Dahlia</data>
+</node>
+<node id="Zephine">
+  <data key="label">Zephine</data>
+</node>
+<node id="Fantine">
+  <data key="label">Fantine</data>
+</node>
+<node id="MmeThenardier">
+  <data key="label">MmeThenardier</data>
+</node>
+<node id="Thenardier">
+  <data key="label">Thenardier</data>
+</node>
+<node id="Cosette">
+  <data key="label">Cosette</data>
+</node>
+<node id="Javert">
+  <data key="label">Javert</data>
+</node>
+<node id="Fauchelevent">
+  <data key="label">Fauchelevent</data>
+</node>
+<node id="Bamatabois">
+  <data key="label">Bamatabois</data>
+</node>
+<node id="Perpetue">
+  <data key="label">Perpetue</data>
+</node>
+<node id="Simplice">
+  <data key="label">Simplice</data>
+</node>
+<node id="Scaufflaire">
+  <data key="label">Scaufflaire</data>
+</node>
+<node id="Woman1">
+  <data key="label">Woman1</data>
+</node>
+<node id="Judge">
+  <data key="label">Judge</data>
+</node>
+<node id="Champmathieu">
+  <data key="label">Champmathieu</data>
+</node>
+<node id="Brevet">
+  <data key="label">Brevet</data>
+</node>
+<node id="Chenildieu">
+  <data key="label">Chenildieu</data>
+</node>
+<node id="Cochepaille">
+  <data key="label">Cochepaille</data>
+</node>
+<node id="Pontmercy">
+  <data key="label">Pontmercy</data>
+</node>
+<node id="Boulatruelle">
+  <data key="label">Boulatruelle</data>
+</node>
+<node id="Eponine">
+  <data key="label">Eponine</data>
+</node>
+<node id="Anzelma">
+  <data key="label">Anzelma</data>
+</node>
+<node id="Woman2">
+  <data key="label">Woman2</data>
+</node>
+<node id="MotherInnocent">
+  <data key="label">MotherInnocent</data>
+</node>
+<node id="Gribier">
+  <data key="label">Gribier</data>
+</node>
+<node id="MmeBurgon">
+  <data key="label">MmeBurgon</data>
+</node>
+<node id="Jondrette">
+  <data key="label">Jondrette</data>
+</node>
+<node id="Gavroche">
+  <data key="label">Gavroche</data>
+</node>
+<node id="Gillenormand">
+  <data key="label">Gillenormand</data>
+</node>
+<node id="Magnon">
+  <data key="label">Magnon</data>
+</node>
+<node id="MlleGillenormand">
+  <data key="label">MlleGillenormand</data>
+</node>
+<node id="MmePontmercy">
+  <data key="label">MmePontmercy</data>
+</node>
+<node id="MlleVaubois">
+  <data key="label">MlleVaubois</data>
+</node>
+<node id="LtGillenormand">
+  <data key="label">LtGillenormand</data>
+</node>
+<node id="Marius">
+  <data key="label">Marius</data>
+</node>
+<node id="BaronessT">
+  <data key="label">BaronessT</data>
+</node>
+<node id="Mabeuf">
+  <data key="label">Mabeuf</data>
+</node>
+<node id="Enjolras">
+  <data key="label">Enjolras</data>
+</node>
+<node id="Combeferre">
+  <data key="label">Combeferre</data>
+</node>
+<node id="Prouvaire">
+  <data key="label">Prouvaire</data>
+</node>
+<node id="Feuilly">
+  <data key="label">Feuilly</data>
+</node>
+<node id="Courfeyrac">
+  <data key="label">Courfeyrac</data>
+</node>
+<node id="Bahorel">
+  <data key="label">Bahorel</data>
+</node>
+<node id="Bossuet">
+  <data key="label">Bossuet</data>
+</node>
+<node id="Joly">
+  <data key="label">Joly</data>
+</node>
+<node id="Grantaire">
+  <data key="label">Grantaire</data>
+</node>
+<node id="MotherPlutarch">
+  <data key="label">MotherPlutarch</data>
+</node>
+<node id="Gueulemer">
+  <data key="label">Gueulemer</data>
+</node>
+<node id="Babet">
+  <data key="label">Babet</data>
+</node>
+<node id="Claquesous">
+  <data key="label">Claquesous</data>
+</node>
+<node id="Montparnasse">
+  <data key="label">Montparnasse</data>
+</node>
+<node id="Toussaint">
+  <data key="label">Toussaint</data>
+</node>
+<node id="Child1">
+  <data key="label">Child1</data>
+</node>
+<node id="Child2">
+  <data key="label">Child2</data>
+</node>
+<node id="Brujon">
+  <data key="label">Brujon</data>
+</node>
+<node id="MmeHucheloup">
+  <data key="label">MmeHucheloup</data>
+</node>
+<edge source="Napoleon" target="Myriel">
+  <data key="weight">1</data>
+</edge>
+<edge source="Myriel" target="MlleBaptistine">
+  <data key="weight">8</data>
+</edge>
+<edge source="Myriel" target="MmeMagloire">
+  <data key="weight">10</data>
+</edge>
+<edge source="Myriel" target="CountessDeLo">
+  <data key="weight">1</data>
+</edge>
+<edge source="Myriel" target="Geborand">
+  <data key="weight">1</data>
+</edge>
+<edge source="Myriel" target="Champtercier">
+  <data key="weight">1</data>
+</edge>
+<edge source="Myriel" target="Cravatte">
+  <data key="weight">1</data>
+</edge>
+<edge source="Myriel" target="Count">
+  <data key="weight">2</data>
+</edge>
+<edge source="Myriel" target="OldMan">
+  <data key="weight">1</data>
+</edge>
+<edge source="Myriel" target="Valjean">
+  <data key="weight">5</data>
+</edge>
+<edge source="MlleBaptistine" target="MmeMagloire">
+  <data key="weight">6</data>
+</edge>
+<edge source="MlleBaptistine" target="Valjean">
+  <data key="weight">3</data>
+</edge>
+<edge source="MmeMagloire" target="Valjean">
+  <data key="weight">3</data>
+</edge>
+<edge source="Valjean" target="Labarre">
+  <data key="weight">1</data>
+</edge>
+<edge source="Valjean" target="Marguerite">
+  <data key="weight">1</data>
+</edge>
+<edge source="Valjean" target="MmeDeR">
+  <data key="weight">1</data>
+</edge>
+<edge source="Valjean" target="Isabeau">
+  <data key="weight">1</data>
+</edge>
+<edge source="Valjean" target="Gervais">
+  <data key="weight">1</data>
+</edge>
+<edge source="Valjean" target="Fantine">
+  <data key="weight">9</data>
+</edge>
+<edge source="Valjean" target="MmeThenardier">
+  <data key="weight">7</data>
+</edge>
+<edge source="Valjean" target="Thenardier">
+  <data key="weight">12</data>
+</edge>
+<edge source="Valjean" target="Cosette">
+  <data key="weight">31</data>
+</edge>
+<edge source="Valjean" target="Javert">
+  <data key="weight">17</data>
+</edge>
+<edge source="Valjean" target="Fauchelevent">
+  <data key="weight">8</data>
+</edge>
+<edge source="Valjean" target="Bamatabois">
+  <data key="weight">2</data>
+</edge>
+<edge source="Valjean" target="Simplice">
+  <data key="weight">3</data>
+</edge>
+<edge source="Valjean" target="Scaufflaire">
+  <data key="weight">1</data>
+</edge>
+<edge source="Valjean" target="Woman1">
+  <data key="weight">2</data>
+</edge>
+<edge source="Valjean" target="Judge">
+  <data key="weight">3</data>
+</edge>
+<edge source="Valjean" target="Champmathieu">
+  <data key="weight">3</data>
+</edge>
+<edge source="Valjean" target="Brevet">
+  <data key="weight">2</data>
+</edge>
+<edge source="Valjean" target="Chenildieu">
+  <data key="weight">2</data>
+</edge>
+<edge source="Valjean" target="Cochepaille">
+  <data key="weight">2</data>
+</edge>
+<edge source="Valjean" target="Woman2">
+  <data key="weight">3</data>
+</edge>
+<edge source="Valjean" target="MotherInnocent">
+  <data key="weight">1</data>
+</edge>
+<edge source="Valjean" target="Gavroche">
+  <data key="weight">1</data>
+</edge>
+<edge source="Valjean" target="Gillenormand">
+  <data key="weight">2</data>
+</edge>
+<edge source="Valjean" target="MlleGillenormand">
+  <data key="weight">2</data>
+</edge>
+<edge source="Valjean" target="Marius">
+  <data key="weight">19</data>
+</edge>
+<edge source="Valjean" target="Enjolras">
+  <data key="weight">4</data>
+</edge>
+<edge source="Valjean" target="Bossuet">
+  <data key="weight">1</data>
+</edge>
+<edge source="Valjean" target="Gueulemer">
+  <data key="weight">1</data>
+</edge>
+<edge source="Valjean" target="Babet">
+  <data key="weight">1</data>
+</edge>
+<edge source="Valjean" target="Claquesous">
+  <data key="weight">1</data>
+</edge>
+<edge source="Valjean" target="Montparnasse">
+  <data key="weight">1</data>
+</edge>
+<edge source="Valjean" target="Toussaint">
+  <data key="weight">1</data>
+</edge>
+<edge source="Marguerite" target="Fantine">
+  <data key="weight">2</data>
+</edge>
+<edge source="Listolier" target="Tholomyes">
+  <data key="weight">4</data>
+</edge>
+<edge source="Listolier" target="Fameuil">
+  <data key="weight">4</data>
+</edge>
+<edge source="Listolier" target="Blacheville">
+  <data key="weight">4</data>
+</edge>
+<edge source="Listolier" target="Favourite">
+  <data key="weight">3</data>
+</edge>
+<edge source="Listolier" target="Dahlia">
+  <data key="weight">3</data>
+</edge>
+<edge source="Listolier" target="Zephine">
+  <data key="weight">3</data>
+</edge>
+<edge source="Listolier" target="Fantine">
+  <data key="weight">3</data>
+</edge>
+<edge source="Tholomyes" target="Fameuil">
+  <data key="weight">4</data>
+</edge>
+<edge source="Tholomyes" target="Blacheville">
+  <data key="weight">4</data>
+</edge>
+<edge source="Tholomyes" target="Favourite">
+  <data key="weight">3</data>
+</edge>
+<edge source="Tholomyes" target="Dahlia">
+  <data key="weight">3</data>
+</edge>
+<edge source="Tholomyes" target="Zephine">
+  <data key="weight">3</data>
+</edge>
+<edge source="Tholomyes" target="Fantine">
+  <data key="weight">3</data>
+</edge>
+<edge source="Tholomyes" target="Cosette">
+  <data key="weight">1</data>
+</edge>
+<edge source="Tholomyes" target="Marius">
+  <data key="weight">1</data>
+</edge>
+<edge source="Fameuil" target="Blacheville">
+  <data key="weight">4</data>
+</edge>
+<edge source="Fameuil" target="Favourite">
+  <data key="weight">3</data>
+</edge>
+<edge source="Fameuil" target="Dahlia">
+  <data key="weight">3</data>
+</edge>
+<edge source="Fameuil" target="Zephine">
+  <data key="weight">3</data>
+</edge>
+<edge source="Fameuil" target="Fantine">
+  <data key="weight">3</data>
+</edge>
+<edge source="Blacheville" target="Favourite">
+  <data key="weight">4</data>
+</edge>
+<edge source="Blacheville" target="Dahlia">
+  <data key="weight">3</data>
+</edge>
+<edge source="Blacheville" target="Zephine">
+  <data key="weight">3</data>
+</edge>
+<edge source="Blacheville" target="Fantine">
+  <data key="weight">3</data>
+</edge>
+<edge source="Favourite" target="Dahlia">
+  <data key="weight">5</data>
+</edge>
+<edge source="Favourite" target="Zephine">
+  <data key="weight">4</data>
+</edge>
+<edge source="Favourite" target="Fantine">
+  <data key="weight">4</data>
+</edge>
+<edge source="Dahlia" target="Zephine">
+  <data key="weight">4</data>
+</edge>
+<edge source="Dahlia" target="Fantine">
+  <data key="weight">4</data>
+</edge>
+<edge source="Zephine" target="Fantine">
+  <data key="weight">4</data>
+</edge>
+<edge source="Fantine" target="MmeThenardier">
+  <data key="weight">2</data>
+</edge>
+<edge source="Fantine" target="Thenardier">
+  <data key="weight">1</data>
+</edge>
+<edge source="Fantine" target="Javert">
+  <data key="weight">5</data>
+</edge>
+<edge source="Fantine" target="Bamatabois">
+  <data key="weight">1</data>
+</edge>
+<edge source="Fantine" target="Perpetue">
+  <data key="weight">1</data>
+</edge>
+<edge source="Fantine" target="Simplice">
+  <data key="weight">2</data>
+</edge>
+<edge source="MmeThenardier" target="Thenardier">
+  <data key="weight">13</data>
+</edge>
+<edge source="MmeThenardier" target="Cosette">
+  <data key="weight">4</data>
+</edge>
+<edge source="MmeThenardier" target="Javert">
+  <data key="weight">1</data>
+</edge>
+<edge source="MmeThenardier" target="Eponine">
+  <data key="weight">2</data>
+</edge>
+<edge source="MmeThenardier" target="Anzelma">
+  <data key="weight">1</data>
+</edge>
+<edge source="MmeThenardier" target="Magnon">
+  <data key="weight">1</data>
+</edge>
+<edge source="MmeThenardier" target="Gueulemer">
+  <data key="weight">1</data>
+</edge>
+<edge source="MmeThenardier" target="Babet">
+  <data key="weight">1</data>
+</edge>
+<edge source="MmeThenardier" target="Claquesous">
+  <data key="weight">1</data>
+</edge>
+<edge source="Thenardier" target="Cosette">
+  <data key="weight">1</data>
+</edge>
+<edge source="Thenardier" target="Javert">
+  <data key="weight">5</data>
+</edge>
+<edge source="Thenardier" target="Pontmercy">
+  <data key="weight">1</data>
+</edge>
+<edge source="Thenardier" target="Boulatruelle">
+  <data key="weight">1</data>
+</edge>
+<edge source="Thenardier" target="Eponine">
+  <data key="weight">3</data>
+</edge>
+<edge source="Thenardier" target="Anzelma">
+  <data key="weight">2</data>
+</edge>
+<edge source="Thenardier" target="Gavroche">
+  <data key="weight">1</data>
+</edge>
+<edge source="Thenardier" target="Marius">
+  <data key="weight">2</data>
+</edge>
+<edge source="Thenardier" target="Gueulemer">
+  <data key="weight">5</data>
+</edge>
+<edge source="Thenardier" target="Babet">
+  <data key="weight">6</data>
+</edge>
+<edge source="Thenardier" target="Claquesous">
+  <data key="weight">4</data>
+</edge>
+<edge source="Thenardier" target="Montparnasse">
+  <data key="weight">1</data>
+</edge>
+<edge source="Thenardier" target="Brujon">
+  <data key="weight">3</data>
+</edge>
+<edge source="Cosette" target="Javert">
+  <data key="weight">1</data>
+</edge>
+<edge source="Cosette" target="Woman2">
+  <data key="weight">1</data>
+</edge>
+<edge source="Cosette" target="Gillenormand">
+  <data key="weight">3</data>
+</edge>
+<edge source="Cosette" target="MlleGillenormand">
+  <data key="weight">2</data>
+</edge>
+<edge source="Cosette" target="LtGillenormand">
+  <data key="weight">1</data>
+</edge>
+<edge source="Cosette" target="Marius">
+  <data key="weight">21</data>
+</edge>
+<edge source="Cosette" target="Toussaint">
+  <data key="weight">2</data>
+</edge>
+<edge source="Javert" target="Fauchelevent">
+  <data key="weight">1</data>
+</edge>
+<edge source="Javert" target="Bamatabois">
+  <data key="weight">1</data>
+</edge>
+<edge source="Javert" target="Simplice">
+  <data key="weight">1</data>
+</edge>
+<edge source="Javert" target="Woman1">
+  <data key="weight">1</data>
+</edge>
+<edge source="Javert" target="Woman2">
+  <data key="weight">1</data>
+</edge>
+<edge source="Javert" target="Gavroche">
+  <data key="weight">1</data>
+</edge>
+<edge source="Javert" target="Enjolras">
+  <data key="weight">6</data>
+</edge>
+<edge source="Javert" target="Gueulemer">
+  <data key="weight">1</data>
+</edge>
+<edge source="Javert" target="Babet">
+  <data key="weight">2</data>
+</edge>
+<edge source="Javert" target="Claquesous">
+  <data key="weight">1</data>
+</edge>
+<edge source="Javert" target="Montparnasse">
+  <data key="weight">1</data>
+</edge>
+<edge source="Javert" target="Toussaint">
+  <data key="weight">1</data>
+</edge>
+<edge source="Fauchelevent" target="MotherInnocent">
+  <data key="weight">3</data>
+</edge>
+<edge source="Fauchelevent" target="Gribier">
+  <data key="weight">2</data>
+</edge>
+<edge source="Bamatabois" target="Judge">
+  <data key="weight">2</data>
+</edge>
+<edge source="Bamatabois" target="Champmathieu">
+  <data key="weight">2</data>
+</edge>
+<edge source="Bamatabois" target="Brevet">
+  <data key="weight">1</data>
+</edge>
+<edge source="Bamatabois" target="Chenildieu">
+  <data key="weight">1</data>
+</edge>
+<edge source="Bamatabois" target="Cochepaille">
+  <data key="weight">1</data>
+</edge>
+<edge source="Perpetue" target="Simplice">
+  <data key="weight">2</data>
+</edge>
+<edge source="Judge" target="Champmathieu">
+  <data key="weight">3</data>
+</edge>
+<edge source="Judge" target="Brevet">
+  <data key="weight">2</data>
+</edge>
+<edge source="Judge" target="Chenildieu">
+  <data key="weight">2</data>
+</edge>
+<edge source="Judge" target="Cochepaille">
+  <data key="weight">2</data>
+</edge>
+<edge source="Champmathieu" target="Brevet">
+  <data key="weight">2</data>
+</edge>
+<edge source="Champmathieu" target="Chenildieu">
+  <data key="weight">2</data>
+</edge>
+<edge source="Champmathieu" target="Cochepaille">
+  <data key="weight">2</data>
+</edge>
+<edge source="Brevet" target="Chenildieu">
+  <data key="weight">2</data>
+</edge>
+<edge source="Brevet" target="Cochepaille">
+  <data key="weight">2</data>
+</edge>
+<edge source="Chenildieu" target="Cochepaille">
+  <data key="weight">2</data>
+</edge>
+<edge source="Pontmercy" target="MmePontmercy">
+  <data key="weight">1</data>
+</edge>
+<edge source="Pontmercy" target="Marius">
+  <data key="weight">1</data>
+</edge>
+<edge source="Eponine" target="Anzelma">
+  <data key="weight">2</data>
+</edge>
+<edge source="Eponine" target="Marius">
+  <data key="weight">5</data>
+</edge>
+<edge source="Eponine" target="Mabeuf">
+  <data key="weight">1</data>
+</edge>
+<edge source="Eponine" target="Courfeyrac">
+  <data key="weight">1</data>
+</edge>
+<edge source="Eponine" target="Gueulemer">
+  <data key="weight">1</data>
+</edge>
+<edge source="Eponine" target="Babet">
+  <data key="weight">1</data>
+</edge>
+<edge source="Eponine" target="Claquesous">
+  <data key="weight">1</data>
+</edge>
+<edge source="Eponine" target="Montparnasse">
+  <data key="weight">1</data>
+</edge>
+<edge source="Eponine" target="Brujon">
+  <data key="weight">1</data>
+</edge>
+<edge source="MmeBurgon" target="Jondrette">
+  <data key="weight">1</data>
+</edge>
+<edge source="MmeBurgon" target="Gavroche">
+  <data key="weight">2</data>
+</edge>
+<edge source="Gavroche" target="Marius">
+  <data key="weight">4</data>
+</edge>
+<edge source="Gavroche" target="Mabeuf">
+  <data key="weight">1</data>
+</edge>
+<edge source="Gavroche" target="Enjolras">
+  <data key="weight">7</data>
+</edge>
+<edge source="Gavroche" target="Combeferre">
+  <data key="weight">6</data>
+</edge>
+<edge source="Gavroche" target="Prouvaire">
+  <data key="weight">1</data>
+</edge>
+<edge source="Gavroche" target="Feuilly">
+  <data key="weight">2</data>
+</edge>
+<edge source="Gavroche" target="Courfeyrac">
+  <data key="weight">7</data>
+</edge>
+<edge source="Gavroche" target="Bahorel">
+  <data key="weight">5</data>
+</edge>
+<edge source="Gavroche" target="Bossuet">
+  <data key="weight">5</data>
+</edge>
+<edge source="Gavroche" target="Joly">
+  <data key="weight">3</data>
+</edge>
+<edge source="Gavroche" target="Grantaire">
+  <data key="weight">1</data>
+</edge>
+<edge source="Gavroche" target="Gueulemer">
+  <data key="weight">1</data>
+</edge>
+<edge source="Gavroche" target="Babet">
+  <data key="weight">1</data>
+</edge>
+<edge source="Gavroche" target="Montparnasse">
+  <data key="weight">1</data>
+</edge>
+<edge source="Gavroche" target="Child1">
+  <data key="weight">2</data>
+</edge>
+<edge source="Gavroche" target="Child2">
+  <data key="weight">2</data>
+</edge>
+<edge source="Gavroche" target="Brujon">
+  <data key="weight">1</data>
+</edge>
+<edge source="Gavroche" target="MmeHucheloup">
+  <data key="weight">1</data>
+</edge>
+<edge source="Gillenormand" target="Magnon">
+  <data key="weight">1</data>
+</edge>
+<edge source="Gillenormand" target="MlleGillenormand">
+  <data key="weight">9</data>
+</edge>
+<edge source="Gillenormand" target="LtGillenormand">
+  <data key="weight">1</data>
+</edge>
+<edge source="Gillenormand" target="Marius">
+  <data key="weight">12</data>
+</edge>
+<edge source="Gillenormand" target="BaronessT">
+  <data key="weight">1</data>
+</edge>
+<edge source="MlleGillenormand" target="MmePontmercy">
+  <data key="weight">1</data>
+</edge>
+<edge source="MlleGillenormand" target="MlleVaubois">
+  <data key="weight">1</data>
+</edge>
+<edge source="MlleGillenormand" target="LtGillenormand">
+  <data key="weight">2</data>
+</edge>
+<edge source="MlleGillenormand" target="Marius">
+  <data key="weight">6</data>
+</edge>
+<edge source="LtGillenormand" target="Marius">
+  <data key="weight">1</data>
+</edge>
+<edge source="Marius" target="BaronessT">
+  <data key="weight">1</data>
+</edge>
+<edge source="Marius" target="Mabeuf">
+  <data key="weight">1</data>
+</edge>
+<edge source="Marius" target="Enjolras">
+  <data key="weight">7</data>
+</edge>
+<edge source="Marius" target="Combeferre">
+  <data key="weight">5</data>
+</edge>
+<edge source="Marius" target="Feuilly">
+  <data key="weight">1</data>
+</edge>
+<edge source="Marius" target="Courfeyrac">
+  <data key="weight">9</data>
+</edge>
+<edge source="Marius" target="Bahorel">
+  <data key="weight">1</data>
+</edge>
+<edge source="Marius" target="Bossuet">
+  <data key="weight">5</data>
+</edge>
+<edge source="Marius" target="Joly">
+  <data key="weight">2</data>
+</edge>
+<edge source="Mabeuf" target="Enjolras">
+  <data key="weight">1</data>
+</edge>
+<edge source="Mabeuf" target="Combeferre">
+  <data key="weight">2</data>
+</edge>
+<edge source="Mabeuf" target="Feuilly">
+  <data key="weight">1</data>
+</edge>
+<edge source="Mabeuf" target="Courfeyrac">
+  <data key="weight">2</data>
+</edge>
+<edge source="Mabeuf" target="Bahorel">
+  <data key="weight">2</data>
+</edge>
+<edge source="Mabeuf" target="Bossuet">
+  <data key="weight">1</data>
+</edge>
+<edge source="Mabeuf" target="Joly">
+  <data key="weight">1</data>
+</edge>
+<edge source="Mabeuf" target="MotherPlutarch">
+  <data key="weight">3</data>
+</edge>
+<edge source="Enjolras" target="Combeferre">
+  <data key="weight">15</data>
+</edge>
+<edge source="Enjolras" target="Prouvaire">
+  <data key="weight">4</data>
+</edge>
+<edge source="Enjolras" target="Feuilly">
+  <data key="weight">6</data>
+</edge>
+<edge source="Enjolras" target="Courfeyrac">
+  <data key="weight">17</data>
+</edge>
+<edge source="Enjolras" target="Bahorel">
+  <data key="weight">4</data>
+</edge>
+<edge source="Enjolras" target="Bossuet">
+  <data key="weight">10</data>
+</edge>
+<edge source="Enjolras" target="Joly">
+  <data key="weight">5</data>
+</edge>
+<edge source="Enjolras" target="Grantaire">
+  <data key="weight">3</data>
+</edge>
+<edge source="Enjolras" target="Claquesous">
+  <data key="weight">1</data>
+</edge>
+<edge source="Enjolras" target="MmeHucheloup">
+  <data key="weight">1</data>
+</edge>
+<edge source="Combeferre" target="Prouvaire">
+  <data key="weight">2</data>
+</edge>
+<edge source="Combeferre" target="Feuilly">
+  <data key="weight">5</data>
+</edge>
+<edge source="Combeferre" target="Courfeyrac">
+  <data key="weight">13</data>
+</edge>
+<edge source="Combeferre" target="Bahorel">
+  <data key="weight">5</data>
+</edge>
+<edge source="Combeferre" target="Bossuet">
+  <data key="weight">9</data>
+</edge>
+<edge source="Combeferre" target="Joly">
+  <data key="weight">5</data>
+</edge>
+<edge source="Combeferre" target="Grantaire">
+  <data key="weight">1</data>
+</edge>
+<edge source="Prouvaire" target="Feuilly">
+  <data key="weight">2</data>
+</edge>
+<edge source="Prouvaire" target="Courfeyrac">
+  <data key="weight">3</data>
+</edge>
+<edge source="Prouvaire" target="Bahorel">
+  <data key="weight">2</data>
+</edge>
+<edge source="Prouvaire" target="Bossuet">
+  <data key="weight">2</data>
+</edge>
+<edge source="Prouvaire" target="Joly">
+  <data key="weight">2</data>
+</edge>
+<edge source="Prouvaire" target="Grantaire">
+  <data key="weight">1</data>
+</edge>
+<edge source="Feuilly" target="Courfeyrac">
+  <data key="weight">6</data>
+</edge>
+<edge source="Feuilly" target="Bahorel">
+  <data key="weight">3</data>
+</edge>
+<edge source="Feuilly" target="Bossuet">
+  <data key="weight">6</data>
+</edge>
+<edge source="Feuilly" target="Joly">
+  <data key="weight">5</data>
+</edge>
+<edge source="Feuilly" target="Grantaire">
+  <data key="weight">1</data>
+</edge>
+<edge source="Courfeyrac" target="Bahorel">
+  <data key="weight">6</data>
+</edge>
+<edge source="Courfeyrac" target="Bossuet">
+  <data key="weight">12</data>
+</edge>
+<edge source="Courfeyrac" target="Joly">
+  <data key="weight">5</data>
+</edge>
+<edge source="Courfeyrac" target="Grantaire">
+  <data key="weight">2</data>
+</edge>
+<edge source="Courfeyrac" target="MmeHucheloup">
+  <data key="weight">1</data>
+</edge>
+<edge source="Bahorel" target="Bossuet">
+  <data key="weight">4</data>
+</edge>
+<edge source="Bahorel" target="Joly">
+  <data key="weight">5</data>
+</edge>
+<edge source="Bahorel" target="Grantaire">
+  <data key="weight">1</data>
+</edge>
+<edge source="Bahorel" target="MmeHucheloup">
+  <data key="weight">1</data>
+</edge>
+<edge source="Bossuet" target="Joly">
+  <data key="weight">7</data>
+</edge>
+<edge source="Bossuet" target="Grantaire">
+  <data key="weight">3</data>
+</edge>
+<edge source="Bossuet" target="MmeHucheloup">
+  <data key="weight">1</data>
+</edge>
+<edge source="Joly" target="Grantaire">
+  <data key="weight">2</data>
+</edge>
+<edge source="Joly" target="MmeHucheloup">
+  <data key="weight">1</data>
+</edge>
+<edge source="Grantaire" target="MmeHucheloup">
+  <data key="weight">1</data>
+</edge>
+<edge source="Gueulemer" target="Babet">
+  <data key="weight">6</data>
+</edge>
+<edge source="Gueulemer" target="Claquesous">
+  <data key="weight">4</data>
+</edge>
+<edge source="Gueulemer" target="Montparnasse">
+  <data key="weight">2</data>
+</edge>
+<edge source="Gueulemer" target="Brujon">
+  <data key="weight">3</data>
+</edge>
+<edge source="Babet" target="Claquesous">
+  <data key="weight">4</data>
+</edge>
+<edge source="Babet" target="Montparnasse">
+  <data key="weight">2</data>
+</edge>
+<edge source="Babet" target="Brujon">
+  <data key="weight">3</data>
+</edge>
+<edge source="Claquesous" target="Montparnasse">
+  <data key="weight">2</data>
+</edge>
+<edge source="Claquesous" target="Brujon">
+  <data key="weight">1</data>
+</edge>
+<edge source="Montparnasse" target="Brujon">
+  <data key="weight">1</data>
+</edge>
+<edge source="Child1" target="Child2">
+  <data key="weight">3</data>
+</edge>
+</graph></graphml>

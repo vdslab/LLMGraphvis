@@ -22,7 +22,7 @@ from app.core.logging import get_logger
 from app.services import llm as llm_service
 from app.services.llm import mcp_client
 from app.services.llm.catalog import get_available_provider_catalog
-from app.services import chat_service
+from app.services import chat_service, sample_networks
 
 logger = get_logger(__name__)
 
@@ -49,6 +49,14 @@ def list_llm_providers(
 ):
     """List the LLM providers/models a chat can be pinned to."""
     return get_available_provider_catalog()
+
+
+@router.get("/samples", response_model=List[schemas.SampleNetworkOption])
+def list_sample_networks(
+    current_user: models.User = Depends(get_current_user),
+):
+    """List the bundled networks available for starting an analysis."""
+    return sample_networks.list_samples()
 
 
 @router.get("", response_model=List[schemas.Chat])
@@ -246,6 +254,31 @@ async def upload_network(
         chat.network_id,
         graphml_data,
         file.filename,
+    )
+
+    return {"status": "accepted"}
+
+
+@router.post("/{chat_id}/samples/{sample_id}", status_code=202)
+async def load_sample_network(
+    chat_id: int,
+    sample_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Initialize a chat from one allowlisted bundled sample network."""
+    chat = verify_chat_ownership(chat_id, current_user.id, db)
+    sample = sample_networks.get_sample(sample_id)
+    if sample is None:
+        raise HTTPException(status_code=404, detail="Sample network not found")
+
+    background_tasks.add_task(
+        chat_service.handle_upload_background,
+        chat_id,
+        chat.network_id,
+        sample_networks.load_graphml(sample),
+        sample.upload_filename,
     )
 
     return {"status": "accepted"}
