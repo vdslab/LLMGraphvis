@@ -59,6 +59,8 @@ def create_subgraph_from_nodes(
     suffix: str = "Subgraph",
     preserve_layout: bool = False,
     description: str = None,
+    initialize_layout: bool = True,
+    reuse_existing: bool = True,
 ) -> Dict[str, Any]:
     """
     Creates a new network as a subgraph containing the specified nodes.
@@ -93,7 +95,7 @@ def create_subgraph_from_nodes(
         .first()
     )
 
-    if existing_network:
+    if existing_network and reuse_existing:
         logger.info(
             f"Returning existing subgraph: {existing_network.id} ({target_name})"
         )
@@ -159,10 +161,10 @@ def create_subgraph_from_nodes(
     )
 
     # 7. Calculate Initial Layout (only if NOT preserved)
-    if not preserve_layout:
+    if not preserve_layout and initialize_layout:
         logger.info("Calculating initial layout (forceatlas2)...")
         calculate_layout(new_network_id, "forceatlas2", db)
-    else:
+    elif preserve_layout:
         logger.info(f"Preserving existing layout (x, y copied) from {source_network.last_layout_name}.")
         # Verify if the specific layout attributes exist?
         # Ideally, AttributeCopier copied everything. 

@@ -43,7 +43,8 @@ def subgraph_create_from_nodes(
     Use this ONLY when the user provides a specific list of node IDs (e.g., "create a subgraph
     for nodes A, B, and C"). For attribute-based filtering, use `subgraph_create_by_filter` instead.
 
-    After creation, call `visualization_switch_network(new_network_id)` to display the result.
+    Legacy compound behavior: the backend automatically selects and renders the
+    result. Prefer subgraph_extract_nodes for extraction without these side effects.
 
     Returns:
         dict: {"new_network_id": int, "content": str}
@@ -90,7 +91,8 @@ def subgraph_create_by_filter(
     - "ranges": list of {"min": float, "max": float} numeric ranges (OR within condition)
     Multiple conditions are combined with AND.
 
-    After creation, call `visualization_switch_network(new_network_id)` to display.
+    Legacy compound behavior: the backend automatically selects and renders the
+    result. Prefer subgraph_extract_filter for extraction without these side effects.
 
     Returns:
         dict: {"new_network_id": int, "content": str}

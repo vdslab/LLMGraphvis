@@ -111,6 +111,15 @@ _VIEW_SWITCH_TOOLS = (
 @hook(HookEvent.POST_TOOL, tools="*", priority=15, name="on_view_switch")
 async def on_view_switch(ctx: HookContext) -> None:
     """Follow an explicit view switch with the agent's own context."""
+    if ctx.tool_name == "network_select" and not ctx.handled:
+        if isinstance(ctx.result, dict) and "error" not in ctx.result:
+            target = ctx.result.get("network_id")
+            if isinstance(target, int):
+                _update_chat_state(ctx, network_id=target)
+                ctx.turn_state["network_id"] = target
+                ctx.handled = True
+        return
+
     if ctx.handled or ctx.tool_name not in _VIEW_SWITCH_TOOLS:
         return
 

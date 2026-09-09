@@ -2,9 +2,9 @@ from unittest.mock import patch
 
 import networkx as nx
 import pytest
-
 from app.logic.centrality import calculate_centrality, get_top_nodes
 from app.logic.utils.graph_builder import build_graph_from_db
+
 from common import models
 
 
