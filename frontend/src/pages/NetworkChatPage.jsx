@@ -302,7 +302,10 @@ const NetworkChatPage = () => {
         )}
 
         {/* Center: Graph */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        <div
+          data-testid="network-graph-panel"
+          style={{ flex: 1, position: 'relative', overflow: 'hidden' }}
+        >
           
            {/* Sidebar Toggle Button (if closed) */}
            {!showChatList && (
