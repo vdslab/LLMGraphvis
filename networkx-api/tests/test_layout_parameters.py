@@ -111,11 +111,18 @@ class TestLayoutParamKeys:
         """nx.random_layout genuinely lacks `scale`, unlike the other geometrics."""
         assert "scale" not in LAYOUT_PARAM_KEYS["random"]
 
-    def test_unsupported_override_is_dropped_not_raised(self, db):
+    def test_unsupported_override_is_rejected_without_saving(self, db):
         setup_graph(db)
         # `gravity` is a forceatlas2/spring parameter; circular has no such kwarg.
-        calculate_layout(1, "circular", db, overrides={"gravity": 5.0})
-        assert stored_layouts(db, 1, "circular") is not None
+        with pytest.raises(ValueError, match="Unsupported parameters.*gravity"):
+            calculate_layout(1, "circular", db, overrides={"gravity": 5.0})
+        assert stored_layouts(db, 1, "circular") is None
+
+    def test_weight_on_unweighted_layout_is_rejected(self, db):
+        setup_graph(db)
+        with pytest.raises(ValueError, match="does not support weight"):
+            calculate_layout(1, "circular", db, overrides={"weight": "weight"})
+        assert stored_layouts(db, 1, "circular") is None
 
 
 class TestRegistry:

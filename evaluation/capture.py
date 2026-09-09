@@ -63,7 +63,7 @@ async def capture_graph(
                 )
                 await page.wait_for_function(
                     count_expression,
-                    ["[data-testid='network-graph'] svg circle", expected_nodes],
+                    arg=["[data-testid='network-graph'] svg circle", expected_nodes],
                     timeout=60_000,
                 )
             await graph.screenshot(path=str(output_path))

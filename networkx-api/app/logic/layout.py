@@ -205,18 +205,16 @@ def calculate_layout(
     if spec.prepare:
         spec.prepare(G, network_id, sanitized_overrides, db)
 
-    # Filter to the parameters this specific nx layout function accepts, so an
-    # unsupported kwarg can never raise TypeError inside networkx and an
-    # advertised one can never be silently discarded.
+    # Preparation consumes app-level options. Everything remaining must reach
+    # NetworkX: accepting an ignored option would falsely report success.
     rejected = set(sanitized_overrides) - spec.params
     if rejected:
-        logger.warning(
-            f"Ignoring parameters not supported by layout '{layout_name}': "
-            f"{sorted(rejected)}"
+        raise ValueError(
+            f"Unsupported parameters for layout '{layout_name}': "
+            f"{sorted(rejected)}. Supported computation parameters: "
+            f"{sorted(spec.params)}."
         )
-    params.update(
-        {k: v for k, v in sanitized_overrides.items() if k in spec.params}
-    )
+    params.update(sanitized_overrides)
 
     # --- Cache check ---
     from .attributes import get_cached_attribute, is_cache_valid

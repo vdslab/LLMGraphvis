@@ -45,9 +45,9 @@ def resolve_weight(spec, requested, network_id: int, db):
 
     if spec.weight_role is WeightRole.NONE:
         if requested_name:
-            logger.warning(
-                f"Layout '{spec.name}' has no weight concept; ignoring "
-                f"weight={requested_name!r}."
+            raise ValueError(
+                f"Layout '{spec.name}' does not support weight. "
+                "Omit weight or choose a weighted layout."
             )
         return None, ""
 
