@@ -55,6 +55,7 @@ def layout_forceatlas2(
     node_size: Annotated[Optional[dict], Field(description="Optional mapping of node id to radius, enabling size-aware repulsion so large nodes push each other apart instead of overlapping. Pass this when large nodes visibly overlap.")] = None,
     weight: Annotated[Optional[str], Field(description=_WEIGHT_DESC)] = None,
     seed: Annotated[Optional[int], Field(description=_SEED_DESC)] = None,
+    pos: Annotated[Optional[dict[str, Tuple[float, float]]], Field(description="Explicit initial x/y coordinates keyed by exact node ID. Partial positions are allowed where NetworkX supports them. Cannot be combined with init_from_layout; fixed nodes must have positions.")] = None,
     init_from_layout: Annotated[Optional[str], Field(description=_INIT_FROM_DESC)] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
@@ -91,6 +92,7 @@ def layout_forceatlas2(
             "weight": weight,
             "seed": seed,
             "init_from_layout": init_from_layout,
+            "pos": pos,
         }
         info = layout.calculate_layout(
             network_id, "forceatlas2", db, overrides=overrides, force=force_recompute
@@ -109,13 +111,14 @@ def layout_spring(
     iterations: Annotated[Optional[int], Field(description="Number of iterations. Defaults to auto (200–1000 based on graph size).")] = None,
     k: Annotated[Optional[float], Field(description="Optimal distance between nodes. Defaults to auto (2.0/sqrt(node_count)). Larger values increase spacing between nodes.")] = None,
     threshold: Annotated[Optional[float], Field(description="Convergence threshold on total node movement; iteration stops below it. Defaults to auto (1e-6 to 1e-4 based on graph size). Lower is more precise and slower.")] = None,
-    method: Annotated[Optional[str], Field(description="Force computation method: 'auto' (default), 'energy' (exact, better quality, slower), or 'force' (approximate, faster on large graphs).")] = None,
+    method: Annotated[Optional[str], Field(description="Force computation method: 'auto' (default), 'energy' (energy minimization using absolute weights and component gravity), or 'force' (Fruchterman-Reingold force simulation).")] = None,
     gravity: Annotated[Optional[float], Field(description="Strength of the pull toward the center, which keeps disconnected components from drifting apart. Only used by the 'energy' method.")] = None,
-    fixed: Annotated[Optional[list], Field(description="List of node ids to hold at their current positions while the rest of the graph moves around them. Requires init_from_layout so those nodes have positions to be held at.")] = None,
+    fixed: Annotated[Optional[list[str]], Field(description="List of node ids to hold at their current positions while the rest of the graph moves around them. Requires pos or init_from_layout for those nodes. Renderer normalization can still change their screen positions.")] = None,
     weight: Annotated[Optional[str], Field(description=_WEIGHT_DESC)] = None,
     scale: Annotated[Optional[float], Field(description=_SCALE_CENTER_DESC)] = None,
     center: Annotated[Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)] = None,
     seed: Annotated[Optional[int], Field(description=_SEED_DESC)] = None,
+    pos: Annotated[Optional[dict[str, Tuple[float, float]]], Field(description="Explicit initial x/y coordinates keyed by exact node ID. Partial positions are allowed where NetworkX supports them. Cannot be combined with init_from_layout; fixed nodes must have positions.")] = None,
     init_from_layout: Annotated[Optional[str], Field(description=_INIT_FROM_DESC)] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
@@ -149,6 +152,7 @@ def layout_spring(
             "center": center,
             "seed": seed,
             "init_from_layout": init_from_layout,
+            "pos": pos,
         }
         info = layout.calculate_layout(
             network_id, "spring", db, overrides=overrides, force=force_recompute
@@ -170,6 +174,7 @@ def layout_arf(
     dt: Annotated[Optional[float], Field(description="Integration step size. Smaller is more stable but slower to converge.")] = None,
     max_iter: Annotated[Optional[int], Field(description="Maximum iterations. Defaults to auto (200–1000 based on graph size).")] = None,
     seed: Annotated[Optional[int], Field(description=_SEED_DESC)] = None,
+    pos: Annotated[Optional[dict[str, Tuple[float, float]]], Field(description="Explicit initial x/y coordinates keyed by exact node ID. Partial positions are allowed where NetworkX supports them. Cannot be combined with init_from_layout; fixed nodes must have positions.")] = None,
     init_from_layout: Annotated[Optional[str], Field(description=_INIT_FROM_DESC)] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
@@ -196,6 +201,7 @@ def layout_arf(
             "max_iter": max_iter,
             "seed": seed,
             "init_from_layout": init_from_layout,
+            "pos": pos,
         }
         layout.calculate_layout(
             network_id, "arf", db, overrides=overrides, force=force_recompute

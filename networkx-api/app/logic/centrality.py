@@ -1,10 +1,11 @@
+import math
 from typing import Any, Dict, List, Optional
 
 import networkx as nx
 from sqlalchemy.orm import Session
 
-from common import models
 from app.core.logging import get_logger
+from common import models
 
 from .attributes import (
     bulk_save_node_attributes,
@@ -29,41 +30,24 @@ def calculate_centrality(
     max_iter: Optional[int] = None,
     tol: Optional[float] = None,
     k: Optional[int] = None,
+    seed: Optional[int] = 42,
+    endpoints: bool = False,
+    wf_improved: bool = True,
+    nstart: Optional[dict] = None,
+    personalization: Optional[dict] = None,
+    dangling: Optional[dict] = None,
 ):
-    """
-    Calculates a centrality metric for all nodes in the network.
+    """Compute and persist one metric, keyed by its effective parameters.
 
-    Args:
-        network_id: The ID of the network.
-        centrality_type: One of "degree", "betweenness", "closeness", "eigenvector", "pagerank".
-        db: Database session.
-        force: If True, bypasses the cache and always recomputes.
-        damping_factor: PageRank-only. Alpha (damping) parameter, forwarded to
-            `nx.pagerank(alpha=...)`. Defaults to networkx's own default (0.85)
-            when None/omitted.
-        weight: Name of the edge attribute to use as edge weight. Applies to
-            "betweenness", "closeness" (forwarded as nx's `distance` kwarg),
-            and "eigenvector". Not supported by "degree" (nx.degree_centrality
-            has no weight concept) or "pagerank" (has its own weight handling,
-            out of scope for this stage). When set, `build_graph_from_db` is
-            asked to load that edge attribute onto the graph ("weight" being the
-            imported edge-weight column); it raises if no such attribute exists.
-        normalized: Applies to "degree" (emulated manually — nx.degree_centrality
-            has no `normalized` kwarg, so we scale by (n-1) ourselves when False)
-            and "betweenness" (nx has a real `normalized` kwarg). NOTE:
-            nx.closeness_centrality has no normalization toggle at all (its
-            formula is inherently size-normalized), so this has no effect for
-            "closeness" and is intentionally not read for that type.
-        max_iter: Eigenvector-only. Defaults to 1000 (today's hardcoded value)
-            when None.
-        tol: Eigenvector-only. Defaults to networkx's own default (1e-06) when
-            None (today's code doesn't pass `tol` at all, so this preserves
-            that exact behavior).
-        k: Betweenness-only. Approximate-sampling parameter forwarded to
-            `nx.betweenness_centrality(k=...)`. None (default) computes exactly,
-            same as before this parameter existed.
+    Weights are distances for betweenness/closeness and strengths for
+    eigenvector/PageRank. Node distributions use exact string node IDs.
+    NetworkX handles convergence; failures never create a successful cache entry.
     """
-    attr_name = f"{centrality_type}_centrality"
+    attr_name = (
+        "pagerank" if centrality_type == "pagerank" else f"{centrality_type}_centrality"
+    )
+    if weight == "none":
+        weight = None
 
     # --- Cache check ---
     current_hash = compute_graph_state_hash(network_id, db)
@@ -73,28 +57,39 @@ def calculate_centrality(
     # (e.g. `k` is meaningless for "degree" and must not appear there).
     effective_params = {"centrality_type": centrality_type}
     if centrality_type == "pagerank":
-        effective_params["damping_factor"] = damping_factor
-    if centrality_type in ("betweenness", "closeness", "eigenvector"):
+        effective_params.update(
+            {
+                "damping_factor": damping_factor,
+                "personalization": personalization,
+                "dangling": dangling,
+            }
+        )
+    if centrality_type in ("betweenness", "closeness", "eigenvector", "pagerank"):
         effective_params["weight"] = weight
-    if centrality_type in ("degree", "betweenness"):
+    if centrality_type in ("degree", "in_degree", "out_degree", "betweenness"):
         effective_params["normalized"] = normalized
-    if centrality_type == "eigenvector":
+    if centrality_type in ("eigenvector", "pagerank"):
         effective_params["max_iter"] = max_iter
         effective_params["tol"] = tol
+        effective_params["nstart"] = nstart
     if centrality_type == "betweenness":
-        effective_params["k"] = k
+        effective_params.update({"k": k, "seed": seed, "endpoints": endpoints})
+    if centrality_type == "closeness":
+        effective_params["wf_improved"] = wf_improved
 
     if not force:
         cached = get_cached_attribute(network_id, attr_name, models.NodeAttribute, db)
         if is_cache_valid(cached, current_hash, effective_params):
             logger.info(
-                f"Centrality cache HIT for network {network_id}, type='{centrality_type}' "
+                f"Centrality cache HIT for network {network_id}, "
+                f"type='{centrality_type}' "
                 f"(graph_state_hash={current_hash[:12]}...). Skipping recomputation."
             )
             return load_node_attribute_values(network_id, attr_name, db)
 
     logger.info(
-        f"Centrality cache MISS for network {network_id}, type='{centrality_type}'. Recomputing."
+        f"Centrality cache MISS for network {network_id}, "
+        f"type='{centrality_type}'. Recomputing."
     )
 
     # Reconstruct graph (Optimized). Only ask for edge weights when a `weight`
@@ -103,26 +98,61 @@ def calculate_centrality(
     # weight other than the imported `weight` column resolves to that edge
     # attribute instead of silently producing an unweighted graph.
     from .utils.graph_builder import build_graph_from_db
+
     G = build_graph_from_db(network_id, db, weight_attribute=weight)
+
+    for name, vector in (
+        ("nstart", nstart),
+        ("personalization", personalization),
+        ("dangling", dangling),
+    ):
+        if vector is None:
+            continue
+        unknown = set(vector) - set(G)
+        if unknown:
+            raise ValueError(f"{name} contains unknown node IDs: {sorted(unknown)}")
+        if not vector or any(not math.isfinite(v) or v < 0 for v in vector.values()):
+            raise ValueError(f"{name} requires finite nonnegative values")
+        if sum(vector.values()) <= 0:
+            raise ValueError(f"{name} requires a positive sum")
+    if weight and centrality_type in {"betweenness", "closeness"}:
+        if any(
+            not math.isfinite(d[weight]) or d[weight] <= 0
+            for _, _, d in G.edges(data=True)
+        ):
+            raise ValueError(
+                "Distance weights for this centrality must be finite and positive"
+            )
 
     # Need node_map for saving results later (node_id -> db_id)
     # We can fetch this efficiently or reconstruct it.
     # Since we need to map back to DB IDs for saving, let's fetch map.
-    nodes = db.query(models.Node.id, models.Node.node_id).filter(models.Node.network_id == network_id).all()
+    nodes = (
+        db.query(models.Node.id, models.Node.node_id)
+        .filter(models.Node.network_id == network_id)
+        .all()
+    )
     node_map = {n.node_id: n.id for n in nodes}
 
     # Calculate Centrality
-    if centrality_type == "degree":
-        # NOTE: nx.degree_centrality has no `normalized` kwarg (its formula is
-        # always divided by (n-1)); we emulate an "unnormalized" (raw degree
-        # count) mode manually when normalized=False, by scaling back up.
-        centrality = nx.degree_centrality(G)
-        if not normalized:
-            n = len(G)
-            if n > 1:
-                centrality = {node: val * (n - 1) for node, val in centrality.items()}
+    if centrality_type in ("degree", "in_degree", "out_degree"):
+        functions = {
+            "degree": nx.degree_centrality,
+            "in_degree": nx.in_degree_centrality,
+            "out_degree": nx.out_degree_centrality,
+        }
+        if normalized:
+            centrality = functions[centrality_type](G)
+        else:
+            if centrality_type != "degree" and not G.is_directed():
+                raise ValueError("In/out degree requires a directed graph")
+            centrality = dict(getattr(G, centrality_type)())
     elif centrality_type == "betweenness":
-        bc_kwargs: Dict[str, Any] = {"normalized": normalized}
+        bc_kwargs: Dict[str, Any] = {
+            "normalized": normalized,
+            "endpoints": endpoints,
+            "seed": seed,
+        }
         if k is not None:
             bc_kwargs["k"] = k
         if weight is not None:
@@ -132,19 +162,32 @@ def calculate_centrality(
         # NOTE: nx.closeness_centrality has no `normalized` kwarg at all (its
         # formula is inherently size-normalized). Its weight-equivalent kwarg
         # is named `distance`, not `weight`.
-        cc_kwargs: Dict[str, Any] = {}
+        cc_kwargs: Dict[str, Any] = {"wf_improved": wf_improved}
         if weight is not None:
             cc_kwargs["distance"] = weight
         centrality = nx.closeness_centrality(G, **cc_kwargs)
     elif centrality_type == "eigenvector":
-        ev_kwargs: Dict[str, Any] = {"max_iter": max_iter if max_iter is not None else 1000}
+        ev_kwargs: Dict[str, Any] = {
+            "max_iter": max_iter if max_iter is not None else 1000
+        }
         if tol is not None:
             ev_kwargs["tol"] = tol
         if weight is not None:
             ev_kwargs["weight"] = weight
+        if nstart is not None:
+            ev_kwargs["nstart"] = nstart
         centrality = nx.eigenvector_centrality(G, **ev_kwargs)
     elif centrality_type == "pagerank":
-        centrality = nx.pagerank(G, alpha=damping_factor if damping_factor is not None else 0.85)
+        centrality = nx.pagerank(
+            G,
+            alpha=damping_factor if damping_factor is not None else 0.85,
+            personalization=personalization,
+            dangling=dangling,
+            nstart=nstart,
+            weight=weight,
+            max_iter=max_iter if max_iter is not None else 100,
+            tol=tol if tol is not None else 1e-6,
+        )
     else:
         raise ValueError(f"Unknown centrality type: {centrality_type}")
 
@@ -199,7 +242,11 @@ def get_top_nodes(
 
     # Sort by score, skipping non-numeric values defensively (e.g. a text attribute
     # accidentally passed as `metric`).
-    numeric_items = [(node_id, score) for node_id, score in values.items() if isinstance(score, (int, float))]
+    numeric_items = [
+        (node_id, score)
+        for node_id, score in values.items()
+        if isinstance(score, (int, float))
+    ]
     sorted_nodes = sorted(numeric_items, key=lambda item: item[1], reverse=reverse)
 
     # Take top k

@@ -1,10 +1,10 @@
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 import networkx as nx
 from sqlalchemy.orm import Session
 
-from common import models
 from app.core.logging import get_logger
+from common import models
 
 from .attributes import (
     bulk_save_node_attributes,
@@ -25,120 +25,78 @@ def calculate_community(
     resolution: Optional[float] = None,
     seed: Optional[int] = None,
     best_n: Optional[int] = None,
+    weight: Optional[str] = None,
+    cutoff: Optional[int] = None,
+    threshold: Optional[float] = None,
+    max_level: Optional[int] = None,
 ) -> str:
-    """
-    Calculates communities for the network and saves them as a categorical node attribute.
+    """Persist one partition; accepted options are shared by execution and cache.
 
-    Args:
-        network_id: The ID of the network.
-        algorithm: "louvain", "greedy_modularity", "label_propagation"
-        db: Database session.
-        force: If True, bypasses the cache and always recomputes.
-        resolution: Louvain-only. Higher resolution favors smaller communities.
-            Forwarded to `nx.community.louvain_communities(resolution=...)`.
-            Ignored (with a debug log) for other algorithms rather than raising,
-            since it's simply not meaningful for them. Defaults to networkx's
-            own default (1) when None.
-        seed: Louvain-only. Forwarded to `nx.community.louvain_communities(seed=...)`
-            for reproducible results. Not supported by "label_propagation"
-            (networkx's label_propagation_communities has no seed parameter —
-            it is inherently non-deterministic) or "greedy_modularity" (which
-            uses `best_n` instead, see below). Ignored (with a debug log) if
-            passed for those algorithms.
-        best_n: Greedy-modularity-only. Forwarded to
-            `nx.community.greedy_modularity_communities(best_n=...)` to force
-            a specific number of communities. Ignored (with a debug log) for
-            other algorithms.
-
-    Returns:
-        The name of the attribute created (e.g., "louvain_community").
+    Algorithms have distinct contracts. Invalid combinations are rejected instead
+    of being ignored, and a missing implementation never changes the algorithm.
     """
+    algorithms = {
+        "louvain": (
+            nx.community.louvain_communities,
+            {"weight", "resolution", "seed", "threshold", "max_level"},
+        ),
+        "greedy_modularity": (
+            nx.community.greedy_modularity_communities,
+            {"weight", "resolution", "cutoff", "best_n"},
+        ),
+        "label_propagation": (nx.community.label_propagation_communities, set()),
+    }
+    if algorithm not in algorithms:
+        raise ValueError(f"Unknown community algorithm: {algorithm}")
+    function, allowed = algorithms[algorithm]
+    supplied = {
+        "resolution": resolution,
+        "seed": seed,
+        "best_n": best_n,
+        "weight": weight,
+        "cutoff": cutoff,
+        "threshold": threshold,
+        "max_level": max_level,
+    }
+    parameters = {key: value for key, value in supplied.items() if value is not None}
+    unsupported = set(parameters) - allowed
+    if unsupported:
+        raise ValueError(
+            f"Unsupported parameters for {algorithm}: {sorted(unsupported)}"
+        )
+    if "weight" in allowed:
+        parameters["weight"] = None if weight == "none" else weight
     attr_name = f"{algorithm}_community"
-
-    # --- Cache check ---
     current_hash = compute_graph_state_hash(network_id, db)
-
-    # Build effective_params with only the entries meaningful for this
-    # algorithm, to keep the cache key minimal/stable per algorithm (e.g.
-    # `best_n` must not appear in the cache key for "louvain" calls).
-    effective_params = {"algorithm": algorithm}
-    if algorithm == "louvain":
-        effective_params["resolution"] = resolution
-        effective_params["seed"] = seed
-    elif algorithm == "greedy_modularity":
-        effective_params["best_n"] = best_n
-    # "label_propagation" (and any unknown algorithm) needs no extra params;
-    # unknown algorithms fall through to the ValueError raised further below.
-
-    if resolution is not None and algorithm != "louvain":
-        logger.debug(
-            f"calculate_community: 'resolution' param is not applicable to "
-            f"algorithm='{algorithm}' and will be ignored."
-        )
-    if seed is not None and algorithm != "louvain":
-        logger.debug(
-            f"calculate_community: 'seed' param is not applicable to "
-            f"algorithm='{algorithm}' and will be ignored."
-        )
-    if best_n is not None and algorithm != "greedy_modularity":
-        logger.debug(
-            f"calculate_community: 'best_n' param is not applicable to "
-            f"algorithm='{algorithm}' and will be ignored."
-        )
+    effective_params = {"algorithm": algorithm, **parameters}
 
     if not force:
         cached = get_cached_attribute(network_id, attr_name, models.NodeAttribute, db)
         if is_cache_valid(cached, current_hash, effective_params):
             logger.info(
-                f"Community cache HIT for network {network_id}, algorithm='{algorithm}' "
+                f"Community cache HIT for network {network_id}, "
+                f"algorithm='{algorithm}' "
                 f"(graph_state_hash={current_hash[:12]}...). Skipping recomputation."
             )
             return attr_name
 
     logger.info(
-        f"Community cache MISS for network {network_id}, algorithm='{algorithm}'. Recomputing."
+        f"Community cache MISS for network {network_id}, "
+        f"algorithm='{algorithm}'. Recomputing."
     )
 
     from .utils.graph_builder import build_graph_from_db
 
-    G = build_graph_from_db(network_id, db)
+    G = build_graph_from_db(network_id, db, weight_attribute=parameters.get("weight"))
     nodes = db.query(models.Node).filter(models.Node.network_id == network_id).all()
     node_map = {node.node_id: node.id for node in nodes}
 
-    # Detect Communities
-    # Returns list of sets of nodes, e.g. [{n1, n2}, {n3, n4}]
-    partition = []
-    
-    if algorithm == "louvain":
-        # nx.community.louvain_communities returns list of sets.
-        # Only thread resolution/seed into the actual louvain call — never
-        # into the greedy_modularity fallback below, which may not accept
-        # them the same way (and greedy_modularity has its own `best_n` knob
-        # that's simply not relevant to a louvain request).
-        louvain_kwargs: Dict[str, Any] = {}
-        if resolution is not None:
-            louvain_kwargs["resolution"] = resolution
-        if seed is not None:
-            louvain_kwargs["seed"] = seed
-        try:
-             partition = nx.community.louvain_communities(G, **louvain_kwargs)
-        except AttributeError:
-             # Fallback for older NetworkX versions or if not available
-             partition = nx.community.greedy_modularity_communities(G)
-    elif algorithm == "greedy_modularity":
-        gm_kwargs: Dict[str, Any] = {}
-        if best_n is not None:
-            gm_kwargs["best_n"] = best_n
-        partition = nx.community.greedy_modularity_communities(G, **gm_kwargs)
-    elif algorithm == "label_propagation":
-        partition = nx.community.label_propagation_communities(G)
-    else:
-        raise ValueError(f"Unknown community algorithm: {algorithm}")
+    partition = function(G, **parameters)
 
     # Prepare data for bulk insert
     # db_node_id -> community_id (string)
     data_map = {}
-    
+
     for i, community_nodes in enumerate(partition):
         cluster_id = str(i)
         for node_id in community_nodes:

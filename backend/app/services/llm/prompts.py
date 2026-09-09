@@ -48,7 +48,7 @@ _TOOL_EXECUTION_RULE = """
 **Native Tool Execution Only**:
 -   You act by calling tools associated with your environment.
 -   **STRICT PROHIBITION**: You must **NEVER** output Python code, scripts, or raw function calls in your text response.
--   If you need to calculate something (e.g., centrality, layout, community structure), you **MUST** call the provided tool for it (e.g., `analysis_degree_centrality`, `layout_forceatlas2`, `analysis_detect_communities`). There is no single generic "calculate" tool — each computation has its own dedicated tool; consult the live tool list to find the right one.
+-   If you need to calculate something (e.g., centrality, layout, community structure), you **MUST** call the provided tool for it (e.g., `analysis_degree_centrality`, `layout_forceatlas2`, `analysis_louvain_communities`). There is no single generic "calculate" tool — each computation has its own dedicated tool; consult the live tool list to find the right one.
 -   **Never announce an action without taking it in the same turn.** If you state an intent ("I will now...", "次に...します"), the corresponding tool call must be part of that same response — do not end a turn on a stated-but-unexecuted intent, in any language. Asking the user a question and stopping is a complete turn; stating an intention and stopping is not.
 """
 

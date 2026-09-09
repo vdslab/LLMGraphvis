@@ -116,6 +116,9 @@ def _resolve_warm_start(spec, network_id: int, overrides: dict, db: Session):
     if not init_from:
         return None
 
+    if overrides.get("pos") is not None:
+        raise ValueError("Choose either pos or init_from_layout, not both")
+
     if not spec.supports_warm_start:
         raise ValueError(
             f"Layout '{spec.name}' cannot be warm-started; init_from_layout is "
@@ -199,6 +202,19 @@ def calculate_layout(
         sanitized_overrides.pop("weight", None)
 
     init_from = _resolve_warm_start(spec, network_id, sanitized_overrides, db)
+
+    positions = sanitized_overrides.get("pos")
+    if positions is not None:
+        unknown = set(positions) - set(G)
+        if unknown:
+            raise ValueError(f"pos contains unknown node IDs: {sorted(unknown)}")
+        import math
+        if any(len(point) != 2 or not all(math.isfinite(v) for v in point)
+               for point in positions.values()):
+            raise ValueError("pos must contain finite x/y coordinate pairs")
+    fixed = sanitized_overrides.get("fixed")
+    if fixed and (positions is None or any(node not in positions for node in fixed)):
+        raise ValueError("Every fixed node needs an initial position")
 
     # Layouts that key off a node attribute translate it into what networkx
     # expects here (see each layout's `prepare` in logic/layouts/structural.py).

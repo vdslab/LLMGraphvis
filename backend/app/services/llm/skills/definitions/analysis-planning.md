@@ -2,7 +2,7 @@
 name: analysis-planning
 description: How to turn an open-ended analysis request into concrete strategies, and how to verify attributes exist before relying on them. Load this for "analyze this network" style requests, or before computing a metric or community structure.
 triggers: [analyze, analyse, 分析, 特徴, 傾向, 構造, structure, important, 重要, influential, 中心, community, コミュニティ, クラスタ, cluster, group, グループ, centrality, 中心性, metric, 指標, attribute, 属性]
-related_tools: [network_list_node_attributes, network_list_edge_attributes, analysis_detect_communities, analysis_degree_centrality, analysis_pagerank, analysis_betweenness_centrality, node_get_top_ranked]
+related_tools: [network_list_node_attributes, network_list_edge_attributes, analysis_louvain_communities, analysis_greedy_modularity_communities, analysis_label_propagation_communities, ask_user, analysis_degree_centrality, analysis_pagerank, analysis_betweenness_centrality, node_get_top_ranked]
 ---
 
 ## Offer distinct readings, not arbitrary ones
@@ -61,7 +61,7 @@ the context block costs nothing.
 ## Metrics save under names you must read back
 
 Computation tools write their results as new node attributes, and some names are
-derived rather than fixed. `analysis_detect_communities` saves to
+derived rather than fixed. Community tools save to
 `{algorithm}_community` — `louvain_community`, not `community`. Always take the
 attribute name from the tool's own return message rather than assuming one, then
 use that exact string in the follow-up styling call.
@@ -83,3 +83,16 @@ from the ones reported earlier.
 3. Report the community-to-colour mapping using the hex codes from the legend.
 4. If useful, follow with the size of each community or the nodes bridging them
    (`analysis_betweenness_centrality`).
+
+## Algorithm-specific controls
+
+Prefer the separate Louvain, greedy-modularity, and label-propagation tools.
+Louvain offers resolution, seed, gain threshold, and level limit. Greedy modularity
+has cutoff/best_n instead of a seed; exactly k groups requires both set to k.
+Semi-synchronous label propagation has no weight or seed parameter. Do not silently
+switch algorithms on failure. Community numbers are labels, not rankings.
+
+PageRank accepts personalization, dangling-node distribution, initial ranks, and
+convergence controls. Read the exact saved `pagerank` attribute. Distinguish
+incoming from outgoing centrality on directed graphs; closeness uses incoming
+paths. Use `ask_user` when the direction or meaning of an edge value is unclear.

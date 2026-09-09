@@ -31,6 +31,7 @@ def layout_kamada_kawai(
     dist: Annotated[Optional[Dict[str, Dict[str, float]]], Field(description="Optional precomputed pairwise target distances as {source: {target: distance}}. Omit to use shortest-path distances, which is almost always what you want.")] = None,
     scale: Annotated[Optional[float], Field(description=_SCALE_CENTER_DESC)] = None,
     center: Annotated[Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)] = None,
+    pos: Annotated[Optional[dict[str, Tuple[float, float]]], Field(description="Explicit initial x/y coordinates keyed by exact node ID. Partial positions are allowed where NetworkX supports them. Cannot be combined with init_from_layout; fixed nodes must have positions.")] = None,
     init_from_layout: Annotated[Optional[str], Field(description="Name of a previously computed layout whose stored coordinates become the starting positions for the optimization. A good starting point (e.g. 'forceatlas2') both speeds up convergence and avoids poor local minima.")] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
@@ -58,6 +59,7 @@ def layout_kamada_kawai(
             "scale": scale,
             "center": center,
             "init_from_layout": init_from_layout,
+            "pos": pos,
         }
         info = layout.calculate_layout(
             network_id, "kamada_kawai", db, overrides=overrides, force=force_recompute
