@@ -174,7 +174,14 @@ _K_INTEGER_TOOLS = {"analysis_betweenness_centrality"}
 
 @hook(HookEvent.PRE_TOOL, tools="*", priority=30, name="normalize_numeric_params")
 def normalize_numeric_params(ctx: HookContext) -> Optional[ToolCallDecision]:
-    """Clamp out-of-range numeric parameters instead of letting them fail."""
+    """Clamp presentation values; preserve scientific computation parameters.
+
+    Algorithm-specific schemas and logic validate analysis inputs. Global bounds
+    would change valid NetworkX settings (e.g. zero convergence threshold) and
+    make a reported experiment differ from the user's requested experiment.
+    """
+    if (ctx.tool_name or "").startswith(("analysis_", "layout_", "subgraph_")):
+        return None
     changes = []
     args = dict(ctx.args)
 

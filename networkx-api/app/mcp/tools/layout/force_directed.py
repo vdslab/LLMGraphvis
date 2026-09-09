@@ -18,7 +18,8 @@ _SEED_DESC = (
     "Random seed for the initial node placement. Force layouts start from random "
     "positions, so successive runs differ unless this is fixed. Defaults to 42, meaning "
     "results are reproducible by default; pass a different value to get a different "
-    "arrangement of the same graph."
+    "arrangement of the same graph. Null uses fresh randomness; a cached result "
+    "is still reused unless force_recompute=True."
 )
 _WEIGHT_DESC = (
     "Edge attribute to use as connection strength (heavier = drawn closer together). "
@@ -51,10 +52,10 @@ def layout_forceatlas2(
     strong_gravity: Annotated[Optional[bool], Field(description="If True, gravity pulls with a force independent of distance, producing a tighter, more centered cluster. Useful when a graph spreads too thinly.")] = None,
     linlog: Annotated[Optional[bool], Field(description="If True, use a logarithmic attraction model. Separates clusters more sharply than the default linear model — a good choice when the user wants community structure emphasized.")] = None,
     distributed_action: Annotated[Optional[bool], Field(description="If True, distributes the attraction force across a node's degree, which prevents high-degree hubs from collapsing their neighbors onto themselves.")] = None,
-    node_mass: Annotated[Optional[dict], Field(description="Optional mapping of node id to mass. Heavier nodes move less. Omit for the default (mass derived from degree).")] = None,
-    node_size: Annotated[Optional[dict], Field(description="Optional mapping of node id to radius, enabling size-aware repulsion so large nodes push each other apart instead of overlapping. Pass this when large nodes visibly overlap.")] = None,
+    node_mass: Annotated[Optional[dict[str, float]], Field(description="Optional mapping of node id to mass. Heavier nodes move less. Omit for the default (mass derived from degree).")] = None,
+    node_size: Annotated[Optional[dict[str, float]], Field(description="Optional mapping of node id to radius, enabling size-aware repulsion so large nodes push each other apart instead of overlapping. Pass this when large nodes visibly overlap.")] = None,
     weight: Annotated[Optional[str], Field(description=_WEIGHT_DESC)] = None,
-    seed: Annotated[Optional[int], Field(description=_SEED_DESC)] = None,
+    seed: Annotated[Optional[int], Field(description=_SEED_DESC)] = 42,
     pos: Annotated[Optional[dict[str, Tuple[float, float]]], Field(description="Explicit initial x/y coordinates keyed by exact node ID. Partial positions are allowed where NetworkX supports them. Cannot be combined with init_from_layout; fixed nodes must have positions.")] = None,
     init_from_layout: Annotated[Optional[str], Field(description=_INIT_FROM_DESC)] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
@@ -76,6 +77,10 @@ def layout_forceatlas2(
 
     Returns:
         str: Status message.
+    Coordinates are fixed to 2D (NetworkX dim=2). NetworkX store_pos_as is
+    replaced by database attributes named after the layout: <layout>_x/y.
+    Omitted/null tuning parameters use app defaults unless stated otherwise.
+
     """
     with get_db_context() as db:
         from app.logic import layout
@@ -117,7 +122,7 @@ def layout_spring(
     weight: Annotated[Optional[str], Field(description=_WEIGHT_DESC)] = None,
     scale: Annotated[Optional[float], Field(description=_SCALE_CENTER_DESC)] = None,
     center: Annotated[Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)] = None,
-    seed: Annotated[Optional[int], Field(description=_SEED_DESC)] = None,
+    seed: Annotated[Optional[int], Field(description=_SEED_DESC)] = 42,
     pos: Annotated[Optional[dict[str, Tuple[float, float]]], Field(description="Explicit initial x/y coordinates keyed by exact node ID. Partial positions are allowed where NetworkX supports them. Cannot be combined with init_from_layout; fixed nodes must have positions.")] = None,
     init_from_layout: Annotated[Optional[str], Field(description=_INIT_FROM_DESC)] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
@@ -137,6 +142,10 @@ def layout_spring(
 
     Returns:
         str: Status message.
+    Coordinates are fixed to 2D (NetworkX dim=2). NetworkX store_pos_as is
+    replaced by database attributes named after the layout: <layout>_x/y.
+    Omitted/null tuning parameters use app defaults unless stated otherwise.
+
     """
     with get_db_context() as db:
         from app.logic import layout
@@ -173,7 +182,7 @@ def layout_arf(
     etol: Annotated[Optional[float], Field(description="Energy tolerance for stopping. Lower converges further at more cost.")] = None,
     dt: Annotated[Optional[float], Field(description="Integration step size. Smaller is more stable but slower to converge.")] = None,
     max_iter: Annotated[Optional[int], Field(description="Maximum iterations. Defaults to auto (200–1000 based on graph size).")] = None,
-    seed: Annotated[Optional[int], Field(description=_SEED_DESC)] = None,
+    seed: Annotated[Optional[int], Field(description=_SEED_DESC)] = 42,
     pos: Annotated[Optional[dict[str, Tuple[float, float]]], Field(description="Explicit initial x/y coordinates keyed by exact node ID. Partial positions are allowed where NetworkX supports them. Cannot be combined with init_from_layout; fixed nodes must have positions.")] = None,
     init_from_layout: Annotated[Optional[str], Field(description=_INIT_FROM_DESC)] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
@@ -190,6 +199,10 @@ def layout_arf(
 
     Returns:
         str: Status message.
+    Coordinates are fixed to 2D (NetworkX dim=2). NetworkX store_pos_as is
+    replaced by database attributes named after the layout: <layout>_x/y.
+    Omitted/null tuning parameters use app defaults unless stated otherwise.
+
     """
     with get_db_context() as db:
         from app.logic import layout
@@ -203,7 +216,7 @@ def layout_arf(
             "init_from_layout": init_from_layout,
             "pos": pos,
         }
-        layout.calculate_layout(
+        info = layout.calculate_layout(
             network_id, "arf", db, overrides=overrides, force=force_recompute
         )
-        return "ARF layout calculated. Call `visualization_generate` to render."
+        return layout.format_layout_result(info, "ARF layout calculated. Call `visualization_generate` to render.")

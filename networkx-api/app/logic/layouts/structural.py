@@ -64,7 +64,13 @@ def prepare_multipartite(G, network_id, overrides, db):
 
     subset_attr = overrides.pop("subset_attribute", None)
 
-    if overrides.get("subset_key"):
+    groups = overrides.get("subset_key")
+    if groups is not None:
+        if subset_attr:
+            raise ValueError("Choose subset_attribute or subset_key, not both")
+        assigned = [node for group in groups.values() for node in group]
+        if len(assigned) != len(set(assigned)) or set(assigned) != set(G):
+            raise ValueError("subset_key must assign every node exactly once")
         return
     if not subset_attr:
         raise ValueError(

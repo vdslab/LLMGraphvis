@@ -146,45 +146,26 @@ class TestNormalizeAttributeCase:
 
 
 class TestNormalizeNumericParams:
-    def test_clamps_negative_iterations(self):
+    @pytest.mark.parametrize(
+        "tool,args",
+        [
+            ("layout_spring", {"iterations": -5}),
+            ("analysis_pagerank", {"damping_factor": 1.5}),
+            ("layout_forceatlas2", {"max_iter": 10**9}),
+            ("analysis_betweenness_centrality", {"k": 0.5}),
+            ("analysis_louvain_communities", {"threshold": 0}),
+        ],
+    )
+    def test_scientific_values_are_validated_by_the_tool_not_rewritten(
+        self, tool, args
+    ):
+        assert normalize.normalize_numeric_params(ctx(tool, args)) is None
+
+    def test_presentation_values_still_clamp(self):
         decision = normalize.normalize_numeric_params(
-            ctx("layout_spring", {"iterations": -5})
+            ctx("visualization_set_node_size", {"min_size": -5})
         )
-        assert decision.args["iterations"] == 1
-        assert "clamped" in decision.reason
-
-    def test_clamps_damping_factor_below_one(self):
-        """PageRank diverges at damping_factor >= 1."""
-        decision = normalize.normalize_numeric_params(
-            ctx("analysis_pagerank", {"damping_factor": 1.5})
-        )
-        assert decision.args["damping_factor"] == 0.999
-
-    def test_in_range_values_untouched(self):
-        assert (
-            normalize.normalize_numeric_params(
-                ctx("layout_spring", {"iterations": 500, "k": 0.5})
-            )
-            is None
-        )
-
-    def test_preserves_int_type(self):
-        decision = normalize.normalize_numeric_params(
-            ctx("layout_forceatlas2", {"max_iter": 10**9})
-        )
-        assert isinstance(decision.args["max_iter"], int)
-
-    def test_k_means_different_things_per_tool(self):
-        """spring's k is a float distance; betweenness's k is a pivot count."""
-        spring = normalize.normalize_numeric_params(
-            ctx("layout_spring", {"k": 0.5})
-        )
-        assert spring is None  # 0.5 is a valid distance
-
-        betweenness = normalize.normalize_numeric_params(
-            ctx("analysis_betweenness_centrality", {"k": 0.5})
-        )
-        assert betweenness.args["k"] == 1  # but not a valid sample count
+        assert decision.args["min_size"] == 0
 
     def test_booleans_are_not_treated_as_numbers(self):
         assert (
@@ -365,8 +346,13 @@ class TestGuardConsecutiveFailures:
         state = new_turn_state(10)
         for _ in range(guards.MAX_TOOL_FAILURES):
             guards.guard_consecutive_failures(
-                ctx("layout_spring", {}, turn_state=state,
-                    event=HookEvent.TOOL_ERROR, error="boom")
+                ctx(
+                    "layout_spring",
+                    {},
+                    turn_state=state,
+                    event=HookEvent.TOOL_ERROR,
+                    error="boom",
+                )
             )
         assert state["should_abort"] is True
         assert "layout_spring" in state["abort_reason"]
@@ -375,8 +361,13 @@ class TestGuardConsecutiveFailures:
         state = new_turn_state(10)
         for _ in range(guards.MAX_TOOL_FAILURES - 1):
             guards.guard_consecutive_failures(
-                ctx("layout_spring", {}, turn_state=state,
-                    event=HookEvent.TOOL_ERROR, error="boom")
+                ctx(
+                    "layout_spring",
+                    {},
+                    turn_state=state,
+                    event=HookEvent.TOOL_ERROR,
+                    error="boom",
+                )
             )
         assert state["should_abort"] is False
 
@@ -384,8 +375,9 @@ class TestGuardConsecutiveFailures:
         state = new_turn_state(10)
         for name in ("a", "b", "c", "d"):
             guards.guard_consecutive_failures(
-                ctx(name, {}, turn_state=state,
-                    event=HookEvent.TOOL_ERROR, error="boom")
+                ctx(
+                    name, {}, turn_state=state, event=HookEvent.TOOL_ERROR, error="boom"
+                )
             )
         assert state["should_abort"] is False
 
@@ -396,15 +388,25 @@ class TestGuardConsecutiveFailures:
         state = new_turn_state(10)
         for _ in range(guards.MAX_TOOL_FAILURES - 1):
             guards.guard_consecutive_failures(
-                ctx("layout_spring", {}, turn_state=state,
-                    event=HookEvent.TOOL_ERROR, error="boom")
+                ctx(
+                    "layout_spring",
+                    {},
+                    turn_state=state,
+                    event=HookEvent.TOOL_ERROR,
+                    error="boom",
+                )
             )
         audit.audit_tool_success(
             ctx("layout_spring", {}, turn_state=state, event=HookEvent.POST_TOOL)
         )
         guards.guard_consecutive_failures(
-            ctx("layout_spring", {}, turn_state=state,
-                event=HookEvent.TOOL_ERROR, error="boom")
+            ctx(
+                "layout_spring",
+                {},
+                turn_state=state,
+                event=HookEvent.TOOL_ERROR,
+                error="boom",
+            )
         )
         assert state["should_abort"] is False
 
@@ -463,8 +465,11 @@ class TestDetectStalledIntent:
 
 class TestIntentHooks:
     def test_nudge_requests_continuation(self):
-        c = ctx("x", event=HookEvent.NO_TOOL_CALLS,
-                assistant_text="次にコミュニティを検出します。")
+        c = ctx(
+            "x",
+            event=HookEvent.NO_TOOL_CALLS,
+            assistant_text="次にコミュニティを検出します。",
+        )
         intent.nudge_stalled_intent(c)
         assert c.turn_state["continuation"]["prompt"].startswith(
             "You described an action"
@@ -473,16 +478,25 @@ class TestIntentHooks:
     def test_nudge_respects_the_continuation_budget(self):
         state = new_turn_state(10)
         state["continuations_granted"] = intent.MAX_CONTINUATIONS
-        c = ctx("x", turn_state=state, event=HookEvent.NO_TOOL_CALLS,
-                assistant_text="次に計算します。")
+        c = ctx(
+            "x",
+            turn_state=state,
+            event=HookEvent.NO_TOOL_CALLS,
+            assistant_text="次に計算します。",
+        )
         intent.nudge_stalled_intent(c)
         assert c.turn_state["continuation"] is None
 
     def test_forced_summary_fires_when_tools_ran_but_nothing_was_said(self):
         state = new_turn_state(10)
         state["tools_run"] = 2
-        c = ctx("x", turn_state=state, event=HookEvent.NO_TOOL_CALLS,
-                assistant_text="", thought_text="did the work")
+        c = ctx(
+            "x",
+            turn_state=state,
+            event=HookEvent.NO_TOOL_CALLS,
+            assistant_text="",
+            thought_text="did the work",
+        )
         intent.force_final_summary(c)
         assert "final report" in c.turn_state["continuation"]["prompt"]
         assert "did the work" in c.turn_state["continuation"]["model_text"]
@@ -490,8 +504,12 @@ class TestIntentHooks:
     def test_forced_summary_does_not_fire_when_text_exists(self):
         state = new_turn_state(10)
         state["tools_run"] = 2
-        c = ctx("x", turn_state=state, event=HookEvent.NO_TOOL_CALLS,
-                assistant_text="Done: layout updated.")
+        c = ctx(
+            "x",
+            turn_state=state,
+            event=HookEvent.NO_TOOL_CALLS,
+            assistant_text="Done: layout updated.",
+        )
         intent.force_final_summary(c)
         assert c.turn_state["continuation"] is None
 
@@ -510,8 +528,12 @@ class TestCandidateListing:
             "visualization_set_node_color",
             {"attribute": "zzz"},
             node_attrs=[
-                "club", "degree_centrality",
-                "spring_x", "spring_y", "forceatlas2_x", "forceatlas2_y",
+                "club",
+                "degree_centrality",
+                "spring_x",
+                "spring_y",
+                "forceatlas2_x",
+                "forceatlas2_y",
             ],
         )
         reason = guards.guard_attribute_exists(c).reason
@@ -522,15 +544,16 @@ class TestCandidateListing:
     def test_an_unpaired_name_is_kept(self):
         """A user attribute called `pos_x` with no `pos_y` is real data."""
         assert guards._without_layout_coordinates(["pos_x", "club"]) == [
-            "pos_x", "club",
+            "pos_x",
+            "club",
         ]
 
     def test_a_paired_user_attribute_is_the_accepted_cost(self):
         """Genuine x/y pairs are indistinguishable from layout output; hiding
         them is the deliberate tradeoff."""
-        assert guards._without_layout_coordinates(
-            ["pos_x", "pos_y", "club"]
-        ) == ["club"]
+        assert guards._without_layout_coordinates(["pos_x", "pos_y", "club"]) == [
+            "club"
+        ]
 
     def test_all_hidden_reports_none(self):
         assert guards._format_candidates(["spring_x", "spring_y"]) == "(none)"

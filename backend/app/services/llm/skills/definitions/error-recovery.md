@@ -38,9 +38,9 @@ The refusals you can encounter:
   for a computed metric, re-read the computing tool's return message for the
   exact name it saved.
 - **Invalid parameter value** — read the tool's schema for the accepted range.
-  Out-of-range numbers are usually clamped automatically and reported back via
-  `_adjusted_arguments`; an outright rejection means the value was the wrong
-  *kind*, not just too large.
+  Scientific parameters are preserved and validated by the individual tool.
+  Do not silently replace a requested value. Explain the failed condition; if
+  changing it alters the intended analysis, ask the user before retrying.
 - **Layout failed on this graph** — some layouts have structural preconditions.
   `layout_planar` requires a planar graph; `layout_bipartite` and
   `layout_multipartite` require a valid partition attribute. Fall back to a

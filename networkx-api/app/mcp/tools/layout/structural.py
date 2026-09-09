@@ -53,6 +53,10 @@ def layout_bipartite(
 
     Returns:
         str: Status message.
+    Coordinates are fixed to 2D (NetworkX dim=2). NetworkX store_pos_as is
+    replaced by database attributes named after the layout: <layout>_x/y.
+    Omitted/null tuning parameters use app defaults unless stated otherwise.
+
     """
     with get_db_context() as db:
         from app.logic import layout
@@ -65,17 +69,18 @@ def layout_bipartite(
             "scale": scale,
             "center": center,
         }
-        layout.calculate_layout(
+        info = layout.calculate_layout(
             network_id, "bipartite", db, overrides=overrides, force=force_recompute
         )
-        return "Bipartite layout calculated. Call `visualization_generate` to render."
+        return layout.format_layout_result(info, "Bipartite layout calculated. Call `visualization_generate` to render.")
 
 
 @mcp.tool()
 @handle_tool_errors
 def layout_multipartite(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    subset_attribute: Annotated[str, Field(description="Node attribute whose distinct values define the layers, one column (or row) per value — e.g. 'level', 'generation', 'year', or a community attribute such as 'louvain_community'. EVERY node must have a value for this attribute; nodes without one cannot be placed in a layer.")],
+    subset_attribute: Annotated[Optional[str], Field(description="Node attribute whose distinct values define the layers, one column (or row) per value — e.g. 'level', 'generation', 'year', or a community attribute such as 'louvain_community'. EVERY node must have a value. Omit when passing explicit subset_key groups.")] = None,
+    subset_key: Annotated[Optional[dict[str, List[str]]], Field(description="Explicit mapping from layer name to node IDs, as an alternative to subset_attribute. Each node must occur exactly once.")] = None,
     align: Annotated[Optional[str], Field(description=_ALIGN_DESC)] = None,
     scale: Annotated[Optional[float], Field(description=_SCALE_CENTER_DESC)] = None,
     center: Annotated[Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)] = None,
@@ -96,19 +101,24 @@ def layout_multipartite(
 
     Returns:
         str: Status message.
+    Coordinates are fixed to 2D (NetworkX dim=2). NetworkX store_pos_as is
+    replaced by database attributes named after the layout: <layout>_x/y.
+    Omitted/null tuning parameters use app defaults unless stated otherwise.
+
     """
     with get_db_context() as db:
         from app.logic import layout
         overrides = {
             "subset_attribute": subset_attribute,
+            "subset_key": subset_key,
             "align": align,
             "scale": scale,
             "center": center,
         }
-        layout.calculate_layout(
+        info = layout.calculate_layout(
             network_id, "multipartite", db, overrides=overrides, force=force_recompute
         )
-        return "Multipartite layout calculated. Call `visualization_generate` to render."
+        return layout.format_layout_result(info, "Multipartite layout calculated. Call `visualization_generate` to render.")
 
 
 @mcp.tool()
@@ -132,14 +142,18 @@ def layout_planar(
 
     Returns:
         str: Status message.
+    Coordinates are fixed to 2D (NetworkX dim=2). NetworkX store_pos_as is
+    replaced by database attributes named after the layout: <layout>_x/y.
+    Omitted/null tuning parameters use app defaults unless stated otherwise.
+
     """
     with get_db_context() as db:
         from app.logic import layout
         overrides = {"scale": scale, "center": center}
-        layout.calculate_layout(
+        info = layout.calculate_layout(
             network_id, "planar", db, overrides=overrides, force=force_recompute
         )
-        return "Planar layout calculated. Call `visualization_generate` to render."
+        return layout.format_layout_result(info, "Planar layout calculated. Call `visualization_generate` to render.")
 
 
 @mcp.tool()
@@ -166,6 +180,10 @@ def layout_bfs(
 
     Returns:
         str: Status message.
+    Coordinates are fixed to 2D (NetworkX dim=2). NetworkX store_pos_as is
+    replaced by database attributes named after the layout: <layout>_x/y.
+    Omitted/null tuning parameters use app defaults unless stated otherwise.
+
     """
     with get_db_context() as db:
         from app.logic import layout
@@ -175,7 +193,7 @@ def layout_bfs(
             "scale": scale,
             "center": center,
         }
-        layout.calculate_layout(
+        info = layout.calculate_layout(
             network_id, "bfs", db, overrides=overrides, force=force_recompute
         )
-        return "BFS layout calculated. Call `visualization_generate` to render."
+        return layout.format_layout_result(info, "BFS layout calculated. Call `visualization_generate` to render.")

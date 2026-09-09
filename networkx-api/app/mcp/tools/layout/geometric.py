@@ -47,14 +47,18 @@ def layout_circular(
 
     Returns:
         str: Status message.
+    Coordinates are fixed to 2D (NetworkX dim=2). NetworkX store_pos_as is
+    replaced by database attributes named after the layout: <layout>_x/y.
+    Omitted/null tuning parameters use app defaults unless stated otherwise.
+
     """
     with get_db_context() as db:
         from app.logic import layout
         overrides = {"scale": scale, "center": center}
-        layout.calculate_layout(
+        info = layout.calculate_layout(
             network_id, "circular", db, overrides=overrides, force=force_recompute
         )
-        return "Circular layout calculated. Call `visualization_generate` to render."
+        return layout.format_layout_result(info, "Circular layout calculated. Call `visualization_generate` to render.")
 
 
 @mcp.tool()
@@ -78,6 +82,10 @@ def layout_shell(
 
     Returns:
         str: Status message.
+    Coordinates are fixed to 2D (NetworkX dim=2). NetworkX store_pos_as is
+    replaced by database attributes named after the layout: <layout>_x/y.
+    Omitted/null tuning parameters use app defaults unless stated otherwise.
+
     """
     with get_db_context() as db:
         from app.logic import layout
@@ -87,10 +95,10 @@ def layout_shell(
             "scale": scale,
             "center": center,
         }
-        layout.calculate_layout(
+        info = layout.calculate_layout(
             network_id, "shell", db, overrides=overrides, force=force_recompute
         )
-        return "Shell layout calculated. Call `visualization_generate` to render."
+        return layout.format_layout_result(info, "Shell layout calculated. Call `visualization_generate` to render.")
 
 
 @mcp.tool()
@@ -114,6 +122,10 @@ def layout_spiral(
 
     Returns:
         str: Status message.
+    Coordinates are fixed to 2D (NetworkX dim=2). NetworkX store_pos_as is
+    replaced by database attributes named after the layout: <layout>_x/y.
+    Omitted/null tuning parameters use app defaults unless stated otherwise.
+
     """
     with get_db_context() as db:
         from app.logic import layout
@@ -123,17 +135,17 @@ def layout_spiral(
             "scale": scale,
             "center": center,
         }
-        layout.calculate_layout(
+        info = layout.calculate_layout(
             network_id, "spiral", db, overrides=overrides, force=force_recompute
         )
-        return "Spiral layout calculated. Call `visualization_generate` to render."
+        return layout.format_layout_result(info, "Spiral layout calculated. Call `visualization_generate` to render.")
 
 
 @mcp.tool()
 @handle_tool_errors
 def layout_random(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    seed: Annotated[Optional[int], Field(description="Random seed. Defaults to 42, so the result is reproducible; pass a different value for a different arrangement.")] = None,
+    seed: Annotated[Optional[int], Field(description="Random seed. Defaults to 42; null uses fresh randomness. Cached coordinates are reused unless force_recompute=True.")] = 42,
     center: Annotated[Optional[Tuple[float, float]], Field(description=_CENTER_DESC + " NOTE: unlike the other geometric layouts, networkx's random_layout has no `scale` parameter, so none is offered here.")] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
@@ -148,11 +160,15 @@ def layout_random(
 
     Returns:
         str: Status message.
+    Coordinates are fixed to 2D (NetworkX dim=2). NetworkX store_pos_as is
+    replaced by database attributes named after the layout: <layout>_x/y.
+    Omitted/null tuning parameters use app defaults unless stated otherwise.
+
     """
     with get_db_context() as db:
         from app.logic import layout
         overrides = {"seed": seed, "center": center}
-        layout.calculate_layout(
+        info = layout.calculate_layout(
             network_id, "random", db, overrides=overrides, force=force_recompute
         )
-        return "Random layout calculated. Call `visualization_generate` to render."
+        return layout.format_layout_result(info, "Random layout calculated. Call `visualization_generate` to render.")

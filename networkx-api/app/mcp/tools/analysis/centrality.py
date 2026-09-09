@@ -39,7 +39,7 @@ def analysis_betweenness_centrality(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     weight: Annotated[Optional[str], Field(description="Name of an edge attribute to use as edge weight/distance when computing shortest paths ('weight' reads the imported weight; other names read numeric edge attributes). Defaults to unweighted (all edges treated as distance 1) if not specified.")] = None,
     normalized: Annotated[bool, Field(description="If True (default), scores are normalized by the number of node pairs. If False, returns raw (unnormalized) betweenness counts.")] = True,
-    k: Annotated[Optional[int], Field(description="If set, uses approximate betweenness via sampling k source nodes instead of computing exactly over all nodes — trades accuracy for speed on large graphs (addresses the O(N*E) cost warned about below). Defaults to exact computation (all nodes) if not specified.")] = None,
+    k: Annotated[Optional[int], Field(ge=1, description="If set, uses approximate betweenness via sampling k source nodes instead of computing exactly over all nodes — trades accuracy for speed on large graphs (addresses the O(N*E) cost warned about below). Defaults to exact computation (all nodes) if not specified.")] = None,
     seed: Annotated[Optional[int], Field(description="Seed for sampled sources when k is set. Defaults to 42 for reproducibility; null uses NetworkX randomness.")] = 42,
     endpoints: Annotated[bool, Field(description="Include the source and target endpoints in betweenness counts.")] = False,
     force_recompute: Annotated[bool, Field(description="If True, bypasses the cache and always recomputes, even if a valid cached result exists for this exact graph state and parameters. Default False preserves current auto-caching behavior.")] = False
@@ -137,7 +137,7 @@ def analysis_eigenvector_centrality(
 @handle_tool_errors
 def analysis_pagerank(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    damping_factor: Annotated[float, Field(description="Damping factor (alpha) for PageRank. Default 0.85.")] = 0.85,
+    damping_factor: Annotated[float, Field(ge=0, lt=1, allow_inf_nan=False, description="Damping factor (alpha) for PageRank in [0, 1). Default 0.85.")] = 0.85,
     weight: Annotated[Optional[str], Field(description="Numeric edge strength attribute; 'weight' uses imported weights. Omit or pass null/'none' for unweighted PageRank, preserving the app's earlier behavior.")] = None,
     personalization: Annotated[Optional[dict[str, float]], Field(description="Teleportation distribution by exact node ID; unspecified nodes receive zero. Values must have nonzero sum. Omit for uniform teleportation.")] = None,
     dangling: Annotated[Optional[dict[str, float]], Field(description="Distribution for nodes with no outgoing edges. Omit to use personalization (uniform when that is omitted). Must define an irreducible transition matrix with the graph.")] = None,

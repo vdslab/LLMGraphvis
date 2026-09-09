@@ -2,7 +2,7 @@
 name: analysis-planning
 description: How to turn an open-ended analysis request into concrete strategies, and how to verify attributes exist before relying on them. Load this for "analyze this network" style requests, or before computing a metric or community structure.
 triggers: [analyze, analyse, 分析, 特徴, 傾向, 構造, structure, important, 重要, influential, 中心, community, コミュニティ, クラスタ, cluster, group, グループ, centrality, 中心性, metric, 指標, attribute, 属性]
-related_tools: [network_list_node_attributes, network_list_edge_attributes, analysis_louvain_communities, analysis_greedy_modularity_communities, analysis_label_propagation_communities, ask_user, analysis_degree_centrality, analysis_pagerank, analysis_betweenness_centrality, node_get_top_ranked]
+related_tools: [network_list_node_attributes, network_list_edge_attributes, analysis_louvain_communities, analysis_greedy_modularity_communities, analysis_label_propagation_communities, ask_user, analysis_degree_centrality, analysis_pagerank, analysis_betweenness_centrality, node_get_top_ranked, analysis_core_number, analysis_triangles, analysis_edge_betweenness, analysis_modularity]
 ---
 
 ## Offer distinct readings, not arbitrary ones
@@ -60,7 +60,7 @@ the context block costs nothing.
 
 ## Metrics save under names you must read back
 
-Computation tools write their results as new node attributes, and some names are
+Persisting computation tools write their results as node attributes, and some names are
 derived rather than fixed. Community tools save to
 `{algorithm}_community` — `louvain_community`, not `community`. Always take the
 attribute name from the tool's own return message rather than assuming one, then
@@ -69,8 +69,8 @@ use that exact string in the follow-up styling call.
 ## Metrics are topology-dependent
 
 Degree, centrality, and clustering are properties of the graph they were computed
-on. After creating a subgraph, the parent's values are still attached to the nodes
-but no longer describe the view being shown. If a metric matters for analysing a
+on. Extraction excludes derived metrics; do not assume the parent’s values were
+copied or that they describe the new view. If a metric matters for analysing a
 subgraph, recompute it there — and say that you did, since the numbers will differ
 from the ones reported earlier.
 
@@ -96,3 +96,14 @@ PageRank accepts personalization, dangling-node distribution, initial ranks, and
 convergence controls. Read the exact saved `pagerank` attribute. Distinguish
 incoming from outgoing centrality on directed graphs; closeness uses incoming
 paths. Use `ask_user` when the direction or meaning of an edge value is unclear.
+
+
+## Read-only structural measurements
+
+`analysis_core_number` measures cohesive cores without extracting one.
+`analysis_triangles` counts local closure; `analysis_transitivity` measures global
+closure. `analysis_edge_betweenness` measures edge shortest-path traffic and takes
+distances, not strengths. `analysis_modularity` evaluates an existing partition;
+keep graph, weight, and resolution fixed when comparing partitions. These tools
+return values without saving attributes or changing the view. Do not pass their
+result field names to a styling tool as if those were stored attributes.

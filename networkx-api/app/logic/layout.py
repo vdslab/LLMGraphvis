@@ -7,6 +7,7 @@ needs) is declared with that layout in `logic/layouts/`.
 """
 
 import json
+import math
 
 from sqlalchemy.orm import Session
 
@@ -24,7 +25,16 @@ LAYOUT_PARAM_KEYS = param_keys()
 
 # Parameters that can hold one entry per node. Replaced by a digest before being
 # stored as cache metadata — see the cache_params construction below.
-BULKY_PARAM_KEYS = {"pos", "nodes", "node_mass", "node_size", "dist", "fixed", "nlist"}
+BULKY_PARAM_KEYS = {
+    "pos",
+    "nodes",
+    "node_mass",
+    "node_size",
+    "dist",
+    "fixed",
+    "nlist",
+    "subset_key",
+}
 
 
 def determine_layout_params(G, layout_name: str) -> dict:
@@ -139,7 +149,15 @@ def _resolve_warm_start(spec, network_id: int, overrides: dict, db: Session):
 def format_layout_result(info, headline: str, follow_up: str = "") -> str:
     """Assemble a layout tool's return message, including any weight note."""
     note = (info or {}).get("weight_note") or ""
-    return " ".join(part for part in (headline, note, follow_up) if part)
+    settings = ""
+    if info:
+        encoded = json.dumps(info.get("parameters", {}), sort_keys=True)
+        settings = (
+            f"Saved {info.get('attributes', [])}. "
+            f"Effective parameters: {encoded}. "
+            f"Cached: {info.get('cached', False)}."
+        )
+    return " ".join(part for part in (headline, note, settings, follow_up) if part)
 
 
 def calculate_layout(
@@ -167,6 +185,7 @@ def calculate_layout(
     )
 
     from .utils.graph_builder import build_graph_from_db
+
     G = build_graph_from_db(network_id, db, weight_attribute=weight_attribute)
 
     # Need node_map for saving results (str_id -> db_id)
@@ -189,7 +208,7 @@ def calculate_layout(
     sanitized_overrides = {
         k: (list(v) if isinstance(v, tuple) else v)
         for k, v in raw_overrides.items()
-        if v is not None
+        if v is not None or k == "seed"
     }
 
     # `weight` is no longer whatever the caller passed — it is what
@@ -208,9 +227,11 @@ def calculate_layout(
         unknown = set(positions) - set(G)
         if unknown:
             raise ValueError(f"pos contains unknown node IDs: {sorted(unknown)}")
-        import math
-        if any(len(point) != 2 or not all(math.isfinite(v) for v in point)
-               for point in positions.values()):
+
+        if any(
+            len(point) != 2 or not all(math.isfinite(v) for v in point)
+            for point in positions.values()
+        ):
             raise ValueError("pos must contain finite x/y coordinate pairs")
     fixed = sanitized_overrides.get("fixed")
     if fixed and (positions is None or any(node not in positions for node in fixed)):
@@ -243,8 +264,7 @@ def calculate_layout(
     # they are reduced to a digest — which still changes when their contents
     # change, keeping cache invalidation correct.
     cache_params = {
-        k: (_digest_param(v) if k in BULKY_PARAM_KEYS else v)
-        for k, v in params.items()
+        k: (_digest_param(v) if k in BULKY_PARAM_KEYS else v) for k, v in params.items()
     }
     if init_from:
         cache_params["init_from_layout"] = init_from
@@ -254,6 +274,8 @@ def calculate_layout(
         "layout_name": layout_name,
         "weight": weight_attribute,
         "weight_note": weight_note,
+        "parameters": cache_params,
+        "attributes": [f"{layout_name}_x", f"{layout_name}_y"],
     }
 
     if not force:
@@ -273,6 +295,11 @@ def calculate_layout(
     )
 
     pos = spec.compute(G, params)
+    if any(
+        len(point) != 2 or not all(math.isfinite(float(v)) for v in point)
+        for point in pos.values()
+    ):
+        raise ValueError("Layout produced non-finite coordinates; no result was saved")
 
     # Save to DB - Bulk Update Strategy
     # We save two attributes: {layout_name}_x and {layout_name}_y
@@ -290,14 +317,10 @@ def calculate_layout(
     from .attributes import bulk_save_node_attributes, update_attribute_cache_metadata
 
     # Save X
-    bulk_save_node_attributes(
-        network_id, f"{layout_name}_x", "float", data_map_x, db
-    )
+    bulk_save_node_attributes(network_id, f"{layout_name}_x", "float", data_map_x, db)
 
     # Save Y
-    bulk_save_node_attributes(
-        network_id, f"{layout_name}_y", "float", data_map_y, db
-    )
+    bulk_save_node_attributes(network_id, f"{layout_name}_y", "float", data_map_y, db)
 
     # Stamp cache metadata on both x/y attributes so future calls can detect a cache hit
     derived_from = f"layout:{layout_name}"

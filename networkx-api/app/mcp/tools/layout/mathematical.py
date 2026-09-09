@@ -50,6 +50,10 @@ def layout_kamada_kawai(
 
     Returns:
         str: Status message.
+    Coordinates are fixed to 2D (NetworkX dim=2). NetworkX store_pos_as is
+    replaced by database attributes named after the layout: <layout>_x/y.
+    Omitted/null tuning parameters use app defaults unless stated otherwise.
+
     """
     with get_db_context() as db:
         from app.logic import layout
@@ -97,6 +101,10 @@ def layout_spectral(
 
     Returns:
         str: Status message.
+    Coordinates are fixed to 2D (NetworkX dim=2). NetworkX store_pos_as is
+    replaced by database attributes named after the layout: <layout>_x/y.
+    Omitted/null tuning parameters use app defaults unless stated otherwise.
+
     """
     with get_db_context() as db:
         from app.logic import layout
