@@ -76,3 +76,29 @@ def test_bad_initial_positions_do_not_save_layout(db, options):
     with pytest.raises(ValueError):
         calculate_layout(1, "spring", db, overrides=options)
     assert db.query(models.NodeAttribute).count() == 0
+
+
+def test_derived_partition_change_invalidates_a_dependent_layout(db):
+    setup_graph(db, attrs={"groups": {f"n{i}": i % 2 for i in range(6)}})
+    attribute = db.query(models.NodeAttribute).filter_by(attribute_name="groups").one()
+    attribute.is_derived = True
+    db.commit()
+    calculate_layout(1, "multipartite", db, overrides={"subset_attribute": "groups"})
+    with patch("networkx.multipartite_layout") as compute:
+        calculate_layout(
+            1, "multipartite", db, overrides={"subset_attribute": "groups"}
+        )
+    compute.assert_not_called()
+    value = (
+        db.query(models.NodeFloatAttributeValue)
+        .join(models.NodeAttributeValue)
+        .filter(models.NodeAttributeValue.attribute_id == attribute.id)
+        .first()
+    )
+    value.float_value = 3
+    db.commit()
+    with patch("networkx.multipartite_layout", wraps=nx.multipartite_layout) as compute:
+        calculate_layout(
+            1, "multipartite", db, overrides={"subset_attribute": "groups"}
+        )
+    compute.assert_called_once()

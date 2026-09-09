@@ -67,7 +67,8 @@ def calculate_community(
     if "weight" in allowed:
         parameters["weight"] = None if weight == "none" else weight
     attr_name = f"{algorithm}_community"
-    current_hash = compute_graph_state_hash(network_id, db)
+    dependencies = (("Edge", weight),) if weight and weight != "none" else ()
+    current_hash = compute_graph_state_hash(network_id, db, dependencies)
     effective_params = {"algorithm": algorithm, **parameters}
 
     if not force:

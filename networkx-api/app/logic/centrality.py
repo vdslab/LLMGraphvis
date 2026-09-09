@@ -50,7 +50,8 @@ def calculate_centrality(
         weight = None
 
     # --- Cache check ---
-    current_hash = compute_graph_state_hash(network_id, db)
+    dependencies = (("Edge", weight),) if weight and weight != "none" else ()
+    current_hash = compute_graph_state_hash(network_id, db, dependencies)
 
     # Build effective_params with only the entries meaningful for this
     # centrality_type, so the cache key stays minimal/stable per algorithm

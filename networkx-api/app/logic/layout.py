@@ -257,7 +257,16 @@ def calculate_layout(
     from .attributes import get_cached_attribute, is_cache_valid
     from .utils.cache import compute_graph_state_hash
 
-    current_hash = compute_graph_state_hash(network_id, db)
+    dependencies = tuple(
+        (scope, name)
+        for scope, name in (
+            ("Edge", weight_attribute),
+            ("Node", raw_overrides.get("subset_attribute")),
+            ("Node", raw_overrides.get("partition_attribute")),
+        )
+        if name
+    )
+    current_hash = compute_graph_state_hash(network_id, db, dependencies)
     # Several parameters can hold one entry per node (`pos`, `nodes`, `node_mass`,
     # `node_size`, `dist`, `fixed`). Storing them verbatim would bloat
     # computation_params and make every cache comparison walk the whole graph, so

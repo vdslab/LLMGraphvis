@@ -1,15 +1,18 @@
 import hashlib
 import json
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from common import models
 
 
-def compute_graph_state_hash(network_id: int, db: Session) -> str:
+def compute_graph_state_hash(
+    network_id: int, db: Session, dependencies: tuple[tuple[str, str], ...] = ()
+) -> str:
     """Hash topology, direction, and imported attributes for calculation caches.
 
-    Derived results are excluded so saving a calculation preserves its cache.
+    Derived results are excluded unless explicitly consumed as dependencies.
     """
     nodes = sorted(
         r.node_id
@@ -39,13 +42,13 @@ def compute_graph_state_hash(network_id: int, db: Session) -> str:
         "directed": bool(network and network.is_directed),
         "nodes": nodes,
         "edges": edges,
-        "source_attributes": _source_attribute_values(network_id, db),
+        "source_attributes": _source_attribute_values(network_id, db, dependencies),
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
-def _source_attribute_values(network_id: int, db: Session) -> list:
+def _source_attribute_values(network_id: int, db: Session, dependencies) -> list:
     """Fingerprint imported values used as weights, partitions, or constraints.
 
     Derived metrics and layout coordinates are excluded: saving a calculation
@@ -71,7 +74,12 @@ def _source_attribute_values(network_id: int, db: Session) -> list:
                 .join(typed, link == value.id)
                 .filter(
                     attribute.network_id == network_id,
-                    attribute.is_derived.is_not(True),
+                    or_(
+                        attribute.is_derived.is_not(True),
+                        attribute.attribute_name.in_(
+                            [name for owner, name in dependencies if owner == scope]
+                        ),
+                    ),
                 )
                 .order_by(attribute.attribute_name, owner_id)
                 .all()
