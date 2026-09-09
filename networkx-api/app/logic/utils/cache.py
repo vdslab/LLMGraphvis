@@ -27,7 +27,7 @@ def compute_graph_state_hash(network_id: int, db: Session) -> str:
     }
 
     edges = sorted(
-        (id_map[e.source_node_id], id_map[e.target_node_id], e.weight)
+        (e.id, id_map[e.source_node_id], id_map[e.target_node_id], e.weight)
         for e in db.query(models.Edge)
         .filter(models.Edge.network_id == network_id)
         .all()

@@ -196,7 +196,12 @@ def build_graph_from_db(
     for row in edges_query:
         u = id_map.get(row.source_node_id)
         v = id_map.get(row.target_node_id)
-        if u and v:
+        if u is not None and v is not None:
+            if G.has_edge(u, v):
+                raise ValueError(
+                    "Parallel edges cannot be analyzed as a simple graph. "
+                    "Aggregate the source data explicitly and re-import."
+                )
             if weight_attribute:
                 if attribute_weights is not None:
                     value = attribute_weights.get(row.id, 1.0)

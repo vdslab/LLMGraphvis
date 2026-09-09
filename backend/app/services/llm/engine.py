@@ -564,6 +564,8 @@ class GraphVisAgent:
             else:
                 result = await mcp_client.execute_tool(function_name, args, session=session)
 
+            if isinstance(result, dict) and result.get("error"):
+                return result, "failed", str(result["error"])
             return result, "completed", None
         except Exception as e:
             logger.exception(f"Tool execution failed: {e}")

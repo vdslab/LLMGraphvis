@@ -30,6 +30,12 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
     except ValueError as e:
         raise ValueError(f"Failed to parse GraphML: {e}")
 
+    if G.is_multigraph():
+        raise ValueError(
+            "Parallel edges are not supported by this application's simple-graph "
+            "storage. Aggregate them explicitly before importing; no data was saved."
+        )
+
     # Access metadata from parser result
     network_desc = parsed_data.network_message
     node_descs = parsed_data.node_messages

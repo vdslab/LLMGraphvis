@@ -368,3 +368,13 @@ async def test_raw_generate_fail_non_retryable(mock_google_provider):
         await mock_google_provider._raw_generate([], [], None)
 
     assert mock_google_provider.client.aio.models.generate_content_stream.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_error_envelope_is_a_failure_not_a_completed_tool(mock_agent):
+    with patch("app.services.llm.engine.mcp_client.execute_tool", new_callable=AsyncMock) as execute:
+        execute.return_value = {"error": "Unknown attribute"}
+        result, status, reason = await mock_agent._run_tool("analysis_test", {}, 1, None)
+    assert result == {"error": "Unknown attribute"}
+    assert status == "failed"
+    assert reason == "Unknown attribute"
