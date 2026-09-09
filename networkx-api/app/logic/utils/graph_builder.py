@@ -153,7 +153,10 @@ def build_graph_from_db(
             networkx `weight=` kwarg works. Leaving it None keeps the common
             (unweighted) path exactly as fast as it was.
     """
-    G = nx.Graph()
+    network = db.get(models.Network, network_id)
+    if network is None:
+        raise ValueError(f"Network {network_id} not found")
+    G = nx.DiGraph() if network.is_directed else nx.Graph()
 
     # Optimized Node Query: Fetch only id (pk) and node_id (string id)
     nodes_query = (

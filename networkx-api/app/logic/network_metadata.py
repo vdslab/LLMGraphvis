@@ -32,6 +32,7 @@ def get_network_metadata(db: Session, network_id: int) -> Dict[str, Any]:
         "id": network.id,
         "name": network.name,
         "description": network.description,
+        "is_directed": network.is_directed,
         "created_at": str(network.created_at),
         "visual_state": {
             "last_layout_name": network.last_layout_name,
@@ -46,6 +47,9 @@ def get_network_metadata(db: Session, network_id: int) -> Dict[str, Any]:
 
 def get_network_structure(db: Session, network_id: int) -> Dict[str, Any]:
     """Returns basic structural statistics of the network."""
+    network = db.get(models.Network, network_id)
+    if network is None:
+        raise ValueError(f"Network {network_id} not found")
     node_count = (
         db.query(models.Node).filter(models.Node.network_id == network_id).count()
     )
@@ -53,10 +57,12 @@ def get_network_structure(db: Session, network_id: int) -> Dict[str, Any]:
         db.query(models.Edge).filter(models.Edge.network_id == network_id).count()
     )
 
-    # Calculate density (approximate for undirected)
+    # Directed graphs have twice as many possible non-loop edges.
     density = 0
     if node_count > 1:
-        possible_edges = node_count * (node_count - 1) / 2
+        possible_edges = node_count * (node_count - 1)
+        if not network.is_directed:
+            possible_edges /= 2
         density = edge_count / possible_edges if possible_edges > 0 else 0
 
     # Edge weights live on the edges table, not in the edge-attribute listing
@@ -69,7 +75,7 @@ def get_network_structure(db: Session, network_id: int) -> Dict[str, Any]:
         "node_count": node_count,
         "edge_count": edge_count,
         "density": density,
-        "is_directed": False,
+        "is_directed": network.is_directed,
         "edge_weights": summarize_edge_weights(db=db, network_id=network_id),
     }
 

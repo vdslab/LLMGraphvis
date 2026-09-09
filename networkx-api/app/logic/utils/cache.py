@@ -32,5 +32,9 @@ def compute_graph_state_hash(network_id: int, db: Session) -> str:
         if e.source_node_id in id_map and e.target_node_id in id_map
     )
 
-    payload = "|".join(nodes) + "##" + "|".join(f"{u},{v},{w}" for u, v, w in edges)
+    network = db.get(models.Network, network_id)
+    direction = bool(network and network.is_directed)
+    payload = str(direction) + "##" + "|".join(nodes) + "##" + "|".join(
+        f"{u},{v},{w}" for u, v, w in edges
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()

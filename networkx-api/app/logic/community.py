@@ -99,23 +99,11 @@ def calculate_community(
         f"Community cache MISS for network {network_id}, algorithm='{algorithm}'. Recomputing."
     )
 
-    # Reconstruct graph
-    G = nx.Graph()
+    from .utils.graph_builder import build_graph_from_db
+
+    G = build_graph_from_db(network_id, db)
     nodes = db.query(models.Node).filter(models.Node.network_id == network_id).all()
-    # Map internal ID -> database ID
-    id_map = {n.id: n.node_id for n in nodes}
-    # Map database ID -> internal ID (for saving)
-    node_map = {n.node_id: n.id for n in nodes}
-
-    for n in nodes:
-        G.add_node(n.node_id)
-
-    edges = db.query(models.Edge).filter(models.Edge.network_id == network_id).all()
-    for e in edges:
-        u = id_map.get(e.source_node_id)
-        v = id_map.get(e.target_node_id)
-        if u and v:
-            G.add_edge(u, v)
+    node_map = {node.node_id: node.id for node in nodes}
 
     # Detect Communities
     # Returns list of sets of nodes, e.g. [{n1, n2}, {n3, n4}]

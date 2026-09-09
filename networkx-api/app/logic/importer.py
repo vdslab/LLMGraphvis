@@ -96,6 +96,7 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
             .filter(models.Network.id == final_network_id)
             .first()
         )
+        network_for_update.is_directed = G.is_directed()
         if network_desc and network_for_update:
             network_for_update.description = network_desc
 

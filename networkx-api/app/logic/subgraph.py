@@ -101,7 +101,10 @@ def create_subgraph_from_nodes(
 
     # 3. Create New Network
     new_network = models.Network(
-        name=target_name, parent_network_id=source_network_id, description=description
+        name=target_name,
+        parent_network_id=source_network_id,
+        description=description,
+        is_directed=source_network.is_directed,
     )
     
     # [FIX] Inherit visualization settings if preserving layout
