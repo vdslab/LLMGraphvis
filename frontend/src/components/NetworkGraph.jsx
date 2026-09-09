@@ -195,4 +195,6 @@ const NetworkGraph = memo(({ nodes, links, showLabels = false, onNodeClick, onBa
   );
 });
 
+NetworkGraph.displayName = 'NetworkGraph';
+
 export default NetworkGraph;

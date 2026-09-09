@@ -638,3 +638,28 @@
 .markdown-content th {
   background: var(--background-color);
 }
+
+.input-request {
+  margin: 12px 0;
+  padding: 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: #1e293b;
+}
+.input-request__question { margin: 0 0 14px; font-weight: 600; line-height: 1.5; }
+.input-request fieldset { min-width: 0; padding: 0; margin: 0; border: 0; }
+.input-request__field { display: grid; gap: 6px; margin-bottom: 14px; }
+.input-request__field label, .input-request legend { font-size: 13px; font-weight: 500; }
+.input-request input:not([type="checkbox"]), .input-request select {
+  width: 100%; box-sizing: border-box; min-width: 0;
+}
+.input-request input:not([type="range"]):not([type="checkbox"]), .input-request select {
+  padding: 8px; border: 1px solid #94a3b8; border-radius: 6px; background: white;
+}
+.input-request .input-request__choices { display: grid; gap: 8px; margin-bottom: 14px; }
+.input-request__choices label { display: flex; gap: 8px; align-items: baseline; font-size: 13px; }
+.input-request button { padding: 9px 14px; border: 0; border-radius: 7px; background: #334155; color: white; cursor: pointer; }
+.input-request button:disabled { opacity: 0.5; cursor: default; }
+.input-request__hint { margin: 10px 0 0; font-size: 12px; color: #64748b; line-height: 1.5; }
+.input-request__error { color: #b91c1c; font-size: 13px; }

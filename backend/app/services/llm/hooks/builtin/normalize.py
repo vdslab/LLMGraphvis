@@ -96,6 +96,10 @@ def normalize_network_id(ctx: HookContext) -> Optional[ToolCallDecision]:
     networkx-api tool requires it and the model has no reason to track it, so
     filling it in is the single most-used normalization in the system.
     """
+    from ...local_tools import is_local_tool
+
+    if is_local_tool(ctx.tool_name):
+        return None
     if ctx.args.get("network_id"):
         return None
 

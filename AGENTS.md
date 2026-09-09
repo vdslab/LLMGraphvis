@@ -126,9 +126,9 @@ written by `engine.py` around model reasoning and by nothing else.
 
 Auto-discovered from `@mcp.tool()`-decorated functions in
 `networkx-api/app/mcp/tools/{domain}/`. Naming is `domain_verb`: `network_*`,
-`node_*`, `subgraph_*`, `analysis_*`, `layout_*`, `visualization_*`. Plus three
+`node_*`, `subgraph_*`, `analysis_*`, `layout_*`, `visualization_*`. Plus four
 in-process tools in `backend/.../local_tools.py` (`switch_to_main_network`,
-`switch_to_parent_network`, `skill_load`).
+`switch_to_parent_network`, `skill_load`, `ask_user`).
 
 **To add a tool**: write the function in the right `tools/` module with
 `@mcp.tool()` + `@handle_tool_errors` and export it from that package's

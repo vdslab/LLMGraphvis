@@ -13,14 +13,14 @@ export default defineConfig(({ mode }) => {
       changeOrigin: true,
       secure: false,
       rewrite: (path) => path.replace(/^\/api/, ''),
-      configure: (proxy, _options) => {
-        proxy.on('error', (err, _req, _res) => {
+      configure: (proxy) => {
+        proxy.on('error', (err) => {
           console.log('proxy error', err);
         });
-        proxy.on('proxyReq', (proxyReq, req, _res) => {
+        proxy.on('proxyReq', (proxyReq, req) => {
           console.log('Sending Request to the Target:', req.method, req.url);
         });
-        proxy.on('proxyRes', (proxyRes, req, _res) => {
+        proxy.on('proxyRes', (proxyRes, req) => {
           console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
         });
       },
@@ -34,8 +34,8 @@ export default defineConfig(({ mode }) => {
       changeOrigin: true,
       secure: false,
       rewrite: (path) => path.replace(/^\/nx-api/, ''),
-      configure: (proxy, _options) => {
-        proxy.on('error', (err, _req, _res) => {
+      configure: (proxy) => {
+        proxy.on('error', (err) => {
           console.log('nx-api proxy error', err);
         });
       },

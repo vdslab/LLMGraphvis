@@ -347,3 +347,16 @@ class LlmUsage(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     message = relationship("ChatMessage", back_populates="usage")
+
+
+class AnalysisInput(Base):
+    """One conversational input request with a durable submission state."""
+
+    __tablename__ = "analysis_inputs"
+    id = Column(String(36), primary_key=True)
+    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False, index=True)
+    network_id = Column(Integer, ForeignKey("networks.id", ondelete="CASCADE"), nullable=False)
+    specification = Column(JSON, nullable=False)
+    status = Column(String, nullable=False, default="pending")
+    answer = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Wrench, Check, X, Loader2, Brain } from 'lucide-react';
 import { parseMessageContent } from '../../utils/parseMessageContent';
 import Disclosure from './Disclosure';
+import InputRequest from './InputRequest';
 
 const formatDuration = (startedAt, completedAt) => {
   if (!startedAt || !completedAt) return null;
@@ -59,6 +60,10 @@ const ToolCall = ({ execution }) => {
   const duration = formatDuration(execution.started_at, execution.completed_at);
   const args = formatArgs(execution.arguments);
   const thought = thoughtBody(execution.thought);
+
+  if (execution.tool_name === 'ask_user' && execution.result?.input_request) {
+    return <InputRequest request={execution.result.input_request} />;
+  }
 
   return (
     <div className={`toolcall toolcall--${status}`}>

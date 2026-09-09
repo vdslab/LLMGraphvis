@@ -248,13 +248,22 @@ export const useChatStore = create((set, get) => ({
     get().setMessageStatus(localId, 'sending');
 
     try {
-      await processMessageAPI(get().chatId, message.content);
+      const response = message.inputResponse
+        ? await processMessageAPI(get().chatId, message.content, message.inputResponse)
+        : await processMessageAPI(get().chatId, message.content);
+      if (response?.data?.status === 'already_accepted') {
+        await get().fetchMessages();
+        get().endTurn();
+        return true;
+      }
       // 202 Accepted; SSE carries the rest of the turn.
       get().setMessageStatus(localId, 'sent');
+      return true;
     } catch (error) {
       console.error("Failed to send message:", error);
       get().setMessageStatus(localId, 'failed');
       set({ isLoading: false, thinkingMessage: null, progressSteps: [] });
+      return false;
     }
   },
 
@@ -266,7 +275,7 @@ export const useChatStore = create((set, get) => ({
    * constraint (a turn reads the chat history it is about to extend), not a
    * reason to take the keyboard away from the user.
    */
-  sendMessage: async (content) => {
+  sendMessage: async (content, inputResponse = null) => {
     const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const busy = get().isLoading;
 
@@ -276,13 +285,14 @@ export const useChatStore = create((set, get) => ({
         localId,
         role: 'user',
         content,
+        inputResponse,
         created_at: new Date().toISOString(),
         status: busy ? 'queued' : 'sending',
       }],
     }));
 
     if (busy) return;
-    await get().dispatchMessage(localId);
+    return await get().dispatchMessage(localId);
   },
 
   dispatchQueued: () => {

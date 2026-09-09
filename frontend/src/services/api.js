@@ -122,9 +122,10 @@ export const loadSampleNetwork = (chatId, sampleId) =>
   api.post(`/chat/${chatId}/samples/${sampleId}`);
 
 // Process message
-export const processMessage = (chatId, content) =>
+export const processMessage = (chatId, content, inputResponse = {}) =>
   api.post(`/chat/${chatId}/process`, {
-    message: { content }
+    message: { content },
+    ...inputResponse,
   });
 
 export const uploadGraphML = async (chatId, file) => {

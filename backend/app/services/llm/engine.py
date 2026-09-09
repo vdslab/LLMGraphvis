@@ -315,6 +315,12 @@ class GraphVisAgent:
                     await self._emit_message_chunk(queue, marker)
                     tool_call_counter += 1
 
+            if turn_state.get("input_request"):
+                question = turn_state["input_request"]["question"]
+                note = f"\n\n{question}"
+                await self._emit_message_chunk(queue, note)
+                return full_transcript + note, execution_log, total_usage
+
             # Step E: Honour an abort requested by a hook (e.g. repeated failures
             # of the same tool) before spending another generate() call.
             if turn_state.get("should_abort"):
@@ -352,6 +358,12 @@ class GraphVisAgent:
         session: Any,
     ) -> Dict[str, Any]:
         """Executes tools in PARALLEL, updates history, and returns a step log."""
+
+        # A question is an execution barrier: no co-batched operation may run
+        # before the user has answered, regardless of the model's call order.
+        questions = [call for call in function_calls if call.name == "ask_user"]
+        if questions:
+            function_calls = questions[:1]
 
         # Model turn parts: optional text/thought prefix followed by function call parts
         model_parts = []
@@ -547,7 +559,7 @@ class GraphVisAgent:
         """
         try:
             if local_tools.is_local_tool(function_name):
-                context = {"chat_id": chat_id, "db": self.db, "turn_state": turn_state or {}}
+                context = {"chat_id": chat_id, "db": self.db, "turn_state": turn_state if turn_state is not None else {}}
                 result = await local_tools.execute_local_tool(function_name, args, context)
             else:
                 result = await mcp_client.execute_tool(function_name, args, session=session)

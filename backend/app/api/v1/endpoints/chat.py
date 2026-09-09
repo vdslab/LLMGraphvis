@@ -296,17 +296,36 @@ async def process_message(
     # Verify chat exists and user owns it
     verify_chat_ownership(chat_id, current_user.id, db)
 
-    # Save user message
-    db_message = models.ChatMessage(
-        chat_id=chat_id, role="user", content=request.message.content
-    )
+    from app.services.llm.inputs import accept_answer
+
+    chat = db.query(models.Chat).filter_by(id=chat_id).with_for_update().one()
+    request_id = request.input_request_id
+    content = request.message.content
+    if request_id is None:
+        pending = db.query(models.AnalysisInput).filter_by(
+            chat_id=chat_id, network_id=chat.network_id, status="pending"
+        ).first()
+        if pending:
+            request_id = pending.id
+    if request_id is not None:
+        try:
+            content = accept_answer(
+                chat, db, request_id, request.input_values, content
+            )
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        if content is None:
+            db.commit()
+            return {"status": "already_accepted"}
+    elif request.input_values is not None:
+        raise HTTPException(status_code=409, detail="No active question")
+
+    db_message = models.ChatMessage(chat_id=chat_id, role="user", content=content)
     db.add(db_message)
     db.commit()
-
-    # Start background task utilizing the Service Layer
-    background_tasks.add_task(
-        chat_service.handle_process_background, chat_id, request.message.content
-    )
+    background_tasks.add_task(chat_service.handle_process_background, chat_id, content)
 
     return {"status": "accepted"}
 
@@ -349,3 +368,21 @@ def update_chat(
     db.refresh(chat)
 
     return chat
+
+
+@router.get("/{chat_id}/inputs/{request_id}")
+def get_analysis_input(
+    chat_id: int,
+    request_id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    from app.services.llm.inputs import serialize_request
+
+    chat = verify_chat_ownership(chat_id, current_user.id, db)
+    request = db.query(models.AnalysisInput).filter_by(
+        id=request_id, chat_id=chat_id
+    ).first()
+    if request is None:
+        raise HTTPException(status_code=404, detail="Question not found")
+    return serialize_request(request, chat.network_id)

@@ -2,7 +2,7 @@
 name: conversation-flow
 description: When to propose and wait for approval versus act immediately, and how much to report back. Load this when a request is vague, or before changing what the user is looking at.
 triggers: [analyze, analyse, 分析, 見やすく, きれいに, いい感じ, おすすめ, 提案, どうすれば, なんか, よくして, improve, better, nicer, suggest, recommend]
-related_tools: [visualization_get_state]
+related_tools: [visualization_get_state, ask_user]
 ---
 
 ## Decide which mode you are in
@@ -71,3 +71,16 @@ Report what actually happened, at the granularity the user can act on:
 Offer a next step only when there is an obvious one and the user has not
 signalled where they are going. One suggestion, not a menu. Ending on "what
 would you like to explore next?" every turn is noise.
+
+## Structured questions
+
+When a choice is necessary, use `ask_user` with a concise question and relevant
+controls. Offer concrete analytical goals or actual attribute names from this
+network. Use sliders/numeric fields for tunable values, with meaningful bounds
+and steps. Use a multiselect only when several options can be combined.
+
+Call `ask_user` alone. It ends the turn; execution resumes only after the user
+answers. A free-text reply can refine or replace the proposed choices. Do not
+repeat the form if the user already provided the parameter. Never treat a
+control's initial value as a submitted answer. Old forms expire when the analysis
+network changes or another question supersedes them.

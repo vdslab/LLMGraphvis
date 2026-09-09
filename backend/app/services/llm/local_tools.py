@@ -162,12 +162,13 @@ def get_local_tools() -> list[ToolDefinition]:
             parameters={"type": "object", "properties": {}, "required": []},
         ),
         _skill_load_definition(),
+        _input_definition(),
     ]
 
 
 # Tools handled in-process rather than over MCP. The engine routes on this.
 LOCAL_TOOL_NAMES = frozenset(
-    {"switch_to_main_network", "switch_to_parent_network", "skill_load"}
+    {"switch_to_main_network", "switch_to_parent_network", "skill_load", "ask_user"}
 )
 
 
@@ -180,6 +181,9 @@ async def execute_local_tool(tool_name: str, arguments: dict, context: dict):
     chat_id = context.get("chat_id")
     db = context.get("db")
 
+    if tool_name == "ask_user":
+        from .inputs import present_question
+        return present_question(chat_id, db, arguments, context["turn_state"])
     if tool_name == "switch_to_main_network":
         return await switch_to_main_network(chat_id, db)
     elif tool_name == "switch_to_parent_network":
@@ -188,3 +192,33 @@ async def execute_local_tool(tool_name: str, arguments: dict, context: dict):
         return await skill_load(arguments.get("name", ""), context.get("turn_state") or {})
     else:
         raise ValueError(f"Unknown local tool: {tool_name}")
+
+
+def _input_definition() -> ToolDefinition:
+    from .inputs import InputForm
+
+    schema = InputForm.model_json_schema()
+    definitions = schema.pop("$defs", {})
+
+    def inline(value):
+        if isinstance(value, list):
+            return [inline(item) for item in value]
+        if isinstance(value, dict):
+            if "$ref" in value:
+                return inline(definitions[value["$ref"].split("/")[-1]])
+            return {key: inline(item) for key, item in value.items()}
+        return value
+
+    return ToolDefinition(
+        name="ask_user",
+        description=(
+            "Ask the user to clarify their analysis goal or choose parameters using "
+            "select, multiselect, slider, number, or text controls in chat. "
+            "This ends the turn and waits for an answer. Call it alone: other "
+            "calls in the same batch are deferred. Do not ask again for an already "
+            "explicit instruction. All fields are required; free-text replies are "
+            "also accepted. Sliders require finite minimum/maximum. Use 2–12 "
+            "distinct options for selections. No analysis or view change occurs."
+        ),
+        parameters=inline(schema),
+    )

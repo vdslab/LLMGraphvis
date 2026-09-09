@@ -169,6 +169,8 @@ class ChatProcessMessage(BaseModel):
 
 class ChatProcessRequest(BaseModel):
     message: ChatProcessMessage
+    input_request_id: Optional[str] = None
+    input_values: Optional[dict] = None
 
 
 class CreateEgoNetworkRequest(BaseModel):
