@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Literal, Optional
 from pydantic import Field
 from app.core.mcp import mcp
 from app.core.database import get_db_context
@@ -14,7 +14,8 @@ def visualization_set_node_color(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     attribute: Annotated[str, Field(description="Node attribute name to use for coloring (e.g., 'community', 'degree_centrality', 'country').")],
     scale_type: Annotated[str, Field(description="Color scale type: 'CATEGORICAL' (for text/discrete values), 'LINEAR' (for numeric ranges), or 'RANKING' (top-N rules).")],
-    mapping: Annotated[Optional[Dict[str, str]], Field(description="For CATEGORICAL: dict mapping values that actually occur in the named attribute to hex colors, e.g. {\"A\": \"#FF0000\"}. Copy category names exactly from the network data or a previous legend. Omitted categories are auto-generated from a 20-color palette.")] = None,
+    mapping: Annotated[Optional[Dict[str, str]], Field(description="For CATEGORICAL: dict mapping values that actually occur in the named attribute to hex colors, e.g. {\"A\": \"#FF0000\"}. Copy category names exactly from the network data or a previous legend. Omitted categories are filled from the selected named palette.")] = None,
+    palette: Annotated[Optional[Literal["accent", "category10", "dark2", "observable10", "paired", "pastel1", "pastel2", "set1", "set2", "set3", "tableau10", "extended20"]], Field(description="For CATEGORICAL: named D3 categorical palette for values omitted from mapping. Omit to choose tableau10 for up to 10 values, paired for 11-12, or extended20 for larger sets.")] = None,
     gradient: Annotated[Optional[List[str]], Field(description="For LINEAR: list of hex strings ordered from low value to high, e.g. [\"#C6DBEF\", \"#6BAED6\", \"#08306B\"].")] = None,
     ranking_rules: Annotated[Optional[List[Dict[str, Any]]], Field(description="For RANKING: list of rules applied in order, each {\"top\": N, \"color\": \"#RRGGBB\"} — e.g. [{\"top\": 10, \"color\": \"#e15759\"}, {\"top\": 50, \"color\": \"#f28e2b\"}] colors the 10 highest-valued nodes red and the next 40 orange. Everything unmatched gets default_color. Use this for 'highlight the top N' requests, where position in the ordering matters more than the value itself.")] = None,
     default_color: Annotated[str, Field(description="Fallback color for nodes with missing attribute values, or unmatched by any RANKING rule.")] = "#d3d3d3",
@@ -46,6 +47,7 @@ def visualization_set_node_color(
             attribute=attribute,
             scale_type=scale_type.upper(),
             color_map=mapping,
+            palette=palette,
             ranking_rules=ranking_rules,
             default_color=default_color or "#d3d3d3",
             fixed_mapping=fixed,

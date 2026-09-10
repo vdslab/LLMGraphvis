@@ -10,6 +10,11 @@ related_tools: [visualization_set_node_color, visualization_set_node_size, visua
 - **Colour, categorical** — unordered categories: `club`, `country`,
   `louvain_community`. Use `scale_type='CATEGORICAL'`. A palette is assigned
   automatically; supply `mapping` only when the user names specific colours.
+  Supply `palette` when the user asks for a particular mood: `tableau10` is the
+  balanced default, `category10` or `set1` is vivid, `set2` is softer, `dark2`
+  is dark and saturated, and `pastel1`/`pastel2` is pale. `paired` is useful
+  for 11–12 categories. Never invent a palette name; use one accepted by the
+  tool schema.
 - **Colour, sequential** — continuous quantities: `degree_centrality`,
   `pagerank`, `year`. Use `scale_type='LINEAR'`, optionally with `gradient` as a
   list of hex codes from low to high.

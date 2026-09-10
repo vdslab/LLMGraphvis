@@ -152,7 +152,7 @@ class StyleService:
     ) -> Dict[str, str]:
         """
         Pre-calculate a map of value_str -> color for CATEGORICAL scale type.
-        Implements Top-N (default 10) logic, assigning 'Others' to Gray.
+        Assigns a named palette up to its capacity, then falls back to Gray.
         """
         categorical_color_map = {}
         if node_color_config and node_color_config.get("scale_type") == "CATEGORICAL":
@@ -190,34 +190,28 @@ class StyleService:
                     v for v in sorted_values if v not in categorical_color_map
                 ]
 
-                # Only auto-fill if no explicitly set default color (or we want to override/augment)
-                # Strategy: We fill up to 10 distinct colors.
-                # Anything else falls back to default_color, which we set to Gray if not set.
+                palette_name = node_color_config.get("palette")
+                if not palette_name:
+                    palette_name = utils.choose_categorical_palette(len(sorted_values))
+                node_color_config["palette"] = palette_name
 
-                # If default_color IS provided, we assume the user wants strict mapping + default for everything else.
+                # Anything beyond the selected palette's capacity falls back
+                # to default_color. Cycling would make categories ambiguous.
+
                 if needed_values:
-                    # We only support 20 distinct colors + Gray
-                    limit = 20
-                    # Simplicity: Just assign from palette to the top N needed values.
+                    palette = utils.generate_categorical_palette(
+                        len(sorted_values), palette_name
+                    )
+                    limit = len(palette)
 
                     is_fixed = node_color_config.get("fixed_mapping", False)
                     if not is_fixed:
-                        palette = utils.generate_categorical_palette(limit)
-
-                        # Values that are "Top N" get a color.
-                        # Others get nothing in the map -> Fallback to default.
-
                         assigned_count = len(categorical_color_map)
                         for val in needed_values:
                             if assigned_count < limit:
-                                # Find next unused color in palette?
-                                # For now, simplistic assignment:
-                                if assigned_count < len(palette):
-                                    categorical_color_map[val] = palette[assigned_count]
-                                    assigned_count += 1
+                                categorical_color_map[val] = palette[assigned_count]
+                                assigned_count += 1
                             else:
-                                # Reached limit, stop assigning distinct colors.
-                                # These will use default_color.
                                 break
 
             # Update the config in place so it persists

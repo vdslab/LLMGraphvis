@@ -229,6 +229,7 @@ class VisualizationBuilder:
             if scale == "CATEGORICAL":
                 info["type"] = "categorical"
                 info["mapping"] = self.categorical_color_map
+                info["palette"] = nc.get("palette")
             elif scale == "RANKING":
                 info["type"] = "ranking"
                 # Ranking map is ID based, maybe too large to show. Show rules instead.

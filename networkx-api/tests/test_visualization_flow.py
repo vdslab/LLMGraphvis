@@ -134,6 +134,7 @@ def test_color_patterns(db, setup_network):
         assert res1["legend"]["node_color"]["type"] == "categorical"
         # mapping should exist
         assert "mapping" in res1["legend"]["node_color"]
+        assert res1["legend"]["node_color"]["palette"] == "tableau10"
         
         # Verify score attribute stats
         # Verify score attribute stats
@@ -174,8 +175,10 @@ def test_color_patterns(db, setup_network):
             attribute="country",
             scale_type="CATEGORICAL",
             mapping={"Eu.rope": "purple"},
+            palette="pastel2",
         )
         assert res4["legend"]["node_color"]["mapping"] == {"Europe": "purple"}
+        assert res4["legend"]["node_color"]["palette"] == "pastel2"
         assert all(node["color"] == "purple" for node in res4["nodes"])
 
         with pytest.raises(RuntimeError, match="Available values.*Europe"):

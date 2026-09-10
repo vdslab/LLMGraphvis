@@ -6,6 +6,21 @@ from .base import BaseSchema
 
 # --- Config Models ---
 
+CategoricalPaletteName = Literal[
+    "accent",
+    "category10",
+    "dark2",
+    "observable10",
+    "paired",
+    "pastel1",
+    "pastel2",
+    "set1",
+    "set2",
+    "set3",
+    "tableau10",
+    "extended20",
+]
+
 
 class NodeColorConfig(BaseModel):
     scale_type: Literal["LINEAR", "CATEGORICAL", "RANKING"] = Field(
@@ -20,6 +35,10 @@ class NodeColorConfig(BaseModel):
     color_map: Optional[Dict[str, str]] = Field(
         None,
         description="Dictionary mapping attribute values to hex colors for CATEGORICAL scale.",
+    )
+    palette: Optional[CategoricalPaletteName] = Field(
+        None,
+        description="Named categorical palette used to fill values absent from color_map.",
     )
     ranking_rules: Optional[List[Dict[str, Any]]] = Field(
         None,

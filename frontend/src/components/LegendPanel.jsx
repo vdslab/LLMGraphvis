@@ -65,6 +65,11 @@ const LegendPanel = () => {
       {nodeColor && (nodeColor.type?.toLowerCase() === 'categorical') && nodeColor.mapping && (
         <div style={sectionStyle}>
           <div style={sectionTitleStyle}>Color: {nodeColor.attribute}</div>
+          {nodeColor.palette && (
+            <div style={{ ...rowStyle, fontSize: '11px' }}>
+              Palette: {nodeColor.palette}
+            </div>
+          )}
           {Object.entries(nodeColor.mapping).map(([category, color]) => (
             <div key={category} style={rowStyle}>
               <span style={{ ...swatchStyle, backgroundColor: color }} />
