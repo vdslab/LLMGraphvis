@@ -8,7 +8,7 @@ python-jose[cryptography]
 passlib[argon2]
 python-multipart
 httpx
-google-genai
+google-genai>=2.0,<3
 anthropic
 openai
 python-dotenv

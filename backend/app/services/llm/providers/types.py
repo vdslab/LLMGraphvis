@@ -15,7 +15,8 @@ class FunctionCallData:
     """A function call emitted by the LLM during streaming."""
     name: str
     args: Dict[str, Any]
-    call_id: Optional[str] = None  # Required by Anthropic for tool_use/tool_result pairing
+    call_id: Optional[str] = None
+    thought_signature: Optional[bytes] = None
 
 
 @dataclass
@@ -47,6 +48,7 @@ class LLMFunctionCallPart:
     name: str
     args: Dict[str, Any]
     call_id: Optional[str] = None
+    thought_signature: Optional[bytes] = None
 
 
 @dataclass

@@ -119,6 +119,7 @@ class ToolExecutionBase(BaseModel):
     thought: Optional[str] = None
     status: str
     error: Optional[str] = None
+    call_id: Optional[str] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 

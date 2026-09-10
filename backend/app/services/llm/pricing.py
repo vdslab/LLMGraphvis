@@ -26,8 +26,11 @@ MODEL_PRICING = {
     "claude-sonnet-5": {"input": 3.00, "output": 15.00, "cached_input": 0.30},
     "claude-sonnet-4-6": {"input": 3.00, "output": 15.00, "cached_input": 0.30},
     "claude-haiku-4-5": {"input": 1.00, "output": 5.00, "cached_input": 0.10},
-    # Google Gemini — current default used by this codebase (see google_genai.py
-    # GEMINI_MODEL default) plus adjacent tier.
+    # Google Gemini — standard Google AI Studio text rates. Pro entries use the
+    # <=200k-token tier because this estimator does not receive prompt size.
+    "gemini-3.8-flash": {"input": 0.75, "output": 3.75, "cached_input": 0.075},
+    "gemini-3.1-pro-preview": {"input": 2.00, "output": 12.00, "cached_input": 0.20},
+    "gemini-3.5-flash-lite": {"input": 0.30, "output": 2.50, "cached_input": 0.03},
     "gemini-2.5-flash": {"input": 0.30, "output": 2.50, "cached_input": 0.075},
     "gemini-2.5-pro": {"input": 1.25, "output": 10.00, "cached_input": 0.31},
     # OpenAI — prices published for the GPT-5.6 family.

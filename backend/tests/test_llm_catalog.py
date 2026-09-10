@@ -88,7 +88,7 @@ def test_google_is_the_default_when_provider_is_not_configured(monkeypatch):
         for model in provider["models"]
         if model["default"]
     ]
-    assert defaults == [("google", "gemini-2.5-flash")]
+    assert defaults == [("google", "gemini-3.8-flash")]
 
 
 def test_lmstudio_first_model_is_default_when_not_explicitly_configured(monkeypatch):

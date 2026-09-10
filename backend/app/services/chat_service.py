@@ -371,8 +371,10 @@ async def handle_process_background(
                                 thought=step.get("thought"),
                                 status=tool_call.get("status", "unknown"),
                                 error=tool_call.get("error"),
+                                call_id=tool_call.get("call_id"),
+                                thought_signature=tool_call.get("thought_signature"),
                                 started_at=tool_call.get("started_at"),
-                                completed_at=tool_call.get("completed_at")
+                                completed_at=tool_call.get("completed_at"),
                             )
                             db.add(execution)
                 db.commit()

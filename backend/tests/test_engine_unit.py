@@ -179,7 +179,12 @@ async def test_execute_tools_and_update_history(mock_agent, mock_queue):
     """Tool execution appends model + tool turns and records the step log."""
     mock_agent._run_tool = AsyncMock(return_value=({"content": "ok"}, "completed", None))
 
-    fc = FunctionCallData(name="test_tool", args={"param": 1}, call_id="call_1")
+    fc = FunctionCallData(
+        name="test_tool",
+        args={"param": 1},
+        call_id="call_1",
+        thought_signature=b"signature",
+    )
     history = []
     turn_state = new_turn_state(10)
     turn_state["network_id"] = 1
@@ -201,6 +206,8 @@ async def test_execute_tools_and_update_history(mock_agent, mock_queue):
     assert turn_state["tools_run"] == 1
     assert step_log["tool_calls"][0]["name"] == "test_tool"
     assert step_log["tool_calls"][0]["status"] == "completed"
+    assert step_log["tool_calls"][0]["call_id"] == "call_1"
+    assert step_log["tool_calls"][0]["thought_signature"] == "c2lnbmF0dXJl"
 
 
 @pytest.mark.asyncio
@@ -251,9 +258,11 @@ async def test_same_batch_analysis_runs_before_ranked_read(mock_agent, mock_queu
         "node_get_top_ranked",
     ]
     assert [call["name"] for call in step_log["tool_calls"]] == execution_order
+    # Execution is dependency-safe, while provider history remains in the
+    # model's original order so Gemini thought signatures stay valid.
     assert [part.call_id for part in history[1].parts] == [
-        "calculate",
         "read_before",
+        "calculate",
         "read_after",
     ]
 

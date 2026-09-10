@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 import os
@@ -414,9 +415,10 @@ class GraphVisAgent:
         # before the user has answered, regardless of the model's call order.
         questions = [call for call in function_calls if call.name == "ask_user"]
         if questions:
-            function_calls = questions[:1]
+            model_function_calls = questions[:1]
         else:
-            function_calls = _order_tool_calls(function_calls)
+            model_function_calls = list(function_calls)
+        execution_function_calls = _order_tool_calls(model_function_calls)
 
         # Model turn parts: optional text/thought prefix followed by function call parts
         model_parts = []
@@ -435,16 +437,35 @@ class GraphVisAgent:
             "tool_calls": [],
         }
 
-        # Keep the model call and tool response parts in the same execution order.
-        for fc in function_calls:
-            model_parts.append(LLMFunctionCallPart(name=fc.name, args=fc.args, call_id=fc.call_id))
-            step_record["tool_calls"].append({"name": fc.name, "args": fc.args})
+        # Preserve the model's exact call order and signatures in history. Tools
+        # may execute in dependency order, but Gemini requires the subsequent
+        # responses to match the original function-call sequence.
+        for fc in model_function_calls:
+            model_parts.append(
+                LLMFunctionCallPart(
+                    name=fc.name,
+                    args=fc.args,
+                    call_id=fc.call_id,
+                    thought_signature=fc.thought_signature,
+                )
+            )
 
         # Execute and dispatch hooks one at a time. Later calls may depend on a
         # derived attribute, active-network switch, or layout written by an
         # earlier call in the same model response.
-        tool_parts = []
-        for call in function_calls:
+        tool_parts_by_call = {}
+        for call in execution_function_calls:
+            call_record = {
+                "name": call.name,
+                "args": call.args,
+                "call_id": call.call_id,
+                "thought_signature": (
+                    base64.b64encode(call.thought_signature).decode("ascii")
+                    if call.thought_signature
+                    else None
+                ),
+            }
+            step_record["tool_calls"].append(call_record)
             (
                 result,
                 status,
@@ -476,18 +497,19 @@ class GraphVisAgent:
 
             truncated_result = _truncate_tool_result(result)
 
-            tool_parts.append(LLMFunctionResponsePart(
-                name=feature_name, response=truncated_result, call_id=call.call_id
-            ))
+            tool_parts_by_call[id(call)] = LLMFunctionResponsePart(
+                name=feature_name,
+                response=truncated_result,
+                call_id=call.call_id,
+            )
 
-            for call_record in step_record["tool_calls"]:
-                if call_record["name"] == feature_name and "result" not in call_record:
-                    call_record["result"] = truncated_result
-                    call_record["status"] = status
-                    call_record["error"] = error_msg
-                    call_record["started_at"] = started_at
-                    call_record["completed_at"] = completed_at
-                    break
+            call_record["result"] = truncated_result
+            call_record["status"] = status
+            call_record["error"] = error_msg
+            call_record["started_at"] = started_at
+            call_record["completed_at"] = completed_at
+
+        tool_parts = [tool_parts_by_call[id(call)] for call in model_function_calls]
 
         history.append(LLMMessage(role="model", parts=model_parts))
         history.append(LLMMessage(role="tool", parts=tool_parts))

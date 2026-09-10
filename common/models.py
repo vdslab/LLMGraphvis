@@ -123,6 +123,8 @@ class ToolExecution(Base):
     thought = Column(Text, nullable=True)
     status = Column(String, nullable=False)
     error = Column(Text, nullable=True)
+    call_id = Column(String, nullable=True)
+    thought_signature = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
@@ -338,7 +340,7 @@ class LlmUsage(Base):
     id = Column(Integer, primary_key=True, index=True)
     message_id = Column(Integer, ForeignKey("chat_messages.id"), nullable=False, unique=True)
     provider = Column(String, nullable=False)  # "google" | "anthropic" | "openai"
-    model = Column(String, nullable=False)               # e.g. "gemini-2.5-flash", "claude-opus-4-8"
+    model = Column(String, nullable=False)               # e.g. "gemini-3.8-flash", "claude-opus-4-8"
     input_tokens = Column(Integer, nullable=False, default=0)
     output_tokens = Column(Integer, nullable=False, default=0)
     cached_input_tokens = Column(Integer, nullable=False, default=0)

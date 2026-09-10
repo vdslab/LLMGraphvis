@@ -50,8 +50,14 @@ def _is_retryable_error(exception) -> bool:
     return False
 
 
-DEFAULT_VERTEX_LOCATION = "us-central1"
+DEFAULT_VERTEX_LOCATION = "global"
 DEFAULT_THINKING_BUDGET = 2048
+DEFAULT_THINKING_LEVEL = "medium"
+SUPPORTED_THINKING_LEVELS = {"low", "medium", "high"}
+
+
+def _is_gemini_3(model_name: str) -> bool:
+    return model_name.startswith("gemini-3")
 
 
 class GoogleGenAIProvider(LLMProvider):
@@ -60,15 +66,21 @@ class GoogleGenAIProvider(LLMProvider):
         # `or` chains (instead of os.getenv defaults) so that empty-string values —
         # e.g. docker-compose passing through an unset host variable — still fall back.
         self.model_name = model_name or os.getenv("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
-        self.thinking_budget = int(os.getenv("GEMINI_THINKING_BUDGET") or DEFAULT_THINKING_BUDGET)
+        self.thinking_budget = int(
+            os.getenv("GEMINI_THINKING_BUDGET") or DEFAULT_THINKING_BUDGET
+        )
+        self.thinking_level = (
+            os.getenv("GEMINI_THINKING_LEVEL") or DEFAULT_THINKING_LEVEL
+        ).strip().lower()
+        if self.thinking_level not in SUPPORTED_THINKING_LEVELS:
+            choices = ", ".join(sorted(SUPPORTED_THINKING_LEVELS))
+            raise ValueError(f"GEMINI_THINKING_LEVEL must be one of: {choices}")
 
     @property
     def supports_native_thinking(self) -> bool:
-        # Mirrors the thinking_config gate in _raw_generate: only "thinking" model
-        # variants get native thought parts from the SDK. Other Gemini models fall
-        # back to the literal <thought>-tag parsing state machine in _stream below,
-        # so they still need the prompt to hand-write those tags.
-        return "thinking" in self.model_name
+        # Gemini 3 uses thinking levels; legacy IDs explicitly containing
+        # "thinking" retain the numeric-budget behavior.
+        return _is_gemini_3(self.model_name) or "thinking" in self.model_name
 
     def _initialize_client(self) -> genai.Client:
         project_id = os.getenv("VERTEX_PROJECT_ID")
@@ -84,19 +96,54 @@ class GoogleGenAIProvider(LLMProvider):
 
     def _to_gemini_history(self, history: List[LLMMessage]) -> List[types.Content]:
         result = []
+        valid_call_ids = set()
         for msg in history:
             parts = []
+            call_parts = [
+                part for part in msg.parts if isinstance(part, LLMFunctionCallPart)
+            ]
+            # Gemini 3 requires the encrypted signature from the original model
+            # response. Old persisted history only has synthetic calls; omit those
+            # tool exchanges while retaining the assistant's final text turns.
+            signed_model_turn = not (
+                _is_gemini_3(self.model_name)
+                and call_parts
+                and not any(part.thought_signature for part in call_parts)
+            )
             for part in msg.parts:
                 if isinstance(part, LLMTextPart):
                     parts.append(types.Part.from_text(text=part.text))
                 elif isinstance(part, LLMFunctionCallPart):
-                    parts.append(types.Part(
-                        function_call=types.FunctionCall(name=part.name, args=part.args)
-                    ))
+                    if not signed_model_turn:
+                        continue
+                    parts.append(
+                        types.Part(
+                            function_call=types.FunctionCall(
+                                id=part.call_id,
+                                name=part.name,
+                                args=part.args,
+                            ),
+                            thought_signature=part.thought_signature,
+                        )
+                    )
+                    if part.call_id:
+                        valid_call_ids.add(part.call_id)
                 elif isinstance(part, LLMFunctionResponsePart):
-                    parts.append(types.Part.from_function_response(
-                        name=part.name, response=part.response
-                    ))
+                    if _is_gemini_3(self.model_name) and (
+                        not part.call_id or part.call_id not in valid_call_ids
+                    ):
+                        continue
+                    parts.append(
+                        types.Part(
+                            function_response=types.FunctionResponse(
+                                id=part.call_id,
+                                name=part.name,
+                                response=part.response,
+                            )
+                        )
+                    )
+            if not parts:
+                continue
             # Gemini's Content.role only accepts "user"/"model". Function-call results
             # (role == "tool") are conventionally sent as "user"-role content, mirroring
             # how the Anthropic provider folds tool_result blocks into a "user" turn.
@@ -132,6 +179,18 @@ class GoogleGenAIProvider(LLMProvider):
             if gemini_tools
             else None
         )
+        thinking_config = None
+        if _is_gemini_3(self.model_name):
+            thinking_config = types.ThinkingConfig(
+                thinking_level=self.thinking_level,
+                include_thoughts=True,
+            )
+        elif "thinking" in self.model_name:
+            thinking_config = types.ThinkingConfig(
+                thinking_budget=self.thinking_budget,
+                include_thoughts=True,
+            )
+
         return await self.client.aio.models.generate_content_stream(
             model=self.model_name,
             contents=gemini_history,
@@ -139,9 +198,7 @@ class GoogleGenAIProvider(LLMProvider):
                 tools=gemini_tools or None,
                 tool_config=tool_config,
                 system_instruction=system_instruction,
-                thinking_config=types.ThinkingConfig(thinking_budget=self.thinking_budget)
-                if "thinking" in self.model_name
-                else None,
+                thinking_config=thinking_config,
             ),
         )
 
@@ -219,7 +276,12 @@ class GoogleGenAIProvider(LLMProvider):
                 if part.function_call:
                     fc = part.function_call
                     yield StreamChunk(function_calls=[
-                        FunctionCallData(name=fc.name, args=dict(fc.args))
+                        FunctionCallData(
+                            name=fc.name,
+                            args=dict(fc.args),
+                            call_id=getattr(fc, "id", None),
+                            thought_signature=getattr(part, "thought_signature", None),
+                        )
                     ])
 
         if last_usage is not None:
