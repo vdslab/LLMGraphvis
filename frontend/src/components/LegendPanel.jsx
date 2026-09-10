@@ -31,6 +31,10 @@ const sectionTitleStyle = {
   marginBottom: '4px'
 };
 
+const formatValue = (value) => typeof value === 'number'
+  ? Number(value.toPrecision(4)).toLocaleString(undefined, { maximumSignificantDigits: 4 })
+  : value ?? '';
+
 const LegendPanel = () => {
   const legend = useNetworkStore((state) => state.legend);
 
@@ -77,13 +81,13 @@ const LegendPanel = () => {
             style={{
               height: '10px',
               borderRadius: '4px',
-              background: `linear-gradient(to right, ${(nodeColor.gradient && nodeColor.gradient[0]) || '#d3d3d3'}, ${(nodeColor.gradient && nodeColor.gradient[1]) || '#333333'})`,
+              background: `linear-gradient(to right, ${(nodeColor.gradient?.length ? nodeColor.gradient : ['#d3d3d3', '#333333']).join(', ')})`,
               border: '1px solid rgba(0,0,0,0.15)'
             }}
           />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-            <span>{nodeColor.min !== undefined && nodeColor.min !== null ? nodeColor.min : ''}</span>
-            <span>{nodeColor.max !== undefined && nodeColor.max !== null ? nodeColor.max : ''}</span>
+            <span>{formatValue(nodeColor.min)}</span>
+            <span>{formatValue(nodeColor.max)}</span>
           </div>
         </div>
       )}
@@ -94,9 +98,9 @@ const LegendPanel = () => {
           {(nodeSize.data_min !== undefined || nodeSize.data_max !== undefined) && (
             <div style={rowStyle}>
               <span>
-                {nodeSize.data_min !== undefined && nodeSize.data_min !== null ? nodeSize.data_min : '?'}
+                {formatValue(nodeSize.data_min) || '?'}
                 {' – '}
-                {nodeSize.data_max !== undefined && nodeSize.data_max !== null ? nodeSize.data_max : '?'}
+                {formatValue(nodeSize.data_max) || '?'}
               </span>
             </div>
           )}

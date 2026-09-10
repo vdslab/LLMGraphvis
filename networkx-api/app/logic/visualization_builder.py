@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from common import models
 from app.logic.common_utils import calculate_smart_edge_width, calculate_smart_node_size
-from app.logic.style_service import StyleService
+from app.logic.style_service import DEFAULT_NODE_GRADIENT, StyleService
 from app.logic.attributes import fetch_attribute_values
 
 
@@ -237,7 +237,7 @@ class VisualizationBuilder:
                 info["type"] = "linear"
                 info["min"] = self.node_color_stats[1]
                 info["max"] = self.node_color_stats[2]
-                info["gradient"] = nc.get("gradient")
+                info["gradient"] = nc.get("gradient") or DEFAULT_NODE_GRADIENT
             
             summary["node_color"] = info
 

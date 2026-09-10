@@ -89,9 +89,9 @@ def interpolate_color(
     # Back to RGB
     r_float, g_float, b_float = colorsys.hls_to_rgb(h, l, s)
     
-    r = int(r_float * 255)
-    g = int(g_float * 255)
-    b = int(b_float * 255)
+    r = round(r_float * 255)
+    g = round(g_float * 255)
+    b = round(b_float * 255)
 
     return f"#{r:02x}{g:02x}{b:02x}"
 

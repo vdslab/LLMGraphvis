@@ -3,6 +3,10 @@ from typing import Any, Dict, List, Set, Tuple
 from app.logic import common_utils as utils
 
 
+DEFAULT_NODE_GRADIENT = ["#C6DBEF", "#6BAED6", "#08306B"]
+DEFAULT_EDGE_GRADIENT = ["#CCCCCC", "#000000"]
+
+
 class StyleService:
     """
     Service to handle all styling logic for determining node/edge size, color, and opacity.
@@ -255,7 +259,7 @@ class StyleService:
             if scale_type == "LINEAR":
                 val = cls.get_val(db_id, config.get("attribute"), attr_map, values_map)
                 if isinstance(val, (int, float)) and stats[0]:
-                    gradient = config.get("gradient", ["#C6DBEF", "#6BAED6", "#08306B"])
+                    gradient = (config.get("gradient") or DEFAULT_NODE_GRADIENT)
                     return utils.interpolate_gradient(
                         val, stats[1], stats[2], gradient
                     )
@@ -311,7 +315,7 @@ class StyleService:
             val = cls.get_val(db_id, config["attribute"], attr_map, values_map)
             scale_type = config.get("scale_type", "LINEAR")
             if scale_type == "LINEAR" and isinstance(val, (int, float)):
-                gradient = config.get("gradient", ["#CCCCCC", "#000000"])
+                gradient = (config.get("gradient") or DEFAULT_EDGE_GRADIENT)
                 color = utils.interpolate_gradient(
                     val, stats[1], stats[2], gradient
                 )
