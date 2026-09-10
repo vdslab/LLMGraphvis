@@ -212,13 +212,22 @@ def _input_definition() -> ToolDefinition:
     return ToolDefinition(
         name="ask_user",
         description=(
+            "REQUIRED when proposing alternatives and asking the user to choose, including "
+            "responses to what analyses are possible. Text-only lists do not display UI. "
             "Ask the user to clarify their analysis goal or choose parameters using "
             "select, multiselect, slider, number, or text controls in chat. "
+            "Each field uses the keys id, label, kind, and any applicable options or "
+            "numeric bounds; use label, never title. For a general 'what analyses are "
+            "possible?' question, use exactly one select field with three options. "
+            "Do not add a separate text field or split the choices across categories. "
             "This ends the turn and waits for an answer. Call it alone: other "
             "calls in the same batch are deferred. Do not ask again for an already "
             "explicit instruction. All fields are required; free-text replies are "
             "also accepted. Sliders require finite minimum/maximum. Use 2–12 "
-            "distinct options for selections. No analysis or view change occurs."
+            "distinct options for selections. Other/free-text is added automatically "
+            "(allow_other defaults true); supply only the actual candidates, e.g. "
+            "three candidates yield three choices plus Other. Do not add Other as an option. "
+            "No analysis or view change occurs."
         ),
         parameters=inline(schema),
     )

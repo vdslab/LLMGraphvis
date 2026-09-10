@@ -48,13 +48,14 @@ def audit_turn_summary(ctx: HookContext) -> None:
     ts = ctx.turn_state
     logger.info(
         "Turn summary (chat=%s network=%s): iterations=%s/%s tools_run=%s "
-        "blocked=%s modified=%s failed=%s hook_errors=%s aborted=%s",
+        "blocked=%s deferred=%s modified=%s failed=%s hook_errors=%s aborted=%s",
         ctx.chat_id,
         ts.get("network_id") or ctx.network_id,
         ts.get("iteration"),
         ts.get("max_iterations"),
         ts.get("tools_run", 0),
         ts.get("tools_blocked", 0),
+        ts.get("tools_deferred", 0),
         ts.get("tools_modified", 0),
         ts.get("tools_failed", 0),
         ts.get("hook_errors", 0),

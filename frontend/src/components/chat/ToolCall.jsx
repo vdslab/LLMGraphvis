@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Wrench, Check, X, Loader2, Brain } from 'lucide-react';
+import { Wrench, Check, X, Loader2, Brain, SkipForward } from 'lucide-react';
 import { parseMessageContent } from '../../utils/parseMessageContent';
 import Disclosure from './Disclosure';
 import InputRequest from './InputRequest';
@@ -43,6 +43,7 @@ const thoughtBody = (thought) => {
 const STATUS_ICON = {
   failed: <X size={12} aria-hidden />,
   running: <Loader2 size={12} className="spin" aria-hidden />,
+  deferred: <SkipForward size={12} aria-hidden />,
   completed: <Check size={12} aria-hidden />,
 };
 
@@ -91,6 +92,9 @@ const ToolCall = ({ execution }) => {
       )}
 
       {execution.error && <p className="toolcall__error">{execution.error}</p>}
+      {status === 'deferred' && execution.result?.reason && (
+        <p className="toolcall__note">{execution.result.reason}</p>
+      )}
 
       {args && (
         <>

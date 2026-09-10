@@ -1,5 +1,4 @@
 import json
-import asyncio
 import logging
 import os
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
@@ -25,6 +24,57 @@ from .providers.types import (
 
 logger = get_logger(__name__)
 load_dotenv()
+
+
+# Derived node attributes whose producer/consumer dependency can be identified
+# without guessing. Models occasionally emit a read before its calculation in
+# the same function-call batch; ordering that pair here avoids a recoverable but
+# user-visible tool error while keeping the tools themselves atomic.
+_ANALYSIS_OUTPUTS = {
+    "analysis_degree_centrality": "degree_centrality",
+    "analysis_betweenness_centrality": "betweenness_centrality",
+    "analysis_closeness_centrality": "closeness_centrality",
+    "analysis_eigenvector_centrality": "eigenvector_centrality",
+    "analysis_katz_centrality": "katz_centrality",
+    "analysis_pagerank": "pagerank",
+    "analysis_core_number": "core_number",
+    "analysis_triangles": "triangles",
+}
+
+
+def _order_tool_calls(function_calls: List[FunctionCallData]) -> List[FunctionCallData]:
+    """Place known attribute producers before same-batch ranked reads.
+
+    All unrelated calls retain their model-provided order. Other dependencies,
+    such as layout followed by rendering, are made reliable by sequential tool
+    execution below.
+    """
+    ordered = list(function_calls)
+    index = 0
+    while index < len(ordered):
+        call = ordered[index]
+        if call.name != "node_get_top_ranked":
+            index += 1
+            continue
+
+        metric = call.args.get("metric")
+        producer_index = next(
+            (
+                candidate_index
+                for candidate_index in range(index + 1, len(ordered))
+                if _ANALYSIS_OUTPUTS.get(ordered[candidate_index].name) == metric
+            ),
+            None,
+        )
+        if producer_index is None:
+            index += 1
+            continue
+
+        producer = ordered.pop(producer_index)
+        ordered.insert(index, producer)
+        index += 2
+
+    return ordered
 
 # Max ReAct loop iterations per turn (each iteration = one LLM generate() call).
 AGENT_MAX_ITERATIONS = int(os.getenv("AGENT_MAX_ITERATIONS") or 10)
@@ -140,6 +190,7 @@ class GraphVisAgent:
         network_id: int,
         context_summary: str = "",
         user_text: str = "",
+        resumed_from_input: bool = False,
     ) -> Tuple[str, List[Dict[str, Any]], UsageData]:
         """
         Orchestrates a single turn of the agent (User Input -> [Thoughts/Actions] -> Final Response).
@@ -154,6 +205,7 @@ class GraphVisAgent:
         # the active network id). Created once here and threaded through.
         turn_state = hooks.new_turn_state(AGENT_MAX_ITERATIONS)
         turn_state["network_id"] = network_id
+        turn_state["resumed_from_input"] = resumed_from_input
 
         # Fix the system prompt for this turn: the network context summary and
         # any hook-contributed blocks are appended once here so every generate()
@@ -316,10 +368,9 @@ class GraphVisAgent:
                     tool_call_counter += 1
 
             if turn_state.get("input_request"):
-                question = turn_state["input_request"]["question"]
-                note = f"\n\n{question}"
-                await self._emit_message_chunk(queue, note)
-                return full_transcript + note, execution_log, total_usage
+                # The ask_user marker renders the persisted question itself.
+                # Repeating it as prose adds a second, non-interactive question.
+                return full_transcript, execution_log, total_usage
 
             # Step E: Honour an abort requested by a hook (e.g. repeated failures
             # of the same tool) before spending another generate() call.
@@ -357,13 +408,15 @@ class GraphVisAgent:
         turn_state: Dict[str, Any],
         session: Any,
     ) -> Dict[str, Any]:
-        """Executes tools in PARALLEL, updates history, and returns a step log."""
+        """Execute tools in dependency-safe order and return a step log."""
 
         # A question is an execution barrier: no co-batched operation may run
         # before the user has answered, regardless of the model's call order.
         questions = [call for call in function_calls if call.name == "ask_user"]
         if questions:
             function_calls = questions[:1]
+        else:
+            function_calls = _order_tool_calls(function_calls)
 
         # Model turn parts: optional text/thought prefix followed by function call parts
         model_parts = []
@@ -382,49 +435,49 @@ class GraphVisAgent:
             "tool_calls": [],
         }
 
-        # Build model parts and task list
-        tasks = []
+        # Keep the model call and tool response parts in the same execution order.
         for fc in function_calls:
             model_parts.append(LLMFunctionCallPart(name=fc.name, args=fc.args, call_id=fc.call_id))
             step_record["tool_calls"].append({"name": fc.name, "args": fc.args})
-            tasks.append(
-                self._run_tool_with_events(
-                    fc.name, fc.args, chat_id, session, queue, turn_state
-                )
-            )
 
-        # Execute in parallel; asyncio.gather preserves order
-        results = await asyncio.gather(*tasks)
-
-        # Build tool response parts and finalise the step log
+        # Execute and dispatch hooks one at a time. Later calls may depend on a
+        # derived attribute, active-network switch, or layout written by an
+        # earlier call in the same model response.
         tool_parts = []
-        for i, (result, status, error_msg, feature_name, started_at, completed_at) in enumerate(results):
-            call_id = function_calls[i].call_id
+        for call in function_calls:
+            (
+                result,
+                status,
+                error_msg,
+                feature_name,
+                started_at,
+                completed_at,
+            ) = await self._run_tool_with_events(
+                call.name, call.args, chat_id, session, queue, turn_state
+            )
 
-            # POST_TOOL / TOOL_ERROR run sequentially here, after every tool in
-            # this batch has returned, so a hook that switches the active network
-            # cannot race the other calls of the same batch.
-            event = (
-                hooks.HookEvent.POST_TOOL
-                if status == "completed"
-                else hooks.HookEvent.TOOL_ERROR
-            )
-            await self._dispatch_tool_hooks(
-                event,
-                tool_name=feature_name,
-                args=function_calls[i].args,
-                result=result,
-                error=error_msg,
-                chat_id=chat_id,
-                session=session,
-                queue=queue,
-                turn_state=turn_state,
-            )
+            if status in {"completed", "failed"}:
+                event = (
+                    hooks.HookEvent.POST_TOOL
+                    if status == "completed"
+                    else hooks.HookEvent.TOOL_ERROR
+                )
+                await self._dispatch_tool_hooks(
+                    event,
+                    tool_name=feature_name,
+                    args=call.args,
+                    result=result,
+                    error=error_msg,
+                    chat_id=chat_id,
+                    session=session,
+                    queue=queue,
+                    turn_state=turn_state,
+                )
 
             truncated_result = _truncate_tool_result(result)
 
             tool_parts.append(LLMFunctionResponsePart(
-                name=feature_name, response=truncated_result, call_id=call_id
+                name=feature_name, response=truncated_result, call_id=call.call_id
             ))
 
             for call_record in step_record["tool_calls"]:
@@ -503,13 +556,31 @@ class GraphVisAgent:
             turn_state=turn_state,
         )
 
-        if decision.action == "deny":
-            # Not an exception: the refusal is handed back as the tool result so
-            # the model reads the reason and can correct itself next iteration.
-            turn_state["tools_blocked"] = turn_state.get("tools_blocked", 0) + 1
+        if decision.action in {"deny", "defer"}:
+            # The decision is handed back as a tool result so the model reads
+            # the reason and can correct itself next iteration.
             reason = decision.reason or "This call was blocked by a policy hook."
-            logger.info(f"Tool '{feature_name}' blocked by {decision.hook_name}: {reason}")
             completed_at = datetime.now(timezone.utc)
+            if decision.action == "defer":
+                turn_state["tools_deferred"] = turn_state.get("tools_deferred", 0) + 1
+                logger.info(
+                    "Tool '%s' deferred by %s: %s",
+                    feature_name,
+                    decision.hook_name,
+                    reason,
+                )
+                await self._emit_tool_event(queue, feature_name, "deferred", reason)
+                return (
+                    {"deferred": True, "reason": reason},
+                    "deferred",
+                    None,
+                    feature_name,
+                    started_at,
+                    completed_at,
+                )
+
+            turn_state["tools_blocked"] = turn_state.get("tools_blocked", 0) + 1
+            logger.info(f"Tool '{feature_name}' blocked by {decision.hook_name}: {reason}")
             await self._emit_tool_event(queue, feature_name, "failed", reason)
             return (
                 {"error": reason, "blocked_by": decision.hook_name},

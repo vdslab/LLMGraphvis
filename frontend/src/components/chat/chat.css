@@ -280,6 +280,10 @@
   border-left-color: var(--warning-color);
 }
 
+.toolcall--deferred {
+  border-left-color: var(--text-muted);
+}
+
 .toolcall__head {
   display: flex;
   align-items: center;
@@ -316,6 +320,7 @@
 .toolcall__status--completed { color: var(--success-color); }
 .toolcall__status--failed { color: var(--danger-color); }
 .toolcall__status--running { color: var(--warning-color); }
+.toolcall__status--deferred { color: var(--text-muted); }
 
 .toolcall__thought {
   margin-top: 0.375rem;
@@ -325,6 +330,13 @@
   margin: 0.25rem 0 0;
   font-size: 0.75rem;
   color: var(--danger-color);
+  overflow-wrap: break-word;
+}
+
+.toolcall__note {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
   overflow-wrap: break-word;
 }
 
@@ -651,10 +663,10 @@
 .input-request fieldset { min-width: 0; padding: 0; margin: 0; border: 0; }
 .input-request__field { display: grid; gap: 6px; margin-bottom: 14px; }
 .input-request__field label, .input-request legend { font-size: 13px; font-weight: 500; }
-.input-request input:not([type="checkbox"]), .input-request select {
+.input-request input:not([type="checkbox"]), .input-request select, .input-request textarea {
   width: 100%; box-sizing: border-box; min-width: 0;
 }
-.input-request input:not([type="range"]):not([type="checkbox"]), .input-request select {
+.input-request input:not([type="range"]):not([type="checkbox"]), .input-request select, .input-request textarea {
   padding: 8px; border: 1px solid #94a3b8; border-radius: 6px; background: white;
 }
 .input-request .input-request__choices { display: grid; gap: 8px; margin-bottom: 14px; }
@@ -663,3 +675,5 @@
 .input-request button:disabled { opacity: 0.5; cursor: default; }
 .input-request__hint { margin: 10px 0 0; font-size: 12px; color: #64748b; line-height: 1.5; }
 .input-request__error { color: #b91c1c; font-size: 13px; }
+
+.input-request textarea { min-height: 84px; resize: vertical; font: inherit; }

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from common import models
 from app.core.logging import get_logger
 
-from . import engine, emitters, events, history, local_tools, mcp_client, context
+from . import context, emitters, engine, events, history
 from .providers.types import UsageData
 
 logger = get_logger(__name__)
@@ -23,7 +23,11 @@ def _format_exception_message(e: BaseException) -> str:
 
 
 async def process_chat(
-    chat_id: int, user_message: str, db: Session
+    chat_id: int,
+    user_message: str,
+    db: Session,
+    *,
+    resumed_from_input: bool = False,
 ) -> Tuple[str, List[Any], UsageData, str, str]:
     """Process a chat message using the configured LLM provider with function calling."""
     logger.info(f"Processing chat_id={chat_id}, message='{user_message[:50]}...'")
@@ -65,6 +69,7 @@ async def process_chat(
             network_id=network_id,
             context_summary=context_summary,
             user_text=user_message,
+            resumed_from_input=resumed_from_input,
         )
 
         return final_response_text, execution_log, total_usage, agent.provider_name, agent.provider.model_name

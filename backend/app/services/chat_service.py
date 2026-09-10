@@ -298,7 +298,9 @@ async def handle_upload_background(
         await _handle_background_error(chat_id, e, "Error in upload background task")
 
 
-async def handle_process_background(chat_id: int, user_message: str) -> None:
+async def handle_process_background(
+    chat_id: int, user_message: str, resumed_from_input: bool = False
+) -> None:
     """
     Background task to process chat message with LLM.
     Orchestrates the Agent interaction and persists messages.
@@ -316,7 +318,12 @@ async def handle_process_background(chat_id: int, user_message: str) -> None:
             total_usage,
             provider_name,
             model_name,
-        ) = await llm_service.process_chat(chat_id, user_message, db)
+        ) = await llm_service.process_chat(
+            chat_id,
+            user_message,
+            db,
+            resumed_from_input=resumed_from_input,
+        )
 
         # Save Assistant Message
         if final_response_text:

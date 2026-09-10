@@ -82,7 +82,7 @@ loop in `engine.py`:
 | Event | Can |
 |---|---|
 | `TURN_START` | append blocks to the system prompt |
-| `PRE_TOOL` | **allow / modify args / deny** |
+| `PRE_TOOL` | **allow / modify args / defer / deny** |
 | `POST_TOOL` | render, switch the active network |
 | `TOOL_ERROR` | abort the turn (fires on a failure *or* a denial) |
 | `NO_TOOL_CALLS` | request one more round |
@@ -98,7 +98,8 @@ Priority bands, ascending, so lower runs first:
 
 **Ordering is load-bearing**: a new guard belongs in 40–69, a new normalizer in
 10–39. A `deny` is not an exception — the engine records it as the tool result,
-so the model reads the reason and self-corrects. Hooks fail **open**. Rationale:
+so the model reads the reason and self-corrects. Use `defer` for a recoverable
+unmet prerequisite; it does not fire `TOOL_ERROR`. Hooks fail **open**. Rationale:
 `specification/2_Technical_Details/1_Backend.md`.
 
 Adding a hook: write it in `hooks/builtin/`, decorate with `@hook(...)`, and add

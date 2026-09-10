@@ -119,7 +119,7 @@ class HookRegistry:
 
         - `modify` updates `ctx.args` in place and dispatch continues, so later
           hooks validate the corrected arguments.
-        - `deny` stops dispatch immediately and wins outright.
+        - `deny` or `defer` stops dispatch immediately and wins outright.
         """
         final = ToolCallDecision.allow()
         notes: List[str] = []
@@ -129,9 +129,13 @@ class HookRegistry:
             if decision is None or decision.action == "allow":
                 continue
 
-            if decision.action == "deny":
+            if decision.action in {"deny", "defer"}:
                 logger.info(
-                    f"Hook '{reg.name}' DENIED {ctx.tool_name}: {decision.reason}"
+                    "Hook '%s' %s %s: %s",
+                    reg.name,
+                    decision.action.upper(),
+                    ctx.tool_name,
+                    decision.reason,
                 )
                 return decision
 

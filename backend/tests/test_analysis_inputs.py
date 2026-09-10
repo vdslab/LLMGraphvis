@@ -57,6 +57,33 @@ def test_form_validates_bounds_options_and_field_ids():
             form.answer_text(values)
 
 
+def test_form_normalizes_model_generated_title_alias():
+    title_only = {
+        "question": "Choose",
+        "fields": [
+            {
+                "id": "goal",
+                "title": "Analysis goal",
+                "kind": "select",
+                "options": ["Centrality", "Community", "Attributes"],
+            }
+        ],
+    }
+    assert InputForm.model_validate(title_only).fields[0].label == "Analysis goal"
+
+    redundant_title = {
+        **title_only,
+        "fields": [
+            {
+                **title_only["fields"][0],
+                "label": "目的",
+                "title": "Long redundant title",
+            }
+        ],
+    }
+    assert InputForm.model_validate(redundant_title).fields[0].label == "目的"
+
+
 def test_question_survives_reload_and_supersedes_previous(db, chat):
     state = {}
     first = present_question(chat.id, db, FORM, state)["input_request"]
@@ -144,6 +171,63 @@ async def test_question_blocks_entire_tool_batch_and_ends_generation(db, chat):
         )
     remote.assert_not_called()
     agent.provider.generate.assert_not_called()
-    assert FORM["question"] in text
+    assert '<tool_execution_marker index="0"/>' in text
+    assert FORM["question"] not in text
     assert [call["name"] for call in log[0]["tool_calls"]] == ["ask_user"]
     assert db.query(models.AnalysisInput).count() == 1
+
+
+def test_other_is_explicit_validated_and_readable():
+    form = InputForm.model_validate(FORM)
+    assert "その他: 二つのクラブを比較" in form.answer_text(
+        {
+            "method": {"other": "二つのクラブを比較"},
+            "iterations": 20,
+        }
+    )
+    for custom in [
+        {"other": " "},
+        {"other": "x", "unexpected": 1},
+        {"other": "x" * 4001},
+    ]:
+        with pytest.raises(ValueError):
+            form.answer_text({"method": custom, "iterations": 20})
+    form.fields[0].allow_other = False
+    with pytest.raises(ValueError):
+        form.answer_text({"method": {"other": "比較"}, "iterations": 20})
+
+
+def test_other_answer_persists_and_duplicate_submission_is_idempotent(db, chat):
+    question = present_question(chat.id, db, FORM, {})["input_request"]
+    values = {"method": {"other": "club別に比較したい"}, "iterations": 20}
+    text = accept_answer(chat, db, question["id"], values, "")
+    db.commit()
+    assert "club別に比較したい" in text
+    assert accept_answer(chat, db, question["id"], values, "") is None
+    stored = db.get(models.AnalysisInput, question["id"])
+    assert stored.answer == values
+
+
+def test_multiselect_can_combine_candidates_with_one_custom_answer():
+    form = InputForm(
+        question="比較",
+        fields=[
+            {
+                "id": "metrics",
+                "kind": "multiselect",
+                "label": "指標",
+                "options": ["次数", "媒介"],
+            }
+        ],
+    )
+    assert "次数, その他: 三角形" in form.answer_text(
+        {"metrics": ["次数", {"other": "三角形"}]}
+    )
+    for values in [
+        ["次数", "次数"],
+        [{"other": "x"}, {"other": "y"}],
+        [{"other": ""}],
+        ["unknown"],
+    ]:
+        with pytest.raises(ValueError):
+            form.answer_text({"metrics": values})

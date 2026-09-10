@@ -1,4 +1,3 @@
-import json
 from typing import List
 
 from fastapi import (
@@ -308,6 +307,7 @@ async def process_message(
         if pending:
             request_id = pending.id
     if request_id is not None:
+        resumed_from_input = True
         try:
             content = accept_answer(
                 chat, db, request_id, request.input_values, content
@@ -321,11 +321,18 @@ async def process_message(
             return {"status": "already_accepted"}
     elif request.input_values is not None:
         raise HTTPException(status_code=409, detail="No active question")
+    else:
+        resumed_from_input = False
 
     db_message = models.ChatMessage(chat_id=chat_id, role="user", content=content)
     db.add(db_message)
     db.commit()
-    background_tasks.add_task(chat_service.handle_process_background, chat_id, content)
+    background_tasks.add_task(
+        chat_service.handle_process_background,
+        chat_id,
+        content,
+        resumed_from_input,
+    )
 
     return {"status": "accepted"}
 

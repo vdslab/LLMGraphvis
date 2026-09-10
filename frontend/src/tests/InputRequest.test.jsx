@@ -56,3 +56,48 @@ describe('InputRequest', () => {
     expect(screen.getByRole('button')).toBeDisabled();
   });
 });
+
+it('offers three candidates plus Other and sends custom text explicitly', async () => {
+  const form = { ...request, fields: [
+    { id: 'goal', label: '分析目的', kind: 'select', options: ['属性', '中心性', 'コミュニティ'] },
+  ] };
+  api.get.mockResolvedValue({ data: form });
+  render(<InputRequest request={form} />);
+  await waitFor(() => expect(screen.getByRole('button')).toBeEnabled());
+  expect(screen.getAllByRole('option')).toHaveLength(5); // placeholder + three + Other
+  fireEvent.change(screen.getByLabelText('分析目的'), { target: { value: '__other__' } });
+  const custom = screen.getByLabelText('分析目的：その他の内容');
+  expect(custom).toBeRequired();
+  fireEvent.click(screen.getByRole('button'));
+  expect(sendMessage).not.toHaveBeenCalled();
+  fireEvent.change(custom, { target: { value: '二つのクラブの橋渡しを比較' } });
+  fireEvent.click(screen.getByRole('button'));
+  await waitFor(() => expect(sendMessage).toHaveBeenCalledWith(
+    expect.stringContaining('その他: 二つのクラブの橋渡しを比較'),
+    { input_request_id: 'question-1', input_values: { goal: { other: '二つのクラブの橋渡しを比較' } } },
+  ));
+  expect(await screen.findByText(/回答済み/)).toHaveTextContent('二つのクラブの橋渡しを比較');
+});
+
+it('discards custom input when switching back to a candidate', async () => {
+  const form = { ...request, fields: [request.fields[0]] };
+  api.get.mockResolvedValue({ data: form });
+  render(<InputRequest request={form} />);
+  await waitFor(() => expect(screen.getByRole('button')).toBeEnabled());
+  fireEvent.change(screen.getByLabelText('分析目的'), { target: { value: '__other__' } });
+  fireEvent.change(screen.getByLabelText('分析目的：その他の内容'), { target: { value: '使わない文章' } });
+  fireEvent.change(screen.getByLabelText('分析目的'), { target: { value: '経路' } });
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button'));
+  await waitFor(() => expect(sendMessage).toHaveBeenCalledWith(
+    expect.not.stringContaining('使わない文章'),
+    { input_request_id: 'question-1', input_values: { method: '経路' } },
+  ));
+});
+
+it('renders a persisted custom answer after reload', async () => {
+  api.get.mockResolvedValue({ data: { ...request, status: 'answered', answer: { method: { other: 'club別の比較' } } } });
+  render(<InputRequest request={request} />);
+  expect(await screen.findByText(/回答済み/)).toHaveTextContent('その他: club別の比較');
+  expect(screen.queryByRole('button')).not.toBeInTheDocument();
+});

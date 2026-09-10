@@ -190,18 +190,31 @@ def guard_attribute_exists(ctx: HookContext) -> Optional[ToolCallDecision]:
             f"user which one they mean rather than picking one."
         )
 
-    hint = ""
     if arg_name == "metric":
-        hint = (
-            " If this is a computed metric, run the matching analysis_* tool "
-            "first — it saves the attribute, and its return message states the "
-            "exact name it used."
+        return ToolCallDecision.defer(
+            f"Ranking was deferred because '{requested}' is not an attribute of "
+            f"this network yet. Available: {_format_candidates(known)}. Run the "
+            "matching analysis_* tool first; it saves the attribute and states "
+            "the exact name in its result. Then call node_get_top_ranked again."
         )
 
     return ToolCallDecision.deny(
         f"'{requested}' is not an attribute of this network, so '{tool_name}' "
-        f"cannot use it. Available: {_format_candidates(known)}.{hint} "
+        f"cannot use it. Available: {_format_candidates(known)}. "
         f"Pick the correct name, or ask the user if none of these is what they meant."
+    )
+
+
+@hook(HookEvent.PRE_TOOL, tools="ask_user", priority=65, name="guard_redundant_question")
+def guard_redundant_question(ctx: HookContext) -> Optional[ToolCallDecision]:
+    """Do not reopen a form after acting on the answer to the prior form."""
+    if not ctx.turn_state.get("resumed_from_input"):
+        return None
+    if ctx.turn_state.get("tools_run", 0) < 1:
+        return None
+    return ToolCallDecision.defer(
+        "The user already answered the active form and the requested analysis has "
+        "run. Do not open another form; summarize the result now."
     )
 
 

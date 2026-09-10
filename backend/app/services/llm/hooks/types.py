@@ -42,7 +42,7 @@ class HookEvent(str, Enum):
     TURN_END = "turn_end"
 
 
-ToolCallAction = Literal["allow", "deny", "modify"]
+ToolCallAction = Literal["allow", "deny", "modify", "defer"]
 
 
 @dataclass
@@ -55,13 +55,16 @@ class ToolCallDecision:
     `{"error": reason, "blocked_by": hook_name}` as the tool result and appends
     it to history like any other result, so the model reads the reason and can
     self-correct on the next iteration.
+
+    `defer` also skips execution, but represents a recoverable unmet
+    prerequisite rather than a failed operation.
     """
 
     action: ToolCallAction = "allow"
     # For "modify": the full replacement args dict.
     args: Optional[Dict[str, Any]] = None
-    # For "deny": shown to the model. For "modify": optional note appended to
-    # the tool result so the model knows its arguments were adjusted.
+    # For "deny"/"defer": shown to the model. For "modify": optional note
+    # appended to the tool result so the model knows its arguments were adjusted.
     reason: Optional[str] = None
     # Filled in by the registry so the model (and the audit log) can see which
     # hook was responsible.
@@ -74,6 +77,10 @@ class ToolCallDecision:
     @classmethod
     def deny(cls, reason: str) -> "ToolCallDecision":
         return cls(action="deny", reason=reason)
+
+    @classmethod
+    def defer(cls, reason: str) -> "ToolCallDecision":
+        return cls(action="defer", reason=reason)
 
     @classmethod
     def modify(
@@ -168,6 +175,7 @@ def new_turn_state(max_iterations: int) -> Dict[str, Any]:
         # Audit tallies surfaced at TURN_END.
         "tools_run": 0,
         "tools_blocked": 0,
+        "tools_deferred": 0,
         "tools_modified": 0,
         "tools_failed": 0,
         # Loop control.

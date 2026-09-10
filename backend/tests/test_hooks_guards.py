@@ -227,7 +227,7 @@ class TestGuardAttributeExists:
             node_attrs=["club"],
         )
         decision = guards.guard_attribute_exists(c)
-        assert decision.action == "deny"
+        assert decision.action == "defer"
         assert "analysis_" in decision.reason
 
     def test_candidate_list_is_truncated(self):
@@ -242,6 +242,26 @@ class TestGuardAttributeExists:
     def test_no_attributes_known_means_no_block(self):
         c = ctx("visualization_set_node_color", {"attribute": "club"}, node_attrs=[])
         assert guards.guard_attribute_exists(c) is None
+
+
+class TestGuardRedundantQuestion:
+    def test_defers_a_second_form_after_answered_analysis(self):
+        state = new_turn_state(10)
+        state["resumed_from_input"] = True
+        state["tools_run"] = 2
+        decision = guards.guard_redundant_question(
+            ctx("ask_user", turn_state=state)
+        )
+        assert decision.action == "defer"
+        assert "summarize" in decision.reason
+
+    def test_allows_clarification_before_any_tool_has_run(self):
+        state = new_turn_state(10)
+        state["resumed_from_input"] = True
+        assert (
+            guards.guard_redundant_question(ctx("ask_user", turn_state=state))
+            is None
+        )
 
 
 # --------------------------------------------------------------------------

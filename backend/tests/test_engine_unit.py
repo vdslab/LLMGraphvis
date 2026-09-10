@@ -204,6 +204,101 @@ async def test_execute_tools_and_update_history(mock_agent, mock_queue):
 
 
 @pytest.mark.asyncio
+async def test_same_batch_analysis_runs_before_ranked_read(mock_agent, mock_queue):
+    """A derived metric must exist before a same-batch tool tries to read it."""
+    execution_order = []
+
+    async def run_tool(name, args, *_args):
+        execution_order.append(name)
+        return ({"content": name}, "completed", None)
+
+    mock_agent._run_tool = AsyncMock(side_effect=run_tool)
+    calls = [
+        FunctionCallData(
+            name="node_get_top_ranked",
+            args={"metric": "degree_centrality", "n": 5},
+            call_id="read_before",
+        ),
+        FunctionCallData(
+            name="analysis_degree_centrality",
+            args={"normalized": True},
+            call_id="calculate",
+        ),
+        FunctionCallData(
+            name="node_get_top_ranked",
+            args={"metric": "degree_centrality", "n": 5},
+            call_id="read_after",
+        ),
+    ]
+    history = []
+    turn_state = new_turn_state(10)
+    turn_state["network_id"] = 1
+
+    step_log = await mock_agent._execute_tools_and_update_history(
+        calls,
+        "",
+        "",
+        history,
+        mock_queue,
+        chat_id=1,
+        turn_state=turn_state,
+        session=None,
+    )
+
+    assert execution_order == [
+        "analysis_degree_centrality",
+        "node_get_top_ranked",
+        "node_get_top_ranked",
+    ]
+    assert [call["name"] for call in step_log["tool_calls"]] == execution_order
+    assert [part.call_id for part in history[1].parts] == [
+        "calculate",
+        "read_before",
+        "read_after",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_post_tool_hook_finishes_before_next_tool(mock_agent, mock_queue):
+    """Active-network and render hooks take effect before a dependent call."""
+    events = []
+
+    async def run_with_events(name, *_args):
+        events.append(f"run:{name}")
+        return ({"content": name}, "completed", None, name, None, None)
+
+    async def dispatch_hook(_event, *, tool_name, **_kwargs):
+        events.append(f"hook:{tool_name}")
+
+    mock_agent._run_tool_with_events = AsyncMock(side_effect=run_with_events)
+    mock_agent._dispatch_tool_hooks = AsyncMock(side_effect=dispatch_hook)
+    calls = [
+        FunctionCallData(name="layout_spring", args={}, call_id="layout"),
+        FunctionCallData(
+            name="visualization_generate", args={}, call_id="render"
+        ),
+    ]
+
+    await mock_agent._execute_tools_and_update_history(
+        calls,
+        "",
+        "",
+        [],
+        mock_queue,
+        chat_id=1,
+        turn_state={"network_id": 1},
+        session=None,
+    )
+
+    assert events == [
+        "run:layout_spring",
+        "hook:layout_spring",
+        "run:visualization_generate",
+        "hook:visualization_generate",
+    ]
+
+
+@pytest.mark.asyncio
 async def test_a_denied_tool_is_never_executed(mock_agent, mock_queue):
     """A PRE_TOOL denial must skip the call and hand the reason back as the result."""
     from app.services.llm.hooks import HookEvent, ToolCallDecision, registry
@@ -230,6 +325,44 @@ async def test_a_denied_tool_is_never_executed(mock_agent, mock_queue):
     assert status == "failed"
     assert result["error"] == "not allowed here"
     assert result["blocked_by"] == reg_name
+
+
+@pytest.mark.asyncio
+async def test_a_deferred_tool_is_not_recorded_as_a_failure(mock_agent, mock_queue):
+    """An unmet prerequisite returns guidance without emitting a failed call."""
+    from app.services.llm.hooks import HookEvent, ToolCallDecision, registry
+
+    mock_agent._run_tool = AsyncMock()
+    reg_name = "test_deferring_hook"
+    registry.register(
+        HookEvent.PRE_TOOL,
+        lambda ctx: ToolCallDecision.defer("calculate the metric first"),
+        priority=1,
+        name=reg_name,
+    )
+    state = new_turn_state(10)
+    try:
+        result, status, error, *_ = await mock_agent._run_tool_with_events(
+            "node_get_top_ranked",
+            {"metric": "degree_centrality"},
+            chat_id=1,
+            session=None,
+            queue=mock_queue,
+            turn_state=state,
+        )
+    finally:
+        registry._hooks[HookEvent.PRE_TOOL] = [
+            item
+            for item in registry._hooks[HookEvent.PRE_TOOL]
+            if item.name != reg_name
+        ]
+
+    mock_agent._run_tool.assert_not_called()
+    assert status == "deferred"
+    assert error is None
+    assert result == {"deferred": True, "reason": "calculate the metric first"}
+    assert state["tools_deferred"] == 1
+    assert "deferred" in mock_queue.put.call_args_list[-1].args[0]["data"]
 
 
 @pytest.mark.asyncio

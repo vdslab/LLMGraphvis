@@ -51,13 +51,22 @@ export const useChatConnection = (id, isAuthenticated) => {
                     status: 'completed',
                 });
             } else if (data.status === 'failed') {
-                console.error(`Tool ${data.tool} failed:`, data.error);
+                // A tool-domain failure is part of the agent's recoverable
+                // protocol, not a browser/application error. It remains visible
+                // inline while the model can correct the call.
+                console.warn(`Tool ${data.tool} failed:`, data.error);
                 useChatStore.getState().setRunningTool(null);
 
                 useChatStore.getState().addToolExecutionToStreamingMessage({
                     tool_name: data.tool,
                     status: 'failed',
                     error: data.error
+                });
+            } else if (data.status === 'deferred') {
+                useChatStore.getState().setRunningTool(null);
+                useChatStore.getState().addToolExecutionToStreamingMessage({
+                    tool_name: data.tool,
+                    status: 'deferred',
                 });
             }
         },

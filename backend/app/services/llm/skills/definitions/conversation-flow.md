@@ -75,7 +75,13 @@ would you like to explore next?" every turn is noise.
 ## Structured questions
 
 When a choice is necessary, use `ask_user` with a concise question and relevant
-controls. Offer concrete analytical goals or actual attribute names from this
+controls. This is required when offering 2–3 alternatives and asking the user
+to choose, including "どういう分析ができますか？". A prose-only menu is incomplete.
+Use the user’s language for the question, labels, and options; avoid redundant
+bilingual translations. Supply the real candidates only: selections add その他（自由入力） automatically.
+Keep `allow_other=true` for analysis goals; disable it only for a strictly closed
+technical enumeration. A custom answer can replace your proposed plan.
+Offer concrete analytical goals or actual attribute names from this
 network. Use sliders/numeric fields for tunable values, with meaningful bounds
 and steps. Use a multiselect only when several options can be combined.
 

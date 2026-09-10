@@ -172,3 +172,58 @@ def force_final_summary(ctx: HookContext) -> Optional[None]:
         ),
     )
     return None
+
+
+@hook(HookEvent.NO_TOOL_CALLS, priority=5, name="nudge_choice_ui")
+def nudge_choice_ui(ctx: HookContext) -> None:
+    """Repair a prose-only menu asking for a decision, never execute its options.
+
+    Conservative heuristic: require multiple numbered candidates plus an explicit
+    invitation to choose. A procedure or ordinary explanation must not trigger it.
+    """
+    if ctx.turn_state.get("input_request"):
+        return
+    if ctx.turn_state.get("continuations_granted", 0) >= MAX_CONTINUATIONS:
+        return
+    text = ctx.assistant_text or ""
+    candidates = re.findall(r"(?m)^\s*(?:\*\*)?\d+[.)．、]\s*\S", text)
+    invitation = re.search(
+        r"選んで|選択してください|どれ(?:を|に)|どちら(?:を|に)|ご希望|ご指示|教えてください|"
+        r"\b(?:choose|prefer|which|let me know)\b",
+        text,
+        re.IGNORECASE,
+    )
+    if len(candidates) < 2 or not invitation:
+        return
+    ctx.request_continuation(
+        prompt=(
+            "You offered alternatives and invited the user to choose, but no UI "
+            "was created. Call ask_user now with the concrete candidates in a "
+            "select field. Other/free-text is added automatically. Do not repeat "
+            "the long explanation and do not execute any proposed analysis. "
+            "Wait for the user's answer."
+        ),
+        model_text=text,
+    )
+
+
+@hook(HookEvent.NO_TOOL_CALLS, priority=1, name="retry_empty_response")
+def retry_empty_response(ctx: HookContext) -> None:
+    """Retry once when a provider returns neither text nor tool calls.
+
+    This is especially visible after a structured answer: the answer is saved,
+    but a transient empty model response used to become the misleading fallback
+    "I have processed your request." without doing anything.
+    """
+    if ctx.assistant_text.strip() or ctx.thought_text.strip():
+        return
+    if ctx.turn_state.get("continuations_granted", 0) >= MAX_CONTINUATIONS:
+        return
+    ctx.request_continuation(
+        prompt=(
+            "Your previous response was empty. Continue from the user's latest "
+            "instruction now. If it requests an action, call the necessary tools; "
+            "otherwise answer it directly. Do not claim completion without results."
+        ),
+        model_text="I need to respond to the user's latest instruction.",
+    )

@@ -10,7 +10,21 @@ related_tools: [network_list_node_attributes, network_list_edge_attributes, anal
 An open-ended request ("analyze this network", "show me the important parts") has
 several genuinely different answers. Picking one at random hides the choice from
 the user. Instead, name 2–3 strategies that answer *different questions*, and let
-them choose:
+them choose **through `ask_user`**, never only through a prose list:
+
+Call the tool with `question` and one field: `id="analysis_goal"`,
+`label="分析の目的"`, `kind="select"`, and 2–3 concise, concrete `options`.
+For "どういう分析ができますか？", this form is part of the answer even if the user
+never mentioned UI. Explain the alternatives briefly if helpful, then call the
+tool and stop. `allow_other` defaults to true: the UI adds その他（自由入力）;
+do not spend one of the three candidate slots on "その他".
+
+Example on a graph with `club`: offer "clubごとのつながりを比較",
+"次数で中心的なノードを探す", "構造上のコミュニティを調べる".
+Adapt to the current graph; never invent attributes. A user's free-text answer
+can replace all suggestions. Do not infer that displaying a choice approves it.
+
+The distinct readings are:
 
 - **Structural**: how the graph is organised — community detection, connected
   components, k-core decomposition.

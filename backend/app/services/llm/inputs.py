@@ -11,13 +11,52 @@ from common import models
 
 class InputField(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    id: str = Field(pattern=r"^[a-z][a-z0-9_]{0,39}$")
-    label: str = Field(min_length=1, max_length=160)
-    kind: Literal["select", "multiselect", "slider", "number", "text"]
-    options: list[str] = Field(default_factory=list, max_length=12)
+    id: str = Field(
+        pattern=r"^[a-z][a-z0-9_]{0,39}$",
+        description="Stable field key, lowercase letters/numbers/underscores.",
+    )
+    label: str = Field(
+        min_length=1,
+        max_length=160,
+        description="Short user-facing label in the conversation language.",
+    )
+    kind: Literal["select", "multiselect", "slider", "number", "text"] = Field(
+        description="select for one goal; multiselect for combinable choices; "
+        "slider/number for numeric settings; text for an open question."
+    )
+    options: list[str] = Field(
+        default_factory=list,
+        max_length=12,
+        description="2–12 actual candidates for selection controls. Usually 3 "
+        "for analysis goals. Do not include Other: the UI adds it separately.",
+    )
+    allow_other: bool = Field(
+        default=True,
+        description=(
+            "Selection controls include Other/free-text by default. "
+            "Do not add Other to options. Ignored for non-selection controls."
+        ),
+    )
     minimum: float | None = Field(default=None, allow_inf_nan=False)
     maximum: float | None = Field(default=None, allow_inf_nan=False)
     step: float | None = Field(default=None, gt=0, allow_inf_nan=False)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_title_alias(cls, value):
+        """Accept a common model-generated `title` alias as `label`.
+
+        The advertised schema remains `label`; this normalization only prevents
+        a recoverable chat error when a model adds or substitutes `title`.
+        Unknown keys still fail under ``extra='forbid'``.
+        """
+        if not isinstance(value, dict) or "title" not in value:
+            return value
+        normalized = dict(value)
+        title = normalized.pop("title")
+        if not normalized.get("label"):
+            normalized["label"] = title
+        return normalized
 
     @model_validator(mode="after")
     def check_controls(self):
@@ -42,18 +81,36 @@ class InputField(BaseModel):
                 raise ValueError("Only numeric controls accept bounds/step")
         return self
 
+    def _valid_other(self, value):
+        return (
+            self.allow_other
+            and isinstance(value, dict)
+            and set(value) == {"other"}
+            and isinstance(value["other"], str)
+            and bool(value["other"].strip())
+            and len(value["other"]) <= 4000
+        )
+
     def validate_answer(self, value):
         if self.kind == "select":
-            valid = isinstance(value, str) and value in self.options
+            valid = (
+                isinstance(value, str) and value in self.options
+            ) or self._valid_other(value)
         elif self.kind == "multiselect":
             valid = (
                 isinstance(value, list)
                 and bool(value)
                 and all(
-                    isinstance(item, str) and item in self.options for item in value
+                    (isinstance(item, str) and item in self.options)
+                    or self._valid_other(item)
+                    for item in value
                 )
             )
-            valid = valid and len(value) == len(set(value))
+            valid = valid and (
+                len([item for item in value if isinstance(item, str)])
+                == len({item for item in value if isinstance(item, str)})
+                and sum(isinstance(item, dict) for item in value) <= 1
+            )
         elif self.kind == "text":
             valid = (
                 isinstance(value, str) and bool(value.strip()) and len(value) <= 4000
@@ -73,6 +130,14 @@ class InputField(BaseModel):
         return value
 
 
+def format_answer(value):
+    if isinstance(value, dict):
+        return f"その他: {value['other']}"
+    if isinstance(value, list):
+        return ", ".join(format_answer(item) for item in value)
+    return str(value)
+
+
 class InputForm(BaseModel):
     model_config = ConfigDict(extra="forbid")
     question: str = Field(min_length=1, max_length=500)
@@ -90,7 +155,7 @@ class InputForm(BaseModel):
         lines = [self.question]
         for field in self.fields:
             value = field.validate_answer(values[field.id])
-            text = ", ".join(value) if isinstance(value, list) else str(value)
+            text = format_answer(value)
             lines.append(f"{field.label}: {text}")
         return "\n".join(lines)
 
