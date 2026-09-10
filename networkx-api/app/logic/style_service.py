@@ -1,7 +1,7 @@
+import unicodedata
 from typing import Any, Dict, List, Set, Tuple
 
 from app.logic import common_utils as utils
-
 
 DEFAULT_NODE_GRADIENT = ["#C6DBEF", "#6BAED6", "#08306B"]
 DEFAULT_EDGE_GRADIENT = ["#CCCCCC", "#000000"]
@@ -11,6 +11,59 @@ class StyleService:
     """
     Service to handle all styling logic for determining node/edge size, color, and opacity.
     """
+
+    @staticmethod
+    def _category_key(value: str) -> str:
+        """Return a conservative key for resolving trivial category variations."""
+        normalized = unicodedata.normalize("NFKC", value).casefold()
+        return "".join(char for char in normalized if char.isalnum())
+
+    @classmethod
+    def reconcile_categorical_mapping(
+        cls, provided_map: Dict[str, str], actual_values: Set[str]
+    ) -> Dict[str, str]:
+        """Match explicit color keys to categories that actually exist.
+
+        Exact values win. A unique match after case/spacing/punctuation
+        normalization is corrected to the stored value. Unknown or ambiguous
+        keys are rejected so they cannot become phantom legend entries while
+        the real category is silently auto-colored.
+        """
+        if not provided_map or not actual_values:
+            return provided_map.copy()
+
+        by_key: Dict[str, List[str]] = {}
+        for value in actual_values:
+            by_key.setdefault(cls._category_key(value), []).append(value)
+
+        reconciled: Dict[str, str] = {}
+        invalid: List[str] = []
+        for requested, color in provided_map.items():
+            if requested in actual_values:
+                resolved = requested
+            else:
+                matches = by_key.get(cls._category_key(requested), [])
+                if len(matches) != 1:
+                    invalid.append(requested)
+                    continue
+                resolved = matches[0]
+
+            if resolved in reconciled and reconciled[resolved] != color:
+                raise ValueError(
+                    f"Multiple colors were supplied for category '{resolved}'. "
+                    "Use each exact category value only once."
+                )
+            reconciled[resolved] = color
+
+        if invalid:
+            supplied = ", ".join(repr(value) for value in sorted(invalid))
+            available = ", ".join(repr(value) for value in sorted(actual_values))
+            raise ValueError(
+                f"Unknown or ambiguous categorical mapping value(s): {supplied}. "
+                f"Available values are: {available}. Use values from the data exactly."
+            )
+
+        return reconciled
 
     @staticmethod
     def collect_required_attributes(configs: List[Dict[str, Any]]) -> Set[str]:
@@ -110,8 +163,6 @@ class StyleService:
             if provided_map is None or not isinstance(provided_map, dict):
                 provided_map = {}
 
-            categorical_color_map = provided_map.copy()
-
             if attr_name in global_node_attr_map:
                 attr_id = global_node_attr_map[attr_name]
 
@@ -122,6 +173,13 @@ class StyleService:
                         val_str = str(attrs[attr_id])
                         value_counts[val_str] = value_counts.get(val_str, 0) + 1
 
+                provided_map = StyleService.reconcile_categorical_mapping(
+                    provided_map, set(value_counts)
+                )
+
+            categorical_color_map = provided_map.copy()
+
+            if attr_name in global_node_attr_map:
                 # Sort by frequency desc
                 sorted_values = sorted(
                     value_counts.keys(), key=lambda k: value_counts[k], reverse=True

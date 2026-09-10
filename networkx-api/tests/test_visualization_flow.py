@@ -166,6 +166,27 @@ def test_color_patterns(db, setup_network):
         for n in nodes:
             assert n["color"] == "red"
 
+        # Trivial formatting differences are resolved against values that
+        # actually occur in the data; the requested spelling never leaks into
+        # the legend as a phantom category.
+        res4 = tools.visualization_set_node_color(
+            network_id=network_id,
+            attribute="country",
+            scale_type="CATEGORICAL",
+            mapping={"Eu.rope": "purple"},
+        )
+        assert res4["legend"]["node_color"]["mapping"] == {"Europe": "purple"}
+        assert all(node["color"] == "purple" for node in res4["nodes"])
+
+        with pytest.raises(RuntimeError, match="Available values.*Europe"):
+            tools.visualization_set_node_color(
+                network_id=network_id,
+                attribute="country",
+                scale_type="CATEGORICAL",
+                mapping={"Asia": "green"},
+            )
+
+
 def test_missing_style_attribute(db, setup_network):
     network_id = setup_network
     

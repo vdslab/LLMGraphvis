@@ -1,3 +1,5 @@
+import pytest
+
 from app.logic.style_service import StyleService
 
 
@@ -79,3 +81,44 @@ def test_resolve_node_color_fallback():
     )
 
     assert color == "gray"
+
+
+def test_categorical_mapping_corrects_unique_spacing_variation():
+    config = {
+        "scale_type": "CATEGORICAL",
+        "attribute": "club",
+        "color_map": {"Mr.Hi": "#800080", "Officer": "#008000"},
+    }
+    attr_map = {"club": 1}
+    values_map = {1: {1: "Mr. Hi"}, 2: {1: "Officer"}}
+
+    result = StyleService.prepare_categorical_map(config, attr_map, values_map)
+
+    assert result == {"Mr. Hi": "#800080", "Officer": "#008000"}
+    assert config["color_map"] == result
+
+
+def test_categorical_mapping_rejects_values_absent_from_data():
+    config = {
+        "scale_type": "CATEGORICAL",
+        "attribute": "club",
+        "color_map": {"Unknown club": "#800080"},
+    }
+    attr_map = {"club": 1}
+    values_map = {1: {1: "Mr. Hi"}, 2: {1: "Officer"}}
+
+    with pytest.raises(ValueError, match="Available values.*'Mr. Hi'.*'Officer'"):
+        StyleService.prepare_categorical_map(config, attr_map, values_map)
+
+
+def test_categorical_mapping_rejects_ambiguous_normalized_match():
+    config = {
+        "scale_type": "CATEGORICAL",
+        "attribute": "group",
+        "color_map": {"AB": "#800080"},
+    }
+    attr_map = {"group": 1}
+    values_map = {1: {1: "A B"}, 2: {1: "A-B"}}
+
+    with pytest.raises(ValueError, match="Unknown or ambiguous"):
+        StyleService.prepare_categorical_map(config, attr_map, values_map)
