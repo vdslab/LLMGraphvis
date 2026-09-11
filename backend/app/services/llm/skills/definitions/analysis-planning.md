@@ -2,7 +2,7 @@
 name: analysis-planning
 description: How to turn an open-ended analysis request into concrete strategies, and how to verify attributes exist before relying on them. Load this for "analyze this network" style requests, or before computing a metric or community structure.
 triggers: [analyze, analyse, 分析, 特徴, 傾向, 構造, structure, important, 重要, influential, 中心, community, コミュニティ, クラスタ, cluster, group, グループ, centrality, 中心性, metric, 指標, attribute, 属性]
-related_tools: [network_list_node_attributes, network_list_edge_attributes, analysis_louvain_communities, analysis_greedy_modularity_communities, analysis_label_propagation_communities, ask_user, analysis_degree_centrality, analysis_pagerank, analysis_betweenness_centrality, node_get_top_ranked, analysis_core_number, analysis_triangles, analysis_edge_betweenness, analysis_modularity]
+related_tools: [network_list_node_attributes, network_list_edge_attributes, analysis_louvain_communities, analysis_greedy_modularity_communities, analysis_label_propagation_communities, ask_user, analysis_degree_centrality, analysis_pagerank, analysis_betweenness_centrality, node_get_top_ranked, analysis_core_number, analysis_triangles, analysis_transitivity, analysis_edge_betweenness, analysis_modularity]
 ---
 
 ## Offer distinct readings, not arbitrary ones
@@ -92,8 +92,8 @@ from the ones reported earlier.
 
 1. Run community detection. Read the returned message for the exact saved
    attribute name.
-2. Colour nodes by that exact name with `scale_type='CATEGORICAL'`
-   (see `visual-encoding`).
+2. Load `visual-encoding` so its styling tools become available in the next
+   response, then colour nodes by that exact name with `scale_type='CATEGORICAL'`.
 3. Report the community-to-colour mapping using the hex codes from the legend.
 4. If useful, follow with the size of each community or the nodes bridging them
    (`analysis_betweenness_centrality`).

@@ -2,7 +2,7 @@
 name: layout-tuning
 description: Choosing a layout algorithm and mapping natural-language requests ("spread them out", "use the weights") onto specific layout parameters. Load this whenever node positions are the subject.
 triggers: [layout, レイアウト, 配置, spread, 広げ, 離し, 密, tight, 詰ま, 重な, overlap, 見づら, position, 座標, force, ばね, spring, forceatlas, circular, 円, 円形, kamada, spectral, spiral, tree, 木, 階層, seed, 再現, weight, 重み]
-related_tools: [layout_forceatlas2, layout_spring, layout_kamada_kawai, layout_spectral, layout_circular, layout_shell, layout_spiral, layout_random, layout_arf, layout_bipartite, layout_multipartite, layout_planar, layout_bfs, visualization_generate]
+related_tools: [layout_forceatlas2, layout_spring, layout_kamada_kawai, layout_spectral, layout_circular, layout_shell, layout_spiral, layout_random, layout_arf, layout_bipartite, layout_multipartite, layout_planar, layout_bfs, visualization_generate, visualization_get_state]
 ---
 
 ## Two steps, always
@@ -110,7 +110,7 @@ explicitly wants the same computation redone — "recompute", "try again",
 2. `visualization_generate()`
 3. Ask how they would like nodes encoded — by degree, by community, by an
    existing attribute — rather than assigning colours yourself
-   (see `visual-encoding`).
+   (load `visual-encoding` if they ask you to apply an encoding).
 
 ## Typical procedure: "spread the nodes out more"
 

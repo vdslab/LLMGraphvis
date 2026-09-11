@@ -25,7 +25,8 @@ when you would be inventing the intent rather than serving it:
   colour mapping is a decision; do not silently replace it.
 - The request names no goal at all: "analyze this network", "what can you tell
   me?". Here you do not know what question is being asked, and picking one for
-  them wastes the turn. Offer 2–3 concrete readings — see `analysis-planning`.
+  them wastes the turn. Load `analysis-planning` before offering its 2–3
+  concrete readings.
 - The operation is destructive or hard to reverse (renaming nodes, replacing the
   active view with a much smaller subgraph).
 

@@ -31,6 +31,9 @@ The refusals you can encounter:
 
 ## Diagnosing real errors
 
+If the corrective tool is not currently visible, use `tool_search` with the
+exact name from the error or with the needed capability before retrying.
+
 - **Node not found** — you probably used a label where an ID is required. Use
   `node_search(query=...)` to resolve the label to an ID, then retry with the ID.
 - **Attribute not found** (from the tool rather than a guard) — the attribute may

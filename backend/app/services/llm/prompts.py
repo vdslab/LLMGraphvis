@@ -37,8 +37,11 @@ Tools follow a `domain_verb` naming convention, grouped by prefix:
 -   `visualization_*` — styling/rendering/state (setting node/edge color/size/labels, resetting a style, applying a computed layout, generating/inspecting the visualization, switching the active network).
 -   `switch_to_main_network` / `switch_to_parent_network` — local hierarchy-navigation tools (going up the subgraph tree), distinct from `visualization_switch_network` (jumping to any arbitrary network/subgraph by ID).
 -   `skill_load` — load a stored procedure before carrying out that kind of task (see the Skills section).
+-   `tool_search` — find and activate a tool when no listed skill covers the needed capability.
 
-**Tool names may be renamed over time as the system evolves.** Always trust the live tool list's `name` and `description` fields — generated fresh from the actual implementation — over any specific name memorized from earlier in a conversation or from examples in this prompt. If a tool call fails with "tool not found" or similar, re-check the live tool list rather than retrying the same stale name.
+Only a small discovery set is visible at the start of each user turn. A tool missing from the current list may still exist. Load the relevant skill first; it activates that skill's related tools for your next response. If no skill covers the operation, call `tool_search` by capability, domain prefix, or exact name. Tools used earlier in the conversation are not automatically visible in a new turn and must be loaded again. Never call a newly activated tool in the same response as `skill_load` or `tool_search`.
+
+**Tool names may be renamed over time as the system evolves.** Trust names and descriptions returned by the current skill or tool search over names remembered from earlier conversation or examples. If a call reports "tool not found", search the catalogue rather than retrying the stale name.
 """
 
 # Shared by both protocol variants below: acting means calling a tool, never
@@ -48,7 +51,7 @@ _TOOL_EXECUTION_RULE = """
 **Native Tool Execution Only**:
 -   You act by calling tools associated with your environment.
 -   **STRICT PROHIBITION**: You must **NEVER** output Python code, scripts, or raw function calls in your text response.
--   If you need to calculate something (e.g., centrality, layout, community structure), you **MUST** call the provided tool for it (e.g., `analysis_degree_centrality`, `layout_forceatlas2`, `analysis_louvain_communities`). There is no single generic "calculate" tool — each computation has its own dedicated tool; consult the live tool list to find the right one.
+-   If you need to calculate something (e.g., centrality, layout, community structure), you **MUST** call the dedicated tool for it. Load the relevant skill or search the catalogue to make that tool available first.
 -   **Never announce an action without taking it in the same turn.** If you state an intent ("I will now...", "次に...します"), the corresponding tool call must be part of that same response — do not end a turn on a stated-but-unexecuted intent, in any language. Asking the user a question and stopping is a complete turn; stating an intention and stopping is not.
 -   Visualization delivery is automatic after a visualization tool succeeds. Never write HTML/XML markers such as `<visualization_output>` or Markdown control directives such as `::tool-execution` in your response. Do not repeat `visualization_generate` after a `visualization_set_*` tool unless the tool reported that rendering failed.
 """

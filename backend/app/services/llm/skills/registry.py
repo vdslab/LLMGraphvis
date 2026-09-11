@@ -89,6 +89,7 @@ class SkillRegistry:
             "# Skills\n"
             "Detailed procedures are stored outside this prompt. Load one with "
             "`skill_load(name)` before acting on the kind of request it covers, "
+            "which also makes its related tools available in your next response, "
             "and follow it — the loaded text takes precedence over your general "
             "instincts about how to work with this tool set. Loading is cheap; "
             "guessing at a procedure you have not read is not.\n\n"
@@ -124,7 +125,8 @@ class SkillRegistry:
         names = ", ".join(f"`{s.name}`" for s in matches)
         return (
             f"Skills likely relevant to this request: {names}. "
-            f"Load what you need with `skill_load` before acting."
+            f"Load what you need with `skill_load`; its related tools become "
+            f"available in your next response."
         )
 
 

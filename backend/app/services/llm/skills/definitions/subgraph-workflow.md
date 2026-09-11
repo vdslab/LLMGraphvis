@@ -2,7 +2,7 @@
 name: subgraph-workflow
 description: Extract a network, select the analysis context, lay it out, and render as separate decisions. Load before extracting or switching networks.
 triggers: [subgraph, 部分グラフ, サブグラフ, filter, フィルタ, 絞り, 抽出, extract, focus, フォーカス, 注目, zoom, ズーム, only, のみ, だけ, component, 連結成分, ego, 近傍, neighbor, k-core, コア, 戻, back, parent, 親]
-related_tools: [subgraph_extract_filter, subgraph_extract_nodes, network_select, subgraph_list, analysis_connected_components, visualization_generate, layout_spring, ask_user, switch_to_parent_network, switch_to_main_network]
+related_tools: [subgraph_extract_filter, subgraph_extract_nodes, subgraph_create_from_nodes, subgraph_ego_network, subgraph_k_core, subgraph_community, subgraph_largest_component, subgraph_high_degree_nodes, network_select, subgraph_list, analysis_connected_components, visualization_generate, layout_spring, ask_user, switch_to_parent_network, switch_to_main_network]
 ---
 
 ## Separate selection, extraction, and viewing
