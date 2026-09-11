@@ -2,13 +2,14 @@ import base64
 import json
 import logging
 import os
+import re
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 
 from app.core.logging import get_logger
 
-from . import emitters, hooks, local_tools, mcp_client
+from . import emitters, hooks, local_tools, markup, mcp_client
 from .catalog import DEFAULT_PROVIDER
 from .prompts import build_system_instruction
 from .providers.base import LLMProvider
@@ -87,8 +88,40 @@ AGENT_MAX_ITERATIONS = int(os.getenv("AGENT_MAX_ITERATIONS") or 10)
 hooks.load_builtin_hooks()
 
 
+def _list_cardinality(items: List[Any]) -> int:
+    """Recover the original size of a list truncated by older app versions."""
+    if items and isinstance(items[-1], str):
+        match = re.fullmatch(r"\[(\d+) items omitted for brevity\]", items[-1])
+        if match:
+            return len(items) - 1 + int(match.group(1))
+    return len(items)
+
+
 def _truncate_tool_result(result: Any, max_list_items: int = 15) -> Any:
-    """Recursively truncates large lists in tool results to prevent LLM token overflow."""
+    """Create the compact observation stored in history and shown to the LLM.
+
+    Hooks and SSE receive the original result before this runs. A rendered graph
+    is represented semantically instead of copying node/link rows into every
+    subsequent model request.
+    """
+    if (
+        isinstance(result, dict)
+        and isinstance(result.get("nodes"), list)
+        and isinstance(result.get("links"), list)
+    ):
+        compact = {
+            "rendered": True,
+            "node_count": _list_cardinality(result["nodes"]),
+            "link_count": _list_cardinality(result["links"]),
+        }
+        compact.update(
+            {
+                key: _truncate_tool_result(value, max_list_items)
+                for key, value in result.items()
+                if key not in {"nodes", "links"}
+            }
+        )
+        return compact
     if isinstance(result, list):
         if len(result) > max_list_items:
             truncated = [_truncate_tool_result(item, max_list_items) for item in result[:max_list_items]]
@@ -309,7 +342,7 @@ class GraphVisAgent:
                 await self._emit_usage_update(queue, total_usage, provider_name, self.provider.model_name)
 
             if chunk_thought:
-                full_transcript += f"<thought>{chunk_thought}</thought>\n\n"
+                full_transcript += f"{markup.thought_block(chunk_thought)}\n\n"
             if chunk_text:
                 full_transcript += chunk_text
 
@@ -349,7 +382,7 @@ class GraphVisAgent:
                     current_stream = self.provider.generate(history, all_tools, self.system_instruction)
                     continue
 
-                result_text = full_transcript
+                result_text = markup.sanitize_model_output(full_transcript)
                 if not result_text.strip():
                     return "I have processed your request.", execution_log, total_usage
                 return result_text, execution_log, total_usage
@@ -363,7 +396,7 @@ class GraphVisAgent:
             # Step D: Inject Tool Markers into Transcript and Emit
             if step_log.get("tool_calls"):
                 for _ in step_log["tool_calls"]:
-                    marker = f"\n\n<tool_execution_marker index=\"{tool_call_counter}\"/>\n\n"
+                    marker = f"\n\n{markup.tool_execution_marker(tool_call_counter)}\n\n"
                     full_transcript += marker
                     await self._emit_message_chunk(queue, marker)
                     tool_call_counter += 1
@@ -371,7 +404,11 @@ class GraphVisAgent:
             if turn_state.get("input_request"):
                 # The ask_user marker renders the persisted question itself.
                 # Repeating it as prose adds a second, non-interactive question.
-                return full_transcript, execution_log, total_usage
+                return (
+                    markup.sanitize_model_output(full_transcript),
+                    execution_log,
+                    total_usage,
+                )
 
             # Step E: Honour an abort requested by a hook (e.g. repeated failures
             # of the same tool) before spending another generate() call.
@@ -382,7 +419,11 @@ class GraphVisAgent:
                     f"\n\nI stopped before completing the request: {reason}"
                 )
                 await self._emit_message_chunk(queue, abort_note)
-                return full_transcript + abort_note, execution_log, total_usage
+                return (
+                    markup.sanitize_model_output(full_transcript + abort_note),
+                    execution_log,
+                    total_usage,
+                )
 
             # Step F: Next Generation
             logger.info(f"--- LLM API Request (Iteration {iteration}) ---")
@@ -396,7 +437,7 @@ class GraphVisAgent:
                 total_usage,
             )
 
-        return full_transcript, execution_log, total_usage
+        return markup.sanitize_model_output(full_transcript), execution_log, total_usage
 
     async def _execute_tools_and_update_history(
         self,
@@ -424,7 +465,7 @@ class GraphVisAgent:
         model_parts = []
         model_response_text = ""
         if thought_content:
-            model_response_text += f"<thought>{thought_content}</thought>\n\n"
+            model_response_text += f"{markup.thought_block(thought_content)}\n\n"
         if text_content:
             model_response_text += text_content
         if model_response_text:

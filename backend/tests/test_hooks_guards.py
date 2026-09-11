@@ -507,6 +507,20 @@ class TestIntentHooks:
         intent.nudge_stalled_intent(c)
         assert c.turn_state["continuation"] is None
 
+    def test_nudge_does_not_repeat_an_action_after_a_tool_succeeded(self):
+        state = new_turn_state(10)
+        state["tools_run"] = 1
+        c = ctx(
+            "x",
+            turn_state=state,
+            event=HookEvent.NO_TOOL_CALLS,
+            assistant_text="I will now update the visualization.",
+        )
+
+        intent.nudge_stalled_intent(c)
+
+        assert c.turn_state["continuation"] is None
+
     def test_forced_summary_fires_when_tools_ran_but_nothing_was_said(self):
         state = new_turn_state(10)
         state["tools_run"] = 2

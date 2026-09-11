@@ -24,6 +24,7 @@ from typing import Optional
 
 from app.core.logging import get_logger
 
+from ... import markup
 from ..registry import hook
 from ..types import HookContext, HookEvent
 
@@ -130,6 +131,8 @@ MAX_CONTINUATIONS = 1
 @hook(HookEvent.NO_TOOL_CALLS, priority=10, name="nudge_stalled_intent")
 def nudge_stalled_intent(ctx: HookContext) -> None:
     """The model announced an action but called no tool: ask it to follow through."""
+    if ctx.turn_state.get("tools_run", 0) > 0:
+        return
     if ctx.turn_state.get("continuations_granted", 0) >= MAX_CONTINUATIONS:
         return
     if not detect_stalled_intent(ctx.assistant_text):
@@ -166,7 +169,7 @@ def force_final_summary(ctx: HookContext) -> Optional[None]:
             "and any relevant findings."
         ),
         model_text=(
-            f"<thought>{ctx.thought_text}</thought>"
+            markup.thought_block(ctx.thought_text)
             if ctx.thought_text
             else "I have executed the tools."
         ),

@@ -89,7 +89,12 @@ sequenceDiagram
 
 ## 2.5. インバンド・マークアップ契約
 
-保存されるチャットメッセージは 1 本の Markdown 文字列である。散文でないものは、その文字列の中にタグとして埋め込まれる。`backend/app/services/llm/markup.py` が生成し、`frontend/src/utils/parseMessageContent.js` が解釈する。**この 2 ファイルは 1 つの契約であり、同時に変更する。**
+保存されるチャットメッセージは 1 本の Markdown 文字列である。散文でないものは、
+CommonMark generic directive として埋め込む。`backend/app/services/llm/markup.py` が生成し、
+`frontend/src/utils/parseMessageContent.js` が remark の構文木として解釈する。
+**この 2 ファイルは 1 つの契約であり、同時に変更する。** 旧会話の HTML 風タグは
+読み取り互換としてのみ受理し、新規には生成しない。モデルが本文へ書いた契約外の内部制御タグは
+通常の会話として表示しない（背景は ADR [0009](../4_Decisions/0009-structured-chat-markup-and-tool-observations.md)）。
 
 SSE イベントとの役割分担は次の通り。
 
@@ -100,7 +105,10 @@ SSE イベントとの役割分担は次の通り。
 
 ### 2.5.1. `<thought>` は特別である
 
-`<thought>` はエンジンがモデルの推論の周囲にのみ書き込む。**他のいかなるコードもこのタグを出力してはならない。** 「Thinking」という見出しで提示してよい唯一のブロックがこれであり、2.4.1 と同じ原則をメッセージ本文側で表現したものである。
+`thought` directive はエンジンがモデルの推論の周囲にのみ書き込む。
+**他のいかなるコードもこの directive を出力してはならない。** 「Thinking」という見出しで
+提示してよい唯一のブロックがこれであり、2.4.1 と同じ原則をメッセージ本文側で表現したものである。
+旧会話の `<thought>` は同じ意味として読み取る。
 
 ## 2.6. 状態管理の方針
 

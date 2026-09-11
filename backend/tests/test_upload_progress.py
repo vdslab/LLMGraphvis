@@ -3,7 +3,7 @@
 No model runs during an upload, so labelling "Importing GraphML data…" as the
 agent's reasoning — which is what `thinking_stream` renders as in the UI — told
 the user something untrue. These tests pin the split: fixed steps go out as
-`progress` events and are persisted in a `<steps>` block, and `<thought>` is
+`progress` events and are persisted in a `steps` directive, and `thought` is
 left to the engine.
 """
 
@@ -89,9 +89,9 @@ async def test_last_step_is_reported_finished():
 async def test_saved_message_records_steps_without_claiming_they_were_thought():
     _, content, _ = await _run_upload()
 
-    assert "<steps>" in content
+    assert ":::steps" in content
     assert "Importing GraphML data" in content
-    assert "<thought>" not in content
+    assert ":::thought" not in content
 
 
 @pytest.mark.asyncio
@@ -100,7 +100,7 @@ async def test_overview_is_saved_folded_behind_its_title():
         overview=("Uploaded network — Karate — 34 nodes, 78 edges", "- **Size:** …")
     )
 
-    assert '<collapsible title="Uploaded network — Karate — 34 nodes, 78 edges">' in content
+    assert ':::collapsible{title="Uploaded network — Karate — 34 nodes, 78 edges"}' in content
     assert "- **Size:** …" in content
 
 
@@ -108,7 +108,7 @@ async def test_overview_is_saved_folded_behind_its_title():
 async def test_message_omits_the_collapsible_when_there_is_no_overview():
     _, content, _ = await _run_upload(overview=("", ""))
 
-    assert "<collapsible" not in content
+    assert ":::collapsible" not in content
     assert "Graph uploaded and initialized successfully." in content
 
 

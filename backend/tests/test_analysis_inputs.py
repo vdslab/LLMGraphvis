@@ -171,7 +171,7 @@ async def test_question_blocks_entire_tool_batch_and_ends_generation(db, chat):
         )
     remote.assert_not_called()
     agent.provider.generate.assert_not_called()
-    assert '<tool_execution_marker index="0"/>' in text
+    assert '::tool-execution{index="0"}' in text
     assert FORM["question"] not in text
     assert [call["name"] for call in log[0]["tool_calls"]] == ["ask_user"]
     assert db.query(models.AnalysisInput).count() == 1

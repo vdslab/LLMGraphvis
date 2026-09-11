@@ -1,25 +1,57 @@
-"""In-band markup understood by the chat renderer.
+"""Persistent Markdown directives understood by the chat renderer.
 
 A persisted chat message is a single Markdown string, so anything that is not
-prose is marked up inside it. The frontend splits a message on these tags in
+prose is marked up inside it. The frontend parses these directives in
 `frontend/src/utils/parseMessageContent.js`; the two files are one contract and
 change together.
 
-Tags produced here:
+Directives produced here:
 
-- `<steps>…</steps>`      a fixed pipeline log (one step per line). Rendered as
-                          a collapsed checklist labelled "Steps".
-- `<collapsible title=…>` a section the user can fold away. Used for the upload
-                          overview, which is long and read once.
+- `:::steps`       a fixed pipeline log (one step per line). Rendered as a
+                   collapsed checklist labelled "Steps".
+- `:::collapsible` a section the user can fold away. Used for the upload
+                   overview, which is long and read once.
 
-`<thought>` is *not* here on purpose. It is written by the engine around model
-reasoning only (see engine.py) and is the one block the "Thinking" heading may
-describe — labelling our own progress log as thinking is what this module
-exists to avoid.
+`:::thought` is only produced through `thought_block`, which the engine uses
+around model reasoning. It is the one block the "Thinking" heading may describe.
 """
 
-STEPS_TAG = "steps"
-COLLAPSIBLE_TAG = "collapsible"
+import re
+
+STEPS_DIRECTIVE = "steps"
+COLLAPSIBLE_DIRECTIVE = "collapsible"
+
+_UNSUPPORTED_VISUALIZATION_TAG = re.compile(
+    r"(?:<|&lt;)\s*visualization[_-]output\b[\s\S]*?(?:/?>|/?&gt;)",
+    re.IGNORECASE,
+)
+
+
+def _container_directive(name: str, body: str, attributes: str = "") -> str:
+    """Wrap Markdown in a container directive with a collision-safe fence."""
+    colon_runs = [len(match.group(0)) for match in re.finditer(r"(?m)^:+", body)]
+    fence = ":" * max(3, max(colon_runs, default=0) + 1)
+    return f"{fence}{name}{attributes}\n{body}\n{fence}"
+
+
+def thought_block(body: str) -> str:
+    """Wrap model reasoning in the one directive rendered as Thinking."""
+    return _container_directive("thought", body)
+
+
+def tool_execution_marker(index: int) -> str:
+    """Mark where a persisted tool execution belongs in the transcript."""
+    return f'::tool-execution{{index="{index}"}}'
+
+
+def sanitize_model_output(text: str) -> str:
+    """Remove model-invented internal markers from user-visible prose.
+
+    Visualization delivery is an SSE event, never message markup. Restrict the
+    filter to that exact reserved-looking name so legitimate HTML examples are
+    left untouched.
+    """
+    return _UNSUPPORTED_VISUALIZATION_TAG.sub("", text)
 
 
 def steps_block(steps: list[str]) -> str:
@@ -27,7 +59,7 @@ def steps_block(steps: list[str]) -> str:
     if not steps:
         return ""
     body = "\n".join(steps)
-    return f"<{STEPS_TAG}>{body}</{STEPS_TAG}>"
+    return _container_directive(STEPS_DIRECTIVE, body)
 
 
 def collapsible(title: str, body: str, *, open: bool = False) -> str:
@@ -39,7 +71,8 @@ def collapsible(title: str, body: str, *, open: bool = False) -> str:
     if not body:
         return ""
     safe_title = title.replace('"', "'").replace("\n", " ")
-    attrs = f' title="{safe_title}"'
+    attrs = f'{{title="{safe_title}"'
     if open:
         attrs += ' open="true"'
-    return f"<{COLLAPSIBLE_TAG}{attrs}>\n{body}\n</{COLLAPSIBLE_TAG}>"
+    attrs += "}"
+    return _container_directive(COLLAPSIBLE_DIRECTIVE, body, attrs)

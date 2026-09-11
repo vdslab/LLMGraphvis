@@ -20,6 +20,18 @@ describe('parseMessageContent', () => {
     });
   });
 
+  it('parses new CommonMark thought directives', () => {
+    const blocks = parseMessageContent(
+      'before\n\n:::thought\nI will compute **centrality**\n:::\n\nafter',
+    );
+
+    expect(blocks).toEqual([
+      { type: 'text', content: 'before' },
+      { type: 'thought', content: 'I will compute **centrality**', complete: true },
+      { type: 'text', content: 'after' },
+    ]);
+  });
+
   it('recognizes escaped or loosely formatted thought tags', () => {
     const blocks = parseMessageContent(
       '&lt; Thought &gt;private plan&lt; /Thought &gt;answer',
@@ -42,6 +54,28 @@ describe('parseMessageContent', () => {
     const [block] = parseMessageContent('<steps>Importing\nLaying out\n</steps>');
 
     expect(block.steps).toEqual(['Importing', 'Laying out']);
+  });
+
+  it('reads new steps and collapsible directives', () => {
+    const blocks = parseMessageContent(
+      ':::steps\nImporting\nLaying out\n:::\n\n' +
+        ':::collapsible{title="Uploaded network" open="true"}\n- **Size:** 34\n:::',
+    );
+
+    expect(blocks).toEqual([
+      {
+        type: 'steps',
+        steps: ['Importing', 'Laying out'],
+        complete: true,
+      },
+      {
+        type: 'collapsible',
+        title: 'Uploaded network',
+        open: true,
+        content: '- **Size:** 34',
+        complete: true,
+      },
+    ]);
   });
 
   it('does not report steps as thinking', () => {
@@ -79,6 +113,24 @@ describe('parseMessageContent', () => {
 
     expect(blocks.map((b) => b.type)).toEqual(['text', 'tool', 'text']);
     expect(blocks[1].index).toBe(0);
+  });
+
+  it('keeps directive tool markers in position', () => {
+    const blocks = parseMessageContent(
+      'Computing.\n\n::tool-execution{index="2"}\n\nDone.',
+    );
+
+    expect(blocks.map((b) => b.type)).toEqual(['text', 'tool', 'text']);
+    expect(blocks[1].index).toBe(2);
+  });
+
+  it('hides invented visualization output tags from current and old messages', () => {
+    expect(parseMessageContent(
+      'Done.\n\n<visualization_output network_id="642" type="full"/>',
+    )).toEqual([{ type: 'text', content: 'Done.' }]);
+    expect(parseMessageContent(
+      '&lt;visualization-output network_id="642"/&gt;Ready.',
+    )).toEqual([{ type: 'text', content: 'Ready.' }]);
   });
 
   it('handles a full turn of interleaved blocks', () => {

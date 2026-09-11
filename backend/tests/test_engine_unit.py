@@ -444,6 +444,43 @@ def test_truncate_tool_result_limits_long_lists():
     assert len(truncated["nested"][0]) == 16
 
 
+def test_truncate_tool_result_compacts_visualization_payload_semantically():
+    result = {
+        "network_id": 42,
+        "nodes": [{"id": i, "label": f"Node {i}"} for i in range(34)],
+        "links": [{"source": 0, "target": i} for i in range(1, 34)],
+        "legend": {"color": {"attribute": "club", "palette": "tableau10"}},
+        "reset": ["node_size"],
+    }
+
+    compact = _truncate_tool_result(result)
+
+    assert compact == {
+        "rendered": True,
+        "node_count": 34,
+        "link_count": 33,
+        "network_id": 42,
+        "legend": {"color": {"attribute": "club", "palette": "tableau10"}},
+        "reset": ["node_size"],
+    }
+    assert "nodes" not in compact
+    assert "links" not in compact
+
+
+def test_visualization_compaction_recovers_counts_from_legacy_truncation():
+    old_result = {
+        "nodes": [{"id": i} for i in range(15)]
+        + ["[19 items omitted for brevity]"],
+        "links": [{"source": 0, "target": i} for i in range(15)]
+        + ["[63 items omitted for brevity]"],
+    }
+
+    compact = _truncate_tool_result(old_result)
+
+    assert compact["node_count"] == 34
+    assert compact["link_count"] == 78
+
+
 # --- retry predicate & retry behavior (Google provider) ---
 
 def test_is_retryable_error():
