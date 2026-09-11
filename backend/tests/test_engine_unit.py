@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from app.services.llm import local_tools
 from app.services.llm.engine import GraphVisAgent, _truncate_tool_result
 from app.services.llm.hooks import new_turn_state
 from app.services.llm.providers.google_genai import (
@@ -12,6 +13,8 @@ from app.services.llm.providers.types import (
     StreamChunk,
     UsageData,
 )
+from app.services.llm.providers.types import ToolDefinition
+from app.services.llm.tool_catalog import ToolCatalog
 
 
 @pytest.fixture
@@ -149,6 +152,71 @@ async def test_loop_grants_only_one_continuation(mock_agent, mock_queue):
 
 
 @pytest.mark.asyncio
+async def test_loop_uses_tools_activated_by_search_on_the_next_generation(
+    mock_agent, mock_queue
+):
+    """Every later provider call receives the turn's newly expanded set."""
+    catalog = ToolCatalog(
+        [
+            ToolDefinition("analysis_pagerank", "Calculate PageRank.", {}),
+            *local_tools.get_local_tools(),
+        ]
+    )
+    state = new_turn_state(10)
+    state["network_id"] = 1
+    catalog.initialize_turn(state)
+    state["presented_tool_names"] = {
+        "skill_load", "tool_search", "ask_user"
+    }
+    calls = [
+        _async_iter([
+            StreamChunk(
+                function_calls=[
+                    FunctionCallData("analysis_pagerank", {}, call_id="run")
+                ]
+            )
+        ]),
+        _async_iter([StreamChunk(text="Done.")]),
+    ]
+    mock_agent.provider.generate = MagicMock(side_effect=calls)
+
+    with patch(
+        "app.services.llm.mcp_client.execute_tool",
+        new_callable=AsyncMock,
+        return_value={"content": "pagerank saved"},
+    ):
+        final, _log, _usage = await mock_agent._execute_tool_loop(
+            initial_stream=_async_iter([
+                StreamChunk(
+                    function_calls=[
+                        FunctionCallData(
+                            "tool_search",
+                            {"query": "analysis_pagerank"},
+                            call_id="search",
+                        )
+                    ]
+                )
+            ]),
+            history=[],
+            all_tools=catalog,
+            queue=mock_queue,
+            chat_id=1,
+            network_id=1,
+            session=None,
+            turn_state=state,
+        )
+
+    exposed_names = [
+        tool.name for tool in mock_agent.provider.generate.call_args_list[0].args[1]
+    ]
+    assert "analysis_pagerank" in exposed_names
+    assert mock_agent.provider.generate.call_count == 2
+    assert state["preparation_tools_run"] == 1
+    assert state["tools_run"] == 1
+    assert final.endswith("Done.")
+
+
+@pytest.mark.asyncio
 async def test_loop_does_not_nudge_a_question_to_the_user(mock_agent, mock_queue):
     """Proposing options and waiting is a complete turn, not a stall."""
     mock_agent.provider.generate = MagicMock()
@@ -208,6 +276,42 @@ async def test_execute_tools_and_update_history(mock_agent, mock_queue):
     assert step_log["tool_calls"][0]["status"] == "completed"
     assert step_log["tool_calls"][0]["call_id"] == "call_1"
     assert step_log["tool_calls"][0]["thought_signature"] == "c2lnbmF0dXJl"
+
+
+@pytest.mark.asyncio
+async def test_same_batch_search_does_not_retroactively_expose_tool(
+    mock_agent, mock_queue
+):
+    catalog = ToolCatalog(
+        [
+            ToolDefinition("analysis_pagerank", "Calculate PageRank.", {}),
+            *local_tools.get_local_tools(),
+        ]
+    )
+    state = new_turn_state(10)
+    state["network_id"] = 1
+    catalog.initialize_turn(state)
+    state["presented_tool_names"] = {
+        "skill_load", "tool_search", "ask_user"
+    }
+    calls = [
+        FunctionCallData(
+            "tool_search", {"query": "analysis_pagerank"}, call_id="search"
+        ),
+        FunctionCallData("analysis_pagerank", {}, call_id="run"),
+    ]
+
+    with patch(
+        "app.services.llm.mcp_client.execute_tool", new_callable=AsyncMock
+    ) as remote:
+        result = await mock_agent._execute_tools_and_update_history(
+            calls, "", "", [], mock_queue, 1, state, None
+        )
+
+    remote.assert_not_called()
+    assert [call["status"] for call in result["tool_calls"]] == [
+        "completed", "deferred"
+    ]
 
 
 @pytest.mark.asyncio

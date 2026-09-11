@@ -23,6 +23,7 @@ from .providers.types import (
     ToolDefinition,
     UsageData,
 )
+from .tool_catalog import ToolCatalog, exposure_mode, tool_definition_bytes
 
 logger = get_logger(__name__)
 load_dotenv()
@@ -265,20 +266,26 @@ class GraphVisAgent:
         self.system_instruction = "\n\n---\n\n".join(sections)
 
         # 1. Prepare Tools
-        all_tools = await self._get_all_tools()
+        tool_catalog = ToolCatalog(await self._get_all_tools())
+        tool_catalog.initialize_turn(turn_state)
+        initial_tools = self._tools_for_generation(
+            tool_catalog, turn_state, iteration=0
+        )
 
         # Log what is being sent to the LLM
         self._log_history(history, iteration=0)
 
         # 2. Initial generation stream
-        initial_stream = self.provider.generate(history, all_tools, self.system_instruction)
+        initial_stream = self.provider.generate(
+            history, initial_tools, self.system_instruction
+        )
 
         # 3. Enter Tool Execution Loop within Session Scope
         async with mcp_client.session_scope() as session:
             final_text, execution_log, total_usage = await self._execute_tool_loop(
                 initial_stream=initial_stream,
                 history=history,
-                all_tools=all_tools,
+                all_tools=tool_catalog,
                 queue=queue,
                 chat_id=chat_id,
                 network_id=network_id,
@@ -302,7 +309,7 @@ class GraphVisAgent:
         self,
         initial_stream: AsyncIterator[StreamChunk],
         history: List[LLMMessage],
-        all_tools: List[ToolDefinition],
+        all_tools: List[ToolDefinition] | ToolCatalog,
         queue: Any,
         chat_id: int,
         network_id: int,
@@ -317,6 +324,12 @@ class GraphVisAgent:
         if turn_state is None:
             turn_state = hooks.new_turn_state(max_iterations)
             turn_state["network_id"] = network_id
+
+        tool_catalog = (
+            all_tools if isinstance(all_tools, ToolCatalog) else ToolCatalog(all_tools)
+        )
+        if "tool_catalog" not in turn_state:
+            tool_catalog.initialize_turn(turn_state)
 
         full_transcript = ""
         execution_log = []
@@ -380,7 +393,12 @@ class GraphVisAgent:
                     history.append(LLMMessage(
                         role="user", parts=[LLMTextPart(text=continuation["prompt"])]
                     ))
-                    current_stream = self.provider.generate(history, all_tools, self.system_instruction)
+                    tools = self._tools_for_generation(
+                        tool_catalog, turn_state, iteration=iteration
+                    )
+                    current_stream = self.provider.generate(
+                        history, tools, self.system_instruction
+                    )
                     continue
 
                 result_text = markup.sanitize_model_output(full_transcript)
@@ -429,7 +447,10 @@ class GraphVisAgent:
             # Step F: Next Generation
             logger.info(f"--- LLM API Request (Iteration {iteration}) ---")
             self._log_history(history, iteration)
-            current_stream = self.provider.generate(history, all_tools, self.system_instruction)
+            tools = self._tools_for_generation(
+                tool_catalog, turn_state, iteration=iteration
+            )
+            current_stream = self.provider.generate(history, tools, self.system_instruction)
 
         if not full_transcript.strip():
             return (
@@ -711,6 +732,27 @@ class GraphVisAgent:
         local_tool_defs = local_tools.get_local_tools()
         return mcp_tools + local_tool_defs
 
+    def _tools_for_generation(
+        self, catalog: ToolCatalog, turn_state: Dict[str, Any], iteration: int
+    ) -> List[ToolDefinition]:
+        tools = catalog.active_tools(turn_state)
+        turn_state["presented_tool_names"] = {tool.name for tool in tools}
+        definition_bytes = tool_definition_bytes(tools)
+        turn_state["last_tool_definition_bytes"] = definition_bytes
+        turn_state["max_tool_definition_bytes"] = max(
+            definition_bytes, turn_state.get("max_tool_definition_bytes", 0)
+        )
+        logger.info(
+            "Tool exposure (iteration=%s): mode=%s tools=%s definition_bytes=%s "
+            "searches=%s",
+            iteration,
+            exposure_mode(),
+            len(tools),
+            definition_bytes,
+            turn_state.get("tool_searches", 0),
+        )
+        return tools
+
     # Emission is shared with the hooks (which have a queue but no agent
     # instance), so the event shapes live in emitters.py. These stay as methods
     # because the loop reads more clearly with them.
@@ -762,15 +804,22 @@ async def execute_tool_loop(
 ):
     """Legacy entry point. Instantiates GraphVisAgent and runs the process."""
     agent = GraphVisAgent(db)
-    all_tools = await agent._get_all_tools()
+    tool_catalog = ToolCatalog(await agent._get_all_tools())
+    turn_state = hooks.new_turn_state(AGENT_MAX_ITERATIONS)
+    turn_state["network_id"] = network_id
+    tool_catalog.initialize_turn(turn_state)
+    initial_tools = agent._tools_for_generation(tool_catalog, turn_state, iteration=0)
 
     async with mcp_client.session_scope() as session:
         return await agent._execute_tool_loop(
-            initial_stream=agent.provider.generate(history, all_tools, agent.system_instruction),
+            initial_stream=agent.provider.generate(
+                history, initial_tools, agent.system_instruction
+            ),
             history=history,
-            all_tools=all_tools,
+            all_tools=tool_catalog,
             queue=queue,
             chat_id=chat_id,
             network_id=network_id,
             session=session,
+            turn_state=turn_state,
         )

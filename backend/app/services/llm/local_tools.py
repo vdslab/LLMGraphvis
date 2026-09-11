@@ -108,13 +108,68 @@ async def skill_load(name: str, turn_state: dict) -> dict:
     if skill.name not in loaded:
         loaded.append(skill.name)
 
+    catalog = turn_state.get("tool_catalog")
+    activated, missing = (
+        catalog.activate(skill.related_tools, turn_state)
+        if catalog is not None
+        else ([], list(skill.related_tools))
+    )
+
     logger.info(f"Skill loaded: {skill.name}")
     return {
         "skill": skill.name,
         "description": skill.description,
         "related_tools": skill.related_tools,
+        "activated_tools": activated,
+        "missing_tools": missing,
+        "activation_note": (
+            "Activated tools are available from the next model response."
+        ),
         "content": skill.body,
     }
+
+
+async def tool_search(query: str, limit: int, offset: int, turn_state: dict) -> dict:
+    """Find and activate tool definitions from the per-turn catalogue."""
+    query = str(query).strip()
+    if not query:
+        return {"error": "query must not be empty"}
+    try:
+        limit = min(max(int(limit), 1), 10)
+        offset = max(int(offset), 0)
+    except (TypeError, ValueError):
+        return {"error": "limit and offset must be integers"}
+    catalog = turn_state.get("tool_catalog")
+    if catalog is None:
+        return {"error": "The tool catalogue is not available for this turn."}
+
+    matches = catalog.search(query)
+    page = matches[offset : offset + limit]
+    activated, _missing = catalog.activate((tool.name for tool in page), turn_state)
+    turn_state["tool_searches"] = turn_state.get("tool_searches", 0) + 1
+    return {
+        "query": query,
+        "results": [
+            {
+                "name": tool.name,
+                "description": _short_description(tool.description),
+            }
+            for tool in page
+        ],
+        "activated_tools": activated,
+        "total": len(matches),
+        "offset": offset,
+        "limit": limit,
+        "has_more": offset + len(page) < len(matches),
+        "activation_note": "Results are available from the next model response.",
+    }
+
+
+def _short_description(description: str, limit: int = 220) -> str:
+    first = " ".join(description.strip().splitlines()).strip()
+    if len(first) <= limit:
+        return first
+    return first[: limit - 1].rstrip() + "…"
 
 
 def _skill_load_definition() -> ToolDefinition:
@@ -131,7 +186,8 @@ def _skill_load_definition() -> ToolDefinition:
         name="skill_load",
         description=(
             "Load the full procedure for a stored skill before carrying out that kind of "
-            "task. Returns Markdown instructions you must then follow. "
+            "task. Returns Markdown instructions you must then follow and activates the "
+            "skill's related tool definitions for your next response. "
             f"Available skills: {listed}."
         ),
         parameters={
@@ -144,6 +200,42 @@ def _skill_load_definition() -> ToolDefinition:
                 }
             },
             "required": ["name"],
+        },
+    )
+
+
+def _tool_search_definition() -> ToolDefinition:
+    return ToolDefinition(
+        name="tool_search",
+        description=(
+            "Search the full tool catalogue and activate matching tool definitions for "
+            "the next response. Use this when no skill covers the operation, a needed "
+            "tool is not currently visible, or a tool name from history must be loaded "
+            "again. Search by capability, domain prefix, or exact tool name. Results "
+            "contain short summaries rather than full schemas."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Non-empty capability, domain prefix, or exact tool name.",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Number of results to activate, from 1 to 10. Defaults to 5.",
+                    "minimum": 1,
+                    "maximum": 10,
+                    "default": 5,
+                },
+                "offset": {
+                    "type": "integer",
+                    "description": "Zero-based result offset for pagination. Defaults to 0.",
+                    "minimum": 0,
+                    "default": 0,
+                },
+            },
+            "required": ["query"],
         },
     )
 
@@ -162,13 +254,20 @@ def get_local_tools() -> list[ToolDefinition]:
             parameters={"type": "object", "properties": {}, "required": []},
         ),
         _skill_load_definition(),
+        _tool_search_definition(),
         _input_definition(),
     ]
 
 
 # Tools handled in-process rather than over MCP. The engine routes on this.
 LOCAL_TOOL_NAMES = frozenset(
-    {"switch_to_main_network", "switch_to_parent_network", "skill_load", "ask_user"}
+    {
+        "switch_to_main_network",
+        "switch_to_parent_network",
+        "skill_load",
+        "tool_search",
+        "ask_user",
+    }
 )
 
 
@@ -190,6 +289,13 @@ async def execute_local_tool(tool_name: str, arguments: dict, context: dict):
         return await switch_to_parent_network(chat_id, db)
     elif tool_name == "skill_load":
         return await skill_load(arguments.get("name", ""), context.get("turn_state") or {})
+    elif tool_name == "tool_search":
+        return await tool_search(
+            arguments.get("query", ""),
+            arguments.get("limit", 5),
+            arguments.get("offset", 0),
+            context.get("turn_state") or {},
+        )
     else:
         raise ValueError(f"Unknown local tool: {tool_name}")
 

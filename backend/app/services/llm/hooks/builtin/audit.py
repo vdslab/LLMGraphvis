@@ -18,13 +18,19 @@ logger = get_logger(__name__)
 # name lists that `guard_attribute_exists` reads. `analysis_*` saves metrics
 # (e.g. `pagerank`, `louvain_community`) and `layout_*` saves `{name}_x`/`_y`.
 _ATTRIBUTE_CREATING_PATTERNS = ("analysis_", "layout_")
+_PREPARATION_TOOLS = frozenset({"skill_load", "tool_search"})
 
 
 @hook(HookEvent.POST_TOOL, tools="*", priority=90, name="audit_tool_success")
 def audit_tool_success(ctx: HookContext) -> None:
-    ctx.turn_state["tools_run"] = ctx.turn_state.get("tools_run", 0) + 1
-
     tool_name = ctx.tool_name or ""
+    if tool_name in _PREPARATION_TOOLS:
+        ctx.turn_state["preparation_tools_run"] = (
+            ctx.turn_state.get("preparation_tools_run", 0) + 1
+        )
+    else:
+        ctx.turn_state["tools_run"] = ctx.turn_state.get("tools_run", 0) + 1
+
     if tool_name.startswith(_ATTRIBUTE_CREATING_PATTERNS):
         # A metric or layout attribute may have just appeared; make the next
         # attribute check re-read the database rather than trust a stale list.
@@ -48,17 +54,22 @@ def audit_turn_summary(ctx: HookContext) -> None:
     ts = ctx.turn_state
     logger.info(
         "Turn summary (chat=%s network=%s): iterations=%s/%s tools_run=%s "
-        "blocked=%s deferred=%s modified=%s failed=%s hook_errors=%s aborted=%s",
+        "preparation=%s searches=%s blocked=%s deferred=%s modified=%s failed=%s "
+        "hook_errors=%s exposed_tools=%s definition_bytes=%s aborted=%s",
         ctx.chat_id,
         ts.get("network_id") or ctx.network_id,
         ts.get("iteration"),
         ts.get("max_iterations"),
         ts.get("tools_run", 0),
+        ts.get("preparation_tools_run", 0),
+        ts.get("tool_searches", 0),
         ts.get("tools_blocked", 0),
         ts.get("tools_deferred", 0),
         ts.get("tools_modified", 0),
         ts.get("tools_failed", 0),
         ts.get("hook_errors", 0),
+        len(ts.get("presented_tool_names", [])),
+        ts.get("last_tool_definition_bytes", 0),
         ts.get("should_abort", False),
     )
     if ts.get("skills_loaded"):

@@ -8,6 +8,8 @@ assert on refusal, not on advice.
 import pytest
 from app.services.llm.hooks.builtin import guards, intent, normalize
 from app.services.llm.hooks.types import HookContext, HookEvent, new_turn_state
+from app.services.llm.providers.types import ToolDefinition
+from app.services.llm.tool_catalog import ToolCatalog
 
 
 class FakeDB:
@@ -591,3 +593,25 @@ class TestCandidateListing:
 
     def test_all_hidden_reports_none(self):
         assert guards._format_candidates(["spring_x", "spring_y"]) == "(none)"
+
+
+def test_unexposed_known_tool_is_deferred():
+    from app.services.llm.hooks.builtin.guards import guard_tool_is_exposed
+    from app.services.llm.hooks.types import HookContext, HookEvent
+
+    catalog = ToolCatalog(
+        [ToolDefinition("skill_load", "", {}), ToolDefinition("analysis_pagerank", "", {})]
+    )
+    state = {}
+    catalog.initialize_turn(state)
+    state["presented_tool_names"] = {"skill_load"}
+    ctx = HookContext(
+        event=HookEvent.PRE_TOOL,
+        chat_id=1,
+        network_id=1,
+        turn_state=state,
+        tool_name="analysis_pagerank",
+    )
+    decision = guard_tool_is_exposed(ctx)
+    assert decision.action == "defer"
+    assert "same response" in decision.reason

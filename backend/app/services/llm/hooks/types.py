@@ -178,6 +178,9 @@ def new_turn_state(max_iterations: int) -> Dict[str, Any]:
         "tools_deferred": 0,
         "tools_modified": 0,
         "tools_failed": 0,
+        # Successful discovery operations are separate from graph actions.
+        "preparation_tools_run": 0,
+        "tool_searches": 0,
         # Loop control.
         "should_abort": False,
         "abort_reason": None,
