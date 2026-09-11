@@ -31,3 +31,11 @@ def test_sanitize_model_output_removes_only_invented_visualization_markers():
     assert markup.sanitize_model_output(
         "&lt;visualization-output network_id=\"42\"/&gt;Ready"
     ) == "Ready"
+
+
+def test_sanitize_model_output_canonicalizes_textual_thinking_protocol():
+    text = "<thought>\nPlan **carefully**\n</thought>\n\nDone."
+
+    assert markup.sanitize_model_output(text) == (
+        ":::thought\nPlan **carefully**\n:::\n\nDone."
+    )

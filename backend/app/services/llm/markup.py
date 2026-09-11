@@ -25,6 +25,11 @@ _UNSUPPORTED_VISUALIZATION_TAG = re.compile(
     r"(?:<|&lt;)\s*visualization[_-]output\b[\s\S]*?(?:/?>|/?&gt;)",
     re.IGNORECASE,
 )
+_LEGACY_THOUGHT_BLOCK = re.compile(
+    r"(?:<|&lt;)\s*thought\s*(?:>|&gt;)([\s\S]*?)"
+    r"(?:(?:<|&lt;)\s*/\s*thought\s*(?:>|&gt;)|$)",
+    re.IGNORECASE,
+)
 
 
 def _container_directive(name: str, body: str, attributes: str = "") -> str:
@@ -45,13 +50,18 @@ def tool_execution_marker(index: int) -> str:
 
 
 def sanitize_model_output(text: str) -> str:
-    """Remove model-invented internal markers from user-visible prose.
+    """Canonicalize reserved model markup before display and persistence.
 
     Visualization delivery is an SSE event, never message markup. Restrict the
     filter to that exact reserved-looking name so legitimate HTML examples are
-    left untouched.
+    left untouched. Textual-thinking providers still emit the legacy tag as
+    their wire protocol; convert it to the persisted Markdown directive here.
     """
-    return _UNSUPPORTED_VISUALIZATION_TAG.sub("", text)
+    without_visualization_tags = _UNSUPPORTED_VISUALIZATION_TAG.sub("", text)
+    return _LEGACY_THOUGHT_BLOCK.sub(
+        lambda match: thought_block(match.group(1).strip()),
+        without_visualization_tags,
+    )
 
 
 def steps_block(steps: list[str]) -> str:
