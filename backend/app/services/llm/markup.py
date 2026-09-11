@@ -30,6 +30,10 @@ _LEGACY_THOUGHT_BLOCK = re.compile(
     r"(?:(?:<|&lt;)\s*/\s*thought\s*(?:>|&gt;)|$)",
     re.IGNORECASE,
 )
+_MODEL_AUTHORED_TOOL_MARKER = re.compile(
+    r"(?m)^[ \t]*::tool-execution\{[^}\n]*\}[ \t]*(?:\n|$)",
+    re.IGNORECASE,
+)
 
 
 def _container_directive(name: str, body: str, attributes: str = "") -> str:
@@ -62,6 +66,12 @@ def sanitize_model_output(text: str) -> str:
         lambda match: thought_block(match.group(1).strip()),
         without_visualization_tags,
     )
+
+
+def sanitize_model_text(text: str) -> str:
+    """Remove engine-owned control markers copied into a model text part."""
+    text = _UNSUPPORTED_VISUALIZATION_TAG.sub("", text)
+    return _MODEL_AUTHORED_TOOL_MARKER.sub("", text)
 
 
 def steps_block(steps: list[str]) -> str:

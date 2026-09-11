@@ -39,3 +39,15 @@ def test_sanitize_model_output_canonicalizes_textual_thinking_protocol():
     assert markup.sanitize_model_output(text) == (
         ":::thought\nPlan **carefully**\n:::\n\nDone."
     )
+
+
+def test_sanitize_model_text_removes_engine_owned_markers_copied_by_model():
+    text = (
+        '::tool-execution{index="0"}\n'
+        '<visualization_output network_id="42"/>\n'
+        '<thought>Keep the supported thinking protocol.</thought>'
+    )
+
+    assert markup.sanitize_model_text(text) == (
+        "\n<thought>Keep the supported thinking protocol.</thought>"
+    )

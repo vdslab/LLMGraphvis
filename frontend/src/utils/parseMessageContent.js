@@ -172,6 +172,7 @@ export function parseMessageContent(content) {
   ].sort((a, b) => a.start - b.start || b.end - a.end);
 
   const blocks = [];
+  const seenToolIndexes = new Set();
   let cursor = 0;
   const pushText = (text) => {
     if (text && text.trim()) blocks.push({ type: 'text', content: text.trim() });
@@ -180,7 +181,14 @@ export function parseMessageContent(content) {
   for (const range of candidates) {
     if (range.start < cursor) continue;
     pushText(source.slice(cursor, range.start));
-    if (range.block) blocks.push(range.block);
+    if (range.block?.type === 'tool') {
+      if (!seenToolIndexes.has(range.block.index)) {
+        blocks.push(range.block);
+        seenToolIndexes.add(range.block.index);
+      }
+    } else if (range.block) {
+      blocks.push(range.block);
+    }
     cursor = range.end;
   }
   pushText(source.slice(cursor));

@@ -332,6 +332,7 @@ class GraphVisAgent:
             chunk_text, chunk_thought, function_calls, iter_usage = await self._consume_stream(
                 current_stream, queue
             )
+            chunk_text = markup.sanitize_model_text(chunk_text)
 
             # Iterations are separate generate() calls, each with its own full input
             # context, so input/cached tokens are SUMMED across iterations.

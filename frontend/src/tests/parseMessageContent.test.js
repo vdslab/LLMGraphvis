@@ -124,6 +124,18 @@ describe('parseMessageContent', () => {
     expect(blocks[1].index).toBe(2);
   });
 
+  it('renders each tool execution index only once if a model copied a marker', () => {
+    const blocks = parseMessageContent(
+      '::tool-execution{index="0"}\n\nThinking.\n\n' +
+        '::tool-execution{index="0"}\n\nDone.',
+    );
+
+    expect(blocks.filter((block) => block.type === 'tool')).toEqual([
+      { type: 'tool', index: 0 },
+    ]);
+    expect(blocks.at(-1)).toEqual({ type: 'text', content: 'Done.' });
+  });
+
   it('hides invented visualization output tags from current and old messages', () => {
     expect(parseMessageContent(
       'Done.\n\n<visualization_output network_id="642" type="full"/>',
