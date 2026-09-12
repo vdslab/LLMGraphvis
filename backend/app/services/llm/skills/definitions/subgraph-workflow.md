@@ -2,7 +2,7 @@
 name: subgraph-workflow
 description: Extract a network, select the analysis context, lay it out, and render as separate decisions. Load before extracting or switching networks.
 triggers: [subgraph, 部分グラフ, サブグラフ, filter, フィルタ, 絞り, 抽出, extract, focus, フォーカス, 注目, zoom, ズーム, only, のみ, だけ, component, 連結成分, ego, 近傍, neighbor, k-core, コア, 戻, back, parent, 親]
-related_tools: [subgraph_extract_filter, subgraph_extract_nodes, subgraph_create_from_nodes, subgraph_ego_network, subgraph_k_core, subgraph_community, subgraph_largest_component, subgraph_high_degree_nodes, network_select, subgraph_list, analysis_connected_components, visualization_generate, layout_spring, ask_user, switch_to_parent_network, switch_to_main_network]
+related_tools: [subgraph_extract_filter, subgraph_extract_nodes, subgraph_create_from_nodes, subgraph_ego_network, subgraph_k_core, subgraph_community, subgraph_largest_component, subgraph_high_degree_nodes, network_select, subgraph_list, visualization_switch_network, analysis_connected_components, visualization_generate, layout_spring, ask_user, switch_to_parent_network, switch_to_main_network]
 ---
 
 ## Separate selection, extraction, and viewing
@@ -45,7 +45,12 @@ before interpreting or mapping them.
 
 ## Return to an earlier network
 
-Use `subgraph_list` to discover saved children. `network_select` changes only
-analysis context; follow it with `visualization_generate` to show the saved view.
-`switch_to_parent_network` and `switch_to_main_network` are legacy shortcuts that
-also render. Explain the scope change without exposing implementation details.
+Use `subgraph_list` to discover saved children.
+- To **switch and view** an existing subgraph immediately, call
+  `visualization_switch_network(network_id=...)`, which updates the active context
+  and re-renders the saved view in one step.
+- Alternatively, `network_select` updates only the analysis context without
+  drawing; follow it with `visualization_generate` to display it.
+- `switch_to_parent_network` and `switch_to_main_network` are local shortcuts
+  that traverse up the hierarchy and also render. Explain the scope change
+  without exposing implementation details.

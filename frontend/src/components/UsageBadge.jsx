@@ -40,15 +40,16 @@ const UsageBadge = () => {
         display: 'inline-flex',
         alignItems: 'center',
         gap: '0.4rem',
-        padding: '0.25rem 0.75rem',
-        backgroundColor: 'var(--background-color)',
-        borderRadius: '999px',
-        border: '1px solid var(--border-color)',
-        fontSize: '0.8rem',
-        color: 'var(--text-secondary)',
+        padding: '0.3125rem 0.75rem',
+        backgroundColor: 'var(--md-sys-color-surface-container-high)',
+        borderRadius: 'var(--md-sys-shape-full)',
+        border: '1px solid var(--md-sys-color-outline-subtle)',
+        fontSize: '0.78125rem',
+        fontWeight: 600,
+        color: 'var(--md-sys-color-on-surface-variant)',
         maxWidth: '100%',
         minWidth: 0,
-        flexShrink: 1
+        flexShrink: 1,
       }}
     >
       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

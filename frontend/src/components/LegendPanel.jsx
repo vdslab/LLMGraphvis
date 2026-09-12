@@ -2,38 +2,42 @@ import { useNetworkStore } from '../stores/networkStore';
 
 const swatchStyle = {
   display: 'inline-block',
-  width: '10px',
-  height: '10px',
-  borderRadius: '3px',
-  marginRight: '6px',
-  border: '1px solid rgba(0,0,0,0.15)',
-  verticalAlign: 'middle'
+  width: '12px',
+  height: '12px',
+  borderRadius: '4px',
+  marginRight: '8px',
+  border: '1px solid rgba(0,0,0,0.12)',
+  verticalAlign: 'middle',
+  flexShrink: 0,
 };
 
 const rowStyle = {
   display: 'flex',
   alignItems: 'center',
-  fontSize: '12px',
-  color: 'var(--text-secondary)',
-  marginBottom: '2px'
+  fontSize: '0.75rem',
+  color: 'var(--md-sys-color-on-surface-variant)',
+  marginBottom: '4px',
 };
 
 const sectionStyle = {
-  marginBottom: '8px'
+  marginBottom: '10px',
 };
 
 const sectionTitleStyle = {
-  fontSize: '11px',
+  fontSize: '0.6875rem',
   fontWeight: 700,
   textTransform: 'uppercase',
-  letterSpacing: '0.02em',
-  color: 'var(--text-secondary)',
-  marginBottom: '4px'
+  letterSpacing: '0.04em',
+  color: 'var(--md-sys-color-outline)',
+  marginBottom: '6px',
 };
 
-const formatValue = (value) => typeof value === 'number'
-  ? Number(value.toPrecision(4)).toLocaleString(undefined, { maximumSignificantDigits: 4 })
-  : value ?? '';
+const formatValue = (value) =>
+  typeof value === 'number'
+    ? Number(value.toPrecision(4)).toLocaleString(undefined, {
+        maximumSignificantDigits: 4,
+      })
+    : value ?? '';
 
 const LegendPanel = () => {
   const legend = useNetworkStore((state) => state.legend);
@@ -48,49 +52,64 @@ const LegendPanel = () => {
 
   return (
     <div
+      className="fade-in"
       style={{
         position: 'absolute',
-        bottom: '10px',
-        left: '10px',
+        bottom: '16px',
+        left: '16px',
         zIndex: 5,
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
-        border: '1px solid var(--border-color)',
-        borderRadius: '8px',
-        padding: '10px 12px',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-        maxWidth: '220px',
-        fontFamily: 'inherit'
+        backgroundColor: 'rgba(255, 255, 255, 0.94)',
+        backdropFilter: 'blur(16px)',
+        border: '1px solid var(--md-sys-color-outline-subtle)',
+        borderRadius: 'var(--md-sys-shape-lg)',
+        padding: '12px 16px',
+        boxShadow: 'var(--md-sys-elevation-2)',
+        maxWidth: '240px',
+        fontFamily: 'inherit',
       }}
     >
-      {nodeColor && (nodeColor.type?.toLowerCase() === 'categorical') && nodeColor.mapping && (
-        <div style={sectionStyle}>
-          <div style={sectionTitleStyle}>Color: {nodeColor.attribute}</div>
-          {nodeColor.palette && (
-            <div style={{ ...rowStyle, fontSize: '11px' }}>
-              Palette: {nodeColor.palette}
-            </div>
-          )}
-          {Object.entries(nodeColor.mapping).map(([category, color]) => (
-            <div key={category} style={rowStyle}>
-              <span style={{ ...swatchStyle, backgroundColor: color }} />
-              <span>{category}</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {nodeColor &&
+        nodeColor.type?.toLowerCase() === 'categorical' &&
+        nodeColor.mapping && (
+          <div style={sectionStyle}>
+            <div style={sectionTitleStyle}>Color: {nodeColor.attribute}</div>
+            {nodeColor.palette && (
+              <div style={{ ...rowStyle, fontSize: '0.6875rem', color: 'var(--md-sys-color-outline)' }}>
+                Palette: {nodeColor.palette}
+              </div>
+            )}
+            {Object.entries(nodeColor.mapping).map(([category, color]) => (
+              <div key={category} style={rowStyle}>
+                <span style={{ ...swatchStyle, backgroundColor: color }} />
+                <span style={{ fontWeight: 500, color: 'var(--md-sys-color-on-surface)' }}>
+                  {category}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
-      {nodeColor && (nodeColor.type?.toLowerCase() === 'linear') && (
+      {nodeColor && nodeColor.type?.toLowerCase() === 'linear' && (
         <div style={sectionStyle}>
           <div style={sectionTitleStyle}>Color: {nodeColor.attribute}</div>
           <div
             style={{
               height: '10px',
-              borderRadius: '4px',
+              borderRadius: 'var(--md-sys-shape-xs)',
               background: `linear-gradient(to right, ${(nodeColor.gradient?.length ? nodeColor.gradient : ['#d3d3d3', '#333333']).join(', ')})`,
-              border: '1px solid rgba(0,0,0,0.15)'
+              border: '1px solid rgba(0,0,0,0.12)',
             }}
           />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: '0.6875rem',
+              color: 'var(--md-sys-color-on-surface-variant)',
+              marginTop: '4px',
+              fontFamily: 'var(--font-family-code)',
+            }}
+          >
             <span>{formatValue(nodeColor.min)}</span>
             <span>{formatValue(nodeColor.max)}</span>
           </div>
@@ -102,7 +121,7 @@ const LegendPanel = () => {
           <div style={sectionTitleStyle}>Size: {nodeSize.attribute}</div>
           {(nodeSize.data_min !== undefined || nodeSize.data_max !== undefined) && (
             <div style={rowStyle}>
-              <span>
+              <span style={{ fontFamily: 'var(--font-family-code)', fontSize: '0.75rem' }}>
                 {formatValue(nodeSize.data_min) || '?'}
                 {' – '}
                 {formatValue(nodeSize.data_max) || '?'}
@@ -115,7 +134,18 @@ const LegendPanel = () => {
       {layout && (
         <div>
           <div style={sectionTitleStyle}>Layout</div>
-          <div style={rowStyle}>{layout}</div>
+          <div
+            style={{
+              ...rowStyle,
+              fontWeight: 600,
+              color: 'var(--md-sys-color-primary)',
+              fontFamily: 'var(--font-family-brand)',
+              fontSize: '0.8125rem',
+              marginBottom: 0,
+            }}
+          >
+            {layout}
+          </div>
         </div>
       )}
     </div>

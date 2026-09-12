@@ -31,7 +31,7 @@ describe('InputRequest', () => {
     expect(screen.getByRole('button')).toBeDisabled();
     await waitFor(() => expect(screen.getByRole('button')).toBeEnabled());
     expect(sendMessage).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText('分析目的'), { target: { value: '経路' } });
+    fireEvent.click(screen.getByLabelText('経路'));
     fireEvent.change(screen.getByLabelText('反復回数'), { target: { value: '30' } });
     fireEvent.click(screen.getByLabelText('次数'));
     fireEvent.click(screen.getByRole('button'));
@@ -64,8 +64,8 @@ it('offers three candidates plus Other and sends custom text explicitly', async 
   api.get.mockResolvedValue({ data: form });
   render(<InputRequest request={form} />);
   await waitFor(() => expect(screen.getByRole('button')).toBeEnabled());
-  expect(screen.getAllByRole('option')).toHaveLength(5); // placeholder + three + Other
-  fireEvent.change(screen.getByLabelText('分析目的'), { target: { value: '__other__' } });
+  expect(screen.getAllByRole('radio')).toHaveLength(4); // three candidates + Other
+  fireEvent.click(screen.getByLabelText('Other (free text)'));
   const custom = screen.getByLabelText('分析目的: Other details');
   expect(custom).toBeRequired();
   fireEvent.click(screen.getByRole('button'));
@@ -76,7 +76,8 @@ it('offers three candidates plus Other and sends custom text explicitly', async 
     expect.stringContaining('Other: 二つのクラブの橋渡しを比較'),
     { input_request_id: 'question-1', input_values: { goal: { other: '二つのクラブの橋渡しを比較' } } },
   ));
-  expect(await screen.findByText(/Answered/)).toHaveTextContent('二つのクラブの橋渡しを比較');
+  expect(await screen.findByText(/Answered/)).toBeInTheDocument();
+  expect(screen.getByText(/二つのクラブの橋渡しを比較/)).toBeInTheDocument();
 });
 
 it('discards custom input when switching back to a candidate', async () => {
@@ -84,9 +85,9 @@ it('discards custom input when switching back to a candidate', async () => {
   api.get.mockResolvedValue({ data: form });
   render(<InputRequest request={form} />);
   await waitFor(() => expect(screen.getByRole('button')).toBeEnabled());
-  fireEvent.change(screen.getByLabelText('分析目的'), { target: { value: '__other__' } });
+  fireEvent.click(screen.getByLabelText('Other (free text)'));
   fireEvent.change(screen.getByLabelText('分析目的: Other details'), { target: { value: '使わない文章' } });
-  fireEvent.change(screen.getByLabelText('分析目的'), { target: { value: '経路' } });
+  fireEvent.click(screen.getByLabelText('経路'));
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button'));
   await waitFor(() => expect(sendMessage).toHaveBeenCalledWith(
@@ -98,7 +99,8 @@ it('discards custom input when switching back to a candidate', async () => {
 it('renders a persisted custom answer after reload', async () => {
   api.get.mockResolvedValue({ data: { ...request, status: 'answered', answer: { method: { other: 'club別の比較' } } } });
   render(<InputRequest request={request} />);
-  expect(await screen.findByText(/Answered/)).toHaveTextContent('Other: club別の比較');
+  expect(await screen.findByText(/Answered/)).toBeInTheDocument();
+  expect(screen.getByText(/Other: club別の比較/)).toBeInTheDocument();
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
 });
 
@@ -109,9 +111,9 @@ it('renders an English conversation without introducing Japanese UI text', async
   api.get.mockResolvedValue({ data: form });
   render(<InputRequest request={form} />);
   await waitFor(() => expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled());
-  expect(screen.getByRole('option', { name: 'Select an option' })).toBeInTheDocument();
-  expect(screen.getByRole('option', { name: 'Other (free text)' })).toBeInTheDocument();
-  fireEvent.change(screen.getByLabelText('Analysis goal'), { target: { value: 'Compare clubs' } });
+  expect(screen.getByRole('radio', { name: 'Other (free text)' })).toBeInTheDocument();
+  expect(screen.queryByRole('option')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByLabelText('Compare clubs'));
   fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
   await waitFor(() => expect(sendMessage).toHaveBeenCalledWith(
     'What would you like to explore?\nAnalysis goal: Compare clubs',

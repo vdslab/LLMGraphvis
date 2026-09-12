@@ -80,7 +80,8 @@ def visualization_set_node_size(
 
     Note: `size` is not a literal pixel radius — it scales with node area, so doubling
     `size` does not double the visible radius. The frontend renders the visible radius
-    as sqrt(size * 10 / π).
+    as sqrt(size * 10 / π). To make nodes appear twice as wide in diameter/radius,
+    roughly quadruple the size or max_size value (~4x area).
 
     Returns:
         dict: The updated visualization object (nodes, links, legend).

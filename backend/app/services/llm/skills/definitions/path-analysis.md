@@ -12,17 +12,20 @@ related_tools: [node_search, analysis_has_path, analysis_shortest_path, analysis
 - How far can we go from A? Use `analysis_single_source_distances`, optionally with a cutoff.
 
 Resolve labels using `node_search`. Ambiguous matches require the user's choice.
-Paths follow outgoing edges when the network is directed; reverse reachability is
-not implied. Previously imported data may need re-importing to recover direction
-that older versions did not preserve.
+Paths follow outgoing edges (source -> target) when the network is directed;
+reverse reachability is not implied unless an explicit return edge exists.
+Undirected networks allow traversal in both directions.
 
 ## Clarify what distance means
 
-Unweighted paths minimize hop count. An edge weight used here is a cost or distance:
-larger values make an edge less desirable. Connection strength is not a cost;
-ask which attribute represents distance if the request or data is ambiguous.
-Never silently invert or substitute a strength attribute. Missing values in a
-selected numeric edge attribute default to one; mention this if it affects interpretation.
+Unweighted paths minimize hop count. In path algorithms, an edge weight is
+interpreted as a **cost or distance**: larger values make an edge less
+desirable (longer). This is the **opposite** of layout or community algorithms,
+where weights represent connection strength (larger = closer/stronger).
+Never pass a connection-strength attribute as a path weight. If the edge
+semantics are ambiguous, ask the user which attribute represents distance or cost.
+Missing values in a selected numeric edge attribute default to 1.0; mention this
+if it affects interpretation.
 
 Dijkstra requires nonnegative costs. Bellman-Ford accepts negative costs, but a
 reachable negative cycle means no finite shortest-path result exists. Explain
