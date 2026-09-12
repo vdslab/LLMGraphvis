@@ -39,13 +39,13 @@ describe('InputRequest', () => {
       expect.stringContaining('反復回数: 30'),
       { input_request_id: 'question-1', input_values: { method: '経路', iterations: 30, metrics: ['次数'] } },
     ));
-    expect(await screen.findByText(/Answered/)).toBeInTheDocument();
+    expect(await screen.findByText(/回答済み/)).toBeInTheDocument();
   });
 
   it('does not allow answering expired requests after reload', async () => {
     api.get.mockResolvedValue({ data: { ...request, status: 'expired' } });
     render(<InputRequest request={request} />);
-    expect(await screen.findByText(/no longer available for the current analysis/)).toBeInTheDocument();
+    expect(await screen.findByText(/この質問は現在の分析では利用できません/)).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
@@ -65,8 +65,8 @@ it('offers three candidates plus Other and sends custom text explicitly', async 
   render(<InputRequest request={form} />);
   await waitFor(() => expect(screen.getByRole('button')).toBeEnabled());
   expect(screen.getAllByRole('radio')).toHaveLength(4); // three candidates + Other
-  fireEvent.click(screen.getByLabelText('Other (free text)'));
-  const custom = screen.getByLabelText('分析目的: Other details');
+  fireEvent.click(screen.getByLabelText('その他（自由記述）'));
+  const custom = screen.getByLabelText('分析目的: その他の内容');
   expect(custom).toBeRequired();
   fireEvent.click(screen.getByRole('button'));
   expect(sendMessage).not.toHaveBeenCalled();
@@ -76,7 +76,7 @@ it('offers three candidates plus Other and sends custom text explicitly', async 
     expect.stringContaining('Other: 二つのクラブの橋渡しを比較'),
     { input_request_id: 'question-1', input_values: { goal: { other: '二つのクラブの橋渡しを比較' } } },
   ));
-  expect(await screen.findByText(/Answered/)).toBeInTheDocument();
+  expect(await screen.findByText(/回答済み/)).toBeInTheDocument();
   expect(screen.getByText(/二つのクラブの橋渡しを比較/)).toBeInTheDocument();
 });
 
@@ -85,8 +85,8 @@ it('discards custom input when switching back to a candidate', async () => {
   api.get.mockResolvedValue({ data: form });
   render(<InputRequest request={form} />);
   await waitFor(() => expect(screen.getByRole('button')).toBeEnabled());
-  fireEvent.click(screen.getByLabelText('Other (free text)'));
-  fireEvent.change(screen.getByLabelText('分析目的: Other details'), { target: { value: '使わない文章' } });
+  fireEvent.click(screen.getByLabelText('その他（自由記述）'));
+  fireEvent.change(screen.getByLabelText('分析目的: その他の内容'), { target: { value: '使わない文章' } });
   fireEvent.click(screen.getByLabelText('経路'));
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button'));
@@ -99,8 +99,8 @@ it('discards custom input when switching back to a candidate', async () => {
 it('renders a persisted custom answer after reload', async () => {
   api.get.mockResolvedValue({ data: { ...request, status: 'answered', answer: { method: { other: 'club別の比較' } } } });
   render(<InputRequest request={request} />);
-  expect(await screen.findByText(/Answered/)).toBeInTheDocument();
-  expect(screen.getByText(/Other: club別の比較/)).toBeInTheDocument();
+  expect(await screen.findByText(/回答済み/)).toBeInTheDocument();
+  expect(screen.getByText(/その他: club別の比較/)).toBeInTheDocument();
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
 });
 
@@ -119,4 +119,17 @@ it('renders an English conversation without introducing Japanese UI text', async
     'What would you like to explore?\nAnalysis goal: Compare clubs',
     { input_request_id: 'question-1', input_values: { analysis_goal: 'Compare clubs' } },
   ));
+});
+
+it('writes the form chrome in the language of the question', async () => {
+  // The question, labels and options arrive in the conversation language; an
+  // English "Other (free text)" card beside Japanese options reads as a
+  // different control rather than as one of the choices.
+  api.get.mockResolvedValue({ data: request });
+  render(<InputRequest request={request} />);
+  await waitFor(() => expect(screen.getByRole('button', { name: '決定' })).toBeEnabled());
+  expect(screen.getByRole('radio', { name: 'その他（自由記述）' })).toBeInTheDocument();
+  expect(screen.getByText('チャットで直接返信することもできます。')).toBeInTheDocument();
+  expect(screen.queryByText(/Other \(free text\)/)).not.toBeInTheDocument();
+  expect(screen.queryByText('Continue')).not.toBeInTheDocument();
 });

@@ -1,9 +1,9 @@
 # AGENTS.md — GraphVisAgent
 
 Chat-driven network visual analytics. The user uploads a GraphML file and drives
-all analysis and visual encoding through conversation; an LLM agent translates
-intent into MCP tool calls against a NetworkX service, and the result is pushed
-to a D3 canvas over SSE. Master's thesis project.
+all analysis and visual encoding through conversation; an LLM agent turns intent
+into MCP tool calls against a NetworkX service, and the result is pushed to a D3
+canvas over SSE. Master's thesis project.
 
 This file is the single source of agent instructions; `CLAUDE.md` and
 `.agent/rules/` point here. Do not duplicate content into them.
@@ -17,7 +17,7 @@ This file is the single source of agent instructions; `CLAUDE.md` and
 | `frontend/` | 5173 | React + D3. Draws what the backend sends; computes nothing |
 | `db` | 5433 → 5432 | Postgres. Models are shared via `common/models.py` |
 
-`common/models.py` is shared by both Python services. Setup: `QUICKSTART.md`.
+Setup: `QUICKSTART.md`.
 
 ## Documentation policy
 
@@ -32,8 +32,8 @@ is how documentation rots.
 
 The test: **can this fact be derived mechanically from the code?** If yes it
 belongs in the code, not in `specification/`. Endpoint tables, tool listings,
-DDL, component inventories and point-in-time counts are exactly what went stale
-before; do not reintroduce them.
+DDL, component inventories and point-in-time counts went stale before; do not
+reintroduce them.
 
 **New features are spec-driven**: write a short ADR in `specification/4_Decisions/`
 (copy `0000-template.md`), implement, then fold the rationale into the relevant
@@ -71,8 +71,12 @@ pulls a full procedure with `skill_load`.
 Adding one: drop a `.md` file in `skills/definitions/`; it is discovered
 automatically. Give it **both English and Japanese triggers** — the app's users
 write Japanese, so an English-only trigger list makes the skill invisible to
-them (`tests/test_skills_loader.py` enforces this). The frontmatter parser
-accepts scalars and string lists only; anything richer belongs in the body.
+them (`tests/test_skills_loader.py` enforces this). The frontmatter parser takes
+scalars and string lists only; anything richer belongs in the body.
+
+Exposure lasts the whole turn and survives an `ask_user` answer (restored from
+`analysis_inputs.activated_tools`, ADR 0014), never the response that activated
+it. Four places tell the model this; change them together.
 
 ### Hooks
 
@@ -88,7 +92,7 @@ loop in `engine.py`:
 | `NO_TOOL_CALLS` | request one more round |
 | `TURN_END` | log the turn summary |
 
-Priority bands, ascending, so lower runs first:
+Priority bands, ascending — lower runs first:
 
 ```
 10-39  normalize     rewrite arguments
@@ -99,14 +103,14 @@ Priority bands, ascending, so lower runs first:
 **Ordering is load-bearing**: a new guard belongs in 40–69, a new normalizer in
 10–39. A `deny` is not an exception — the engine records it as the tool result,
 so the model reads the reason and self-corrects. Use `defer` for a recoverable
-unmet prerequisite; it does not fire `TOOL_ERROR`. Hooks fail **open**. Rationale:
-`specification/2_Technical_Details/1_Backend.md`.
+unmet prerequisite; it does not fire `TOOL_ERROR`. Hooks fail **open**.
+Rationale: `specification/2_Technical_Details/1_Backend.md`.
 
 Adding a hook: write it in `hooks/builtin/`, decorate with `@hook(...)`, and add
 the module to the import list in `registry.load_builtin_hooks()`. Note that
-`app.services.llm.hooks.registry` resolves to the `HookRegistry` *instance*
-exported by the package `__init__`, which shadows the same-named submodule —
-import `load_builtin_hooks` from the package, not the module.
+`app.services.llm.hooks.registry` is the `HookRegistry` *instance* exported by
+the package `__init__`, which shadows the same-named submodule — import
+`load_builtin_hooks` from the package, not the module.
 
 ### What the chat panel is told
 
@@ -121,7 +125,7 @@ ends a turn and calls `chatStore.endTurn()`; `render_update` must not.
 
 **In-band markup** survives into the stored message: `llm/markup.py` lists the
 tags, `frontend/src/utils/parseMessageContent.js` parses them. `<thought>` is
-written by `engine.py` around model reasoning and by nothing else.
+written by `engine.py` and by nothing else.
 
 ## MCP tools
 
@@ -135,55 +139,55 @@ in `backend/.../local_tools.py`: `switch_to_main_network`,
 `@mcp.tool()` + `@handle_tool_errors` and export it from that package's
 `__init__.py`. There is no schema to register by hand — anything telling you to
 edit `backend/app/services/llm_service.py` is stale (that file does not exist).
-Then add a skill *only* if it needs procedural guidance, a hook *only* if it
-needs enforcement.
+Add a skill *only* if it needs procedural guidance, a hook *only* if it needs
+enforcement.
 
-The backend caches discovered tool definitions for `MCP_TOOLS_CACHE_TTL` seconds
-(default 300); call `mcp_client.invalidate_tools_cache()` or wait it out.
+The backend caches tool definitions for `MCP_TOOLS_CACHE_TTL` seconds (default
+300); call `mcp_client.invalidate_tools_cache()` or wait it out.
 
 ### Invariants that are easy to get wrong
 
 The rationale for each is in `specification/2_Technical_Details/3_NetworkXAPI.md`.
 
 - **`size` is an area, not a radius**: the frontend renders
-  `r = sqrt(size * 10 / π)` (`NetworkGraph.jsx`). Also stated in the tool
-  descriptions and `visualization_builder`; keep the three in sync.
+  `r = sqrt(size * 10 / π)` (`NetworkGraph.jsx`). The tool descriptions and
+  `visualization_builder` say so too; keep the three in sync.
 - **Layout, then render.** `layout_*` only stores coordinates; nothing is drawn
   until `visualization_generate`.
 - **Coordinates are renormalized to [-1000, 1000]**, making every layout's
-  `scale`/`center` visually inert. Say so rather than offering them as a zoom.
+  `scale`/`center` visually inert. Say so; never offer them as a zoom.
 - **Layouts are weighted by default, but only from the imported weight.** A
   layout declares what a weight *means* to it (`WeightRole` in
   `logic/layouts/base.py`): `STRENGTH` applies automatically, `DISTANCE` never
   does, `NONE` has no weight parameter. Any *other* numeric edge attribute is
-  offered, never chosen. `weight='<name>'` picks one, `weight='none'` opts out.
-  Weights live in `edges.weight`, never as an EdgeAttribute.
+  offered, never chosen. `weight='<name>'` picks one, `'none'` opts out. Weights
+  live in `edges.weight`, never as an EdgeAttribute.
 - **Styles persist and cannot be cleared by setting them.**
   `visualization_reset_style` is the only way back to uniform.
 - **One layout, one declaration.** Each declares its nx call, parameter
   allowlist, tuning, `WeightRole` and `prepare` step in one `@register` in
   `logic/layouts/`; `logic/layout.py` never branches on a layout name. Adding a
   layout = one `@register`ed function plus its MCP tool.
-- **Derived attribute names** come from the tool's return message — communities
+- **Derived attribute names** come from the tool's return message: communities
   save to `{algorithm}_community`, layouts to `{layout}_x`/`{layout}_y`.
 
 ### MCP resources
 
 `networkx-api/app/mcp/resources.py` serves the `network://…` resources the
 backend reads directly (not via the LLM) to build the system-prompt context and
-post-upload overview in `backend/app/services/llm/context.py`.
+post-upload overview in `llm/context.py`.
 
 - Every resource must pass **`mime_type="application/json"`** (enforced by
   `tests/test_mcp_integration.py`).
 - Resources swallow exceptions into `{"error": ...}`, so one pointed at a renamed
-  helper fails **silently** — it looks like an empty network. That is why
-  `test_resources_return_data_not_errors` runs each against a real DB.
+  helper fails **silently** — it looks like an empty network. Hence
+  `test_resources_return_data_not_errors`, which runs each against a real DB.
 
 ### Deprecated but retained
 
 `network_initialize` (import + a hardcoded layout + render) and
-`visualization_apply_layout` (identical to `visualization_generate`) are kept so
-old conversations do not break. Do not use them in new code.
+`visualization_apply_layout` (same as `visualization_generate`) are kept so old
+conversations do not break. Do not use them in new code.
 
 ## Running and testing
 
@@ -199,14 +203,14 @@ cd frontend      && npm test && npm run lint
 Lint/typecheck config is the single root `pyproject.toml` (ruff line-length 88,
 mypy). The codebase does not fully comply with E501 — long
 `Field(description=...)` strings are the established style in `mcp/tools/`. New
-non-tool modules should be clean. There is **no CI** and no pre-commit config.
+non-tool modules should be clean. There is **no CI** and no pre-commit.
 
 ## Known rough edges
 
 - `mypy` reports pre-existing errors in `common/models.py` (SQLAlchemy
-  `declarative_base` typing) and in the provider/history modules.
+  `declarative_base` typing) and the provider/history modules.
 - Dozens of ad-hoc `verify_*.py` / `repro_*.py` / `debug_*.py` scripts sit under
-  `networkx-api/`, `backend/` and `scripts/`. They are not tests.
+  `networkx-api/`, `backend/` and `scripts/`. Not tests.
 
 ## Secrets and local config
 
@@ -218,7 +222,7 @@ them rather than inlining them.
 `.gemini/settings.json` holds MCP server config, refers to the token as
 `${GITHUB_MCP_PAT}` (Gemini CLI expands `$VAR` and loads the root `.env`), and
 sets `context.fileName` to `AGENTS.md` — without it Gemini CLI looks for a
-`GEMINI.md` that no longer exists. **`.gemini/` is gitignored**, so a fresh
+`GEMINI.md` that is gone. **`.gemini/` is gitignored**, so a fresh
 clone must recreate that setting. **Do not create `.gemini/.env`** — it takes
 precedence over the root `.env` in the same directory and would shadow the
 Google credentials the CLI needs.

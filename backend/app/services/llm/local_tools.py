@@ -87,6 +87,20 @@ async def switch_to_parent_network(chat_id: int, db: Session) -> dict:
         return {"content": f"Failed to switch to parent network: {str(e)}"}
 
 
+# What "activated" actually means, in the one place both tools read it from.
+# `activated_tools` lists only the NEW names, so a second skill_load over an
+# overlapping skill returns an empty list while those tools are in fact usable —
+# `active_tools` is the key to read for "what can I call now".
+ACTIVATION_NOTE = (
+    "Scope: the rest of this turn. Activated tools stay callable in every later "
+    "response of this turn, including after ask_user pauses for an answer. They "
+    "are NOT callable in this same response — the current request's tool list was "
+    "already fixed before this call ran. A new user message that does not answer "
+    "a question starts a new turn and resets the set. `active_tools` is everything "
+    "callable now; `activated_tools` is only what this call added."
+)
+
+
 async def skill_load(name: str, turn_state: dict) -> dict:
     """
     Loads the full text of a skill (a stored procedure for one kind of task).
@@ -121,10 +135,9 @@ async def skill_load(name: str, turn_state: dict) -> dict:
         "description": skill.description,
         "related_tools": skill.related_tools,
         "activated_tools": activated,
+        "active_tools": catalog.active_names(turn_state) if catalog else [],
         "missing_tools": missing,
-        "activation_note": (
-            "Activated tools are available from the next model response."
-        ),
+        "activation_note": ACTIVATION_NOTE,
         "content": skill.body,
     }
 
@@ -157,11 +170,12 @@ async def tool_search(query: str, limit: int, offset: int, turn_state: dict) -> 
             for tool in page
         ],
         "activated_tools": activated,
+        "active_tools": catalog.active_names(turn_state),
         "total": len(matches),
         "offset": offset,
         "limit": limit,
         "has_more": offset + len(page) < len(matches),
-        "activation_note": "Results are available from the next model response.",
+        "activation_note": ACTIVATION_NOTE,
     }
 
 
@@ -187,7 +201,8 @@ def _skill_load_definition() -> ToolDefinition:
         description=(
             "Load the full procedure for a stored skill before carrying out that kind of "
             "task. Returns Markdown instructions you must then follow and activates the "
-            "skill's related tool definitions for your next response. "
+            "skill's related tool definitions for the rest of this turn — from your next "
+            "response onward, and still after an ask_user answer. "
             f"Available skills: {listed}."
         ),
         parameters={
@@ -209,7 +224,8 @@ def _tool_search_definition() -> ToolDefinition:
         name="tool_search",
         description=(
             "Search the full tool catalogue and activate matching tool definitions for "
-            "the next response. Use this when no skill covers the operation, a needed "
+            "the rest of this turn, starting with your next response. Use this when no "
+            "skill covers the operation, a needed "
             "tool is not currently visible, or a tool name from history must be loaded "
             "again. Search by capability, domain prefix, or exact tool name. Results "
             "contain short summaries rather than full schemas."
@@ -301,41 +317,38 @@ async def execute_local_tool(tool_name: str, arguments: dict, context: dict):
 
 
 def _input_definition() -> ToolDefinition:
+    """Build the ask_user schema from the Pydantic model that validates it.
+
+    The schema goes through the same cleaner as an MCP tool's: a Pydantic
+    rendering carries `$defs`, `title` keys and `exclusiveMinimum`, and
+    `google.genai.types.Schema` rejects the last of those outright — which
+    failed the whole request, not just this tool, because `ask_user` is in
+    the initial exposure set.
+    """
     from .inputs import InputForm
+    from .mcp_client import _resolve_schema_refs, _sanitize_schema
 
     schema = InputForm.model_json_schema()
-    definitions = schema.pop("$defs", {})
-
-    def inline(value):
-        if isinstance(value, list):
-            return [inline(item) for item in value]
-        if isinstance(value, dict):
-            if "$ref" in value:
-                return inline(definitions[value["$ref"].split("/")[-1]])
-            return {key: inline(item) for key, item in value.items()}
-        return value
+    schema = _sanitize_schema(_resolve_schema_refs(schema, schema))
 
     return ToolDefinition(
         name="ask_user",
         description=(
             "REQUIRED when asking the user to choose among distinct alternatives (e.g. 'what analyses are possible?'). "
-            "Plain text lists do not display interactive UI controls.\n\n"
-            "Key Rules:\n"
+            "Plain text lists do not display interactive UI controls. The parameter schema defines the shape of "
+            "`fields`; these are the rules the schema cannot state.\n\n"
             "1. Explain in the SAME response: Write ordinary text explaining what each option would show and which visual "
             "channels it assigns. A turn containing only this form gives the user a menu with nothing to judge it by.\n"
-            "2. Single select field for goals: When offering alternative views or goals, pass fields as a list containing "
-            "exactly ONE select field object with 2–4 options (e.g. fields=[{\"id\": \"analysis_goal\", \"label\": \"...\", \"kind\": \"select\", \"options\": [...]}]). "
-            "Put all candidates in its 'options' list; never create multiple fields with one option each, never flatten "
-            "field properties into top-level arguments, and do not split choices across categories.\n"
-            "3. Field keys: Use id, label, kind (never use 'title'). Options require 2–12 distinct items. Other/free-text "
-            "is added automatically (allow_other defaults true), so do not add 'Other' as an option. Sliders require finite "
-            "minimum/maximum.\n"
-            "4. Language: Use the conversation language (e.g. Japanese) for question, labels, and options. Keep technical "
+            "2. One question, one field: alternative views or goals go in a single select field with 2–4 options, never "
+            "one field per candidate and never split across categories. Do not add a separate free-text field — "
+            "selection controls get Other/free-text from the UI.\n"
+            "3. Language: Use the conversation language (e.g. Japanese) for question, labels, and options. Keep technical "
             "IDs and values unchanged.\n"
-            "5. Turn boundary: This ends the turn and waits for an answer. Call it alone: other calls in the same batch are "
-            "deferred. Do not use for direct instructions, refinements of what is on screen, questions you can answer yourself, "
+            "4. Turn boundary: This ends the turn and waits for an answer. Call it alone: other calls in the same batch are "
+            "deferred. The tools you have activated stay available in the turn that handles the answer. Do not use for "
+            "direct instructions, refinements of what is on screen, questions you can answer yourself, "
             "or things already specified. Free-text replies are accepted; treat partial answers ('any', 'you choose') as "
             "valid decisions rather than re-asking. No analysis or view change occurs."
         ),
-        parameters=inline(schema),
+        parameters=schema,
     )

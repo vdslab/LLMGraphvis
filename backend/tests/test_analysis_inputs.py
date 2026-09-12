@@ -7,7 +7,13 @@ from app import schemas
 from app.api.v1.endpoints.chat import get_analysis_input, process_message
 from app.services.llm.engine import GraphVisAgent
 from app.services.llm.inputs import InputForm, accept_answer, present_question
-from app.services.llm.providers.types import FunctionCallData, StreamChunk
+from app.services.llm import local_tools
+from app.services.llm.providers.types import (
+    FunctionCallData,
+    StreamChunk,
+    ToolDefinition,
+)
+from app.services.llm.tool_catalog import ToolCatalog
 from common import models
 
 FORM = {
@@ -353,3 +359,139 @@ def test_multiselect_can_combine_candidates_with_one_custom_answer():
     ]:
         with pytest.raises(ValueError):
             form.answer_text({"metrics": values})
+
+
+def test_asking_records_the_turns_exposure_and_answering_restores_it(db, chat):
+    """The reported friction: a question used to discard the turn's skill_load."""
+    from app.services.llm.inputs import restore_activation
+
+    state = {
+        "enabled_tool_names": {
+            "ask_user",
+            "skill_load",
+            "tool_search",
+            "analysis_betweenness_centrality",
+        }
+    }
+    request = present_question(chat.id, db, FORM, state)["input_request"]
+    row = db.get(models.AnalysisInput, request["id"])
+    assert "analysis_betweenness_centrality" in row.activated_tools
+    # The frontend contract is unchanged: this is backend bookkeeping.
+    assert "activated_tools" not in request
+
+    accept_answer(chat, db, request["id"], {"method": "中心性", "iterations": 20}, "")
+    db.commit()
+
+    assert "analysis_betweenness_centrality" in restore_activation(
+        db, chat.id, chat.network_id
+    )
+
+
+def test_restore_ignores_questions_from_another_network(db, chat):
+    from app.services.llm.inputs import restore_activation
+
+    request = present_question(
+        chat.id, db, FORM, {"enabled_tool_names": {"analysis_pagerank"}}
+    )["input_request"]
+    accept_answer(chat, db, request["id"], {"method": "経路", "iterations": 20}, "")
+    db.commit()
+
+    assert restore_activation(db, chat.id, chat.network_id + 1) == set()
+
+
+def test_unanswered_and_legacy_questions_restore_nothing(db, chat):
+    from app.services.llm.inputs import restore_activation
+
+    present_question(chat.id, db, FORM, {"enabled_tool_names": {"analysis_pagerank"}})
+    # Still pending, never answered.
+    assert restore_activation(db, chat.id, chat.network_id) == set()
+
+    request = present_question(chat.id, db, FORM, {})["input_request"]
+    row = db.get(models.AnalysisInput, request["id"])
+    row.activated_tools = None  # a row written before the column existed
+    accept_answer(chat, db, request["id"], {"method": "経路", "iterations": 20}, "")
+    db.commit()
+    assert restore_activation(db, chat.id, chat.network_id) == set()
+
+
+def test_malformed_fields_return_an_actionable_error_not_a_pydantic_dump(db, chat):
+    result = present_question(
+        chat.id, db, {"question": "どれにしますか？", "fields": "analysis_goal"}, {}
+    )
+    assert "input_request" not in result
+    message = result["error"]
+    assert "fields: Input should be a valid list" in message
+    assert '"kind": "select"' in message
+    assert "type=list_type" not in message
+
+
+@pytest.mark.asyncio
+async def test_answering_turn_reopens_with_the_tools_the_question_had(db, chat):
+    """End to end: ask, answer, and the analysis tool is callable straight away.
+
+    Before this, the answering turn restarted from skill_load/tool_search/
+    ask_user and the model had to buy `analysis_betweenness_centrality` back
+    with a second tool_search.
+    """
+    from contextlib import asynccontextmanager
+
+    catalog_tools = [
+        ToolDefinition(name=name, description=name, parameters={})
+        for name in ("analysis_betweenness_centrality", "visualization_generate")
+    ]
+
+    with patch("app.services.llm.engine._create_provider", return_value=MagicMock()):
+        agent = GraphVisAgent(db=db)
+
+    exposed_per_turn = []
+
+    def record(history, tools, system_instruction):
+        exposed_per_turn.append({t.name for t in tools})
+
+        async def stream():
+            yield StreamChunk(text="done")
+
+        return stream()
+
+    agent.provider.generate.side_effect = record
+    agent.provider.supports_native_thinking = False
+
+    @asynccontextmanager
+    async def no_session():
+        yield None
+
+    with patch(
+        "app.services.llm.mcp_client.get_tools",
+        new_callable=AsyncMock,
+        return_value=catalog_tools,
+    ), patch("app.services.llm.mcp_client.session_scope", no_session), patch(
+        "app.services.llm.context.build_context_summary", return_value=""
+    ):
+        # Turn 1: the model earns the tool, then asks a question.
+        state = {"network_id": chat.network_id}
+        request = None
+
+        async def asking_stream():
+            yield StreamChunk(
+                text="どちらを見ますか。",
+                function_calls=[FunctionCallData(name="ask_user", args=FORM)],
+            )
+
+        catalog = ToolCatalog(catalog_tools + local_tools.get_local_tools())
+        catalog.initialize_turn(state)
+        catalog.activate(["analysis_betweenness_centrality"], state)
+        # What _tools_for_generation would have recorded for that request.
+        state["presented_tool_names"] = set(state["enabled_tool_names"])
+        await agent._execute_tool_loop(
+            asking_stream(), [], catalog, AsyncMock(), chat.id, chat.network_id, None, state
+        )
+        request = db.query(models.AnalysisInput).one()
+        accept_answer(chat, db, request.id, {"method": "中心性", "iterations": 20}, "")
+        db.commit()
+
+        # Turn 2: the answer comes back as a new turn.
+        await agent.process_turn(
+            [], AsyncMock(), chat.id, chat.network_id, resumed_from_input=True
+        )
+
+    assert "analysis_betweenness_centrality" in exposed_per_turn[0]

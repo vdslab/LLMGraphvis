@@ -211,6 +211,13 @@ def _sanitize_schema(schema: dict) -> dict:
         if "items" not in new_schema and prefix_items:
             new_schema["items"] = prefix_items[0]
 
+    # Same story for exclusive bounds: Pydantic renders `gt=0` as
+    # "exclusiveMinimum", which Gemini's Schema type also rejects with
+    # extra_forbidden. The bound is enforced server-side when the arguments are
+    # validated, so dropping it from the advertised schema loses nothing.
+    for bound in ("exclusiveMinimum", "exclusiveMaximum"):
+        new_schema.pop(bound, None)
+
     for key, value in new_schema.items():
         if isinstance(value, dict):
             new_schema[key] = _sanitize_schema(value)

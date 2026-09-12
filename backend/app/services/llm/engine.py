@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 
 from app.core.logging import get_logger
 
-from . import emitters, hooks, local_tools, markup, mcp_client
+from . import emitters, hooks, inputs, local_tools, markup, mcp_client
 from .catalog import DEFAULT_PROVIDER
 from .prompts import build_system_instruction
 from .providers.base import LLMProvider
@@ -267,7 +267,15 @@ class GraphVisAgent:
 
         # 1. Prepare Tools
         tool_catalog = ToolCatalog(await self._get_all_tools())
-        tool_catalog.initialize_turn(turn_state)
+        # An answered question resumes the same task, so this turn starts from
+        # the exposure the asking turn had earned rather than from the three
+        # discovery tools. Every other turn starts fresh. See ADR 0014.
+        restore = (
+            inputs.restore_activation(self.db, chat_id, turn_state["network_id"])
+            if resumed_from_input
+            else None
+        )
+        tool_catalog.initialize_turn(turn_state, restore=restore)
         initial_tools = self._tools_for_generation(
             tool_catalog, turn_state, iteration=0
         )

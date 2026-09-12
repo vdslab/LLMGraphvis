@@ -6,7 +6,7 @@ import re
 from typing import Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from common import models
 
@@ -142,8 +142,21 @@ def format_answer(value):
 
 class InputForm(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    question: str = Field(min_length=1, max_length=500)
-    fields: list[InputField] = Field(min_length=1, max_length=6)
+    question: str = Field(
+        min_length=1,
+        max_length=500,
+        description="The question itself, in the conversation language. The "
+        "explanation of the alternatives belongs in your ordinary text, not here.",
+    )
+    fields: list[InputField] = Field(
+        min_length=1,
+        max_length=6,
+        description="A JSON array of field objects, never a string and never a "
+        "single object. Offering alternative goals takes exactly one select "
+        'field: [{"id": "analysis_goal", "label": "Analysis goal", "kind": '
+        '"select", "options": ["...", "...", "..."]}]. Put every candidate in '
+        "that one field's options; do not create one field per candidate.",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -323,8 +336,33 @@ class InputForm(BaseModel):
         return "\n".join(lines)
 
 
+FIELDS_SHAPE_HINT = (
+    'fields must be a JSON array of field objects, e.g. [{"id": "analysis_goal", '
+    '"label": "Analysis goal", "kind": "select", "options": ["A", "B", "C"]}]. '
+    "Use the keys id, label and kind; selection controls need 2-12 distinct "
+    "options and Other/free-text is added by the UI, so leave it out."
+)
+
+
+def _readable_validation_error(error: ValidationError) -> str:
+    """Turn a pydantic dump into one line the model can act on.
+
+    The raw ValidationError reaches the model verbatim as the tool result
+    (`engine._run_tool`), and its `[type=..., input_value=..., input_type=...]`
+    tail says nothing about the shape that would have worked.
+    """
+    problems = []
+    for detail in error.errors():
+        location = ".".join(str(part) for part in detail["loc"]) or "(root)"
+        problems.append(f"{location}: {detail['msg']}")
+    return "; ".join(problems) + ". " + FIELDS_SHAPE_HINT
+
+
 def present_question(chat_id, db, arguments, turn_state):
-    form = InputForm.model_validate(arguments)
+    try:
+        form = InputForm.model_validate(arguments)
+    except ValidationError as error:
+        return {"error": _readable_validation_error(error)}
     chat = db.query(models.Chat).filter_by(id=chat_id).with_for_update().one()
     db.query(models.AnalysisInput).filter_by(chat_id=chat_id, status="pending").update(
         {"status": "superseded"}
@@ -335,6 +373,10 @@ def present_question(chat_id, db, arguments, turn_state):
         network_id=chat.network_id,
         specification=form.model_dump(),
         status="pending",
+        # Answering resumes this same task in a new turn; without this the turn
+        # would restart from the three discovery tools and have to re-earn the
+        # exposure it already paid for. See ADR 0014.
+        activated_tools=sorted(turn_state.get("enabled_tool_names") or ()),
     )
     db.add(request)
     db.commit()
@@ -355,6 +397,24 @@ def serialize_request(request, active_network_id):
         **request.specification,
         "answer": request.answer,
     }
+
+
+def restore_activation(db, chat_id, active_network_id) -> set[str]:
+    """Tool names exposed when the most recent answered question was asked.
+
+    Called only on a turn that resumes from an answer. A question asked against
+    a different network is ignored: the answer belongs to a view that is no
+    longer active, so its exposure is not the exposure this turn wants.
+    """
+    request = (
+        db.query(models.AnalysisInput)
+        .filter_by(chat_id=chat_id, status="answered", network_id=active_network_id)
+        .order_by(models.AnalysisInput.created_at.desc())
+        .first()
+    )
+    if request is None or not request.activated_tools:
+        return set()
+    return {name for name in request.activated_tools if isinstance(name, str)}
 
 
 def accept_answer(chat, db, request_id, values, content):

@@ -128,3 +128,36 @@ async def test_stream_preserves_function_call_id_and_signature(provider):
     call = result[0].function_calls[0]
     assert call.call_id == "call_456"
     assert call.thought_signature == b"encrypted"
+
+
+def test_local_tool_schemas_survive_gemini_schema_validation(provider):
+    """Local tools bypassed the sanitizer that MCP tool schemas go through.
+
+    `google.genai.types.Schema` forbids unknown keys, so the `exclusiveMinimum`
+    Pydantic emits for `step: Field(gt=0)` in ask_user's schema made the whole
+    FunctionDeclaration list unbuildable — and ask_user is exposed on every
+    turn, so every Gemini turn raised before reaching the API.
+    """
+    from app.services.llm.local_tools import get_local_tools
+
+    definitions = get_local_tools()
+    assert {"ask_user", "skill_load", "tool_search"} <= {t.name for t in definitions}
+
+    declarations = provider._to_gemini_tools(definitions)
+
+    assert len(declarations) == len(definitions)
+    ask_user = next(
+        declaration.function_declarations[0]
+        for declaration in declarations
+        if declaration.function_declarations[0].name == "ask_user"
+    )
+    # The array shape the model has to produce must survive the cleaning.
+    fields = ask_user.parameters.properties["fields"]
+    assert fields.type == "ARRAY"
+    assert fields.items.properties["kind"].enum == [
+        "select",
+        "multiselect",
+        "slider",
+        "number",
+        "text",
+    ]

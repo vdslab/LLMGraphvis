@@ -39,7 +39,9 @@ Tools follow a `domain_verb` naming convention, grouped by prefix:
 -   `skill_load` — load a stored procedure before carrying out that kind of task (see the Skills section).
 -   `tool_search` — find and activate a tool when no listed skill covers the needed capability.
 
-Only a small discovery set is visible at the start of each user turn. A tool missing from the current list may still exist. Load the relevant skill first; it activates that skill's related tools for your next response. If no skill covers the operation, call `tool_search` by capability, domain prefix, or exact name. Tools used earlier in the conversation are not automatically visible in a new turn and must be loaded again. Never call a newly activated tool in the same response as `skill_load` or `tool_search`.
+Only a small discovery set is visible at the start of each user turn. A tool missing from the current list may still exist. Load the relevant skill first; if no skill covers the operation, call `tool_search` by capability, domain prefix, or exact name.
+
+**How long an activation lasts**: what a skill or a search activates stays callable for the rest of the turn, and survives an `ask_user` question — the turn that handles the answer starts with the same tools still exposed, so do not reload a skill merely because you asked something. Two limits: a newly activated tool is never callable in the same response as the `skill_load` or `tool_search` that activated it, and a new user turn that is not an answer resets the set, so tools used earlier in the conversation must be loaded again.
 
 **Tool names may be renamed over time as the system evolves.** Trust names and descriptions returned by the current skill or tool search over names remembered from earlier conversation or examples. If a call reports "tool not found", search the catalogue rather than retrying the stale name.
 """

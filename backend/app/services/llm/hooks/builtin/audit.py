@@ -73,7 +73,8 @@ def audit_turn_summary(ctx: HookContext) -> None:
     logger.info(
         "Turn summary (chat=%s network=%s): iterations=%s/%s tools_run=%s "
         "preparation=%s searches=%s blocked=%s deferred=%s modified=%s failed=%s "
-        "hook_errors=%s exposed_tools=%s definition_bytes=%s aborted=%s",
+        "hook_errors=%s exposed_tools=%s restored_tools=%s definition_bytes=%s "
+        "aborted=%s",
         ctx.chat_id,
         ts.get("network_id") or ctx.network_id,
         ts.get("iteration"),
@@ -87,6 +88,7 @@ def audit_turn_summary(ctx: HookContext) -> None:
         ts.get("tools_failed", 0),
         ts.get("hook_errors", 0),
         len(ts.get("presented_tool_names", [])),
+        len(ts.get("restored_tool_names", [])),
         ts.get("last_tool_definition_bytes", 0),
         ts.get("should_abort", False),
     )

@@ -361,4 +361,8 @@ class AnalysisInput(Base):
     specification = Column(JSON, nullable=False)
     status = Column(String, nullable=False, default="pending")
     answer = Column(JSON, nullable=True)
+    # Tool names exposed to the model when it asked. Answering resumes the same
+    # task in a new turn, so the turn's progressive-disclosure state is restored
+    # from here rather than re-earned with another skill_load. See ADR 0014.
+    activated_tools = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

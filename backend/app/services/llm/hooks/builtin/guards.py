@@ -40,7 +40,9 @@ def guard_tool_is_exposed(ctx: HookContext) -> Optional[ToolCallDecision]:
             f"'{ctx.tool_name}' exists but was not exposed in the current model "
             "request. Load a skill that relates to it or call tool_search with "
             "its exact name, then call it in a later response. A skill or search "
-            "call in this same response does not expose it retroactively."
+            "call in this same response does not expose it retroactively. Once "
+            "exposed it stays callable for the rest of this turn, including "
+            "after an ask_user answer."
         )
     return ToolCallDecision.defer(
         f"'{ctx.tool_name}' is not in the live tool catalogue. Use tool_search "

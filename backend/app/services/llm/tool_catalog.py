@@ -35,14 +35,31 @@ class ToolCatalog:
     def names(self) -> frozenset[str]:
         return frozenset(self._by_name)
 
-    def initialize_turn(self, turn_state: dict) -> None:
+    def initialize_turn(
+        self, turn_state: dict, restore: Iterable[str] | None = None
+    ) -> None:
+        """Seed this turn's exposure set.
+
+        `restore` carries an earlier turn's exposure across an `ask_user`
+        answer, which resumes the same task (ADR 0014). Names that no longer
+        exist in the catalogue are dropped, so a renamed tool degrades to
+        "load it again" rather than to a call that cannot be executed.
+        """
         turn_state["tool_catalog"] = self
         if exposure_mode() == "all":
             enabled = set(self._by_name)
         else:
             enabled = {name for name in INITIAL_TOOL_NAMES if name in self._by_name}
+        restored = {name for name in (restore or ()) if name in self._by_name}
+        enabled |= restored
         turn_state["enabled_tool_names"] = enabled
+        turn_state["restored_tool_names"] = restored
         turn_state["presented_tool_names"] = set()
+
+    def active_names(self, turn_state: dict) -> list[str]:
+        """Every name currently exposed, not just the most recent addition."""
+        enabled = turn_state.get("enabled_tool_names", set())
+        return sorted(name for name in enabled if name in self._by_name)
 
     def active_tools(self, turn_state: dict) -> list[ToolDefinition]:
         enabled = turn_state.get("enabled_tool_names", set())

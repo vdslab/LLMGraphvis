@@ -170,3 +170,73 @@ async def test_skill_load_activates_related_tools(monkeypatch):
 async def test_empty_search_is_rejected():
     result = await local_tools.tool_search("  ", 5, 0, {})
     assert result == {"error": "query must not be empty"}
+
+
+def test_initialize_turn_restores_a_previous_exposure_set(monkeypatch):
+    """An ask_user answer resumes the same task, so it keeps its tools."""
+    monkeypatch.delenv("TOOL_EXPOSURE_MODE", raising=False)
+    catalog = ToolCatalog(
+        [
+            tool("analysis_alpha"),
+            tool("skill_load"),
+            tool("tool_search"),
+            tool("ask_user"),
+        ]
+    )
+    state = {}
+    catalog.initialize_turn(state, restore={"analysis_alpha"})
+    assert state["enabled_tool_names"] == {
+        "analysis_alpha",
+        "skill_load",
+        "tool_search",
+        "ask_user",
+    }
+    assert state["restored_tool_names"] == {"analysis_alpha"}
+    assert [t.name for t in catalog.active_tools(state)] == [
+        "analysis_alpha",
+        "skill_load",
+        "tool_search",
+        "ask_user",
+    ]
+
+
+def test_restoring_a_renamed_tool_degrades_to_loading_it_again(monkeypatch):
+    monkeypatch.delenv("TOOL_EXPOSURE_MODE", raising=False)
+    catalog = ToolCatalog([tool("skill_load"), tool("tool_search"), tool("ask_user")])
+    state = {}
+    catalog.initialize_turn(state, restore={"analysis_under_its_old_name"})
+    assert state["restored_tool_names"] == set()
+    assert "analysis_under_its_old_name" not in state["enabled_tool_names"]
+
+
+def test_turns_that_do_not_resume_start_from_the_discovery_set(monkeypatch):
+    monkeypatch.delenv("TOOL_EXPOSURE_MODE", raising=False)
+    catalog = ToolCatalog(
+        [tool("analysis_alpha"), tool("skill_load"), tool("tool_search"), tool("ask_user")]
+    )
+    state = {"enabled_tool_names": {"analysis_alpha"}}
+    catalog.initialize_turn(state)
+    assert state["enabled_tool_names"] == {"skill_load", "tool_search", "ask_user"}
+
+
+@pytest.mark.asyncio
+async def test_activation_payloads_report_everything_callable(monkeypatch):
+    """`activated_tools` lists only new names; `active_tools` lists all of them."""
+    monkeypatch.delenv("TOOL_EXPOSURE_MODE", raising=False)
+    catalog = ToolCatalog(
+        [
+            tool("analysis_alpha", "metric"),
+            tool("skill_load"),
+            tool("tool_search"),
+            tool("ask_user"),
+        ]
+    )
+    state = {}
+    catalog.initialize_turn(state)
+    first = await local_tools.tool_search("analysis_alpha", 5, 0, state)
+    assert first["activated_tools"] == ["analysis_alpha"]
+
+    second = await local_tools.tool_search("analysis_alpha", 5, 0, state)
+    assert second["activated_tools"] == []
+    assert "analysis_alpha" in second["active_tools"]
+    assert "this same response" in second["activation_note"]
