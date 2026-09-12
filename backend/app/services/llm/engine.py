@@ -474,6 +474,15 @@ class GraphVisAgent:
     ) -> Dict[str, Any]:
         """Execute tools in dependency-safe order and return a step log."""
 
+        # Visible prose produced so far in this turn, for PRE_TOOL hooks that
+        # care whether the model has said anything to the user yet (see
+        # `guard_question_needs_prose`). Thought blocks are excluded: they are
+        # reasoning, not an explanation addressed to the user.
+        if text_content:
+            turn_state["assistant_text_so_far"] = (
+                turn_state.get("assistant_text_so_far", "") + text_content
+            )
+
         # A question is an execution barrier: no co-batched operation may run
         # before the user has answered, regardless of the model's call order.
         questions = [call for call in function_calls if call.name == "ask_user"]

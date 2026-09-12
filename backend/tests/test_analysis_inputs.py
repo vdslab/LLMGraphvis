@@ -161,7 +161,11 @@ async def test_question_blocks_entire_tool_batch_and_ends_generation(db, chat):
     ]
 
     async def stream():
-        yield StreamChunk(function_calls=calls)
+        # The explanation rides along with the form: a bare form is deferred by
+        # `guard_question_needs_prose`, so it cannot stand in for this case.
+        yield StreamChunk(
+            text="このデータでは club 属性が使えます。", function_calls=calls
+        )
 
     with patch(
         "app.services.llm.mcp_client.execute_tool", new_callable=AsyncMock

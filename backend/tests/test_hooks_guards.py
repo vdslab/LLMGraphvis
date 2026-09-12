@@ -266,6 +266,30 @@ class TestGuardRedundantQuestion:
         )
 
 
+class TestGuardQuestionNeedsProse:
+    def test_defers_a_form_sent_with_no_explanation(self):
+        state = new_turn_state(10)
+        decision = guards.guard_question_needs_prose(ctx("ask_user", turn_state=state))
+        assert decision.action == "defer"
+        assert "no explanation" in decision.reason
+
+    def test_allows_a_form_that_comes_with_text(self):
+        state = new_turn_state(10)
+        state["assistant_text_so_far"] = "このデータには club 属性があります。"
+        assert (
+            guards.guard_question_needs_prose(ctx("ask_user", turn_state=state)) is None
+        )
+
+    def test_defers_only_once_per_turn(self):
+        """A second bare form is still better than looping on the same nudge."""
+        state = new_turn_state(10)
+        first = guards.guard_question_needs_prose(ctx("ask_user", turn_state=state))
+        assert first.action == "defer"
+        assert (
+            guards.guard_question_needs_prose(ctx("ask_user", turn_state=state)) is None
+        )
+
+
 # --------------------------------------------------------------------------
 # guard_expensive_computation
 # --------------------------------------------------------------------------

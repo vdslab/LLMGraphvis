@@ -240,6 +240,38 @@ def guard_redundant_question(ctx: HookContext) -> Optional[ToolCallDecision]:
     )
 
 
+@hook(
+    HookEvent.PRE_TOOL,
+    tools="ask_user",
+    priority=66,
+    name="guard_question_needs_prose",
+)
+def guard_question_needs_prose(ctx: HookContext) -> Optional[ToolCallDecision]:
+    """A form with no accompanying text is a menu the user cannot judge.
+
+    `ask_user` ends the turn, so whatever the model wrote alongside the call is
+    the only explanation the user gets. When it wrote nothing, the chat shows a
+    bare set of options: no statement of what each one would draw, what it would
+    reveal, or what has to be computed first. The prompt asks for that prose; a
+    small model routinely skips it, which is the case a hook exists for.
+
+    Deferred at most once per turn. If the model comes back with a form and still
+    no text, the form is better than another round trip.
+    """
+    if ctx.turn_state.get("assistant_text_so_far", "").strip():
+        return None
+    if ctx.turn_state.get("question_prose_deferred"):
+        return None
+    ctx.turn_state["question_prose_deferred"] = True
+    return ToolCallDecision.defer(
+        "This question would reach the user with no explanation: you have written "
+        "no text in this turn, and ask_user ends the turn. Write the explanation "
+        "as ordinary text first — what the data supports and what each option "
+        "would show, naming the visual channels it would assign — then call "
+        "ask_user again in that same response, in the user's language."
+    )
+
+
 def _without_layout_coordinates(names: List[str]) -> List[str]:
     """Drop the `{layout}_x` / `{layout}_y` pairs layouts store as node attributes.
 
