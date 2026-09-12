@@ -50,17 +50,20 @@ const ModelSelector = () => {
       disabled={isSaving}
       title="LLM provider/model used for this chat"
       style={{
-        padding: '0.25rem 0.5rem',
-        borderRadius: '999px',
-        border: '1px solid var(--border-color)',
-        backgroundColor: 'var(--background-color)',
-        color: 'var(--text-secondary)',
-        fontSize: '0.8rem',
+        padding: '0.3125rem 0.75rem',
+        borderRadius: 'var(--md-sys-shape-full)',
+        border: '1px solid var(--md-sys-color-outline-subtle)',
+        backgroundColor: 'var(--md-sys-color-surface-container)',
+        color: 'var(--md-sys-color-on-surface-variant)',
+        fontSize: '0.78125rem',
+        fontWeight: 500,
         cursor: isSaving ? 'wait' : 'pointer',
-        maxWidth: '160px',
+        maxWidth: '180px',
         minWidth: 0,
         flexShrink: 1,
-        textOverflow: 'ellipsis'
+        textOverflow: 'ellipsis',
+        outline: 'none',
+        transition: 'all 0.15s ease',
       }}
     >
       <option value={DEFAULT_VALUE}>{defaultLabel}</option>
