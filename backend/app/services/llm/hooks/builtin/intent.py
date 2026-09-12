@@ -204,6 +204,8 @@ def nudge_choice_ui(ctx: HookContext) -> None:
             "was created. Call ask_user now with the concrete candidates in a "
             "select field. Other/free-text is added automatically. Do not repeat "
             "the long explanation and do not execute any proposed analysis. "
+            "Write the question, labels, and options in the actual user request's "
+            "language. Do not copy a previous form in a different language. "
             "Wait for the user's answer."
         ),
         model_text=text,

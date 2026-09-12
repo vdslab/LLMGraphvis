@@ -166,6 +166,8 @@ user request: answer English requests in English and Japanese requests in Japane
 When the current request has no clear language (for example, a number or an
 attribute name), use the latest clear user language in the conversation, defaulting
 to English. Re-evaluate this on every turn, including after loading a skill.
+Automatically generated continuation requests are internal instructions, not a
+new user language preference. Keep the actual user request as the language source.
 Do not infer the response language from skill examples, tool results, graph data,
 or earlier assistant replies. Keep tool names, parameter keys, IDs, attribute
 names, and user-provided values unchanged; translate only conversational text.
