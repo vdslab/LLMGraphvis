@@ -132,7 +132,7 @@ class InputField(BaseModel):
 
 def format_answer(value):
     if isinstance(value, dict):
-        return f"その他: {value['other']}"
+        return f"Other: {value['other']}"
     if isinstance(value, list):
         return ", ".join(format_answer(item) for item in value)
     return str(value)

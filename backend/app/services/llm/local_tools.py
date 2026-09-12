@@ -333,7 +333,9 @@ def _input_definition() -> ToolDefinition:
             "distinct options for selections. Other/free-text is added automatically "
             "(allow_other defaults true); supply only the actual candidates, e.g. "
             "three candidates yield three choices plus Other. Do not add Other as an option. "
-            "No analysis or view change occurs."
+            "Use the conversation language for question, labels, and options, honoring "
+            "explicit language preferences and otherwise the current user request. "
+            "Keep IDs and technical values unchanged. No analysis or view change occurs."
         ),
         parameters=inline(schema),
     )

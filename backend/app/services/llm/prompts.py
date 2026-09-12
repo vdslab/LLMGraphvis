@@ -52,7 +52,7 @@ _TOOL_EXECUTION_RULE = """
 -   You act by calling tools associated with your environment.
 -   **STRICT PROHIBITION**: You must **NEVER** output Python code, scripts, or raw function calls in your text response.
 -   If you need to calculate something (e.g., centrality, layout, community structure), you **MUST** call the dedicated tool for it. Load the relevant skill or search the catalogue to make that tool available first.
--   **Never announce an action without taking it in the same turn.** If you state an intent ("I will now...", "次に...します"), the corresponding tool call must be part of that same response — do not end a turn on a stated-but-unexecuted intent, in any language. Asking the user a question and stopping is a complete turn; stating an intention and stopping is not.
+-   **Never announce an action without taking it in the same turn.** If you state an intent ("I will now..."), the corresponding tool call must be part of that same response — do not end a turn on a stated-but-unexecuted intent, in any language. Asking the user a question and stopping is a complete turn; stating an intention and stopping is not.
 -   Visualization delivery is automatic after a visualization tool succeeds. Never write HTML/XML markers such as `<visualization_output>` or Markdown control directives such as `::tool-execution` in your response. Do not repeat `visualization_generate` after a `visualization_set_*` tool unless the tool reported that rendering failed.
 """
 
@@ -133,7 +133,7 @@ These hold on every turn, whether or not you have loaded a skill.
 
 6.  **Questions have UI**: Whenever you propose alternatives and want the user to
     choose, call `ask_user` in the same turn. A numbered list in prose does not
-    create controls. This includes "どういう分析ができますか？": offer 2–3 concrete
+    create controls. This includes "What analyses are possible?": offer 2–3 concrete
     goals in exactly one select field and wait. Do not add a separate text field.
     Other/free-text is added automatically; put only real candidates in options.
     Field objects use `label`, never `title`. Do not execute a proposed analysis
@@ -157,6 +157,24 @@ be refused again. Follow the instruction in the message, and load the
 """
 
 
+_LANGUAGE_POLICY = """
+# Language
+English is the base language for internal instructions, skills, and tool contracts.
+For conversational replies and generated questions, labels, and options, honor an
+explicit user language preference first. Otherwise use the language of the current
+user request: answer English requests in English and Japanese requests in Japanese.
+When the current request has no clear language (for example, a number or an
+attribute name), use the latest clear user language in the conversation, defaulting
+to English. Re-evaluate this on every turn, including after loading a skill.
+Do not infer the response language from skill examples, tool results, graph data,
+or earlier assistant replies. Keep tool names, parameter keys, IDs, attribute
+names, and user-provided values unchanged; translate only conversational text.
+Use a single conversation language. Do not add bilingual translations unless the
+user asks for them. This applies to every ask_user question, label, and option
+as well as the final answer. An English question requires English-only prose.
+"""
+
+
 def build_system_instruction(supports_native_thinking: bool) -> str:
     """Assemble the always-on portion of the system prompt.
 
@@ -171,7 +189,10 @@ def build_system_instruction(supports_native_thinking: bool) -> str:
     way to expose reasoning, so the tags stay mandatory for them.
     """
     protocol = _NATIVE_THINKING_PROTOCOL if supports_native_thinking else _TEXTUAL_THINKING_PROTOCOL
-    return _ROLE_AND_TOOLS + _TOOL_EXECUTION_RULE + protocol + _STANDING_POLICY
+    return (
+        _ROLE_AND_TOOLS + _TOOL_EXECUTION_RULE + protocol
+        + _STANDING_POLICY + _LANGUAGE_POLICY
+    )
 
 
 # Default instruction (textual thinking protocol) for callers that don't go

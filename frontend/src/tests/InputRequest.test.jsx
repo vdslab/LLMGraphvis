@@ -39,13 +39,13 @@ describe('InputRequest', () => {
       expect.stringContaining('反復回数: 30'),
       { input_request_id: 'question-1', input_values: { method: '経路', iterations: 30, metrics: ['次数'] } },
     ));
-    expect(await screen.findByText(/回答済み/)).toBeInTheDocument();
+    expect(await screen.findByText(/Answered/)).toBeInTheDocument();
   });
 
   it('does not allow answering expired requests after reload', async () => {
     api.get.mockResolvedValue({ data: { ...request, status: 'expired' } });
     render(<InputRequest request={request} />);
-    expect(await screen.findByText(/現在の分析では使用できません/)).toBeInTheDocument();
+    expect(await screen.findByText(/no longer available for the current analysis/)).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
@@ -66,17 +66,17 @@ it('offers three candidates plus Other and sends custom text explicitly', async 
   await waitFor(() => expect(screen.getByRole('button')).toBeEnabled());
   expect(screen.getAllByRole('option')).toHaveLength(5); // placeholder + three + Other
   fireEvent.change(screen.getByLabelText('分析目的'), { target: { value: '__other__' } });
-  const custom = screen.getByLabelText('分析目的：その他の内容');
+  const custom = screen.getByLabelText('分析目的: Other details');
   expect(custom).toBeRequired();
   fireEvent.click(screen.getByRole('button'));
   expect(sendMessage).not.toHaveBeenCalled();
   fireEvent.change(custom, { target: { value: '二つのクラブの橋渡しを比較' } });
   fireEvent.click(screen.getByRole('button'));
   await waitFor(() => expect(sendMessage).toHaveBeenCalledWith(
-    expect.stringContaining('その他: 二つのクラブの橋渡しを比較'),
+    expect.stringContaining('Other: 二つのクラブの橋渡しを比較'),
     { input_request_id: 'question-1', input_values: { goal: { other: '二つのクラブの橋渡しを比較' } } },
   ));
-  expect(await screen.findByText(/回答済み/)).toHaveTextContent('二つのクラブの橋渡しを比較');
+  expect(await screen.findByText(/Answered/)).toHaveTextContent('二つのクラブの橋渡しを比較');
 });
 
 it('discards custom input when switching back to a candidate', async () => {
@@ -85,7 +85,7 @@ it('discards custom input when switching back to a candidate', async () => {
   render(<InputRequest request={form} />);
   await waitFor(() => expect(screen.getByRole('button')).toBeEnabled());
   fireEvent.change(screen.getByLabelText('分析目的'), { target: { value: '__other__' } });
-  fireEvent.change(screen.getByLabelText('分析目的：その他の内容'), { target: { value: '使わない文章' } });
+  fireEvent.change(screen.getByLabelText('分析目的: Other details'), { target: { value: '使わない文章' } });
   fireEvent.change(screen.getByLabelText('分析目的'), { target: { value: '経路' } });
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button'));
@@ -98,6 +98,23 @@ it('discards custom input when switching back to a candidate', async () => {
 it('renders a persisted custom answer after reload', async () => {
   api.get.mockResolvedValue({ data: { ...request, status: 'answered', answer: { method: { other: 'club別の比較' } } } });
   render(<InputRequest request={request} />);
-  expect(await screen.findByText(/回答済み/)).toHaveTextContent('その他: club別の比較');
+  expect(await screen.findByText(/Answered/)).toHaveTextContent('Other: club別の比較');
   expect(screen.queryByRole('button')).not.toBeInTheDocument();
+});
+
+it('renders an English conversation without introducing Japanese UI text', async () => {
+  const form = { ...request, question: 'What would you like to explore?', fields: [
+    { id: 'analysis_goal', label: 'Analysis goal', kind: 'select', options: ['Compare clubs', 'Find hubs', 'Explore communities'] },
+  ] };
+  api.get.mockResolvedValue({ data: form });
+  render(<InputRequest request={form} />);
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled());
+  expect(screen.getByRole('option', { name: 'Select an option' })).toBeInTheDocument();
+  expect(screen.getByRole('option', { name: 'Other (free text)' })).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Analysis goal'), { target: { value: 'Compare clubs' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+  await waitFor(() => expect(sendMessage).toHaveBeenCalledWith(
+    'What would you like to explore?\nAnalysis goal: Compare clubs',
+    { input_request_id: 'question-1', input_values: { analysis_goal: 'Compare clubs' } },
+  ));
 });

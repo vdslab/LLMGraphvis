@@ -179,7 +179,7 @@ async def test_question_blocks_entire_tool_batch_and_ends_generation(db, chat):
 
 def test_other_is_explicit_validated_and_readable():
     form = InputForm.model_validate(FORM)
-    assert "その他: 二つのクラブを比較" in form.answer_text(
+    assert "Other: 二つのクラブを比較" in form.answer_text(
         {
             "method": {"other": "二つのクラブを比較"},
             "iterations": 20,
@@ -220,7 +220,7 @@ def test_multiselect_can_combine_candidates_with_one_custom_answer():
             }
         ],
     )
-    assert "次数, その他: 三角形" in form.answer_text(
+    assert "次数, Other: 三角形" in form.answer_text(
         {"metrics": ["次数", {"other": "三角形"}]}
     )
     for values in [

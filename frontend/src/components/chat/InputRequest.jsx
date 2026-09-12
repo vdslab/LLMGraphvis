@@ -4,7 +4,7 @@ import { useChatStore } from '../../stores/chatStore';
 import { useNetworkStore } from '../../stores/networkStore';
 
 const formatAnswer = (value) => Array.isArray(value) ? value.map(formatAnswer).join(', ')
-  : value && typeof value === 'object' ? `その他: ${value.other}` : String(value ?? '');
+  : value && typeof value === 'object' ? `Other: ${value.other}` : String(value ?? '');
 
 /** A persisted question. Server state, never initial UI values, proves submission. */
 export default function InputRequest({ request }) {
@@ -46,7 +46,7 @@ export default function InputRequest({ request }) {
       input_request_id: current.id, input_values: values,
     });
     if (accepted) setCurrent((old) => ({ ...old, status: 'answered', answer: values }));
-    else setError('送信できませんでした。入力内容を確認して再送してください。');
+    else setError('Could not submit. Check your input and try again.');
     setSending(false);
   };
 
@@ -63,9 +63,9 @@ export default function InputRequest({ request }) {
             let otherKey = '__other__';
             while (field.options?.includes(otherKey)) otherKey += '_';
             const otherInput = (text, onChange) => <div className="input-request__field">
-              <label htmlFor={`${id}-other`}>{field.label}：その他の内容</label>
+              <label htmlFor={`${id}-other`}>{field.label}: Other details</label>
               <textarea id={`${id}-other`} required maxLength={4000} value={text}
-                placeholder="希望する内容を入力してください"
+                placeholder="Enter what you would like to do"
                 onChange={(event) => onChange(event.target.value)} />
             </div>;
             if (field.kind === 'multiselect') return (
@@ -82,7 +82,7 @@ export default function InputRequest({ request }) {
                     <input type="checkbox" checked={value.some((item) => typeof item === 'object')}
                       onChange={(event) => update(field.id, event.target.checked
                         ? [...value, { other: '' }] : value.filter((item) => typeof item !== 'object'))} />
-                    その他（自由入力）
+                    Other (free text)
                   </label>
                   {value.some((item) => typeof item === 'object') && otherInput(
                     value.find((item) => typeof item === 'object').other,
@@ -98,9 +98,9 @@ export default function InputRequest({ request }) {
                   <select id={id} required value={isOther ? otherKey : value}
                     onChange={(event) => update(field.id, event.target.value === otherKey
                       ? { other: '' } : event.target.value)}>
-                    <option value="">選択してください</option>
+                    <option value="">Select an option</option>
                     {field.options.map((option) => <option key={option}>{option}</option>)}
-                    {allowOther && <option value={otherKey}>その他（自由入力）</option>}
+                    {allowOther && <option value={otherKey}>Other (free text)</option>}
                   </select>
                   {isOther && otherInput(value.other, (text) => update(field.id, { other: text }))}
                 </>
@@ -115,11 +115,11 @@ export default function InputRequest({ request }) {
               {field.kind === 'slider' && <output htmlFor={id}>{values[field.id]}</output>}
             </div>;
           })}
-          <button type="submit">{sending ? '送信中…' : 'この内容で進める'}</button>
+          <button type="submit">{sending ? 'Sending…' : 'Continue'}</button>
         </fieldset>
-        <p className="input-request__hint">チャットに文章で回答することもできます。</p>
+        <p className="input-request__hint">You can also reply in the chat.</p>
       </> : <p className="input-request__hint">
-        {current.status === 'answered' ? '回答済み' : 'この質問は現在の分析では使用できません。'}
+        {current.status === 'answered' ? 'Answered' : 'This question is no longer available for the current analysis.'}
         {current.answer && <span> {Object.values(current.answer).map(formatAnswer).join(' / ')}</span>}
       </p>}
       {error && <p role="alert" className="input-request__error">{error}</p>}

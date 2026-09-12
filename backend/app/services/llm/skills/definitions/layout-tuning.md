@@ -48,14 +48,14 @@ default, so only override what the user actually asked about.
 
 | The user says | Change |
 |---|---|
-| "spread them out", "広げて", nodes overlap | ForceAtlas2: raise `scaling_ratio`, lower `gravity`. Spring: raise `k`. |
-| "pull it together", "詰めて", too sparse | The reverse: lower `scaling_ratio`, raise `gravity`, lower `k`. |
+| "spread them out", nodes overlap | ForceAtlas2: raise `scaling_ratio`, lower `gravity`. Spring: raise `k`. |
+| "pull it together", too sparse | The reverse: lower `scaling_ratio`, raise `gravity`, lower `k`. |
 | "the big nodes overlap" | ForceAtlas2 `node_size` — enables size-aware repulsion so large nodes push each other apart. |
 | "make it cleaner / converge better" | Raise `max_iter` (ForceAtlas2) or `iterations` (spring). Costs time roughly linearly. |
-| "use the edge weights", "重みを使って" | Nothing — already done. See "Edge weights" below. |
-| "use <attribute> as the weight", "<属性>で重み付け" | Pass `weight='<attribute>'`. It must be a numeric edge attribute. |
-| "ignore the weights", "重みは無視して" | Pass `weight='none'` on the force/spectral layout, then re-render. |
-| "same result every time", "再現性" | Pass an explicit `seed`. Force layouts start from random positions, so without a fixed seed successive runs differ. |
+| "use the edge weights" | Nothing — already done. See "Edge weights" below. |
+| "use <attribute> as the weight" | Pass `weight='<attribute>'`. It must be a numeric edge attribute. |
+| "ignore the weights" | Pass `weight='none'` on the force/spectral layout, then re-render. |
+| "same result every time" | Pass an explicit `seed`. Force layouts start from random positions, so without a fixed seed successive runs differ. |
 | "try a different arrangement" | Change `seed`, with `force_recompute=True`. |
 | "emphasise the clusters more" | ForceAtlas2 `strong_gravity=True`, or `linlog=True` for a log attraction model that separates clusters more sharply. |
 | "keep the current shape but refine it" | `init_from_layout='<previous layout name>'` — warm-starts from stored coordinates instead of from random. |

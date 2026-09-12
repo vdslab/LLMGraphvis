@@ -12,15 +12,20 @@ several genuinely different answers. Picking one at random hides the choice from
 the user. Instead, name 2–3 strategies that answer *different questions*, and let
 them choose **through `ask_user`**, never only through a prose list:
 
-Call the tool with `question` and one field: `id="analysis_goal"`,
-`label="分析の目的"`, `kind="select"`, and 2–3 concise, concrete `options`.
-For "どういう分析ができますか？", this form is part of the answer even if the user
-never mentioned UI. Explain the alternatives briefly if helpful, then call the
-tool and stop. `allow_other` defaults to true: the UI adds その他（自由入力）;
-do not spend one of the three candidate slots on "その他".
+Use the conversation language defined by the system policy for the question,
+labels, and options; the English examples below are not fixed output text.
+For an English request, write all of them in English only. For a Japanese
+request, write them in Japanese only. Do not append translations unless asked.
 
-Example on a graph with `club`: offer "clubごとのつながりを比較",
-"次数で中心的なノードを探す", "構造上のコミュニティを調べる".
+Call the tool with `question` and one field: `id="analysis_goal"`,
+`label="Analysis goal"`, `kind="select"`, and 2–3 concise, concrete `options`.
+For "What analyses are possible?", this form is part of the answer even if the user
+never mentioned UI. Explain the alternatives briefly if helpful, then call the
+tool and stop. `allow_other` defaults to true: the UI adds Other (free text);
+do not spend one of the three candidate slots on "Other".
+
+Example on a graph with `club`: offer "Compare connections across clubs",
+"Find highly connected nodes by degree", "Explore structural communities".
 Adapt to the current graph; never invent attributes. A user's free-text answer
 can replace all suggestions. Do not infer that displaying a choice approves it.
 
