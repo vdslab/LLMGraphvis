@@ -26,6 +26,18 @@ def test_numbered_analysis_suggestions_request_ui_not_execution():
     assert "do not execute" in prompt.lower()
 
 
+def test_repair_keeps_the_explanation_instead_of_sending_a_bare_form():
+    """A form with no prose leaves the user nothing to judge the options by."""
+    ctx = context(
+        "**1. 属性の比較**\n**2. 中心性**\n**3. コミュニティ**\n"
+        "ご希望を教えてください。"
+    )
+    nudge_choice_ui(ctx)
+    prompt = ctx.turn_state["continuation"]["prompt"]
+    assert "Keep a short version of your explanation" in prompt
+    assert "only a form" in prompt
+
+
 def test_explanations_existing_forms_and_repeated_nudges_do_not_reprompt():
     for ctx in [
         context("1. ファイルを選びます。\n2. 読み込みを待ちます。"),

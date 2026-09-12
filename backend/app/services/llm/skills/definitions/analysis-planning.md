@@ -40,12 +40,35 @@ Explicit requests for a metric or algorithm still proceed directly.
 
 Use `ask_user` when asking the user to choose: `question` and one field with
 `id="analysis_goal"`, `label="Analysis goal"`, `kind="select"`, and 2–3
-concise options. Use the user's conversation language for all visible text.
+concise options. Write the explanation as ordinary text in the **same response**
+as the form. A turn whose entire content is a form asks the user to pick from a
+menu you never explained, which is the failure mode this whole procedure exists
+to avoid. Use the user's conversation language for all visible text.
 For "What analyses are possible?", first explain what the available data makes
 possible, then offer the goals and stop. Keep `allow_other=true`; the UI adds
 Other/free text automatically. A free-text answer can replace the suggestions.
 Do not infer approval from displaying a choice or execute the proposed analysis
 before the answer. An explanation-only request does not need a choice form.
+
+## Propose a whole view, not a single channel
+
+A goal is what the user will be able to *read off the screen*, so describe each
+option as the view it produces, not as one styling operation. Colour, size and
+labels are independent channels that can be assigned together, so a question with
+two parts gets two channels — usually a recorded category on colour and a
+computed quantity on size. See `visual-encoding` for the pairings and their
+limits.
+
+Concretely, for "I want to see the two opposing groups" on Karate Club, the
+option is not "colour by `club`". It is "colour by the recorded `club`, and size
+by betweenness centrality, so the split and the people bridging it are visible at
+once" — and, if they only want the split, colour alone remains available as a
+simpler option. Offering the single channel as the only candidate hides half of
+what this canvas can show.
+
+State plainly which part of a proposed view comes from the imported data and
+which part has to be computed first. The user is choosing an interpretation, not
+only an appearance.
 
 ## Prefer existing attributes over computing new ones
 
@@ -99,9 +122,11 @@ from the ones reported earlier.
    attribute name.
 2. Load `visual-encoding` so its styling tools become available in the next
    response, then colour nodes by that exact name with `scale_type='CATEGORICAL'`.
-3. Report the community-to-colour mapping using the hex codes from the legend.
-4. If useful, follow with the size of each community or the nodes bridging them
-   (`analysis_betweenness_centrality`).
+3. Unless the user asked for colour alone, put a quantity on the size channel in
+   the same response — `degree_centrality` or `betweenness_centrality` — so the
+   view shows both the grouping and who matters within and between the groups.
+4. Report every channel you set, each with its legend, and then what the two say
+   together.
 
 ## Algorithm-specific controls
 

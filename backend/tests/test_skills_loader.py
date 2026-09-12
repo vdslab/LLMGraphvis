@@ -246,6 +246,17 @@ class TestShippedSkills:
             )
             assert has_japanese, f"{skill.name} has no Japanese triggers"
 
+    def test_visual_encoding_activates_both_node_channels(self):
+        """A composite encoding must be reachable in one skill_load.
+
+        Colour and size are set by separate tools; if loading the skill activates
+        only one of them, the model can only build half the view it just read
+        about, and the second channel costs another round trip it usually skips.
+        """
+        skill = next(s for s in load_skills() if s.name == "visual-encoding")
+        assert "visualization_set_node_color" in skill.related_tools
+        assert "visualization_set_node_size" in skill.related_tools
+
     def test_index_block_is_much_smaller_than_the_bodies(self):
         """Progressive disclosure only pays off if the index stays small."""
         skills = load_skills()

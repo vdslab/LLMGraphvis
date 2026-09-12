@@ -182,7 +182,13 @@ def nudge_choice_ui(ctx: HookContext) -> None:
     """Repair a prose-only menu asking for a decision, never execute its options.
 
     Conservative heuristic: require multiple numbered candidates plus an explicit
-    invitation to choose. A procedure or ordinary explanation must not trigger it.
+    invitation to choose. A procedure or ordinary explanation must not trigger it,
+    and neither does a single question asked in prose — the form is for a fork with
+    distinct alternatives, not for every sentence ending in a question mark.
+
+    The continuation deliberately asks the model to *keep* its explanation: an
+    earlier version said not to repeat it, which produced turns whose entire
+    content was a form.
     """
     if ctx.turn_state.get("input_request"):
         return
@@ -201,9 +207,12 @@ def nudge_choice_ui(ctx: HookContext) -> None:
     ctx.request_continuation(
         prompt=(
             "You offered alternatives and invited the user to choose, but no UI "
-            "was created. Call ask_user now with the concrete candidates in a "
-            "select field. Other/free-text is added automatically. Do not repeat "
-            "the long explanation and do not execute any proposed analysis. "
+            "was created. Keep a short version of your explanation as ordinary "
+            "text — a response containing only a form leaves the user nothing to "
+            "judge the options by — and call ask_user in that same response with "
+            "the concrete candidates in a select field, each described by what the "
+            "resulting view would show. Other/free-text is added automatically. Do "
+            "not execute any proposed analysis. "
             "Write the question, labels, and options in the actual user request's "
             "language. Do not copy a previous form in a different language. "
             "Wait for the user's answer."
