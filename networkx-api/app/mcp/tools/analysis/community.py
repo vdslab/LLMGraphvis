@@ -69,9 +69,11 @@ def analysis_louvain_communities(
     seed: Annotated[Optional[int], Field(description="Random seed; 42 is reproducible, null uses fresh randomness.")] = 42,
     force_recompute: Annotated[bool, Field(description="Bypass a valid cache for the same graph and parameters.")] = False,
 ) -> str:
-    """Run Louvain and save 'louvain_community'; supports directed/undirected graphs.
+    """Run Louvain modularity optimization and save 'louvain_community' node attribute.
 
-    Edge weights mean connection strength. Self-loops affect community retention.
+    Recommended default for community detection: fast, high quality, and scales
+    well to large graphs. Supports directed and undirected graphs. Edge weights
+    represent connection strength. Self-loops affect community retention.
     No coloring, subgraph extraction, view switch, or rendering is performed.
     """
     with get_db_context() as db:
@@ -92,9 +94,12 @@ def analysis_greedy_modularity_communities(
     best_n: Annotated[Optional[int], Field(ge=1, description="Force merging until at most this many groups remain. For exactly k groups, set cutoff=best_n=k. Must be at least cutoff and at most node count.")] = None,
     force_recompute: Annotated[bool, Field(description="Bypass a valid cache for the same graph and parameters.")] = False,
 ) -> str:
-    """Run greedy modularity maximization and save 'greedy_modularity_community'.
+    """Run Clauset-Newman-Moore greedy modularity maximization and save 'greedy_modularity_community' node attribute.
 
-    No random seed is used. No coloring, extraction, switching, or rendering.
+    Deterministic (no random seed used). Best when you need an exact or bounded
+    number of communities via cutoff/best_n (e.g. exactly k groups: cutoff=best_n=k).
+    Slower than Louvain on large networks.
+    No coloring, extraction, switching, or rendering is performed.
     """
     with get_db_context() as db:
         from app.logic.community import calculate_community
@@ -110,10 +115,12 @@ def analysis_label_propagation_communities(
     network_id: Annotated[int, Field(description="Undirected network to partition.")],
     force_recompute: Annotated[bool, Field(description="Bypass a valid cache for the same graph.")] = False,
 ) -> str:
-    """Run semi-synchronous label propagation; save 'label_propagation_community'.
+    """Run semi-synchronous label propagation and save 'label_propagation_community' node attribute.
 
-    Requires an undirected graph. This NetworkX algorithm accepts neither weights
-    nor seed. No coloring, extraction, switching, or rendering is performed.
+    Fast heuristic for undirected unweighted networks based on neighbor majority
+    voting. Requires an undirected graph. This NetworkX algorithm accepts neither
+    weights nor seed.
+    No coloring, extraction, switching, or rendering is performed.
     """
     with get_db_context() as db:
         from app.logic.community import calculate_community

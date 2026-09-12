@@ -92,8 +92,9 @@ def node_filter(
     Lists nodes matching a specific attribute condition WITHOUT creating a new network.
 
     Use this for inspection/reporting (e.g., "list all Austrian composers", "find nodes with degree > 10").
-    Do NOT use this to get node IDs for subgraph creation — use `subgraph_create_by_filter` instead,
-    which avoids context window limits by filtering server-side.
+    Do NOT use this to get node IDs for subgraph creation — use `subgraph_extract_filter` (atomic)
+    or `subgraph_create_by_filter` (legacy compound) instead, which avoid context window limits
+    by filtering server-side.
 
     Returns:
         dict: {"count": int, "truncated": bool, "nodes": [{"id": str, "label": str}]}
