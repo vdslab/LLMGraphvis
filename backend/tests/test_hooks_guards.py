@@ -267,6 +267,64 @@ class TestGuardRedundantQuestion:
         )
 
 
+class TestGuardChannelOverwrite:
+    def test_denies_repointing_one_channel_at_a_second_attribute(self):
+        state = new_turn_state(10)
+        state["styled_channels"] = {"visualization_set_node_color": "club"}
+        state["tool_catalog"] = ToolCatalog(
+            [ToolDefinition("visualization_set_node_size", "", {})]
+        )
+        state["tool_catalog"].initialize_turn(state)
+        decision = guards.guard_channel_overwrite(
+            ctx(
+                "visualization_set_node_color",
+                {"attribute": "betweenness_centrality"},
+                turn_state=state,
+            )
+        )
+        assert decision.action == "deny"
+        assert "club" in decision.reason
+        assert "visualization_set_node_size" in decision.reason
+        # The correction must be callable on the next iteration.
+        assert "visualization_set_node_size" in state["enabled_tool_names"]
+
+    def test_allows_refining_the_same_attribute(self):
+        state = new_turn_state(10)
+        state["styled_channels"] = {"visualization_set_node_size": "pagerank"}
+        assert (
+            guards.guard_channel_overwrite(
+                ctx(
+                    "visualization_set_node_size",
+                    {"attribute": "pagerank", "scaling_factor": 3},
+                    turn_state=state,
+                )
+            )
+            is None
+        )
+
+    def test_allows_a_different_channel(self):
+        state = new_turn_state(10)
+        state["styled_channels"] = {"visualization_set_node_color": "club"}
+        assert (
+            guards.guard_channel_overwrite(
+                ctx(
+                    "visualization_set_node_size",
+                    {"attribute": "betweenness_centrality"},
+                    turn_state=state,
+                )
+            )
+            is None
+        )
+
+    def test_allows_the_first_call_of_a_turn(self):
+        assert (
+            guards.guard_channel_overwrite(
+                ctx("visualization_set_node_color", {"attribute": "club"})
+            )
+            is None
+        )
+
+
 class TestGuardQuestionNeedsProse:
     def test_defers_a_form_sent_with_no_explanation(self):
         state = new_turn_state(10)

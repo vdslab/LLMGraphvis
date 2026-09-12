@@ -137,6 +137,11 @@ When a user asks to change one channel of a composite encoding ("make the sizes
 more extreme", "use warmer colours"), call only that channel's tool. The rest of
 the encoding stays, so do not rebuild it.
 
+A channel holds one attribute. Calling the same `set_*` tool twice in one turn
+with different attributes replaces the first mapping instead of adding to it, so
+it is refused — put the second variable on a different channel. If the tool for
+that channel is not currently exposed, the refusal exposes it for you.
+
 ## Report the legend with real hex codes
 
 After a colour change, read the `legend` in the tool result and report the

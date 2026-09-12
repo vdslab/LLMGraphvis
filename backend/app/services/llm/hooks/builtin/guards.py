@@ -240,6 +240,51 @@ def guard_redundant_question(ctx: HookContext) -> Optional[ToolCallDecision]:
     )
 
 
+_SIBLING_NODE_CHANNEL = {
+    "visualization_set_node_color": "visualization_set_node_size",
+    "visualization_set_node_size": "visualization_set_node_color",
+}
+
+
+@hook(
+    HookEvent.PRE_TOOL,
+    tools="visualization_set_*",
+    priority=45,
+    name="guard_channel_overwrite",
+)
+def guard_channel_overwrite(ctx: HookContext) -> Optional[ToolCallDecision]:
+    """Stop a channel from being re-pointed at a second attribute in one turn.
+
+    Each channel holds one attribute, so calling the same `set_*` tool twice
+    with different attributes discards the first mapping. Between two user
+    messages there is no reason to want that: the model is trying to show two
+    variables and is putting both on the same channel because the other
+    channel's tool is not currently exposed. Deny, and expose the sibling so
+    the correction is one call away.
+    """
+    tool_name = ctx.tool_name or ""
+    previous = (ctx.turn_state.get("styled_channels") or {}).get(tool_name)
+    attribute = (ctx.args or {}).get("attribute")
+    if not previous or not attribute or previous == attribute:
+        return None
+
+    sibling = _SIBLING_NODE_CHANNEL.get(tool_name)
+    catalog = ctx.turn_state.get("tool_catalog")
+    if sibling and catalog is not None:
+        catalog.activate([sibling], ctx.turn_state)
+    alternative = (
+        f" To show both variables, leave this channel on `{previous}` and put "
+        f"`{attribute}` on another one — `{sibling}` is now available."
+        if sibling
+        else ""
+    )
+    return ToolCallDecision.deny(
+        f"`{tool_name}` already encodes `{previous}` in this turn. Calling it "
+        f"again with `{attribute}` would replace that mapping, not add to it, "
+        f"and the first encoding would be lost.{alternative}"
+    )
+
+
 @hook(
     HookEvent.PRE_TOOL,
     tools="ask_user",

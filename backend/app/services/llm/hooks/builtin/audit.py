@@ -43,6 +43,24 @@ def audit_tool_success(ctx: HookContext) -> None:
         failures.pop(tool_name, None)
 
 
+@hook(
+    HookEvent.POST_TOOL,
+    tools="visualization_set_*",
+    priority=90,
+    name="audit_styled_channel",
+)
+def audit_styled_channel(ctx: HookContext) -> None:
+    """Remember which attribute each visual channel carries, for this turn.
+
+    `guard_channel_overwrite` reads it. Recorded on success only: a call that
+    was denied or failed changed nothing, so it must not look like an encoding
+    the next call would destroy.
+    """
+    attribute = (ctx.args or {}).get("attribute")
+    if attribute:
+        ctx.turn_state.setdefault("styled_channels", {})[ctx.tool_name] = attribute
+
+
 @hook(HookEvent.TOOL_ERROR, tools="*", priority=90, name="audit_tool_error")
 def audit_tool_error(ctx: HookContext) -> None:
     ctx.turn_state["tools_failed"] = ctx.turn_state.get("tools_failed", 0) + 1
