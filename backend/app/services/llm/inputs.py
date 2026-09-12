@@ -1,6 +1,8 @@
 """Validated, persistent questions; the model declares controls, never HTML."""
 
+import json
 import math
+import re
 from typing import Literal
 from uuid import uuid4
 
@@ -142,6 +144,98 @@ class InputForm(BaseModel):
     model_config = ConfigDict(extra="forbid")
     question: str = Field(min_length=1, max_length=500)
     fields: list[InputField] = Field(min_length=1, max_length=6)
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_fields_input(cls, value):
+        """Recover from malformed model outputs for the fields parameter.
+
+        Models (notably Claude/Anthropic) occasionally emit tool calls where:
+        1. `fields` is a JSON-encoded string, sometimes prefixed or wrapped by
+           internal XML tags such as `\\n<parameter name="fields">[{"id": ...}]`.
+        2. `fields` is a single dict rather than a list of dicts.
+        3. Field parameters (`id`, `label`, `kind`, `options`) are flattened
+           into the top-level arguments dictionary rather than nested under `fields`.
+        4. Field strings (e.g., `id`, `label`) contain leaked XML tags.
+        """
+        if not isinstance(value, dict):
+            return value
+
+        normalized = dict(value)
+        raw_fields = normalized.get("fields")
+
+        # Case 1: `fields` is a string
+        if isinstance(raw_fields, str):
+            cleaned = raw_fields.strip()
+            parsed = None
+            match = re.search(r"(\[[\s\S]*\]|\{[\s\S]*\})", cleaned)
+            if match:
+                try:
+                    parsed = json.loads(match.group(1))
+                except Exception:
+                    parsed = None
+            if parsed is None:
+                stripped = re.sub(r"<[^>]+>", "", cleaned).strip()
+                if stripped.startswith("[") or stripped.startswith("{"):
+                    try:
+                        parsed = json.loads(stripped)
+                    except Exception:
+                        parsed = None
+
+            if isinstance(parsed, list):
+                raw_fields = parsed
+                normalized["fields"] = raw_fields
+            elif isinstance(parsed, dict):
+                raw_fields = [parsed]
+                normalized["fields"] = raw_fields
+
+        # Case 2: `fields` is a dict
+        if isinstance(raw_fields, dict):
+            raw_fields = [raw_fields]
+            normalized["fields"] = raw_fields
+
+        # Case 3: Field keys are flattened at the top level
+        field_keys = {
+            "id",
+            "label",
+            "kind",
+            "options",
+            "allow_other",
+            "minimum",
+            "maximum",
+            "step",
+            "title",
+        }
+        has_flattened_attrs = any(k in normalized for k in ("kind", "options", "label"))
+        if not isinstance(normalized.get("fields"), list) and has_flattened_attrs:
+            extracted_field = {}
+            for k in list(normalized.keys()):
+                if k in field_keys:
+                    extracted_field[k] = normalized.pop(k)
+            if "id" not in extracted_field:
+                if isinstance(raw_fields, str):
+                    candidate_id = re.sub(r"<[^>]+>", "", raw_fields).strip()
+                    if candidate_id and re.fullmatch(r"^[a-z][a-z0-9_]{0,39}$", candidate_id):
+                        extracted_field["id"] = candidate_id
+                if "id" not in extracted_field:
+                    extracted_field["id"] = "goal"
+            normalized["fields"] = [extracted_field]
+
+        # Case 4: Clean up any residual XML tags inside field dictionaries
+        if isinstance(normalized.get("fields"), list):
+            cleaned_list = []
+            for item in normalized["fields"]:
+                if isinstance(item, dict):
+                    clean_item = dict(item)
+                    for k, v in clean_item.items():
+                        if isinstance(v, str) and ("<" in v and ">" in v):
+                            clean_item[k] = re.sub(r"<[^>]+>", "", v).strip()
+                    cleaned_list.append(clean_item)
+                else:
+                    cleaned_list.append(item)
+            normalized["fields"] = cleaned_list
+
+        return normalized
 
     @model_validator(mode="before")
     @classmethod

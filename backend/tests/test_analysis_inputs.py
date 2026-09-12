@@ -141,6 +141,67 @@ def test_form_merges_split_single_option_select_fields():
     assert len(validated_mixed.fields) == 2
 
 
+def test_form_auto_heals_malformed_fields_inputs():
+    # Real-world chat 226 case: XML tag prefix leaked into fields string
+    xml_string_payload = {
+        "question": "どの可視化を作成しますか？（各選択肢の内容は上の説明をご覧ください）",
+        "fields": (
+            '\n<parameter name="fields">[{"id": "analysis_goal", "label": "可視化のゴール", '
+            '"kind": "select", "options": ["対立と橋渡し役を同時に表示", "接点リンクを強調", "構造を比較"]}]'
+        ),
+    }
+    validated_xml = InputForm.model_validate(xml_string_payload)
+    assert len(validated_xml.fields) == 1
+    assert validated_xml.fields[0].id == "analysis_goal"
+    assert validated_xml.fields[0].label == "可視化のゴール"
+    assert len(validated_xml.fields[0].options) == 3
+
+    # Flattened payload case: field attributes passed at top level with residual XML tag
+    flattened_payload = {
+        "question": "どの条件で分析しますか？",
+        "fields": '\n<parameter name="id">analysis_goal',
+        "label": "可視化の方針",
+        "kind": "select",
+        "options": ["①clubで2陣営を色分け", "②接点リンク強調"],
+    }
+    validated_flattened = InputForm.model_validate(flattened_payload)
+    assert len(validated_flattened.fields) == 1
+    assert validated_flattened.fields[0].id == "analysis_goal"
+    assert validated_flattened.fields[0].label == "可視化の方針"
+    assert len(validated_flattened.fields[0].options) == 2
+
+    # Single dictionary payload
+    dict_payload = {
+        "question": "Choose a view",
+        "fields": {
+            "id": "goal",
+            "label": "Analysis goal",
+            "kind": "select",
+            "options": ["View 1", "View 2"],
+        },
+    }
+    validated_dict = InputForm.model_validate(dict_payload)
+    assert len(validated_dict.fields) == 1
+    assert validated_dict.fields[0].id == "goal"
+    assert len(validated_dict.fields[0].options) == 2
+
+    # Field containing residual XML tags in string values
+    residual_xml_payload = {
+        "question": "Choose a view",
+        "fields": [
+            {
+                "id": '<parameter name="id">goal</parameter>',
+                "label": "<title>Goal Selection</title>",
+                "kind": "select",
+                "options": ["Option A", "Option B"],
+            }
+        ],
+    }
+    validated_residual = InputForm.model_validate(residual_xml_payload)
+    assert validated_residual.fields[0].id == "goal"
+    assert validated_residual.fields[0].label == "Goal Selection"
+
+
 def test_question_survives_reload_and_supersedes_previous(db, chat):
     state = {}
     first = present_question(chat.id, db, FORM, state)["input_request"]
