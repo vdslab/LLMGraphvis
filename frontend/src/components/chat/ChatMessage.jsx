@@ -50,6 +50,18 @@ const StepsBlock = ({ block }) => (
   </Disclosure>
 );
 
+const isRetriedAskUserFailure = (execution, allExecutions, currentIndex) => {
+  if (execution.tool_name !== 'ask_user' || execution.status !== 'failed') {
+    return false;
+  }
+  return allExecutions.some(
+    (e, idx) =>
+      idx > currentIndex &&
+      e.tool_name === 'ask_user' &&
+      e.result?.input_request,
+  );
+};
+
 const ChatMessage = ({ message, onRetry }) => {
   const blocks = useMemo(
     () => parseMessageContent(message.content),
@@ -61,7 +73,11 @@ const ChatMessage = ({ message, onRetry }) => {
     blocks.filter((b) => b.type === 'tool').map((b) => b.index),
   );
   const orphanExecutions = [
-    ...executions.filter((_, idx) => !inlineToolIndexes.has(idx)),
+    ...executions.filter(
+      (e, idx) =>
+        !inlineToolIndexes.has(idx) &&
+        !isRetriedAskUserFailure(e, executions, idx),
+    ),
     ...(executions.length ? [] : legacyExecutions(message.meta_data)),
   ];
 
@@ -124,6 +140,9 @@ const ChatMessage = ({ message, onRetry }) => {
               tool_name: 'Tool call',
               status: 'running',
             };
+            if (isRetriedAskUserFailure(execution, executions, block.index)) {
+              return null;
+            }
             return <ToolCall key={idx} execution={execution} />;
           }
           default:
