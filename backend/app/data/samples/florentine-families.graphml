@@ -1,7 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
-<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd"><key id="label" for="node" attr.name="label" attr.type="string"/>
-<key id="name" for="graph" attr.name="name" attr.type="string"/>
-<graph edgedefault="undirected"><data key="name">Florentine Families</data>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd"><key id="label" for="node" attr.name="label" attr.type="string"><desc>Family name.</desc></key>
+<key id="name" for="graph" attr.name="name" attr.type="string"><desc>Dataset name.</desc></key>
+<graph edgedefault="undirected">
+<desc>Florentine family marriage network. Nodes represent families and edges represent marriage ties. This sample contains family labels and connections, but no wealth, political power, or faction attributes. Source: https://networkx.org/documentation/stable/reference/generated/networkx.generators.social.florentine_families_graph.html</desc>
+<data key="name">Florentine Families</data>
 <node id="Acciaiuoli">
   <data key="label">Acciaiuoli</data>
 </node>

@@ -25,8 +25,9 @@ when you would be inventing the intent rather than serving it:
   colour mapping is a decision; do not silently replace it.
 - The request names no goal at all: "analyze this network", "what can you tell
   me?". Here you do not know what question is being asked, and picking one for
-  them wastes the turn. Load `analysis-planning` before offering its 2–3
-  concrete readings.
+  them wastes the turn. Load `analysis-planning` and read the data
+  descriptions and existing attributes before offering 2–3 concrete,
+  data-grounded goals.
 - The operation is destructive or hard to reverse (renaming nodes, replacing the
   active view with a much smaller subgraph).
 
@@ -77,7 +78,10 @@ would you like to explore next?" every turn is noise.
 
 When a choice is necessary, use `ask_user` with a concise question and relevant
 controls. This is required when offering 2–3 alternatives and asking the user
-to choose, including "What analyses are possible?". A prose-only menu is incomplete.
+to choose, including "What analyses are possible?". Explain the possibilities
+from the actual data first; do not replace that answer with a generic goal
+question.
+A prose-only menu asking for a choice is incomplete.
 Use the user’s language for the question, labels, and options; avoid redundant
 bilingual translations. Supply the real candidates only: selections add Other (free text) automatically.
 Keep `allow_other=true` for analysis goals; disable it only for a strictly closed

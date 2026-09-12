@@ -1,9 +1,11 @@
 <?xml version='1.0' encoding='utf-8'?>
-<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd"><key id="node_type" for="node" attr.name="node_type" attr.type="string"/>
-<key id="label" for="node" attr.name="label" attr.type="string"/>
-<key id="bipartite" for="node" attr.name="bipartite" attr.type="long"/>
-<key id="name" for="graph" attr.name="name" attr.type="string"/>
-<graph edgedefault="undirected"><data key="name">Davis Southern Women</data>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd"><key id="node_type" for="node" attr.name="node_type" attr.type="string"><desc>Readable sample annotation of bipartite: woman or event.</desc></key>
+<key id="label" for="node" attr.name="label" attr.type="string"><desc>Woman name or event identifier.</desc></key>
+<key id="bipartite" for="node" attr.name="bipartite" attr.type="long"><desc>Bipartite set: 0 for women, 1 for events.</desc></key>
+<key id="name" for="graph" attr.name="name" attr.type="string"><desc>Dataset name.</desc></key>
+<graph edgedefault="undirected">
+<desc>Davis Southern Women attendance network. Nodes represent women or social events; an edge records attendance, not a direct friendship between women. The imported bipartite attribute distinguishes women (0) from events (1). The sample adds node_type with woman/event and display labels for readability. Source: https://networkx.org/documentation/stable/reference/generated/networkx.generators.social.davis_southern_women_graph.html</desc>
+<data key="name">Davis Southern Women</data>
 <node id="Evelyn Jefferson">
   <data key="bipartite">0</data>
   <data key="label">Evelyn Jefferson</data>

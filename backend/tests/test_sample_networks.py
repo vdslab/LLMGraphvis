@@ -33,6 +33,12 @@ def test_bundled_graphml_matches_catalog_metadata():
         assert len(root.findall(".//g:node", GRAPHML_NS)) == sample.node_count
         assert len(root.findall(".//g:edge", GRAPHML_NS)) == sample.edge_count
 
+        graph = root.find("g:graph", GRAPHML_NS)
+        description = graph.findtext("g:desc", namespaces=GRAPHML_NS)
+        assert description and sample.source_url in description
+        for key in root.findall("g:key", GRAPHML_NS):
+            assert key.findtext("g:desc", namespaces=GRAPHML_NS)
+
 
 @pytest.mark.asyncio
 async def test_list_samples_returns_public_catalog(async_client, db):

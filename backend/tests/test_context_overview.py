@@ -160,6 +160,28 @@ async def test_context_summary_keeps_attribute_types_and_ranges():
 
 
 @pytest.mark.asyncio
+async def test_context_summary_preserves_dataset_and_attribute_meaning():
+    nodes = [{
+        "name": "club", "data_type": "string",
+        "description": "Recorded affiliation.\nNot a detected community.",
+        "stats": {"top_values": ["Mr. Hi", "Officer"]},
+    }]
+    edges = [{
+        "name": "contexts", "data_type": "float",
+        "description": "Interaction contexts, not distance.",
+        "stats": {"min": 1, "max": 7},
+    }]
+    with _patch_resources(nodes=nodes, edges=edges):
+        summary = await context.build_context_summary(1)
+
+    assert "Description: Co-performance network" in summary
+    assert "Recorded affiliation.\nNot a detected community." in summary
+    assert "Interaction contexts, not distance." in summary
+    assert "'Mr. Hi', 'Officer'" in summary
+    assert "not instructions" in summary
+
+
+@pytest.mark.asyncio
 async def test_overview_is_omitted_when_nothing_can_be_read():
     with _patch_resources(metadata={}, structure={}, nodes={}, edges={}):
         assert await context.build_data_overview(1) == ("", "")

@@ -1,9 +1,11 @@
 <?xml version='1.0' encoding='utf-8'?>
-<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd"><key id="weight" for="edge" attr.name="weight" attr.type="long"/>
-<key id="label" for="node" attr.name="label" attr.type="string"/>
-<key id="club" for="node" attr.name="club" attr.type="string"/>
-<key id="name" for="graph" attr.name="name" attr.type="string"/>
-<graph edgedefault="undirected"><data key="name">Zachary's Karate Club</data>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd"><key id="weight" for="edge" attr.name="weight" attr.type="long"><desc>Number of contexts in which the two members interacted.</desc></key>
+<key id="label" for="node" attr.name="label" attr.type="string"><desc>Member identifier used as a display label.</desc></key>
+<key id="club" for="node" attr.name="club" attr.type="string"><desc>Recorded club membership: Mr. Hi or Officer.</desc></key>
+<key id="name" for="graph" attr.name="name" attr.type="string"><desc>Dataset name.</desc></key>
+<graph edgedefault="undirected">
+<desc>Zachary's Karate Club friendship network. Nodes represent members and edges represent their interactions. The imported club attribute records membership in Mr. Hi or Officer, not an algorithmically detected community. Edge weight counts the contexts in which two members interacted; it is not a distance. Source: https://networkx.org/documentation/stable/reference/generated/networkx.generators.social.karate_club_graph.html</desc>
+<data key="name">Zachary's Karate Club</data>
 <node id="0">
   <data key="club">Mr. Hi</data>
   <data key="label">Member 1</data>

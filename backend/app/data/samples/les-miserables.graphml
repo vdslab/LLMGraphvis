@@ -1,8 +1,10 @@
 <?xml version='1.0' encoding='utf-8'?>
-<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd"><key id="weight" for="edge" attr.name="weight" attr.type="long"/>
-<key id="label" for="node" attr.name="label" attr.type="string"/>
-<key id="name" for="graph" attr.name="name" attr.type="string"/>
-<graph edgedefault="undirected"><data key="name">Les Miserables</data>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd"><key id="weight" for="edge" attr.name="weight" attr.type="long"><desc>Coappearance weight supplied by the source network.</desc></key>
+<key id="label" for="node" attr.name="label" attr.type="string"><desc>Character name.</desc></key>
+<key id="name" for="graph" attr.name="name" attr.type="string"><desc>Dataset name.</desc></key>
+<graph edgedefault="undirected">
+<desc>Character coappearance network from Victor Hugo's Les Miserables. Nodes represent characters and edges represent coappearances. Edge weight is the coappearance weight supplied by NetworkX; it is not a distance. This sample has character labels but no imported faction or community membership. Source: https://networkx.org/documentation/stable/reference/generated/networkx.generators.social.les_miserables_graph.html</desc>
+<data key="name">Les Miserables</data>
 <node id="Napoleon">
   <data key="label">Napoleon</data>
 </node>

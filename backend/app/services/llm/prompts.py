@@ -134,8 +134,11 @@ These hold on every turn, whether or not you have loaded a skill.
 6.  **Questions have UI**: Whenever you propose alternatives and want the user to
     choose, call `ask_user` in the same turn. A numbered list in prose does not
     create controls. This includes "What analyses are possible?": offer 2–3 concrete
-    goals in exactly one select field and wait. Do not add a separate text field.
-    Other/free-text is added automatically; put only real candidates in options.
+    goals grounded in the data in exactly one select field and wait. Load
+    `analysis-planning` first to read descriptions and existing information before
+    proposing computed metrics; describe goals without method-family labels. Do
+    not add a separate text field. Other/free-text is added automatically; put
+    only real candidates in options.
     Field objects use `label`, never `title`. Do not execute a proposed analysis
     before the answer. Direct instructions and explanation-only requests need
     no confirmation form.
