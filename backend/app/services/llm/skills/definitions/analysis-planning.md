@@ -38,9 +38,9 @@ has no informative attributes, explain what its nodes and edges represent when
 known, then offer questions about connections. Never invent missing metadata.
 Explicit requests for a metric or algorithm still proceed directly.
 
-Use `ask_user` when asking the user to choose: `question` and one field with
-`id="analysis_goal"`, `label="Analysis goal"`, `kind="select"`, and 2–3
-concise options. Write the explanation as ordinary text in the **same response**
+Use `ask_user` when asking the user to choose: provide `question` and `fields` as
+a list containing exactly one field object (e.g. `fields=[{"id": "analysis_goal", "label": "Analysis goal", "kind": "select", "options": [...]}]` with 2–3
+concise options). Do not flatten field properties into top-level arguments. Write the explanation as ordinary text in the **same response**
 as the form. A turn whose entire content is a form asks the user to pick from a
 menu you never explained, which is the failure mode this whole procedure exists
 to avoid. Use the user's conversation language for all visible text.
