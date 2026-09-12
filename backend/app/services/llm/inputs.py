@@ -143,6 +143,75 @@ class InputForm(BaseModel):
     question: str = Field(min_length=1, max_length=500)
     fields: list[InputField] = Field(min_length=1, max_length=6)
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_split_selection_fields(cls, value):
+        """Recover when a model creates multiple select fields each holding one option.
+
+        When presenting a set of alternative analysis goals, models occasionally
+        declare N separate `select` fields, each with a single candidate in its
+        `options` list, instead of declaring one `select` field containing N options.
+        Because select controls require at least two options, every field in that
+        structure fails validation.
+        When all fields in the request are select controls with exactly one option,
+        merge them into a single select control with all distinct options.
+        """
+        if not isinstance(value, dict) or "fields" not in value:
+            return value
+        raw_fields = value.get("fields")
+        if not isinstance(raw_fields, list) or len(raw_fields) < 2:
+            return value
+
+        is_split_select = all(
+            isinstance(f, dict)
+            and f.get("kind") == "select"
+            and isinstance(f.get("options"), list)
+            and len(f.get("options")) == 1
+            and isinstance(f.get("options")[0], str)
+            for f in raw_fields
+        )
+        if not is_split_select:
+            return value
+
+        merged_options = []
+        for f in raw_fields:
+            opt = f["options"][0].strip()
+            if opt and opt not in merged_options:
+                merged_options.append(opt)
+
+        if len(merged_options) >= 2:
+            question = str(value.get("question", ""))
+            has_japanese = any(
+                "\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff"
+                for c in question
+            )
+            default_label = "分析目的" if has_japanese else "Analysis goal"
+
+            primary_id = str(raw_fields[0].get("id", "goal"))
+            clean_id = (
+                primary_id.rsplit("_", 1)[0]
+                if "_" in primary_id and primary_id.rsplit("_", 1)[1].isdigit()
+                else primary_id
+            )
+            if not clean_id or not clean_id[0].isalpha():
+                clean_id = "goal"
+
+            allow_other = any(f.get("allow_other", True) is not False for f in raw_fields)
+
+            normalized = dict(value)
+            normalized["fields"] = [
+                {
+                    "id": clean_id,
+                    "kind": "select",
+                    "label": default_label,
+                    "options": merged_options,
+                    "allow_other": allow_other,
+                }
+            ]
+            return normalized
+
+        return value
+
     @model_validator(mode="after")
     def unique_fields(self):
         if len({field.id for field in self.fields}) != len(self.fields):

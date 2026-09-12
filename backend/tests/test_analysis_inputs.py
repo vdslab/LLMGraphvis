@@ -84,6 +84,63 @@ def test_form_normalizes_model_generated_title_alias():
     assert InputForm.model_validate(redundant_title).fields[0].label == "目的"
 
 
+def test_form_merges_split_single_option_select_fields():
+    # Japanese case (matches the exact real-world scenario from chat 221)
+    split_form_ja = {
+        "question": "対立する2つのグループをどのような視点から分析しますか？",
+        "fields": [
+            {
+                "id": "goal_1_centrality",
+                "label": "仲介者を見る",
+                "kind": "select",
+                "options": ["クラブ所属で色分けし、媒介中心性でサイズを決定するビュー。"],
+            },
+            {
+                "id": "goal_2_community",
+                "label": "コミュニティ検出",
+                "kind": "select",
+                "options": ["Louvain法でコミュニティを検出し、色分けするビュー。"],
+            },
+            {
+                "id": "goal_3_pagerank",
+                "label": "影響力を測る",
+                "kind": "select",
+                "options": ["PageRankで重要度を計算し、サイズで示すビュー。"],
+            },
+        ],
+    }
+    validated_ja = InputForm.model_validate(split_form_ja)
+    assert len(validated_ja.fields) == 1
+    assert validated_ja.fields[0].kind == "select"
+    assert validated_ja.fields[0].label == "分析目的"
+    assert len(validated_ja.fields[0].options) == 3
+    assert "Louvain法" in validated_ja.fields[0].options[1]
+
+    # English case
+    split_form_en = {
+        "question": "Which perspective would you like to explore?",
+        "fields": [
+            {"id": "opt_1", "label": "Option 1", "kind": "select", "options": ["View A"]},
+            {"id": "opt_2", "label": "Option 2", "kind": "select", "options": ["View B"]},
+        ],
+    }
+    validated_en = InputForm.model_validate(split_form_en)
+    assert len(validated_en.fields) == 1
+    assert validated_en.fields[0].label == "Analysis goal"
+    assert validated_en.fields[0].options == ["View A", "View B"]
+
+    # Legitimate multiple fields (select + slider) must not be merged
+    mixed_form = {
+        "question": "Parameters",
+        "fields": [
+            {"id": "method", "label": "Method", "kind": "select", "options": ["A", "B"]},
+            {"id": "param", "label": "Param", "kind": "slider", "minimum": 1, "maximum": 10},
+        ],
+    }
+    validated_mixed = InputForm.model_validate(mixed_form)
+    assert len(validated_mixed.fields) == 2
+
+
 def test_question_survives_reload_and_supersedes_previous(db, chat):
     state = {}
     first = present_question(chat.id, db, FORM, state)["input_request"]
