@@ -6,6 +6,7 @@ assert on refusal, not on advice.
 """
 
 import pytest
+from app.services.llm import markup
 from app.services.llm.hooks.builtin import guards, intent, normalize
 from app.services.llm.hooks.types import HookContext, HookEvent, new_turn_state
 from app.services.llm.providers.types import ToolDefinition
@@ -279,6 +280,19 @@ class TestGuardQuestionNeedsProse:
         assert (
             guards.guard_question_needs_prose(ctx("ask_user", turn_state=state)) is None
         )
+
+    def test_reasoning_does_not_count_as_an_explanation(self):
+        """Textual-thinking providers put <thought> in the ordinary text channel.
+
+        The engine stores only the visible remainder, so a turn made entirely of
+        reasoning must still be treated as having said nothing to the user.
+        """
+        state = new_turn_state(10)
+        state["assistant_text_so_far"] = markup.visible_text(
+            "<thought>I will offer three goals.</thought>"
+        )
+        decision = guards.guard_question_needs_prose(ctx("ask_user", turn_state=state))
+        assert decision.action == "defer"
 
     def test_defers_only_once_per_turn(self):
         """A second bare form is still better than looping on the same nudge."""

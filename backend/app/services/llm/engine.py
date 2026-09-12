@@ -478,9 +478,10 @@ class GraphVisAgent:
         # care whether the model has said anything to the user yet (see
         # `guard_question_needs_prose`). Thought blocks are excluded: they are
         # reasoning, not an explanation addressed to the user.
-        if text_content:
+        visible = markup.visible_text(text_content) if text_content else ""
+        if visible:
             turn_state["assistant_text_so_far"] = (
-                turn_state.get("assistant_text_so_far", "") + text_content
+                turn_state.get("assistant_text_so_far", "") + visible
             )
 
         # A question is an execution barrier: no co-batched operation may run

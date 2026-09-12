@@ -68,6 +68,24 @@ def sanitize_model_output(text: str) -> str:
     )
 
 
+_THOUGHT_DIRECTIVE_BLOCK = re.compile(
+    r"(?m)^(:{3,})thought\b[\s\S]*?(?:^\1[ \t]*$|\Z)"
+)
+
+
+def visible_text(text: str) -> str:
+    """What the model actually said to the user, with reasoning stripped.
+
+    Providers without a native thinking stream write their reasoning as
+    `<thought>` tags inside the ordinary text channel, so the raw text is not a
+    usable answer to "has the model addressed the user yet?" — a turn made
+    entirely of reasoning looks like prose to a naive length check.
+    """
+    without_thoughts = _LEGACY_THOUGHT_BLOCK.sub("", text)
+    without_thoughts = _THOUGHT_DIRECTIVE_BLOCK.sub("", without_thoughts)
+    return _MODEL_AUTHORED_TOOL_MARKER.sub("", without_thoughts).strip()
+
+
 def sanitize_model_text(text: str) -> str:
     """Remove engine-owned control markers copied into a model text part."""
     text = _UNSUPPORTED_VISUALIZATION_TAG.sub("", text)
