@@ -149,6 +149,19 @@ def _format_attr_stats(dtype: Optional[str], stats: Optional[Dict[str, Any]]) ->
     return ""
 
 
+def _format_attr_provenance(attr: Dict[str, Any]) -> str:
+    """Mark an attribute that was computed here rather than imported.
+
+    The agent is told not to present a computed score as something the dataset
+    recorded, and an attribute name does not say which it is — `club` was
+    imported, `louvain_community` was not. Unmarked means it came with the file.
+    """
+    if not attr.get("is_derived"):
+        return ""
+    source = attr.get("derived_from")
+    return f" [derived: {source}]" if source else " [derived]"
+
+
 async def build_context_summary(network_id: int) -> str:
     """Fetches network stats and attributes to build a context summary string.
 
@@ -204,7 +217,8 @@ async def build_context_summary(network_id: int) -> str:
                 name = attr.get("name")
                 dtype = attr.get("data_type")
                 stats_str = _format_attr_stats(dtype, attr.get("stats"))
-                summary_lines.append(f"- {name} ({dtype}){stats_str}")
+                provenance = _format_attr_provenance(attr)
+                summary_lines.append(f"- {name} ({dtype}){stats_str}{provenance}")
                 description = attr.get("description")
                 if description:
                     summary_lines.append(f"  Description: {description}")

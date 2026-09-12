@@ -488,6 +488,12 @@ def get_attribute_stats(
             "name": attr.attribute_name,
             "data_type": attr.data_type,
             "description": attr.description,
+            # Whether a value came with the file or was computed in the
+            # conversation cannot be recovered from its name, and a reader that
+            # cannot tell them apart will report a computed score as recorded
+            # data. Provenance travels with every listing for that reason.
+            "is_derived": bool(attr.is_derived),
+            "derived_from": attr.derived_from,
         }
 
         try:
@@ -572,6 +578,7 @@ def get_attribute_stats(
                         "name": "weight",
                         "data_type": "float",
                         "description": "Edge weight (core attribute)",
+                        "is_derived": False,
                         "stats": {"min": float(w_stats[0]), "max": float(w_stats[1])},
                     }
                 )
@@ -601,6 +608,7 @@ def get_attribute_stats(
                     "name": "label",
                     "data_type": "string",
                     "description": "Node label (core attribute)",
+                    "is_derived": False,
                     "stats": {
                         "unique_count": unique_count,
                         "top_values": [v[0] for v in top_vals],
@@ -641,6 +649,8 @@ def get_specific_attribute_stats(
         "name": attr.attribute_name,
         "data_type": attr.data_type,
         "description": attr.description,
+        "is_derived": bool(attr.is_derived),
+        "derived_from": attr.derived_from,
     }
 
     try:

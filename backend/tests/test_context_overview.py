@@ -182,6 +182,25 @@ async def test_context_summary_preserves_dataset_and_attribute_meaning():
 
 
 @pytest.mark.asyncio
+async def test_context_summary_marks_attributes_computed_here():
+    """Provenance, so a computed score is not reported as recorded data."""
+    nodes = [
+        {"name": "club", "data_type": "string", "is_derived": False,
+         "stats": {"top_values": ["Mr. Hi"]}},
+        {"name": "louvain_community", "data_type": "string", "is_derived": True,
+         "derived_from": "louvain", "stats": {"top_values": ["0"]}},
+        {"name": "forceatlas2_x", "data_type": "float", "is_derived": True,
+         "stats": {"min": -1.0, "max": 1.0}},
+    ]
+    with _patch_resources(nodes=nodes):
+        summary = await context.build_context_summary(1)
+
+    assert "- club (string) [values: 'Mr. Hi']\n" in summary
+    assert "- louvain_community (string) [values: '0'] [derived: louvain]" in summary
+    assert "- forceatlas2_x (float) [min: -1.00, max: 1.00] [derived]" in summary
+
+
+@pytest.mark.asyncio
 async def test_overview_is_omitted_when_nothing_can_be_read():
     with _patch_resources(metadata={}, structure={}, nodes={}, edges={}):
         assert await context.build_data_overview(1) == ("", "")

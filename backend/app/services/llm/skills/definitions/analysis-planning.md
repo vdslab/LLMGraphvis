@@ -16,10 +16,13 @@ Do not infer domain facts just from a familiar graph name.
 Identify questions supported by the imported information before offering new
 metrics: recorded affiliations, node types, dates, categories, or measured edge
 values. Use the descriptions to explain what those fields mean. Do not assume
-an existing field was imported merely because it is stored: metrics and layout
-coordinates created during the conversation are derived. If provenance or meaning
-is unclear, state that uncertainty rather than inventing it. Generated canvas
-coordinates do not imply geographic position or real-world importance.
+an existing field was imported merely because it is stored: an attribute marked
+`[derived: ...]` or `[derived]` in `[Current Network Context]` was computed
+here — a metric or layout coordinate — and only unmarked ones came with the
+file. Never present a computed score as something the data recorded. If
+provenance or meaning is unclear, state that uncertainty rather than inventing
+it. Generated canvas coordinates do not imply geographic position or real-world
+importance.
 
 Offer 2–3 concrete goals, with the data-grounded goals first. For Karate Club
 with a documented `club` attribute, examples are comparing connections within
