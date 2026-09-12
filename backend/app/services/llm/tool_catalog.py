@@ -85,6 +85,16 @@ class ToolCatalog:
                 score = (3, len(description), name)
             elif all(term in related for term in terms):
                 score = (4, len(related), name)
+            elif len(terms) > 1 and (
+                matched := _terms_matched(terms, name, description, related)
+            ):
+                # A query that names a real tool plus extra words ("node_size
+                # scaling factor") matches every field partially and none of them
+                # wholly. Returning nothing there sends the model into a retry
+                # loop against a tool that exists, so rank partial hits last
+                # rather than dropping them. Single-term queries cannot reach
+                # this branch, so strict behaviour is unchanged for them.
+                score = (5, -matched, name)
             else:
                 continue
             matches.append(SearchResult(tool, score))
@@ -113,3 +123,8 @@ def tool_definition_bytes(tools: Iterable[ToolDefinition]) -> int:
             [tool.__dict__ for tool in tools], ensure_ascii=False, sort_keys=True
         ).encode("utf-8")
     )
+
+
+def _terms_matched(terms: list[str], *fields: str) -> int:
+    """How many of `terms` appear in any of `fields`."""
+    return sum(any(term in field for field in fields) for term in terms)

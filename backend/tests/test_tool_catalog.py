@@ -96,6 +96,30 @@ def test_search_ranks_name_before_description_and_hides_deprecated():
     ]
 
 
+def test_multi_word_query_naming_a_real_tool_still_finds_it():
+    """A tool name plus extra words must not return nothing.
+
+    "visualization_set_node_size scaling factor" matches the name partially and
+    the description partially, but no single field wholly. Returning [] there
+    sent the model into a retry loop against a tool that exists.
+    """
+    catalog = ToolCatalog(
+        [
+            tool("visualization_set_node_size", "Updates ONLY the node sizes."),
+            tool("analysis_pagerank", "Calculate importance"),
+        ]
+    )
+    assert [
+        item.name
+        for item in catalog.search("visualization_set_node_size scaling factor")
+    ][0] == "visualization_set_node_size"
+
+
+def test_single_term_search_stays_strict():
+    catalog = ToolCatalog([tool("analysis_pagerank", "Calculate importance")])
+    assert catalog.search("layout") == []
+
+
 def test_search_uses_japanese_skill_metadata():
     catalog = ToolCatalog([tool("visualization_set_node_color")])
     assert [item.name for item in catalog.search("色分け")] == [
