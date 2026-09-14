@@ -5,67 +5,21 @@ triggers: [error, エラー, 失敗, failed, not found, 見つから, 存在し�
 related_tools: [node_search, network_list_node_attributes, network_list_edge_attributes, visualization_get_state]
 ---
 
-## Two kinds of failure, handled differently
+## Error Classification
 
-**A tool error** means the call was attempted and something went wrong. The
-result has an `error` field.
+- **Policy Refusal (`blocked_by` present)**: Pre-execution check rejected the call. Retrying identical arguments will be refused again. Read the `error` message and apply the prescribed remedy:
+  - *Attribute missing*: Pick from the real attribute names listed in the message, or ask user.
+  - *Computation too expensive*: Use approximation (e.g. `k` for betweenness) or extract a subgraph.
+  - *Repeated identical call*: Use the already-obtained result.
+- **Tool Error (`error` present without `blocked_by`)**: Execution attempted and failed:
+  - *Node not found*: Resolve label to ID using `node_search(query=...)`, then retry with ID.
+  - *Attribute not found*: Re-check return message of computing tool or list attributes.
+  - *Invalid parameter*: Check schema bounds. Ask user if changing value alters analysis intent.
+  - *Layout failure*: Fall back to ForceAtlas2/Spring if graph is non-planar or unpartitioned.
+  - *Empty filter*: Not a fatal error; suggest a looser filter condition.
 
-**A policy refusal** means the call was never attempted: a pre-execution check
-rejected it. The result has both `error` and **`blocked_by`** naming the check.
-This is not a bug and not a transient failure — retrying the identical call will
-be refused identically. The `error` text states what to do instead; do that.
+## Recovery Rules
 
-The refusals you can encounter:
-
-- **Attribute does not exist** — the message lists the network's real attribute
-  names. Pick the right one from that list. If none is what the user meant, ask
-  them; do not substitute something approximate.
-- **Ambiguous attribute** — two attributes differ only by case. Ask which.
-- **Computation too expensive** — the graph is above the size limit for a
-  super-linear algorithm. The message names the mitigation: an approximation
-  parameter (`k` for betweenness), a cheaper metric, or extracting a smaller
-  subgraph first. Choose one, and tell the user which and why — they should know
-  they got an approximation rather than an exact figure.
-- **Repeated identical call** — you have already made this exact call. Use the
-  result you already have.
-
-## Diagnosing real errors
-
-If the corrective tool is not currently visible, use `tool_search` with the
-exact name from the error or with the needed capability before retrying.
-
-- **Node not found** — you probably used a label where an ID is required. Use
-  `node_search(query=...)` to resolve the label to an ID, then retry with the ID.
-- **Attribute not found** (from the tool rather than a guard) — the attribute may
-  have been created mid-conversation under a derived name. Re-list attributes;
-  for a computed metric, re-read the computing tool's return message for the
-  exact name it saved.
-- **Invalid parameter value** — read the tool's schema for the accepted range.
-  Scientific parameters are preserved and validated by the individual tool.
-  Do not silently replace a requested value. Explain the failed condition; if
-  changing it alters the intended analysis, ask the user before retrying.
-- **Layout failed on this graph** — some layouts have structural preconditions.
-  `layout_planar` requires a planar graph; `layout_bipartite` and
-  `layout_multipartite` require a valid partition attribute. Fall back to a
-  force-directed layout and say why.
-- **Empty result** — a filter that matched nothing is not an error. Report that
-  no nodes matched, and suggest a looser condition rather than silently showing
-  an empty graph.
-
-## Correct once, then stop
-
-Attempt one targeted correction based on what the error actually said. Do not
-retry the same call unchanged, and do not cycle through variations hoping one
-works.
-
-After three failures of the same tool the turn is ended for you and the user is
-told why. Reaching that point means the diagnosis was wrong, so it is better to
-stop earlier and ask: report what you tried, quote the specific error, and say
-what you need from the user to proceed.
-
-## Report failures honestly
-
-State that the operation did not succeed, what the error was, and what you did
-about it. Do not describe a fallback as if it were what was asked for, and do not
-report partial completion as completion. If half of a multi-step request worked,
-say which half.
+1. **One Targeted Fix**: Make at most one corrective attempt addressing the specific failure reason. If the tool needed for correction is unexposed, use `tool_search`.
+2. **Stop and Consult**: If correction fails, stop immediately. Report what was attempted, quote the error, and ask the user for clarification. (3 failures of the same tool aborts the turn automatically).
+3. **Honest Reporting**: State clearly what failed and what fallback or partial result was obtained. Never report a fallback as if it were the requested operation.

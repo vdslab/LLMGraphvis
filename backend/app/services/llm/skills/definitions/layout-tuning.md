@@ -5,119 +5,53 @@ triggers: [layout, レイアウト, 配置, spread, 広げ, 離し, 密, tight, 
 related_tools: [layout_forceatlas2, layout_spring, layout_kamada_kawai, layout_spectral, layout_circular, layout_shell, layout_spiral, layout_random, layout_arf, layout_bipartite, layout_multipartite, layout_planar, layout_bfs, visualization_generate, visualization_get_state]
 ---
 
-## Two steps, always
+## Two-Step Execution Invariant
 
-Layout tools compute coordinates and store them; they do not redraw. Nothing
-changes on screen until you render:
+Layout tools compute and store coordinates; they do **not** draw.
+1. `layout_<algorithm>(...)` — compute coordinates.
+2. `visualization_generate()` — render updated coordinates on screen.
 
-1. `layout_<algorithm>(...)` — computes and saves positions.
-2. `visualization_generate()` — renders with the newly computed layout.
+## Algorithm Selection
 
-## Choosing an algorithm
+- **`layout_forceatlas2`**: Default. Emphasizes communities and scales to large graphs.
+- **`layout_spring`** (Fruchterman-Reingold): Uniform spacing, less extreme clustering.
+- **`layout_kamada_kawai`**: High-quality global layout for small graphs (<300 nodes). O(N²) memory/time; unweighted by default.
+- **`layout_arf`**: Force layout with adjustable attraction/repulsion; alternative when ForceAtlas2 overlaps.
+- **`layout_circular` / `layout_shell` / `layout_spiral`**: Geometric layouts for ordered/partitioned views (`nlist`).
+- **`layout_bipartite` / `layout_multipartite`**: Partition-based layers.
+- **`layout_bfs`**: Hierarchical tree levels from a root node.
+- **`layout_spectral`**: Fast eigenvector layout; may collapse dense graphs into lines.
+- **`layout_planar`**: Crossing-free layout for strictly planar graphs only.
 
-- **`layout_forceatlas2`** — the default. Reveals community structure well and
-  scales to large graphs. Use it unless there is a reason not to.
-- **`layout_spring`** (Fruchterman–Reingold) — the other general-purpose
-  force-directed option; tends to produce more even spacing and less pronounced
-  clustering than ForceAtlas2.
-- **`layout_kamada_kawai`** — excellent global structure on small graphs, but
-  builds a dense N×N distance matrix, so it is O(N²) in both time and memory and
-  is refused above a node threshold. Under a few hundred nodes it is often the
-  most readable choice.
-- **`layout_arf`** — force-directed with attractive/repulsive tuning; a good
-  second attempt when ForceAtlas2 leaves too much overlap.
-- **`layout_circular` / `layout_shell` / `layout_spiral`** — arrange nodes
-  geometrically rather than by structure. Useful when the user wants every node
-  visible and evenly spaced, or when shells encode a grouping (`nlist`).
-- **`layout_bipartite` / `layout_multipartite`** — when nodes divide into sides
-  or layers by an attribute, and that division is the point.
-- **`layout_planar`** — only for planar graphs; produces a crossing-free drawing.
-  It fails on non-planar input, which is most real graphs.
-- **`layout_bfs`** — hierarchical layers by BFS distance from a root. Use for
-  trees or when "distance from X" is the question.
-- **`layout_spectral`** — positions from the graph Laplacian's eigenvectors.
-  Fast and deterministic, but often collapses dense graphs into a line.
-- **`layout_random`** — only as a baseline, or as a starting point to re-run a
-  force layout from.
+## Parameter Mapping Guide
 
-## Mapping requests to parameters
+Parameters auto-tune to graph size by default. Override only when requested:
 
-The live tool schema is authoritative for names, defaults, and ranges — read it
-rather than trusting the values below. Parameters are auto-tuned to graph size by
-default, so only override what the user actually asked about.
-
-| The user says | Change |
+| User Request | Parameter Change |
 |---|---|
-| "spread them out", nodes overlap | ForceAtlas2: raise `scaling_ratio`, lower `gravity`. Spring: raise `k`. |
-| "pull it together", too sparse | The reverse: lower `scaling_ratio`, raise `gravity`, lower `k`. |
-| "the big nodes overlap" | ForceAtlas2 `node_size` — enables size-aware repulsion so large nodes push each other apart. |
-| "make it cleaner / converge better" | Raise `max_iter` (ForceAtlas2) or `iterations` (spring). Costs time roughly linearly. |
-| "use the edge weights" | Nothing — already done. See "Edge weights" below. |
-| "use <attribute> as the weight" | Pass `weight='<attribute>'`. It must be a numeric edge attribute. |
-| "ignore the weights" | Pass `weight='none'` on the force/spectral layout, then re-render. |
-| "same result every time" | Pass an explicit `seed`. Force layouts start from random positions, so without a fixed seed successive runs differ. |
-| "try a different arrangement" | Change `seed`, with `force_recompute=True`. |
-| "emphasise the clusters more" | ForceAtlas2 `strong_gravity=True`, or `linlog=True` for a log attraction model that separates clusters more sharply. |
-| "keep the current shape but refine it" | `init_from_layout='<previous layout name>'` — warm-starts from stored coordinates instead of from random. |
-| "start the circle from the top" | `layout_shell`: `rotate`. |
-| "tighter/looser spiral" | `layout_spiral`: `resolution`; `equidistant=True` for even arc spacing. |
+| "spread them out" / overlap | ForceAtlas2: raise `scaling_ratio`, lower `gravity`. Spring: raise `k`. |
+| "pull it together" / sparse | ForceAtlas2: lower `scaling_ratio`, raise `gravity`. Spring: lower `k`. |
+| "big nodes overlap" | ForceAtlas2: `node_size=True` (size-aware repulsion). |
+| "converge better" | Raise `max_iter` (ForceAtlas2) or `iterations` (Spring). |
+| "use edge weights" | Already applied by default. Do not pass `weight='weight'`. |
+| "use <attr> as weight" | Pass `weight='<attr>'` (must be numeric edge attribute). |
+| "ignore weights" | Pass `weight='none'`. |
+| "reproducible / same result"| Pass explicit integer `seed`. |
+| "try different arrangement"| Change `seed`, with `force_recompute=True`. |
+| "sharper clusters" | ForceAtlas2: `strong_gravity=True` or `linlog=True`. |
+| "refine current shape" | `init_from_layout='<previous_layout_name>'`. |
 
-## Edge weights
+## Edge Weight Semantics & Invariants
 
-`layout_forceatlas2`, `layout_spring` and `layout_spectral` are **weighted by
-default**: if the network's own imported edge weights vary and are positive, they
-are used as connection strength without any parameter. The tool's return message
-says what it did and what else was available — read it, and pass it on rather
-than claiming the layout ignored the weights.
+- **Default Weighting**: `forceatlas2`, `spring`, and `spectral` automatically use imported positive edge weights as connection strength.
+- **Kamada-Kawai**: Interprets weight as target *distance* (higher = farther). Never weighted by default.
+- **Coordinates Normalized**: Canvas normalizes coordinates to [-1000, 1000]. Parameters `scale` and `center` are visually inert — never offer them as zoom or pan.
+- **Caching**: Layouts cache by topology hash and parameters. Use `force_recompute=True` only when explicitly retrying the exact same parameters.
 
-- Do **not** pass `weight='weight'` "to be safe". It is already the behaviour,
-  and a redundant parameter is one more thing to get wrong.
-- **A graph can carry several numeric edge quantities.** Only the imported weight
-  is used unasked; anything else (`cost`, `distance`, `year`, a similarity score)
-  is *offered* in the return message and in the network context, never chosen for
-  you. Pass `weight='<name>'` when the user wants that quantity to drive the
-  layout, or when they say what the edges mean and one attribute obviously is it.
-- Pass `weight='none'` when the user explicitly wants the structure alone.
-- `layout_kamada_kawai` is the exception and is never weighted by default: there
-  a weight is the target *distance* between endpoints, so a strength-like weight
-  would draw the most strongly connected nodes furthest apart. Pass `weight`
-  there only when the attribute really is a distance or a cost.
+## Procedures
 
-Weighting is decided per call, so it costs nothing to change later: the initial
-layout is already weighted, and switching to a different weight is one re-call of
-the same tool plus `visualization_generate`. Report which quantity is driving the
-layout when it is not the plain imported weight — the user cannot see it
-otherwise.
-
-`scale` and `center` are accepted but have **no visible effect**: the renderer
-normalizes all coordinates to a fixed [-1000, 1000] extent before drawing. Do not
-offer them as a way to zoom or reposition, and do not claim they worked.
-
-## Caching and force_recompute
-
-Layout results are cached against the graph's structure hash **and** the exact
-parameters used. Re-calling with identical parameters on an unchanged graph
-returns instantly from cache; there is no reason to avoid a call for efficiency.
-
-The cache is keyed on parameters, so a genuine parameter change is a cache miss
-and recomputes on its own. Pass `force_recompute=True` only when the user
-explicitly wants the same computation redone — "recompute", "try again",
-"refresh" — or when a run produced a degenerate result you want to retry.
-
-## Typical procedure: "visualize this network"
-
-1. `layout_forceatlas2()`
-2. `visualization_generate()`
-3. Ask how they would like nodes encoded — by degree, by community, by an
-   existing attribute — rather than assigning colours yourself
-   (load `visual-encoding` if they ask you to apply an encoding).
-
-## Typical procedure: "spread the nodes out more"
-
-1. Read the current layout from `visualization_get_state` if you do not already
-   know which algorithm is active. Tuning the wrong algorithm's parameters does
-   nothing visible.
-2. Re-call that layout tool with the adjusted parameter.
-3. `visualization_generate()`.
-4. Report which parameter you changed and to what, so the user can ask for
-   "more" or "less" from a known starting point.
+### Adjusting Current Layout
+1. Call `visualization_get_state` to identify the active layout algorithm if unknown.
+2. Re-call that layout tool with the modified parameter.
+3. Call `visualization_generate()`.
+4. Report the adjusted parameter and value clearly.
