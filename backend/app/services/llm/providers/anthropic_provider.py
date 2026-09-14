@@ -1,6 +1,6 @@
 import json
 import os
-from typing import AsyncIterator, List, Optional
+from typing import Any, AsyncIterator, List, Optional
 
 from app.core.logging import get_logger
 
@@ -177,6 +177,20 @@ class AnthropicProvider(LLMProvider):
     ):
         messages = self._to_anthropic_messages(history)
         anthropic_tools = self._to_anthropic_tools(tools)
+        if anthropic_tools:
+            anthropic_tools[-1]["cache_control"] = {"type": "ephemeral"}
+
+        system_payload: Any = (
+            [
+                {
+                    "type": "text",
+                    "text": system_instruction,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
+            if system_instruction
+            else ""
+        )
 
         # Accumulate partial tool-call inputs, keyed by content block index
         pending_tools: dict = {}
@@ -191,7 +205,7 @@ class AnthropicProvider(LLMProvider):
         async with self.client.messages.stream(
             model=self.model_name,
             max_tokens=self.max_tokens,
-            system=system_instruction,
+            system=system_payload,
             messages=messages,
             tools=anthropic_tools,
             thinking={"type": "adaptive"},
