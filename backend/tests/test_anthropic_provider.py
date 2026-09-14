@@ -118,3 +118,48 @@ async def test_stream_applies_prompt_caching():
     assert len(tools_arg) == 2
     assert "cache_control" not in tools_arg[0]
     assert tools_arg[1]["cache_control"] == {"type": "ephemeral"}
+
+
+@pytest.mark.asyncio
+async def test_stream_captures_usage_with_prompt_caching():
+    from types import SimpleNamespace
+
+    provider = _provider()
+
+    mock_stream = MagicMock()
+    mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
+    mock_stream.__aexit__ = AsyncMock(return_value=None)
+
+    events = [
+        SimpleNamespace(
+            type="message_start",
+            message=SimpleNamespace(
+                usage=SimpleNamespace(
+                    input_tokens=10,
+                    cache_creation_input_tokens=1000,
+                    cache_read_input_tokens=500,
+                )
+            ),
+        ),
+        SimpleNamespace(
+            type="message_delta",
+            usage=SimpleNamespace(output_tokens=50),
+        ),
+        SimpleNamespace(type="message_stop"),
+    ]
+
+    async def event_generator():
+        for e in events:
+            yield e
+
+    mock_stream.__aiter__ = MagicMock(side_effect=event_generator)
+    provider.client.messages.stream = MagicMock(return_value=mock_stream)
+
+    chunks = []
+    async for chunk in provider._stream([], [], "prompt"):
+        chunks.append(chunk)
+
+    usage_chunk = next(c for c in chunks if c.usage is not None)
+    assert usage_chunk.usage.input_tokens == 1010  # 10 + 1000
+    assert usage_chunk.usage.output_tokens == 50
+    assert usage_chunk.usage.cached_input_tokens == 500

@@ -248,7 +248,9 @@ class AnthropicProvider(LLMProvider):
                 elif etype == "message_start":
                     u = getattr(event.message, "usage", None)
                     if u is not None:
-                        usage_input = getattr(u, "input_tokens", 0) or 0
+                        usage_input = (getattr(u, "input_tokens", 0) or 0) + (
+                            getattr(u, "cache_creation_input_tokens", 0) or 0
+                        )
                         usage_cached = getattr(u, "cache_read_input_tokens", 0) or 0
 
                 elif etype == "message_delta":
