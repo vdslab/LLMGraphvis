@@ -21,6 +21,11 @@ from app.services.llm.local_tools import LOCAL_TOOL_NAMES
 REPO_ROOT = Path(__file__).resolve().parents[2]
 AGENTS_MD = REPO_ROOT / "AGENTS.md"
 
+pytestmark = pytest.mark.skipif(
+    not AGENTS_MD.exists(),
+    reason="AGENTS.md not found at repo root (e.g. running in Docker container)",
+)
+
 # Antigravity truncates a rules file past 12,000 characters without warning, and
 # it reads AGENTS.md as a rules file. Leave headroom so an edit does not silently
 # drop the tail of the document for one of the tools that reads it.
