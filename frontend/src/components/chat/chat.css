@@ -508,16 +508,23 @@
   font-weight: 500;
 }
 
-/* Stadium-shaped composer input bar */
+/* Composer input bar: stadium pill when single-line, rounded card when multi-line */
 .composer__row {
   display: flex;
   align-items: flex-end;
   gap: 0.5rem;
   padding: 0.375rem 0.5rem 0.375rem 1rem;
   border: 1px solid var(--md-sys-color-outline-subtle);
-  border-radius: var(--md-sys-shape-full);
+  border-radius: var(--md-sys-shape-xl);
   background: var(--md-sys-color-surface-container-low);
-  transition: all var(--md-sys-motion-duration-short) ease;
+  transition: border-color var(--md-sys-motion-duration-short) ease,
+              background-color var(--md-sys-motion-duration-short) ease,
+              box-shadow var(--md-sys-motion-duration-short) ease;
+}
+
+.composer__row--has-attach,
+.composer__row:has(.composer__icon-btn) {
+  padding-left: 0.5rem;
 }
 
 .composer__row:focus-within {
@@ -539,6 +546,7 @@
   line-height: 1.5;
   color: var(--md-sys-color-on-surface);
   max-height: 10rem;
+  overflow-y: auto;
 }
 
 .composer__input::placeholder {
