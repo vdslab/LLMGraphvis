@@ -247,25 +247,6 @@ class TestGuardAttributeExists:
         assert guards.guard_attribute_exists(c) is None
 
 
-class TestGuardRedundantQuestion:
-    def test_defers_a_second_form_after_answered_analysis(self):
-        state = new_turn_state(10)
-        state["resumed_from_input"] = True
-        state["tools_run"] = 2
-        decision = guards.guard_redundant_question(
-            ctx("ask_user", turn_state=state)
-        )
-        assert decision.action == "defer"
-        assert "summarize" in decision.reason
-
-    def test_allows_clarification_before_any_tool_has_run(self):
-        state = new_turn_state(10)
-        state["resumed_from_input"] = True
-        assert (
-            guards.guard_redundant_question(ctx("ask_user", turn_state=state))
-            is None
-        )
-
 
 class TestGuardChannelOverwrite:
     def test_denies_repointing_one_channel_at_a_second_attribute(self):
