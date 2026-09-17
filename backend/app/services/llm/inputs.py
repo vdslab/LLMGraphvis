@@ -3,12 +3,33 @@
 import json
 import math
 import re
+from datetime import timezone
 from typing import Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from common import models
+
+
+def is_valid_number(value, minimum=None, maximum=None, step=None) -> bool:
+    """A finite, non-boolean number inside the bounds and on the step grid.
+
+    The step grid starts at `minimum` (or 0). Shared with parameter tuning
+    (`tuning.py`), whose sliders obey the same contract as a question's.
+    """
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    if not math.isfinite(value):
+        return False
+    if minimum is not None and value < minimum:
+        return False
+    if maximum is not None and value > maximum:
+        return False
+    if step is not None:
+        steps = (value - (minimum or 0)) / step
+        return math.isclose(steps, round(steps), abs_tol=1e-8)
+    return True
 
 
 class InputField(BaseModel):
@@ -118,15 +139,7 @@ class InputField(BaseModel):
                 isinstance(value, str) and bool(value.strip()) and len(value) <= 4000
             )
         else:
-            valid = isinstance(value, (int, float)) and not isinstance(value, bool)
-            valid = valid and math.isfinite(value)
-            if valid and self.minimum is not None:
-                valid = value >= self.minimum
-            if valid and self.maximum is not None:
-                valid = value <= self.maximum
-            if valid and self.step is not None:
-                steps = (value - (self.minimum or 0)) / self.step
-                valid = math.isclose(steps, round(steps), abs_tol=1e-8)
+            valid = is_valid_number(value, self.minimum, self.maximum, self.step)
         if not valid:
             raise ValueError(f"Invalid answer for '{self.label}'")
         return value
@@ -405,16 +418,35 @@ def restore_activation(db, chat_id, active_network_id) -> set[str]:
     Called only on a turn that resumes from an answer. A question asked against
     a different network is ignored: the answer belongs to a view that is no
     longer active, so its exposure is not the exposure this turn wants.
+
+    Confirming a tuning panel resumes its task the same way (ADR 0016); when a
+    panel was confirmed after the latest question was asked, its exposure wins.
     """
+    from .tuning import latest_confirmed
+
     request = (
         db.query(models.AnalysisInput)
         .filter_by(chat_id=chat_id, status="answered", network_id=active_network_id)
         .order_by(models.AnalysisInput.created_at.desc())
         .first()
     )
-    if request is None or not request.activated_tools:
+    source = request
+    confirmed = latest_confirmed(db, chat_id, active_network_id)
+    if confirmed is not None and confirmed.confirmed_at is not None:
+        if request is None or request.created_at is None or _naive(
+            confirmed.confirmed_at
+        ) > _naive(request.created_at):
+            source = confirmed
+    if source is None or not source.activated_tools:
         return set()
-    return {name for name in request.activated_tools if isinstance(name, str)}
+    return {name for name in source.activated_tools if isinstance(name, str)}
+
+
+def _naive(moment):
+    """SQLite drops tzinfo; compare both sides as naive UTC."""
+    if moment.tzinfo is not None:
+        moment = moment.astimezone(timezone.utc).replace(tzinfo=None)
+    return moment
 
 
 def accept_answer(chat, db, request_id, values, content):

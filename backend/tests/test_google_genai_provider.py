@@ -161,3 +161,22 @@ def test_local_tool_schemas_survive_gemini_schema_validation(provider):
         "number",
         "text",
     ]
+
+
+def test_tuning_tool_schemas_survive_gemini_schema_validation(provider):
+    """The tuning tools carry `gt=0` steps and a multi-type `value` union."""
+    from app.services.llm.local_tools import get_local_tools
+
+    definitions = [
+        t
+        for t in get_local_tools()
+        if t.name in {"offer_parameter_tuning", "apply_parameter_tuning"}
+    ]
+    assert len(definitions) == 2
+    declarations = provider._to_gemini_tools(definitions)
+    by_name = {d.function_declarations[0].name: d.function_declarations[0] for d in declarations}
+    fields = by_name["offer_parameter_tuning"].parameters.properties["fields"]
+    assert fields.type == "ARRAY"
+    assert "suggested" in fields.items.properties
+    changes = by_name["apply_parameter_tuning"].parameters.properties["changes"]
+    assert changes.type == "ARRAY"

@@ -300,18 +300,12 @@ async def process_message(
     chat = db.query(models.Chat).filter_by(id=chat_id).with_for_update().one()
     request_id = request.input_request_id
     content = request.message.content
-    if request_id is None:
-        pending = db.query(models.AnalysisInput).filter_by(
-            chat_id=chat_id, network_id=chat.network_id, status="pending"
-        ).first()
-        if pending:
-            request_id = pending.id
-    if request_id is not None:
-        resumed_from_input = True
+    if request.parameter_tuning_id is not None:
+        # Confirming a tuning panel resumes its task like an answer does (ADR 0016).
+        from app.services.llm.tuning import confirm
+
         try:
-            content = accept_answer(
-                chat, db, request_id, request.input_values, content
-            )
+            content = confirm(chat, db, request.parameter_tuning_id, content)
         except LookupError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except ValueError as exc:
@@ -319,10 +313,31 @@ async def process_message(
         if content is None:
             db.commit()
             return {"status": "already_accepted"}
-    elif request.input_values is not None:
-        raise HTTPException(status_code=409, detail="No active question")
+        resumed_from_input = True
     else:
-        resumed_from_input = False
+        if request_id is None:
+            pending = db.query(models.AnalysisInput).filter_by(
+                chat_id=chat_id, network_id=chat.network_id, status="pending"
+            ).first()
+            if pending:
+                request_id = pending.id
+        if request_id is not None:
+            resumed_from_input = True
+            try:
+                content = accept_answer(
+                    chat, db, request_id, request.input_values, content
+                )
+            except LookupError as exc:
+                raise HTTPException(status_code=404, detail=str(exc)) from exc
+            except ValueError as exc:
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
+            if content is None:
+                db.commit()
+                return {"status": "already_accepted"}
+        elif request.input_values is not None:
+            raise HTTPException(status_code=409, detail="No active question")
+        else:
+            resumed_from_input = False
 
     db_message = models.ChatMessage(chat_id=chat_id, role="user", content=content)
     db.add(db_message)
@@ -393,3 +408,66 @@ def get_analysis_input(
     if request is None:
         raise HTTPException(status_code=404, detail="Question not found")
     return serialize_request(request, chat.network_id)
+
+
+@router.get("/{chat_id}/tunings/{tuning_id}")
+def get_parameter_tuning(
+    chat_id: int,
+    tuning_id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    from app.services.llm.tuning import serialize_tuning
+
+    chat = verify_chat_ownership(chat_id, current_user.id, db)
+    row = db.query(models.ParameterTuning).filter_by(id=tuning_id, chat_id=chat_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Tuning panel not found")
+    return serialize_tuning(row, chat.network_id)
+
+
+@router.post("/{chat_id}/tunings/{tuning_id}/apply")
+async def apply_parameter_tuning(
+    chat_id: int,
+    tuning_id: str,
+    request: schemas.TuningApplyRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Re-run the panel's pipeline with new field values, without the agent (ADR 0016)."""
+    from app.services.llm import tuning
+
+    verify_chat_ownership(chat_id, current_user.id, db)
+    chat = db.query(models.Chat).filter_by(id=chat_id).with_for_update().one()
+    row = (
+        db.query(models.ParameterTuning)
+        .filter_by(id=tuning_id, chat_id=chat_id)
+        .with_for_update()
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Tuning panel not found")
+    try:
+        outcome = await tuning.apply(
+            db,
+            row,
+            request.values,
+            source="form",
+            active_network_id=chat.network_id,
+            queue=await llm_service.get_event_queue(chat_id),
+        )
+    except tuning.TuningInactive as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except tuning.TuningError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except tuning.TuningExecutionError as exc:
+        db.rollback()
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {
+        "tuning": tuning.serialize_tuning(row, chat.network_id),
+        "changes": outcome["changes"],
+        "steps": outcome["steps"],
+        "visualization": outcome["visualization"],
+    }

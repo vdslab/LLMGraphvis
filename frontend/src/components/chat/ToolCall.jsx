@@ -3,6 +3,7 @@ import { Wrench, Check, X, Loader2, Brain, SkipForward } from 'lucide-react';
 import { parseMessageContent } from '../../utils/parseMessageContent';
 import Disclosure from './Disclosure';
 import InputRequest from './InputRequest';
+import ParameterTuning from './ParameterTuning';
 
 const formatDuration = (startedAt, completedAt) => {
   if (!startedAt || !completedAt) return null;
@@ -65,6 +66,10 @@ const ToolCall = ({ execution }) => {
   if (execution.tool_name === 'ask_user' && execution.result?.input_request) {
     return <InputRequest request={execution.result.input_request} />;
   }
+  if (execution.tool_name === 'offer_parameter_tuning' && execution.result?.parameter_tuning) {
+    return <ParameterTuning tuning={execution.result.parameter_tuning} />;
+  }
+  const changes = execution.tool_name === 'apply_parameter_tuning' ? execution.result?.changes : null;
 
   return (
     <div className={`toolcall toolcall--${status}`}>
@@ -92,6 +97,16 @@ const ToolCall = ({ execution }) => {
       )}
 
       {execution.error && <p className="toolcall__error">{execution.error}</p>}
+      {changes?.length > 0 && (
+        <ul className="toolcall__changes">
+          {changes.map((change) => (
+            <li key={change.param}>
+              <code>{change.param.split('.').pop()}</code>{' '}
+              {JSON.stringify(change.before ?? 'auto')} → {JSON.stringify(change.after ?? 'auto')}
+            </li>
+          ))}
+        </ul>
+      )}
       {status === 'deferred' && execution.result?.reason && (
         <p className="toolcall__note">{execution.result.reason}</p>
       )}

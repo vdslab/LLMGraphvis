@@ -74,9 +74,8 @@ write Japanese, so an English-only trigger list makes the skill invisible to
 them (`tests/test_skills_loader.py` enforces this). The frontmatter parser takes
 scalars and string lists only; anything richer belongs in the body.
 
-Exposure lasts the whole turn and survives an `ask_user` answer (restored from
-`analysis_inputs.activated_tools`, ADR 0014), never the response that activated
-it. Four places tell the model this; change them together.
+Exposure lasts the whole turn and survives an `ask_user` answer or a confirmed
+tuning panel (ADR 0014, 0016), never the response that activated it. Four places tell the model this; change them together.
 
 ### Hooks
 
@@ -133,17 +132,18 @@ Auto-discovered from `@mcp.tool()`-decorated functions in
 `networkx-api/app/mcp/tools/{domain}/`. Naming is `domain_verb`: `network_*`,
 `node_*`, `subgraph_*`, `analysis_*`, `layout_*`, `visualization_*`. Local tools
 in `backend/.../local_tools.py`: `switch_to_main_network`,
-`switch_to_parent_network`, `skill_load`, `tool_search`, `ask_user`.
+`switch_to_parent_network`, `skill_load`, `tool_search`, `ask_user`,
+`offer_parameter_tuning`, `apply_parameter_tuning`.
 
 **To add a tool**: write the function in the right `tools/` module with
 `@mcp.tool()` + `@handle_tool_errors` and export it from that package's
 `__init__.py`. There is no schema to register by hand — anything telling you to
-edit `backend/app/services/llm_service.py` is stale (that file does not exist).
+edit `backend/app/services/llm_service.py` is stale.
 Add a skill *only* if it needs procedural guidance, a hook *only* if it needs
 enforcement.
 
 The backend caches tool definitions for `MCP_TOOLS_CACHE_TTL` seconds (default
-300); call `mcp_client.invalidate_tools_cache()` or wait it out.
+300); call `mcp_client.invalidate_tools_cache()` or wait.
 
 ### Invariants that are easy to get wrong
 

@@ -319,7 +319,7 @@ async def test_same_batch_analysis_runs_before_ranked_read(mock_agent, mock_queu
     """A derived metric must exist before a same-batch tool tries to read it."""
     execution_order = []
 
-    async def run_tool(name, args, *_args):
+    async def run_tool(name, args, *_args, **_kwargs):
         execution_order.append(name)
         return ({"content": name}, "completed", None)
 

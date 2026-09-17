@@ -366,3 +366,33 @@ class AnalysisInput(Base):
     # from here rather than re-earned with another skill_load. See ADR 0014.
     activated_tools = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ParameterTuning(Base):
+    """A re-runnable tool pipeline whose parameters are adjusted by words or a panel.
+
+    The agent (`apply_parameter_tuning`) and the panel (`POST .../apply`) update
+    the same row, so each sees what the other changed. See ADR 0016.
+    """
+
+    __tablename__ = "parameter_tunings"
+    id = Column(String(36), primary_key=True)
+    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False, index=True)
+    network_id = Column(Integer, ForeignKey("networks.id", ondelete="CASCADE"), nullable=False)
+    # question and fields (with the schema description copied in).
+    specification = Column(JSON, nullable=False)
+    # [{tool, arguments}] in execution order: the effective arguments that ran.
+    steps = Column(JSON, nullable=False)
+    # field id ("tool.argument") -> value currently drawn on the canvas.
+    values = Column(JSON, nullable=False)
+    initial_values = Column(JSON, nullable=False)
+    suggested_values = Column(JSON, nullable=False)
+    history = Column(JSON, nullable=False, default=list)
+    last_result = Column(JSON, nullable=True)
+    status = Column(String, nullable=False, default="active")
+    activated_tools = Column(JSON, nullable=True)
+    last_applied_at = Column(DateTime(timezone=True), nullable=True)
+    # The last time the agent was told about panel changes (TURN_START).
+    reported_at = Column(DateTime(timezone=True), nullable=True)
+    confirmed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

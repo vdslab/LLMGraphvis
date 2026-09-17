@@ -172,6 +172,13 @@ class ChatProcessRequest(BaseModel):
     message: ChatProcessMessage
     input_request_id: Optional[str] = None
     input_values: Optional[dict] = None
+    # "Use these values" on a tuning panel: confirms it and resumes its task.
+    parameter_tuning_id: Optional[str] = None
+
+
+class TuningApplyRequest(BaseModel):
+    # field id ("tool.argument") -> value. Only panel fields are accepted here.
+    values: dict
 
 
 class CreateEgoNetworkRequest(BaseModel):
