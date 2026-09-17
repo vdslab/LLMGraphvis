@@ -495,3 +495,107 @@ async def test_answering_turn_reopens_with_the_tools_the_question_had(db, chat):
         )
 
     assert "analysis_betweenness_centrality" in exposed_per_turn[0]
+
+
+@pytest.mark.asyncio
+async def test_consecutive_question_allowed_after_tool_execution_in_resumed_turn(
+    db, chat
+):
+    """A second ask_user after running analysis in an answered turn must not be deferred."""
+    from contextlib import asynccontextmanager
+
+    catalog_tools = [
+        ToolDefinition(
+            name="analysis_betweenness_centrality", description="", parameters={}
+        ),
+    ]
+
+    with patch("app.services.llm.engine._create_provider", return_value=MagicMock()):
+        agent = GraphVisAgent(db=db)
+
+    @asynccontextmanager
+    async def no_session():
+        yield None
+
+    SECOND_FORM = {
+        "question": "次のステップはどうしますか？",
+        "fields": [
+            {
+                "id": "next_step",
+                "label": "次のステップ",
+                "kind": "select",
+                "options": ["エッジ強調", "現状維持"],
+            }
+        ],
+    }
+
+    state = {"network_id": chat.network_id, "resumed_from_input": True}
+    catalog = ToolCatalog(catalog_tools + local_tools.get_local_tools())
+    catalog.initialize_turn(state)
+    catalog.activate(["analysis_betweenness_centrality"], state)
+
+    iteration_count = 0
+
+    def mock_generate(history, tools, system_instruction):
+        nonlocal iteration_count
+        iteration_count += 1
+
+        async def stream():
+            if iteration_count == 1:
+                # Iteration 1: Run analysis tool
+                yield StreamChunk(
+                    text="中心性を計算します。",
+                    function_calls=[
+                        FunctionCallData(
+                            name="analysis_betweenness_centrality", args={}
+                        )
+                    ],
+                )
+            else:
+                # Iteration 2: After tool runs, propose next choice to user
+                yield StreamChunk(
+                    text="計算が完了しました。次にどの可視化を追加しますか？",
+                    function_calls=[
+                        FunctionCallData(name="ask_user", args=SECOND_FORM)
+                    ],
+                )
+
+        return stream()
+
+    agent.provider.generate = mock_generate
+    agent.provider.supports_native_thinking = False
+
+    with patch(
+        "app.services.llm.mcp_client.execute_tool",
+        new_callable=AsyncMock,
+        return_value={"content": "Betweenness centrality calculated."},
+    ), patch("app.services.llm.mcp_client.session_scope", no_session):
+        initial_stream = agent.provider.generate([], catalog.active_tools(state), "")
+        final_text, execution_log, _ = await agent._execute_tool_loop(
+            initial_stream,
+            [],
+            catalog,
+            AsyncMock(),
+            chat.id,
+            chat.network_id,
+            None,
+            state,
+        )
+
+    # Must end the turn with the question, not defer it
+    assert state.get("input_request") is not None
+    assert state["input_request"]["question"] == SECOND_FORM["question"]
+    assert "計算が完了しました" in final_text
+    # Tool execution log has both the analysis tool and ask_user
+    all_calls = [
+        c["name"] for step in execution_log for c in step.get("tool_calls", [])
+    ]
+    assert all_calls == ["analysis_betweenness_centrality", "ask_user"]
+    # And ask_user status must be completed, not deferred
+    ask_user_call = [
+        c
+        for step in execution_log
+        for c in step.get("tool_calls", [])
+        if c["name"] == "ask_user"
+    ][0]
+    assert ask_user_call["status"] == "completed"

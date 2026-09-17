@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react';
+import clsx from 'clsx';
 import { ArrowUp, Paperclip, X } from 'lucide-react';
 
 const MAX_HEIGHT = 160;
@@ -63,7 +64,7 @@ const Composer = ({
         </div>
       )}
 
-      <div className="composer__row">
+      <div className={clsx('composer__row', onAttach && 'composer__row--has-attach')}>
         {onAttach && (
           <button
             type="button"

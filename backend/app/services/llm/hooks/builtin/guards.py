@@ -229,18 +229,6 @@ def guard_attribute_exists(ctx: HookContext) -> Optional[ToolCallDecision]:
     )
 
 
-@hook(HookEvent.PRE_TOOL, tools="ask_user", priority=65, name="guard_redundant_question")
-def guard_redundant_question(ctx: HookContext) -> Optional[ToolCallDecision]:
-    """Do not reopen a form after acting on the answer to the prior form."""
-    if not ctx.turn_state.get("resumed_from_input"):
-        return None
-    if ctx.turn_state.get("tools_run", 0) < 1:
-        return None
-    return ToolCallDecision.defer(
-        "The user already answered the active form and the requested analysis has "
-        "run. Do not open another form; summarize the result now."
-    )
-
 
 _SIBLING_NODE_CHANNEL = {
     "visualization_set_node_color": "visualization_set_node_size",

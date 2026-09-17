@@ -153,4 +153,21 @@ describe('ChatInterface', () => {
         expect(toggle).toHaveAttribute('aria-expanded', 'true');
         expect(screen.getByText('I should compute centrality')).toBeInTheDocument();
     });
+
+    it('applies composer__row--has-attach when network data is loaded', () => {
+        useNetworkStore.mockImplementation((selector) => {
+            const state = { nodes: [{ id: 'n1' }] };
+            return typeof selector === 'function' ? selector(state) : state;
+        });
+        const { container } = render(<ChatInterface />);
+        expect(container.querySelector('.composer__row--has-attach')).toBeInTheDocument();
+        expect(screen.getByTitle('Upload GraphML')).toBeInTheDocument();
+    });
+
+    it('does not apply composer__row--has-attach when no network data is loaded', () => {
+        const { container } = render(<ChatInterface />);
+        expect(container.querySelector('.composer__row--has-attach')).not.toBeInTheDocument();
+        expect(screen.queryByTitle('Upload GraphML')).not.toBeInTheDocument();
+    });
 });
+
