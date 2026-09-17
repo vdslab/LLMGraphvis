@@ -268,6 +268,8 @@ def get_local_tools() -> list[ToolDefinition]:
         _skill_load_definition(),
         _tool_search_definition(),
         _input_definition(),
+        _offer_tuning_definition(),
+        _apply_tuning_definition(),
     ]
 
 
@@ -279,6 +281,8 @@ LOCAL_TOOL_NAMES = frozenset(
         "skill_load",
         "tool_search",
         "ask_user",
+        "offer_parameter_tuning",
+        "apply_parameter_tuning",
     }
 )
 
@@ -295,6 +299,19 @@ async def execute_local_tool(tool_name: str, arguments: dict, context: dict):
     if tool_name == "ask_user":
         from .inputs import present_question
         return present_question(chat_id, db, arguments, context["turn_state"])
+    if tool_name == "offer_parameter_tuning":
+        from .tuning import present_tuning
+        return present_tuning(chat_id, db, arguments, context["turn_state"])
+    if tool_name == "apply_parameter_tuning":
+        from .tuning import apply_from_agent
+        return await apply_from_agent(
+            chat_id,
+            db,
+            arguments,
+            context["turn_state"],
+            queue=context.get("queue"),
+            session=context.get("session"),
+        )
     if tool_name == "switch_to_main_network":
         return await switch_to_main_network(chat_id, db)
     elif tool_name == "switch_to_parent_network":
@@ -344,7 +361,61 @@ def _input_definition() -> ToolDefinition:
             "deferred. The tools you have activated stay available in the turn that handles the answer. Do not use for "
             "direct instructions, refinements of what is on screen, questions you can answer yourself, "
             "or things already specified. Free-text replies are accepted; treat partial answers ('any', 'you choose') as "
-            "valid decisions rather than re-asking. No analysis or view change occurs."
+            "valid decisions rather than re-asking. No analysis or view change occurs.\n"
+            "5. Parameters are not questions: adjust them from the user's words (apply_parameter_tuning, or re-run "
+            "the tool) and attach a tuning panel with offer_parameter_tuning, never an ask_user slider."
+        ),
+        parameters=schema,
+    )
+
+
+def _offer_tuning_definition() -> ToolDefinition:
+    """Schema from the Pydantic model that validates it, cleaned like ask_user's."""
+    from .mcp_client import _resolve_schema_refs, _sanitize_schema
+    from .tuning import TuningForm
+
+    schema = TuningForm.model_json_schema()
+    schema = _sanitize_schema(_resolve_schema_refs(schema, schema))
+    return ToolDefinition(
+        name="offer_parameter_tuning",
+        description=(
+            "Attach a compact tuning panel to a result whose look depends strongly on a few parameters "
+            "(community resolution, force-layout spread, size ranges). The panel is for users fluent in "
+            "visualization: it shows the real parameter names, ranges and tool descriptions, and re-runs the "
+            "pipeline without you when they press Apply. Words remain the main way to tune.\n\n"
+            "1. Run first: every tool in `tools` must already have succeeded on the current view (this or an "
+            "earlier turn); its latest arguments are reused, so list only names.\n"
+            "2. Pick 1-4 fields that matter most for this data, give each a range worth exploring, "
+            "`low_label`/`high_label` in the conversation language, and a `suggested` value with a one-sentence "
+            "`rationale` when you have a data-grounded recommendation. Suggestions are shown, not applied: if you "
+            "are confident a value is better, run the tool with it before offering the panel.\n"
+            "3. Not a question: this does not end the turn. In your text, say what the fields change and that the "
+            "user can also just say how they want it adjusted.\n"
+            "4. One panel per view; a new one replaces the previous panel. After this call, "
+            "apply_parameter_tuning is available."
+        ),
+        parameters=schema,
+    )
+
+
+def _apply_tuning_definition() -> ToolDefinition:
+    from .mcp_client import _resolve_schema_refs, _sanitize_schema
+    from .tuning import ApplyRequest
+
+    schema = ApplyRequest.model_json_schema()
+    schema = _sanitize_schema(_resolve_schema_refs(schema, schema))
+    return ToolDefinition(
+        name="apply_parameter_tuning",
+        description=(
+            "Change parameters of the active tuning panel's pipeline and redraw, in one call. This is how "
+            "tuning requests in words are carried out while a panel is active ('a bit finer', 'spread it out "
+            "and use seed 7', 'resolution 1.3', 'the previous one was better').\n\n"
+            "Convert relative requests to absolute values from the current value, range, low/high meaning and "
+            "history given in the Active Parameter Tuning context: 'a bit' is 1-2 steps (about 10% of the range), "
+            "'much/more' about 30%, 'max/min' the range ends, 'previous' the before-value of the latest change. "
+            "Arguments that are not panel fields can be changed too (any argument of a pipeline tool). When a "
+            "request is ambiguous, apply your best reading and say so; do not ask. Report the returned "
+            "`changes` as parameter before → after, with what visibly changed."
         ),
         parameters=schema,
     )

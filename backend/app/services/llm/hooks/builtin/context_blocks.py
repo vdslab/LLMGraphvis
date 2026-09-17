@@ -56,3 +56,28 @@ def inject_iteration_budget(ctx: HookContext) -> None:
         f"needs more than that, do the most informative part first and tell the "
         f"user what remains."
     )
+
+
+@hook(HookEvent.TURN_START, priority=40, name="inject_active_tuning")
+def inject_active_tuning(ctx: HookContext) -> None:
+    """Current values of the active tuning panel, and what the user changed there.
+
+    The panel re-runs the pipeline without the agent, so this block is the only
+    way the agent learns the canvas no longer shows the values it last chose.
+    See ADR 0016.
+    """
+    from ... import tuning
+
+    if ctx.db is None:
+        return
+    row = tuning.active_tuning(ctx.db, ctx.chat_id, ctx.network_id)
+    if row is not None:
+        ctx.turn_state["tuning_tools"] = {tuning.APPLY_TOOL}
+        ctx.add_context(tuning.context_block(ctx.db, row))
+        return
+    # A tuning request about a view drawn in an earlier turn: without this the
+    # offer tool is unreachable and a small model falls back to an ask_user menu.
+    pipeline = tuning.offerable_pipeline(ctx.db, ctx.chat_id, ctx.network_id, ctx.user_text)
+    if pipeline:
+        ctx.turn_state["tuning_tools"] = {tuning.OFFER_TOOL, *pipeline}
+        ctx.add_context(tuning.offer_hint(pipeline))

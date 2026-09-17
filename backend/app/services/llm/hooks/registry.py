@@ -202,6 +202,7 @@ def load_builtin_hooks() -> HookRegistry:
         intent,
         normalize,
         side_effects,
+        tuning,
     )
 
     _builtins_loaded = True

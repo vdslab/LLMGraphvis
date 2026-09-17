@@ -56,6 +56,9 @@ class ToolCatalog:
         turn_state["restored_tool_names"] = restored
         turn_state["presented_tool_names"] = set()
 
+    def get(self, name: str) -> ToolDefinition | None:
+        return self._by_name.get(name)
+
     def active_names(self, turn_state: dict) -> list[str]:
         """Every name currently exposed, not just the most recent addition."""
         enabled = turn_state.get("enabled_tool_names", set())

@@ -273,8 +273,11 @@ class GraphVisAgent:
         restore = (
             inputs.restore_activation(self.db, chat_id, turn_state["network_id"])
             if resumed_from_input
-            else None
+            else set()
         )
+        # Tuning is done in words on any turn: `inject_active_tuning` names the
+        # tools that needs (ADR 0016).
+        restore = restore | set(turn_state.get("tuning_tools") or ())
         tool_catalog.initialize_turn(turn_state, restore=restore)
         initial_tools = self._tools_for_generation(
             tool_catalog, turn_state, iteration=0
@@ -702,7 +705,12 @@ class GraphVisAgent:
             modification_note = decision.reason
 
         result, status, error_msg = await self._run_tool(
-            feature_name, effective_args, chat_id, session, turn_state
+            feature_name, effective_args, chat_id, session, turn_state, queue=queue
+        )
+        # What actually ran, after normalization: a tuning panel re-runs these
+        # arguments, never the model's original ones. See ADR 0016.
+        turn_state.setdefault("executed_calls", []).append(
+            {"name": feature_name, "args": effective_args, "status": status}
         )
 
         # Tell the model when its arguments were adjusted, so it reports what
@@ -725,6 +733,7 @@ class GraphVisAgent:
         chat_id: int,
         session: Any,
         turn_state: Optional[Dict[str, Any]] = None,
+        queue: Any = None,
     ) -> Tuple[Any, str, Optional[str]]:
         """Actual execution wrapper.
 
@@ -733,7 +742,13 @@ class GraphVisAgent:
         """
         try:
             if local_tools.is_local_tool(function_name):
-                context = {"chat_id": chat_id, "db": self.db, "turn_state": turn_state if turn_state is not None else {}}
+                context = {
+                    "chat_id": chat_id,
+                    "db": self.db,
+                    "turn_state": turn_state if turn_state is not None else {},
+                    "queue": queue,
+                    "session": session,
+                }
                 result = await local_tools.execute_local_tool(function_name, args, context)
             else:
                 result = await mcp_client.execute_tool(function_name, args, session=session)
