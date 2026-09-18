@@ -319,7 +319,10 @@ class TestEdgeWeights:
         setup_graph(db, weighted=True)
         add_edge_attribute(db, 1, "strength", [9.0, 8.0, 7.0, 6.0, 5.0])
         seen = weights_seen_by("spring", "spring_layout", db, {"weight": "strength"})
-        assert sorted(d["strength"] for d in seen["edge_data"]) == [5, 6, 7, 8, 9]
+        # Strength weights arrive divided by their median (7), ratios intact.
+        assert sorted(d["strength"] * 7 for d in seen["edge_data"]) == pytest.approx(
+            [5, 6, 7, 8, 9]
+        )
         assert seen["weight_kwarg"] == "strength"
 
     def test_other_numeric_attributes_are_offered_never_chosen(self, db):

@@ -14,7 +14,8 @@ from sqlalchemy.orm import Session
 from app.core.logging import get_logger
 from common import models
 
-from .layouts import get_spec, layout_names, param_keys, resolve_weight
+from .layouts import WeightRole, get_spec, layout_names, param_keys, resolve_weight
+from .layouts.weights import normalize_strength
 
 logger = get_logger(__name__)
 
@@ -187,6 +188,14 @@ def calculate_layout(
     from .utils.graph_builder import build_graph_from_db
 
     G = build_graph_from_db(network_id, db, weight_attribute=weight_attribute)
+    normalized_by = None
+    if weight_attribute and spec.weight_role is WeightRole.STRENGTH:
+        normalized_by = normalize_strength(G, weight_attribute)
+        if normalized_by is not None and normalized_by != 1:
+            weight_note = (
+                f"{weight_note} Weights were divided by their median "
+                f"({normalized_by:.3g}), so only their ratios shape the layout."
+            ).strip()
 
     # Need node_map for saving results (str_id -> db_id)
     nodes_query = (
@@ -278,6 +287,10 @@ def calculate_layout(
     if init_from:
         cache_params["init_from_layout"] = init_from
     effective_params = {"layout_name": layout_name, **cache_params}
+    if normalized_by is not None:
+        # Part of the cache key only: a layout stored before weights were
+        # normalized must not be reused as if it had been.
+        effective_params["weight_normalization"] = "median"
 
     result = {
         "layout_name": layout_name,

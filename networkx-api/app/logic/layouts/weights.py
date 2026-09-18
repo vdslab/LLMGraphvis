@@ -11,6 +11,8 @@ connection strength is the caller's decision, not this module's, so those are
 reported as candidates and never chosen automatically.
 """
 
+import statistics
+
 from app.core.logging import get_logger
 
 from ..utils.graph_builder import WEIGHT_COLUMN, summarize_edge_weights
@@ -102,3 +104,29 @@ def resolve_weight(spec, requested, network_id: int, db):
 
 def _span(summary) -> str:
     return f"{summary['min']:.3g}–{summary['max']:.3g}"
+
+
+def normalize_strength(G, attribute: str):
+    """Divide strength weights by their median, in place; return the median.
+
+    ForceAtlas2 and spring multiply attraction by the weight, so the same data
+    drew differently depending on its unit (on les_miserables, weights x10 took
+    node overlap from 5% to 21%). Only the ratios between weights mean anything
+    as a strength, so they are fixed to a median of 1. The median rather than
+    the mean keeps a few extreme edges from rescaling everything else.
+
+    Returns None when there is nothing positive to normalize by.
+    """
+    positive = [
+        value
+        for _u, _v, value in G.edges(data=attribute)
+        if value is not None and value > 0
+    ]
+    if not positive:
+        return None
+    median = statistics.median(positive)
+    if median != 1:
+        for _u, _v, data in G.edges(data=True):
+            if data.get(attribute) is not None:
+                data[attribute] = data[attribute] / median
+    return median

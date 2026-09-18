@@ -745,3 +745,31 @@ def build_visualization(
         if quality is not None:
             vis_data["layout_quality"] = quality
     return vis_data
+
+
+def display_node_sizes(db: Session, network_id: int) -> Dict[str, float]:
+    """Each node's size (an area) as the saved style draws it, keyed by node_id.
+
+    Needs no layout, unlike `build_visualization`, so layouts can use it before
+    their first run: `size_aware` repulsion and quality scoring both have to
+    know how large the nodes will be drawn. Focus/context overrides are ignored;
+    they belong to a view, not to the network.
+    """
+    network = db.query(models.Network).filter(models.Network.id == network_id).first()
+    config = network.last_node_size_config if network else None
+    nodes = (
+        db.query(models.Node.id, models.Node.node_id)
+        .filter(models.Node.network_id == network_id)
+        .all()
+    )
+    smart_defaults = calculate_smart_node_size(len(nodes))
+    builder = VisualizationBuilder(network_id, db)
+    attrs = StyleService.collect_required_attributes([config])
+    attr_map, values = builder._fetch_node_data(network_id, attrs)
+    stats = StyleService.calculate_stats(config, attr_map, values)
+    return {
+        node_id: StyleService.resolve_node_size(
+            db_id, config, stats, attr_map, values, smart_defaults
+        )
+        for db_id, node_id in nodes
+    }

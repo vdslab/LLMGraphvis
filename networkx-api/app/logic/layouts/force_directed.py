@@ -7,8 +7,13 @@ accepts, how they are tuned to graph size, and what a weight means to it.
 import math
 
 import networkx as nx
+import numpy as np
 
 from .base import WeightRole, register
+
+# Graph attribute set by `prepare_forceatlas2`: `node_size` holds radii in drawn
+# (renderer) units rather than in the layout's own coordinate units.
+RENDERED_RADII = "node_size_in_rendered_units"
 
 
 def tune_spring(G) -> dict:
@@ -79,6 +84,43 @@ def spring(G, params):
     return nx.spring_layout(G, **params)
 
 
+def prepare_forceatlas2(G, network_id, overrides, db):
+    """Turn `size_aware=True` into `node_size`, from the sizes the nodes are drawn at.
+
+    networkx wants one radius per node, which no caller can type out for a real
+    graph, so the app fills it in from the saved node-size style.
+    """
+    from ..layout_quality import radius_from_size
+    from ..visualization_builder import display_node_sizes
+
+    if not overrides.pop("size_aware", None):
+        return
+    if overrides.get("node_size") is not None:
+        raise ValueError("Choose size_aware or node_size, not both")
+    sizes = display_node_sizes(db, network_id)
+    overrides["node_size"] = {
+        node: radius_from_size(sizes.get(node, 0.0)) for node in G.nodes
+    }
+    G.graph[RENDERED_RADII] = True
+
+
+def _size_aware_forceatlas2(G, params):
+    """ForceAtlas2 with radii given in drawn units.
+
+    The radii have to be in the layout's own units, which are unknown until it
+    has run (the renderer rescales to a 2000-unit square afterwards). So run
+    once without sizes, convert the radii by that layout's extent, and continue
+    from it with size-aware repulsion.
+    """
+    radii = params["node_size"]
+    first = nx.forceatlas2_layout(G, **{**params, "node_size": None})
+    coords = np.array(list(first.values()), dtype=float).reshape(-1, 2)
+    extent = float(np.ptp(coords, axis=0).max()) if len(coords) > 1 else 0.0
+    factor = (extent or 1.0) / 2000.0
+    scaled = {node: radius * factor for node, radius in radii.items()}
+    return nx.forceatlas2_layout(G, **{**params, "pos": first, "node_size": scaled})
+
+
 @register(
     "forceatlas2",
     params={
@@ -88,10 +130,13 @@ def spring(G, params):
     },
     weight_role=WeightRole.STRENGTH,
     tune=tune_forceatlas2,
+    prepare=prepare_forceatlas2,
     aliases=("forceatlas2_layout", "force-directed", "force_directed"),
 )
 def forceatlas2(G, params):
     """ForceAtlas2 (networkx native, 3.6+). Weights are attraction strength."""
+    if G.graph.get(RENDERED_RADII) and params.get("node_size"):
+        return _size_aware_forceatlas2(G, params)
     return nx.forceatlas2_layout(G, **params)
 
 
