@@ -18,7 +18,7 @@ import networkx as nx
 
 # Planarity and bipartiteness are linear-time, but not free; above this size
 # they are reported as unknown rather than slowing every layout run.
-STRUCTURE_CHECK_LIMIT = 20_000
+STRUCTURE_CHECK_LIMIT = 5_000
 
 
 @dataclass(frozen=True)
