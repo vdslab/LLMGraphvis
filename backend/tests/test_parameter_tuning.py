@@ -643,3 +643,12 @@ def test_tuning_request_about_an_earlier_view_exposes_the_offer(db, chat):
 
     state, block = turn_start("中心性を計算して")
     assert "tuning_tools" not in state and block == ""
+
+
+def test_layout_evaluation_tools_are_not_tunable():
+    """They draw nothing, so re-running them from a panel only costs time."""
+    from app.services.llm import tuning
+
+    assert not tuning.is_tunable_tool("layout_suggest_parameters")
+    assert not tuning.is_tunable_tool("layout_profile")
+    assert tuning.is_tunable_tool("layout_forceatlas2")

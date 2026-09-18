@@ -27,7 +27,11 @@ APPLY_TOOL = "apply_parameter_tuning"
 # would create a new network on every change and a view switch changes what is
 # being looked at, so neither is "the same result with different parameters".
 TUNABLE_PREFIXES = ("analysis_", "layout_", "visualization_")
-UNTUNABLE_TOOLS = frozenset({"visualization_switch_network"})
+# The layout evaluation tools compute nothing that is drawn; re-running the
+# parameter search on every panel change would only cost time (ADR 0017).
+UNTUNABLE_TOOLS = frozenset(
+    {"visualization_switch_network", "layout_profile", "layout_suggest_parameters"}
+)
 MAX_HISTORY = 10
 
 

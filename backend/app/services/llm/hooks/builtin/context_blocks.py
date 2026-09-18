@@ -32,9 +32,25 @@ def inject_skill_suggestions(ctx: HookContext) -> None:
     """
     from ...skills import registry as skill_registry
 
-    block = skill_registry.suggestion_block(ctx.user_text)
+    block = skill_registry.suggestion_block(
+        ctx.user_text, current_layout=_current_layout(ctx)
+    )
     if block:
         ctx.add_context(block)
+
+
+def _current_layout(ctx: HookContext):
+    """The layout algorithm the active network was last drawn with, if any."""
+    if ctx.db is None or not ctx.network_id:
+        return None
+    from common import models
+
+    network = (
+        ctx.db.query(models.Network.last_layout_name)
+        .filter(models.Network.id == ctx.network_id)
+        .first()
+    )
+    return network[0] if network else None
 
 
 @hook(HookEvent.TURN_START, priority=30, name="inject_iteration_budget")

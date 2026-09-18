@@ -118,8 +118,35 @@ class SkillRegistry:
         scored.sort(key=lambda pair: (-pair[0], pair[1].name))
         return [skill for _hits, skill in scored[:limit]]
 
-    def suggestion_block(self, text: str, limit: int = 3) -> str:
+    def layout_skill_for(self, layout_name: Optional[str]) -> Optional[Skill]:
+        """The per-algorithm skill for a layout, found by the tool it exposes.
+
+        Per-algorithm skills are named `layout-*` and list their `layout_<name>`
+        tool in `related_tools` (ADR 0017), so no separate mapping is kept.
+        """
+        self._ensure_loaded()
+        if not layout_name:
+            return None
+        tool = f"layout_{layout_name}"
+        for skill in self._skills.values():
+            if skill.name.startswith("layout-") and tool in skill.related_tools:
+                return skill
+        return None
+
+    def suggestion_block(
+        self, text: str, limit: int = 3, current_layout: Optional[str] = None
+    ) -> str:
+        """Skills to load for `text`.
+
+        When the common `layout` skill matches, the skill for `current_layout`
+        (the algorithm on screen) is added: a request like "spread it out"
+        names no algorithm, so its own triggers would never match it.
+        """
         matches = self.suggest(text, limit=limit)
+        if any(s.name == "layout" for s in matches):
+            extra = self.layout_skill_for(current_layout)
+            if extra is not None and extra not in matches:
+                matches.append(extra)
         if not matches:
             return ""
         names = ", ".join(f"`{s.name}`" for s in matches)

@@ -283,10 +283,114 @@ class TestShippedSkills:
                     "-tuning", "-flow", "-planning",
                     "-encoding", "-workflow", "-recovery",
                 )
-                if ref.endswith(suffixes):
+                if ref.endswith(suffixes) or ref.startswith("layout-"):
                     assert ref in names, (
                         f"{skill.name} references unknown skill '{ref}'"
                     )
+
+
+# The arguments each layout tool accepts, as declared in
+# networkx-api/app/mcp/tools/layout/. The backend cannot import that service,
+# so this copy is what a layout skill is checked against: a skill naming a
+# parameter its tool does not have sends the model into a validation error.
+LAYOUT_TOOL_ARGUMENTS = {
+    "forceatlas2": {
+        "max_iter", "gravity", "scaling_ratio", "jitter_tolerance", "strong_gravity",
+        "linlog", "distributed_action", "node_mass", "size_aware", "node_size",
+        "weight", "seed", "pos", "init_from_layout", "force_recompute",
+    },
+    "spring": {
+        "iterations", "k", "threshold", "method", "gravity", "fixed", "weight",
+        "scale", "center", "seed", "pos", "init_from_layout", "force_recompute",
+    },
+    "arf": {
+        "scaling", "a", "etol", "dt", "max_iter", "seed", "pos",
+        "init_from_layout", "force_recompute",
+    },
+    "kamada_kawai": {
+        "weight", "dist", "scale", "center", "pos", "init_from_layout",
+        "force_recompute",
+    },
+    "bipartite": {
+        "partition_attribute", "partition_value", "nodes", "align", "aspect_ratio",
+        "scale", "center", "force_recompute",
+    },
+    "multipartite": {
+        "subset_attribute", "subset_key", "align", "scale", "center", "force_recompute",
+    },
+    "shell": {"nlist", "rotate", "scale", "center", "force_recompute"},
+    "bfs": {"start", "align", "scale", "center", "force_recompute"},
+}
+
+# Backticked words in a layout skill that are not parameters.
+_NOT_PARAMETERS = {
+    "layout", "layout_quality", "score", "issues", "knobs", "arguments", "tradeoff",
+    "metric_deltas", "stopped_early", "recommended", "unsuitable", "none",
+    "node_overlap", "outliers_compress_core", "clumped", "uneven_edge_lengths",
+    "distorted_aspect", "louvain_community",
+}
+
+
+class TestLayoutSkills:
+    """The two-layer layout skills (ADR 0017)."""
+
+    def _layout_skills(self):
+        return [s for s in load_skills() if s.name.startswith("layout-")]
+
+    def test_every_algorithm_skill_exposes_its_tools(self):
+        for skill in self._layout_skills():
+            layout_tools = [t for t in skill.related_tools if t.startswith("layout_")]
+            assert any(t[len("layout_"):] in LAYOUT_TOOL_ARGUMENTS for t in layout_tools), skill.name
+            assert "visualization_generate" in skill.related_tools, skill.name
+
+    def test_algorithm_skills_name_only_real_parameters(self):
+        import re
+
+        token = re.compile(r"`([a-z][a-z0-9_]*)(?:=[^`]*)?`")
+        for skill in self._layout_skills():
+            layouts = [
+                t[len("layout_"):]
+                for t in skill.related_tools
+                if t[len("layout_"):] in LAYOUT_TOOL_ARGUMENTS
+            ]
+            allowed = set().union(*(LAYOUT_TOOL_ARGUMENTS[name] for name in layouts))
+            for word in set(token.findall(skill.body)):
+                if word.startswith(("layout_", "visualization_")) or word in _NOT_PARAMETERS:
+                    continue
+                assert word in allowed, f"{skill.name} names unknown parameter `{word}`"
+
+    def test_layout_skills_state_no_numbers(self):
+        """Defaults and ranges live in code; a number in a skill goes stale."""
+        import re
+
+        for skill in load_skills():
+            if skill.name == "layout" or skill.name.startswith("layout-"):
+                # Neither a digit inside a name (ForceAtlas2) nor a list marker
+                # is a stated value.
+                body = re.sub(r"(?m)^\d+\. ", "", skill.body)
+                number = re.search(r"(?<![A-Za-z_])\d", body)
+                assert not number, f"{skill.name} states a number"
+
+    def test_current_layout_skill_joins_the_suggestion(self):
+        from app.services.llm.skills.registry import SkillRegistry
+
+        registry = SkillRegistry()
+        block = registry.suggestion_block("もう少し広げて", current_layout="forceatlas2")
+        assert "`layout`" in block and "`layout-forceatlas2`" in block
+        partitioned = registry.suggestion_block("レイアウトを整えて", current_layout="bfs")
+        assert "`layout-partitioned`" in partitioned
+
+    def test_no_algorithm_skill_without_a_layout_request(self):
+        from app.services.llm.skills.registry import SkillRegistry
+
+        block = SkillRegistry().suggestion_block("色分けして", current_layout="forceatlas2")
+        assert "layout-forceatlas2" not in block
+
+    def test_layout_without_a_skill_adds_nothing(self):
+        from app.services.llm.skills.registry import SkillRegistry
+
+        block = SkillRegistry().suggestion_block("レイアウト", current_layout="circular")
+        assert "`layout`" in block and "layout-" not in block
 
 
 def test_skill_dataclass_index_line():

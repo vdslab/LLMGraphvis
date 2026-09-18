@@ -2,7 +2,7 @@
 name: parameter-tuning
 description: Adjusting parameters from the user's words ("a bit finer", "spread it out", "resolution 1.3", "the previous one was better"), and attaching an expert tuning panel to parameter-sensitive results. Load this when a request changes how an existing result was computed or laid out.
 triggers: [parameter, parameters, tune, tuning, adjust, slider, resolution, finer, coarser, spread, previous, パラメーター, パラメータ, 調整, 解像度, 細かく, 粗く, もう少し, もっと, 半分, 倍, 広げ, 狭め, さっき, 戻して, スライダー]
-related_tools: [offer_parameter_tuning, apply_parameter_tuning, visualization_get_state, analysis_louvain_communities, analysis_greedy_modularity_communities, layout_forceatlas2, layout_spring, visualization_set_node_size, visualization_generate]
+related_tools: [offer_parameter_tuning, apply_parameter_tuning, visualization_get_state, analysis_louvain_communities, analysis_greedy_modularity_communities, layout_forceatlas2, layout_spring, layout_suggest_parameters, visualization_set_node_size, visualization_generate]
 ---
 
 ## Words Are the Main Path
@@ -10,7 +10,7 @@ related_tools: [offer_parameter_tuning, apply_parameter_tuning, visualization_ge
 Users tune by saying what they want. Turn that into concrete values and act; the panel is only a shortcut for users who think in parameter names.
 
 1. **Active panel?** If the system prompt has an `Active Parameter Tuning` block, call `apply_parameter_tuning` for any change to its pipeline tools, including arguments that are not panel fields. Do not call the pipeline tools directly for these changes.
-2. **No panel**: re-run the tool with the changed argument (and the encoding/render step it needs, see `layout-tuning` and `visual-encoding`). Consider offering a panel afterwards (below).
+2. **No panel**: re-run the tool with the changed argument (and the encoding/render step it needs, see `layout` and `visual-encoding`). Consider offering a panel afterwards (below).
 3. **Convert words to numbers** from the current value, the explored range and the low/high meaning:
    - Explicit values and ratios ("1.3", "half", "double") are used as given, clamped to the range.
    - "a bit / 少し" = 1–2 steps (about 10% of the range); "much / more / もっと / かなり" = about 30%; "max / min" = the range ends.
@@ -40,11 +40,7 @@ Starting points; narrow or shift them from the data.
 | `analysis_louvain_communities.resolution` | 0.2–3.0 / 0.1 | larger groups → finer groups |
 | `analysis_greedy_modularity_communities.resolution` | 0.2–3.0 / 0.1 | larger groups → finer groups |
 | `analysis_greedy_modularity_communities.best_n` | 2–(node count) / 1 | fewer groups → more groups |
-| `layout_forceatlas2.scaling_ratio` | 1–50 / 1 | compact → spread out |
-| `layout_forceatlas2.gravity` | 0.1–10 / 0.1 | drifts apart → pulled to center |
-| `layout_spring.k` | 0.01–1.0 / 0.01 | tight → loose spacing |
-| `layout_spring.iterations` | 50–2000 / 50 | rough → converged |
 | `visualization_set_node_size.min_size` / `max_size` | 1–200 / 1 (area, not radius) | subtle → strong size contrast |
 | `analysis_pagerank.damping_factor` | 0.50–0.95 / 0.05 | local → global importance |
 
-Layout `scale` and `center` are visually inert (coordinates are renormalized); never offer them.
+Layout parameters are not in this table: take their ranges from the `knobs` that `layout_suggest_parameters` returns, and a suggested value from its best candidate (see `layout`). Layout `scale` and `center` are visually inert (coordinates are renormalized); never offer them.
