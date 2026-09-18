@@ -170,6 +170,28 @@ The rationale for each is in `specification/2_Technical_Details/3_NetworkXAPI.md
   layout = one `@register`ed function plus its MCP tool.
 - **Derived attribute names** come from the tool's return message: communities
   save to `{algorithm}_community`, layouts to `{layout}_x`/`{layout}_y`.
+- **Layout quality is measured where it is drawn.** `layout_quality.normalize_like_renderer`
+  is the only coordinate transform; the renderer calls it too. Change it, and you
+  change what every metric means.
+- **Strength weights are median-normalized** before networkx sees them, so only
+  their ratios shape a layout. Distance weights are not.
+
+### Layout rules (ADR 0017)
+
+- **Numbers live in code.** Defaults, recommended ranges and thresholds belong in a
+  layout's `@register` (`tune`, `knobs`) and in `layout_quality.py`, never in a
+  skill; skills point at tool output instead. Tests reject digits in layout skills.
+- **Meaning and direction of a parameter** go in its `Field(description=...)`;
+  skills carry only strategy (order, interactions, procedure).
+- **Two skill layers**: `layout` holds the shared procedure. An algorithm gets a
+  `layout-<name>` skill only if it has `knobs` or a prerequisite procedure, and
+  its `related_tools` must list its `layout_<name>` tool (that is how the skill
+  for the layout on screen is found). The partitioned layouts share
+  `layout-partitioned`. A skill may name only parameters its tool accepts.
+- **`layout_suggest_parameters` is read-only.** Applying a candidate is always a
+  call to the real `layout_*` tool, so tuning replay (ADR 0016) stays correct.
+- Adding a tunable layout: declare `knobs` on its `@register`, then add a
+  `layout-<name>` skill if its knobs interact.
 
 ### MCP resources
 
