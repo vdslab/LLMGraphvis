@@ -190,8 +190,9 @@ The rationale for each is in `specification/2_Technical_Details/3_NetworkXAPI.md
   `layout-partitioned`. A skill may name only parameters its tool accepts.
 - **`layout_suggest_parameters` is read-only.** Applying a candidate is always a
   call to the real `layout_*` tool, so tuning replay (ADR 0016) stays correct.
-- Adding a tunable layout: declare `knobs` on its `@register`, then add a
-  `layout-<name>` skill if its knobs interact.
+- Adding a tunable layout: declare `knobs` on its `@register`, add it to
+  `FORCE_LAYOUTS` in `hooks/builtin/tuning.py` (the post-layout question, ADR
+  0018), then add a `layout-<name>` skill if its knobs interact.
 
 ### MCP resources
 
