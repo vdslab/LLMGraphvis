@@ -25,12 +25,27 @@ def visualization_generate(
     of those renders as part of its own work, so a separate call here is unnecessary after
     one of them.
 
+    The result also carries `layout_quality`, readability metrics of the drawing as
+    the user sees it, so you can judge a layout without seeing it:
+    - `node_overlap`: share of nodes touching another node (0 is ideal).
+    - `crossings` / `crossings_per_edge`: edge crossings (`crossings_sampled` = estimated).
+    - `edge_length_cv`: unevenness of edge lengths (0 = all equal).
+    - `core_extent`: share of the canvas used by the central 90% of nodes; small means a
+      few outlying nodes are squeezing everything else together.
+    - `aspect`: how much the drawing is stretched to fill the square canvas (1 = not).
+    - `occupancy`: how evenly nodes fill the canvas.
+    - `score`: combined penalty for comparing layouts of this network (lower is better).
+    - `issues`: the problems above that exceed their thresholds.
+    `layout_suggest_parameters` searches for parameters that reduce these issues.
+
     Returns:
-        dict: The complete visualization object (nodes, links, legend).
+        dict: The complete visualization object (nodes, links, legend, layout_quality).
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
-        vis_data = visualization_builder.build_visualization(db, network_id)
+        vis_data = visualization_builder.build_visualization(
+            db, network_id, with_quality=True
+        )
         vis_data["network_id"] = network_id
         return vis_data
 

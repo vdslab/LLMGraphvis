@@ -6,6 +6,8 @@ from common import models
 from app.logic.common_utils import calculate_smart_edge_width, calculate_smart_node_size
 from app.logic.style_service import DEFAULT_NODE_GRADIENT, StyleService
 from app.logic.attributes import fetch_attribute_values
+from app.logic.layout_quality import evaluate as evaluate_layout
+from app.logic.layout_quality import normalize_like_renderer
 
 
 class VisualizationBuilder:
@@ -61,6 +63,7 @@ class VisualizationBuilder:
 
         self.layout_x_attr = ""
         self.layout_y_attr = ""
+        self.raw_positions: Dict[str, tuple] = {}
 
     def validate_and_prepare(self):
         # 0. Resolve Network
@@ -209,6 +212,17 @@ class VisualizationBuilder:
         legend = self._build_summary()
 
         return {"nodes": vis_nodes, "links": vis_edges, "legend": legend}
+
+    def layout_quality(self, vis_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Readability metrics of what `build()` drew (see logic/layout_quality)."""
+        if not self.raw_positions:
+            return None
+        report = evaluate_layout(
+            self.raw_positions,
+            [(e["source"], e["target"]) for e in vis_data["links"]],
+            {n["id"]: n["size"] for n in vis_data["nodes"]},
+        )
+        return {"layout": self.layout_name, **report.as_dict()}
 
     def _build_summary(self) -> Dict[str, Any]:
         """Constructs a summary of the applied visual mappings."""
@@ -399,32 +413,13 @@ class VisualizationBuilder:
                 }
             )
 
-        # --- Normalization [NEW] ---
-        # Normalize coordinates to a fixed logical range (e.g. [-1000, 1000])
-        # This ensures node sizes (typically 5-20) have a consistent relative scale to the layout.
-        if vis_nodes:
-            xs = [n["x"] for n in vis_nodes]
-            ys = [n["y"] for n in vis_nodes]
-            
-            min_x, max_x = min(xs), max(xs)
-            min_y, max_y = min(ys), max(ys)
-            
-            # Avoid divide by zero if all nodes are at same spot
-            range_x = (max_x - min_x) if (max_x - min_x) > 0 else 1.0
-            range_y = (max_y - min_y) if (max_y - min_y) > 0 else 1.0
-            
-            # Target range: -1000 to 1000 (Size = 2000)
-            TARGET_EXTENT = 1000.0
-            
-            for node in vis_nodes:
-                # Normalize to 0..1 then shift/scale to -1000..1000
-                nx = (node["x"] - min_x) / range_x
-                ny = (node["y"] - min_y) / range_y
-                
-                # Center around 0: (0..1) -> (-0.5 .. 0.5) -> * 2000 -> (-1000 .. 1000)
-                node["x"] = (nx - 0.5) * (2 * TARGET_EXTENT)
-                node["y"] = (ny - 0.5) * (2 * TARGET_EXTENT)
-        # ---------------------------
+        # Normalize coordinates to the fixed logical range the frontend fits and
+        # sizes nodes against. layout_quality uses the same transform to measure
+        # what is drawn, so this must stay the only copy of it.
+        self.raw_positions = {n["id"]: (n["x"], n["y"]) for n in vis_nodes}
+        normalized = normalize_like_renderer(self.raw_positions)
+        for node in vis_nodes:
+            node["x"], node["y"] = normalized[node["id"]]
 
         return vis_nodes
 
@@ -713,9 +708,13 @@ def build_visualization(
     focus_config: Optional[dict] = None,
     node_label_config: Optional[Any] = None,
     custom_node_colors: Optional[list] = None,
+    with_quality: bool = False,
 ) -> Dict[str, Any]:
     """
     Helper function to instantiate and run VisualizationBuilder.
+
+    `with_quality` adds `layout_quality` (see logic/layout_quality) for the
+    model to read; the frontend ignores it.
     """
     # Convert Pydantic models to dicts if needed
     nc_conf = node_color_config.model_dump() if hasattr(node_color_config, "model_dump") else node_color_config
@@ -740,4 +739,9 @@ def build_visualization(
     builder.validate_and_prepare()
     builder.fetch_data()
     builder.calculate_statistics()
-    return builder.build()
+    vis_data = builder.build()
+    if with_quality:
+        quality = builder.layout_quality(vis_data)
+        if quality is not None:
+            vis_data["layout_quality"] = quality
+    return vis_data
