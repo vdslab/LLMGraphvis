@@ -45,11 +45,11 @@ _INIT_FROM_DESC = (
 @handle_tool_errors
 def layout_forceatlas2(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    max_iter: Annotated[Optional[int], Field(description="Maximum iterations. Defaults to auto: max(200, min(2000, node_count)). Higher values converge further at a roughly linear time cost.")] = None,
-    gravity: Annotated[Optional[float], Field(description="Strength of the pull toward the center, which keeps disconnected parts from drifting away. Defaults to 1.0. Lower spreads the graph out; higher compacts it.")] = None,
-    scaling_ratio: Annotated[Optional[float], Field(description="Node repulsion strength. Defaults to auto from average degree, clamped to [2.0, 10.0]. Raise this to spread overlapping nodes apart.")] = None,
-    jitter_tolerance: Annotated[Optional[float], Field(description="Tolerance for the adaptive step size (nx 'jitter tolerance'). Defaults to 1.0. Lower converges more precisely but more slowly; higher allows faster, looser movement.")] = None,
-    strong_gravity: Annotated[Optional[bool], Field(description="If True, gravity pulls with a force independent of distance, producing a tighter, more centered cluster. Useful when a graph spreads too thinly.")] = None,
+    max_iter: Annotated[Optional[int], Field(ge=1, description="Maximum iterations. Defaults to auto from graph size. Runtime grows linearly with it. More is not always better: long runs keep contracting dense regions, so lowering it can reduce overlap.")] = None,
+    gravity: Annotated[Optional[float], Field(ge=0, description="Pull toward the center. Higher keeps disconnected parts and isolated nodes near the rest, so outliers stop squeezing the drawing into a corner; lower lets the graph spread out. Defaults to 1, raised automatically for graphs in several parts (the reply says so).")] = None,
+    scaling_ratio: Annotated[Optional[float], Field(gt=0, description="Repulsion between nodes. Higher spreads nodes apart; lower compacts them. Defaults to auto from the (weighted) average degree.")] = None,
+    jitter_tolerance: Annotated[Optional[float], Field(gt=0, description="Tolerance for the adaptive step size (nx 'jitter tolerance'). Defaults to 1.0. Lower converges more precisely but more slowly; higher allows faster, looser movement.")] = None,
+    strong_gravity: Annotated[Optional[bool], Field(description="If True, gravity grows with distance from the center, pulling far-flung nodes and components back in, which gives a rounder, more centered drawing. Useful when outliers squeeze the rest, or the graph spreads too thinly.")] = None,
     linlog: Annotated[Optional[bool], Field(description="If True, use a logarithmic attraction model. Separates clusters more sharply than the default linear model — a good choice when the user wants community structure emphasized.")] = None,
     distributed_action: Annotated[Optional[bool], Field(description="If True, distributes the attraction force across a node's degree, which prevents high-degree hubs from collapsing their neighbors onto themselves.")] = None,
     node_mass: Annotated[Optional[dict[str, float]], Field(description="Optional mapping of node id to mass. Heavier nodes move less. Omit for the default (mass derived from degree).")] = None,
@@ -74,7 +74,9 @@ def layout_forceatlas2(
     If the network's edges carry varying weights, they are used as attraction strength
     automatically — no parameter needed. The returned message says when that happened.
 
-    After calling this, use `visualization_generate` to render the result.
+    After calling this, use `visualization_generate` to render the result; its
+    `layout_quality` says how readable the drawing is, and `layout_suggest_parameters`
+    searches for parameters that fix the issues it lists.
 
     Returns:
         str: Status message.
@@ -115,11 +117,11 @@ def layout_forceatlas2(
 @handle_tool_errors
 def layout_spring(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    iterations: Annotated[Optional[int], Field(description="Number of iterations. Defaults to auto (200–1000 based on graph size).")] = None,
-    k: Annotated[Optional[float], Field(description="Optimal distance between nodes. Defaults to auto (2.0/sqrt(node_count)). Larger values increase spacing between nodes.")] = None,
-    threshold: Annotated[Optional[float], Field(description="Convergence threshold on total node movement; iteration stops below it. Defaults to auto (1e-6 to 1e-4 based on graph size). Lower is more precise and slower.")] = None,
-    method: Annotated[Optional[str], Field(description="Force computation method: 'auto' (default), 'energy' (energy minimization using absolute weights and component gravity), or 'force' (Fruchterman-Reingold force simulation).")] = None,
-    gravity: Annotated[Optional[float], Field(description="Strength of the pull toward the center, which keeps disconnected components from drifting apart. Only used by the 'energy' method.")] = None,
+    iterations: Annotated[Optional[int], Field(ge=1, description="Number of iterations. Defaults to auto from graph size. More is not always better: on trees and sparse graphs long runs can pile leaves onto each other, so fewer iterations may reduce overlap.")] = None,
+    k: Annotated[Optional[float], Field(gt=0, description="Optimal distance between nodes, relative to the other forces. Defaults to auto from node count. Higher gives more room between neighbours relative to the whole drawing; because the drawing is rescaled to the canvas, its effect on overlap depends on the graph.")] = None,
+    threshold: Annotated[Optional[float], Field(gt=0, description="Convergence threshold on total node movement; iteration stops below it. Defaults to auto from graph size. Lower is more precise and slower.")] = None,
+    method: Annotated[Optional[str], Field(description="Force computation method: 'auto' (default), 'energy' (energy minimization with per-component gravity, set automatically for graphs in several parts), or 'force' (Fruchterman-Reingold force simulation).")] = None,
+    gravity: Annotated[Optional[float], Field(ge=0, description="Pull of each connected component toward the center. Higher keeps separate parts close to the rest, so they stop squeezing the drawing. Only used by the 'energy' method; setting it without method='energy' has no effect.")] = None,
     fixed: Annotated[Optional[list[str]], Field(description="List of node ids to hold at their current positions while the rest of the graph moves around them. Requires pos or init_from_layout for those nodes. Renderer normalization can still change their screen positions.")] = None,
     weight: Annotated[Optional[str], Field(description=_WEIGHT_DESC)] = None,
     scale: Annotated[Optional[float], Field(description=_SCALE_CENTER_DESC)] = None,
@@ -140,7 +142,9 @@ def layout_spring(
     If the network's edges carry varying weights, they are used as attraction strength
     automatically — no parameter needed.
 
-    After calling this, use `visualization_generate` to render the result.
+    After calling this, use `visualization_generate` to render the result; its
+    `layout_quality` says how readable the drawing is, and `layout_suggest_parameters`
+    searches for parameters that fix the issues it lists.
 
     Returns:
         str: Status message.
@@ -179,11 +183,11 @@ def layout_spring(
 @handle_tool_errors
 def layout_arf(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    scaling: Annotated[Optional[float], Field(description="Overall scaling of the layout. Larger values spread nodes further apart.")] = None,
-    a: Annotated[Optional[float], Field(description="Strength of the spring force relative to repulsion. Must be > 1. Larger values pull connected nodes tighter together.")] = None,
+    scaling: Annotated[Optional[float], Field(gt=0, description="Repulsion scale. Higher spreads nodes further apart, reducing overlap and clumping.")] = None,
+    a: Annotated[Optional[float], Field(gt=1, description="Strength of the spring force relative to repulsion. Must be > 1. Higher pulls connected nodes tighter together, which also draws far-flung nodes back in.")] = None,
     etol: Annotated[Optional[float], Field(description="Energy tolerance for stopping. Lower converges further at more cost.")] = None,
     dt: Annotated[Optional[float], Field(description="Integration step size. Smaller is more stable but slower to converge.")] = None,
-    max_iter: Annotated[Optional[int], Field(description="Maximum iterations. Defaults to auto (200–1000 based on graph size).")] = None,
+    max_iter: Annotated[Optional[int], Field(ge=1, description="Maximum iterations. Defaults to auto from graph size.")] = None,
     seed: Annotated[Optional[int], Field(description=_SEED_DESC)] = 42,
     pos: Annotated[Optional[dict[str, Tuple[float, float]]], Field(description="Explicit initial x/y coordinates keyed by exact node ID. Partial positions are allowed where NetworkX supports them. Cannot be combined with init_from_layout; fixed nodes must have positions.")] = None,
     init_from_layout: Annotated[Optional[str], Field(description=_INIT_FROM_DESC)] = None,
@@ -197,7 +201,9 @@ def layout_arf(
     node overlap, or when the user wants finer control over the attraction/repulsion
     balance than ForceAtlas2 exposes.
 
-    After calling this, use `visualization_generate` to render the result.
+    After calling this, use `visualization_generate` to render the result; its
+    `layout_quality` says how readable the drawing is, and `layout_suggest_parameters`
+    searches for parameters that fix the issues it lists.
 
     Returns:
         str: Status message.
