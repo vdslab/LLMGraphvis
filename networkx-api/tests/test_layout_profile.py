@@ -93,6 +93,14 @@ class TestTuning:
         info = calculate_layout(1, "forceatlas2", db, overrides={"gravity": 2.0})
         assert info["tuning_notes"] == []
 
+    def test_tree_gets_few_spring_iterations(self):
+        G = nx.random_labeled_tree(100, seed=1)
+        params, notes = get_spec("spring").tuned(G, profile_graph(G))
+        assert params["iterations"] < get_spec("spring").tuned(
+            nx.karate_club_graph(), profile_graph(nx.karate_club_graph())
+        )[0]["iterations"]
+        assert any("`iterations`" in n for n in notes)
+
 
 class TestKnobs:
     @pytest.mark.parametrize("name", ["forceatlas2", "spring", "arf"])

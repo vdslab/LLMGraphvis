@@ -24,6 +24,10 @@ _FA2_FRAGMENTED_GRAVITY = (2.0, 10.0)   # clamp for 2 * log2(components)
 # Spring's 'energy' method is the one whose gravity holds components together;
 # on the same graph it took overlap from 92% to 0% at gravity 3.
 _SPRING_FRAGMENTED_GRAVITY = 3.0
+# On trees, long spring runs fold the branches onto each other: on five
+# trees of 120-500 nodes, 1000 iterations left 65-93% of nodes overlapping and
+# 50 iterations 7-77%, always better. networkx's own default is 50.
+_SPRING_FOREST_ITERATIONS = 50
 
 
 def _iterations_by_size(n):
@@ -49,6 +53,12 @@ def tune_spring(G, profile):
         "seed": 42,
     }
     notes = []
+    if profile.is_forest and n > 2:
+        params["iterations"] = _SPRING_FOREST_ITERATIONS
+        notes.append(
+            f"`iterations` {iterations} -> {_SPRING_FOREST_ITERATIONS}, because the "
+            "graph is a tree; longer runs fold its branches onto each other."
+        )
     if profile.fragmented:
         params["method"] = "energy"
         params["gravity"] = _SPRING_FRAGMENTED_GRAVITY
@@ -100,7 +110,8 @@ def tune_forceatlas2(G, profile):
 
 def tune_arf(G, profile):
     """ARF is iterative like spring; nx's other defaults are reasonable as-is."""
-    return {"max_iter": _iterations_by_size(profile.nodes)[0]}, []
+    # Seeded like the tool's default, so a search baseline reproduces the layout.
+    return {"max_iter": _iterations_by_size(profile.nodes)[0], "seed": 42}, []
 
 
 @register(
