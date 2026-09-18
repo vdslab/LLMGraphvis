@@ -39,12 +39,14 @@ MIN_NODES_FOR_SPREAD = 20
 
 # When a metric counts as a problem worth naming. `diagnose` reads these; the
 # layout knobs (logic/layouts) name the same labels to say what fixes them.
+# Crossings have no threshold: how many a graph needs depends mostly on its
+# density (les_miserables sits near 8 per edge under any force layout), so they
+# are only compared between candidates, through `score`.
 THRESHOLDS = {
     "node_overlap": 0.05,           # share of nodes touching another node
     "outliers_compress_core": 0.15,  # core_extent below this
     "uneven_edge_lengths": 1.0,      # edge_length_cv above this
     "distorted_aspect": 3.0,         # aspect above this
-    "many_crossings": 3.0,           # crossings_per_edge above this
     "clumped": 0.15,                 # occupancy below this
 }
 
@@ -195,8 +197,6 @@ def diagnose(report: QualityReport) -> List[str]:
         issues.append("outliers_compress_core")
     if report.occupancy is not None and report.occupancy < t["clumped"]:
         issues.append("clumped")
-    if report.crossings_per_edge > t["many_crossings"]:
-        issues.append("many_crossings")
     if report.edge_length_cv is not None and report.edge_length_cv > t["uneven_edge_lengths"]:
         issues.append("uneven_edge_lengths")
     if report.aspect > t["distorted_aspect"]:

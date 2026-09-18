@@ -13,7 +13,7 @@ from .base import WeightRole, register
     # a similarity/strength weight here would place the most strongly connected
     # nodes furthest apart, so it is never applied automatically.
     weight_role=WeightRole.DISTANCE,
-    tune=lambda G: {"scale": 1.0},
+    tune=lambda G, profile: ({"scale": 1.0}, []),
 )
 def kamada_kawai(G, params):
     """Kamada-Kawai. O(N^2) in time and memory, excellent global structure."""

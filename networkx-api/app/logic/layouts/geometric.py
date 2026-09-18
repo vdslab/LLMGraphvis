@@ -31,7 +31,7 @@ def spiral(G, params):
     # `seed` used to be hardcoded at the call site, which made passing it as an
     # override raise TypeError for a duplicate keyword argument. As a tuned
     # default it is overridable like any other parameter.
-    tune=lambda G: {"seed": 42},
+    tune=lambda G, profile: ({"seed": 42}, []),
 )
 def random(G, params):
     return nx.random_layout(G, **params)

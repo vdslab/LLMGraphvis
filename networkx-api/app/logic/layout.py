@@ -15,6 +15,7 @@ from app.core.logging import get_logger
 from common import models
 
 from .layouts import WeightRole, get_spec, layout_names, param_keys, resolve_weight
+from .layouts.profile import profile_graph
 from .layouts.weights import normalize_strength
 
 logger = get_logger(__name__)
@@ -38,13 +39,13 @@ BULKY_PARAM_KEYS = {
 }
 
 
-def determine_layout_params(G, layout_name: str) -> dict:
-    """The size-derived defaults for a layout, or {} if it has none.
+def determine_layout_params(G, layout_name: str, weight=None) -> dict:
+    """The profile-derived defaults for a layout, or {} if it has none.
 
     Thin wrapper over the registry; the tuning itself lives with each layout.
     """
-    spec = get_spec(layout_name)
-    return spec.tune(G) if spec.tune else {}
+    params, _notes = get_spec(layout_name).tuned(G, profile_graph(G, weight))
+    return params
 
 
 def _digest_param(value):
@@ -150,6 +151,9 @@ def _resolve_warm_start(spec, network_id: int, overrides: dict, db: Session):
 def format_layout_result(info, headline: str, follow_up: str = "") -> str:
     """Assemble a layout tool's return message, including any weight note."""
     note = (info or {}).get("weight_note") or ""
+    tuning = (info or {}).get("tuning_notes") or []
+    if tuning:
+        note = f"{note} Auto-tuned: {' '.join(tuning)}".strip()
     settings = ""
     if info:
         encoded = json.dumps(info.get("parameters", {}), sort_keys=True)
@@ -159,6 +163,31 @@ def format_layout_result(info, headline: str, follow_up: str = "") -> str:
             f"Cached: {info.get('cached', False)}."
         )
     return " ".join(part for part in (headline, note, settings, follow_up) if part)
+
+
+def build_layout_graph(spec, network_id: int, db: Session, requested_weight=None):
+    """The graph a layout runs on, weighted as that layout reads weights.
+
+    Returns `(weight_attribute, weight_note, G, normalized_by)`. Shared by
+    `calculate_layout` and `layout_optimizer`, so a suggested parameter set is
+    scored on exactly the graph it will later be applied to.
+    """
+    weight_attribute, weight_note = resolve_weight(
+        spec, requested_weight, network_id, db
+    )
+
+    from .utils.graph_builder import build_graph_from_db
+
+    G = build_graph_from_db(network_id, db, weight_attribute=weight_attribute)
+    normalized_by = None
+    if weight_attribute and spec.weight_role is WeightRole.STRENGTH:
+        normalized_by = normalize_strength(G, weight_attribute)
+        if normalized_by is not None and normalized_by != 1:
+            weight_note = (
+                f"{weight_note} Weights were divided by their median "
+                f"({normalized_by:.3g}), so only their ratios shape the layout."
+            ).strip()
+    return weight_attribute, weight_note, G, normalized_by
 
 
 def calculate_layout(
@@ -181,21 +210,9 @@ def calculate_layout(
     # Doing it here rather than in the tool layer means every entry point — the
     # upload pipeline, subgraph extraction, the REST endpoint, the MCP tools —
     # gets the same behaviour.
-    weight_attribute, weight_note = resolve_weight(
-        spec, raw_overrides.get("weight"), network_id, db
+    weight_attribute, weight_note, G, normalized_by = build_layout_graph(
+        spec, network_id, db, raw_overrides.get("weight")
     )
-
-    from .utils.graph_builder import build_graph_from_db
-
-    G = build_graph_from_db(network_id, db, weight_attribute=weight_attribute)
-    normalized_by = None
-    if weight_attribute and spec.weight_role is WeightRole.STRENGTH:
-        normalized_by = normalize_strength(G, weight_attribute)
-        if normalized_by is not None and normalized_by != 1:
-            weight_note = (
-                f"{weight_note} Weights were divided by their median "
-                f"({normalized_by:.3g}), so only their ratios shape the layout."
-            ).strip()
 
     # Need node_map for saving results (str_id -> db_id)
     nodes_query = (
@@ -205,7 +222,8 @@ def calculate_layout(
     )
     node_map = {row.node_id: row.id for row in nodes_query}
 
-    params = spec.tune(G) if spec.tune else {}
+    profile = profile_graph(G, weight_attribute)
+    params, tuning_notes = spec.tuned(G, profile)
 
     # Merge caller-supplied overrides on top of the auto-computed params.
     # `None` values in `overrides` mean "use the auto-default" and are filtered
@@ -292,10 +310,17 @@ def calculate_layout(
         # normalized must not be reused as if it had been.
         effective_params["weight_normalization"] = "median"
 
+    # A note only describes a default that was actually used.
+    tuning_notes = [
+        note
+        for note in tuning_notes
+        if not any(f"`{key}`" in note for key in sanitized_overrides)
+    ]
     result = {
         "layout_name": layout_name,
         "weight": weight_attribute,
         "weight_note": weight_note,
+        "tuning_notes": tuning_notes,
         "parameters": cache_params,
         "attributes": [f"{layout_name}_x", f"{layout_name}_y"],
     }
@@ -386,6 +411,7 @@ def calculate_layout(
 
 __all__ = [
     "LAYOUT_PARAM_KEYS",
+    "build_layout_graph",
     "calculate_layout",
     "determine_layout_params",
     "format_layout_result",

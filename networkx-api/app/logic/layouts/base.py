@@ -9,9 +9,9 @@ weight-policy sets, and a dispatch if/elif chain) that had to be kept in step by
 hand; adding a layout meant editing all four and forgetting one was silent.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable, Dict, FrozenSet, Optional, Tuple
+from typing import Any, Callable, Dict, FrozenSet, List, Mapping, Optional, Tuple
 
 
 class WeightRole(Enum):
@@ -30,6 +30,65 @@ class WeightRole(Enum):
 
 
 @dataclass(frozen=True)
+class Knob:
+    """A parameter worth moving to fix a readability problem, and which way.
+
+    `fixes` maps an issue label from `layout_quality.diagnose` to a direction:
+    +1 raises the value (or turns a toggle on), -1 lowers it (or turns it off),
+    0 means it helps but the direction depends on the graph, so try both.
+    The search in `layout_optimizer` and the recommended ranges shown to the
+    model both come from here, so a range is stated once, next to the layout.
+
+    `relative` ranges are factors of the tuned value (e.g. spring's `k`, whose
+    sensible scale depends on the node count); otherwise they are absolute.
+    `requires` names other parameters that must hold for this one to take effect
+    (spring's `gravity` only acts with method='energy').
+    """
+
+    param: str
+    low: float = 0.0
+    high: float = 1.0
+    log: bool = True
+    integer: bool = False
+    toggle: bool = False
+    relative: bool = False
+    fixes: Mapping[str, int] = field(default_factory=dict)
+    requires: Mapping[str, Any] = field(default_factory=dict)
+
+    def bounds(self, tuned_value) -> Tuple[float, float]:
+        if self.relative and isinstance(tuned_value, (int, float)) and tuned_value:
+            return self.low * tuned_value, self.high * tuned_value
+        return self.low, self.high
+
+    def describe(self, tuned_value=None) -> Dict[str, Any]:
+        """The knob as the model sees it in `layout_suggest_parameters`."""
+        info: Dict[str, Any] = {"param": self.param}
+        if self.toggle:
+            info["type"] = "toggle"
+        else:
+            low, high = self.bounds(tuned_value)
+            info["range"] = [_round(low), _round(high)]
+            info["scale"] = "log" if self.log else "linear"
+        words = ("on", "off") if self.toggle else ("raise", "lower")
+        info["fixes"] = {
+            issue: words[0] if d > 0 else words[1] if d < 0 else "either way"
+            for issue, d in self.fixes.items()
+        }
+        if self.requires:
+            info["requires"] = dict(self.requires)
+        return info
+
+
+def _round(value: float) -> float:
+    return float(f"{value:.3g}")
+
+
+# `tune` returns the parameters and one note per rule that moved a value away
+# from its plain default; the notes reach the model in the tool's reply.
+Tuning = Tuple[Dict[str, Any], List[str]]
+
+
+@dataclass(frozen=True)
 class LayoutSpec:
     """Everything the orchestrator needs to know about one layout."""
 
@@ -37,9 +96,16 @@ class LayoutSpec:
     compute: Callable          # (G, params) -> {node: (x, y)}
     params: FrozenSet[str]     # allowlist of kwargs that may reach networkx
     weight_role: WeightRole = WeightRole.NONE
-    tune: Optional[Callable] = None     # (G) -> dict of size-derived defaults
+    tune: Optional[Callable] = None     # (G, GraphProfile) -> Tuning
     prepare: Optional[Callable] = None  # (G, network_id, overrides, db) -> None
     aliases: Tuple[str, ...] = ()
+    knobs: Tuple[Knob, ...] = ()
+
+    def tuned(self, G, profile) -> Tuning:
+        """The profile-derived defaults and the notes explaining them."""
+        if not self.tune:
+            return {}, []
+        return self.tune(G, profile)
 
     @property
     def supports_warm_start(self) -> bool:
@@ -63,6 +129,7 @@ def register(
     tune: Optional[Callable] = None,
     prepare: Optional[Callable] = None,
     aliases=(),
+    knobs=(),
 ):
     """Declare a layout. Decorates the function that calls networkx.
 
@@ -71,6 +138,9 @@ def register(
     which has no such parameter), and a kwarg we advertise but drop would be a
     parameter that silently does nothing. `tests/test_layout_parameters.py`
     checks every name here against the installed networkx signature.
+
+    `knobs` declare which parameters fix which readability problem (see `Knob`);
+    a layout with none cannot be tuned by `layout_suggest_parameters`.
     """
 
     def decorator(fn: Callable) -> Callable:
@@ -82,7 +152,11 @@ def register(
             tune=tune,
             prepare=prepare,
             aliases=tuple(aliases),
+            knobs=tuple(knobs),
         )
+        unknown = {k.param for k in spec.knobs} - spec.params
+        if unknown:
+            raise ValueError(f"Layout '{name}' declares knobs it does not accept: {unknown}")
         SPECS[name] = spec
         for alias in spec.aliases:
             _ALIASES[alias] = name
