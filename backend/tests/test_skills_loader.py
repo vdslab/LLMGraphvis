@@ -380,6 +380,14 @@ class TestLayoutSkills:
         partitioned = registry.suggestion_block("レイアウトを整えて", current_layout="bfs")
         assert "`layout-partitioned`" in partitioned
 
+    @pytest.mark.parametrize("answer", ["おまかせで調整", "今の値から自分で調整", "このままでよい"])
+    def test_each_answer_to_the_tuning_question_reaches_the_layout_skill(self, answer):
+        """The answer arrives in the next turn (ADR 0018); its procedure is in `layout`."""
+        from app.services.llm.skills.registry import SkillRegistry
+
+        names = [s.name for s in SkillRegistry().suggest(answer)]
+        assert "layout" in names
+
     def test_no_algorithm_skill_without_a_layout_request(self):
         from app.services.llm.skills.registry import SkillRegistry
 

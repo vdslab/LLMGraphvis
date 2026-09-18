@@ -1,7 +1,7 @@
 ---
 name: layout
 description: Placing nodes — choosing a layout algorithm, reading how readable the drawn layout is (`layout_quality`), and improving it. Load this whenever node positions are the subject, then load the skill for the algorithm in use.
-triggers: [layout, レイアウト, 配置, spread, 広げ, 離し, 密, tight, 詰ま, 重な, overlap, 見づら, 見にく, 読みにく, ごちゃ, clutter, 綺麗, きれい, 整え, position, 座標, force, ばね, spring, forceatlas, circular, 円, 円形, kamada, spectral, spiral, tree, 木, 階層, seed, 再現, weight, 重み, quality, 品質]
+triggers: [layout, レイアウト, おまかせ, お任せ, 自分で調整, このままでよい, auto-tune, tune it for me, 配置, spread, 広げ, 離し, 密, tight, 詰ま, 重な, overlap, 見づら, 見にく, 読みにく, ごちゃ, clutter, 綺麗, きれい, 整え, position, 座標, force, ばね, spring, forceatlas, circular, 円, 円形, kamada, spectral, spiral, tree, 木, 階層, seed, 再現, weight, 重み, quality, 品質]
 related_tools: [layout_profile, layout_suggest_parameters, visualization_generate, visualization_get_state, layout_forceatlas2, layout_spring, layout_arf, layout_kamada_kawai, layout_spectral, layout_circular, layout_shell, layout_spiral, layout_random, layout_bipartite, layout_multipartite, layout_planar, layout_bfs, offer_parameter_tuning, apply_parameter_tuning]
 ---
 
@@ -37,6 +37,15 @@ Tell the user about an issue in plain words ("many nodes overlap"), not as metri
 4. Report what changed as parameter before → after, plus what visibly improved or got worse (use `tradeoff` / `metric_deltas`, in words).
 5. One search per request. If no candidate improves the score, say so and offer another algorithm from `layout_profile` instead of searching again.
 6. The search runs the layout several times, so it is slow on large graphs; `stopped_early` means fewer candidates were tried. Say so rather than retrying.
+
+## Asking How to Tune (after the first force layout)
+
+After you draw a force layout (forceatlas2, spring, arf) on automatic parameters for the first time on a network, or after switching algorithm, say in a sentence or two how readable it is (from `issues`; if none, say there is no obvious problem) and ask with `ask_user` how the user wants to adjust it. Offer exactly three options: おまかせで調整 (let you tune it), 今の値から自分で調整 (adjust it themselves), このままでよい (keep it). Do not ask after a layout whose parameters the user chose, nor when re-running the same algorithm.
+
+When the answer arrives:
+- **おまかせ / let you tune it**: call `layout_suggest_parameters`. If its best candidate has `improves_score`, apply it (`layout_<algorithm>` with its `arguments`, then `visualization_generate`) and report the changed parameters and what visibly improved. If none improves, say the current layout is already the best found and change nothing.
+- **自分で調整 / adjust it themselves**: call `layout_suggest_parameters`, then `offer_parameter_tuning` for the layout tool and `visualization_generate`, with fields for the most relevant `knobs` (their ranges as the field ranges) and the best candidate's values as `suggested`. Say they can also just tell you what to change.
+- **このまま / keep it**: acknowledge in one sentence and change nothing.
 
 ## Edge Weights
 
