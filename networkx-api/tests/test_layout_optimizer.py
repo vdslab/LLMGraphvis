@@ -60,6 +60,20 @@ class TestSearch:
                 assert before != after
 
 
+def test_pick_diverse_prefers_different_knobs():
+    from types import SimpleNamespace
+
+    def cand(score, changes):
+        return opt.Candidate({}, changes, SimpleNamespace(score=score), 0.0)
+
+    base = cand(1.0, {})
+    a = cand(0.5, {"x": (2.0, 1.0)})
+    a2 = cand(0.55, {"x": (2.0, 0.5)})  # same knob, same direction
+    b = cand(0.6, {"y": (1.0, 2.0)})
+    assert opt.pick_diverse([a2, b, a], base, 2) == [a, b]
+    assert opt.pick_diverse([a2, b, a], base, 3) == [a, b, a2]
+
+
 class TestStep:
     def test_log_knob_doubles_and_clamps(self):
         knob = Knob("x", 1.0, 3.0)

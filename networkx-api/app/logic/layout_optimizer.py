@@ -160,6 +160,37 @@ def search(
     return result
 
 
+def pick_diverse(candidates, baseline: Candidate, limit: int) -> List[Candidate]:
+    """The best `limit` candidates, preferring ones that change different knobs.
+
+    Two steps of the same knob in the same direction are one choice to a user
+    picking between alternatives; better candidates come first, and ones that
+    trade one problem for another fill any remaining places.
+    """
+    ranked = sorted(
+        candidates,
+        key=lambda c: (c.report.score >= baseline.report.score, c.report.score),
+    )
+    chosen, kinds = [], set()
+    for candidate in ranked:
+        kind = frozenset(
+            (p, _direction(before, after)) for p, (before, after) in candidate.changes.items()
+        )
+        if kind not in kinds:
+            chosen.append(candidate)
+            kinds.add(kind)
+    chosen += [c for c in ranked if c not in chosen]
+    return chosen[:limit]
+
+
+def _direction(before, after) -> int:
+    if isinstance(after, bool) or not isinstance(after, (int, float)):
+        return 0
+    if not isinstance(before, (int, float)):
+        return 0
+    return 1 if after > before else -1
+
+
 def tradeoff(candidate: Candidate, baseline: Candidate) -> str:
     """One line naming what got better and what got worse, in plain words."""
     better, worse = [], []
@@ -351,12 +382,7 @@ def suggest_parameters(
 
     result = search(G, spec, base, sizes, tuned_params=tuned)
     baseline = result.baseline
-    better = [c for c in result.candidates if c.report.score < baseline.report.score]
-    chosen = better[:max_candidates]
-    if len(chosen) < max_candidates:
-        # Alternatives that trade one problem for another are still worth offering.
-        rest = [c for c in result.candidates if c not in chosen]
-        chosen += rest[: max_candidates - len(chosen)]
+    chosen = pick_diverse(result.candidates, baseline, max_candidates)
 
     return {
         "layout": spec.name,
