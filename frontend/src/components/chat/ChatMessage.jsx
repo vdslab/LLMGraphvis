@@ -4,6 +4,7 @@ import { parseMessageContent } from '../../utils/parseMessageContent';
 import Disclosure from './Disclosure';
 import ToolCall from './ToolCall';
 import Markdown from './Markdown';
+import { interactionForExecution, interactionKey } from '../../utils/chatInteraction';
 
 /**
  * Tool calls this message made but did not place inline.
@@ -62,7 +63,7 @@ const isRetriedAskUserFailure = (execution, allExecutions, currentIndex) => {
   );
 };
 
-const ChatMessage = ({ message, onRetry }) => {
+const ChatMessage = ({ message, onRetry, detachedInteractionKey = null }) => {
   const blocks = useMemo(
     () => parseMessageContent(message.content),
     [message.content],
@@ -76,6 +77,7 @@ const ChatMessage = ({ message, onRetry }) => {
     ...executions.filter(
       (e, idx) =>
         !inlineToolIndexes.has(idx) &&
+        !(detachedInteractionKey && interactionKey(interactionForExecution(e)) === detachedInteractionKey) &&
         !isRetriedAskUserFailure(e, executions, idx),
     ),
     ...(executions.length ? [] : legacyExecutions(message.meta_data)),
@@ -141,6 +143,9 @@ const ChatMessage = ({ message, onRetry }) => {
               status: 'running',
             };
             if (isRetriedAskUserFailure(execution, executions, block.index)) {
+              return null;
+            }
+            if (detachedInteractionKey && interactionKey(interactionForExecution(execution)) === detachedInteractionKey) {
               return null;
             }
             return <ToolCall key={idx} execution={execution} />;

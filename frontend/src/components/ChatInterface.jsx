@@ -7,6 +7,9 @@ import ModelSelector from './ModelSelector';
 import ChatMessage from './chat/ChatMessage';
 import TurnStatus from './chat/TurnStatus';
 import Composer from './chat/Composer';
+import InputRequest from './chat/InputRequest';
+import ParameterTuning from './chat/ParameterTuning';
+import { interactionKey, latestInteraction } from '../utils/chatInteraction';
 import './chat/chat.css';
 
 // How far from the bottom still counts as "following the conversation".
@@ -32,6 +35,24 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
   const scrollRef = useRef(null);
   const isAtBottomRef = useRef(true);
   const [showJump, setShowJump] = useState(false);
+  const [activeView, setActiveView] = useState('conversation');
+  const seenInteraction = useRef(null);
+  const interaction = latestInteraction(messages);
+  const currentInteractionKey = interactionKey(interaction);
+  const japaneseInteraction = /[\u3040-\u30ff\u4e00-\u9fff]/.test(interaction?.data.question ?? '');
+  const interactionLabel = interaction?.kind === 'choice'
+    ? (japaneseInteraction ? '選択' : 'Choice')
+    : (japaneseInteraction ? '調整' : 'Adjust');
+
+  useEffect(() => {
+    if (currentInteractionKey && currentInteractionKey !== seenInteraction.current) {
+      seenInteraction.current = currentInteractionKey;
+      setActiveView('interaction');
+    } else if (!currentInteractionKey) {
+      seenInteraction.current = null;
+      setActiveView('conversation');
+    }
+  }, [currentInteractionKey]);
 
   const scrollToBottom = useCallback((behavior = 'smooth') => {
     const el = scrollRef.current;
@@ -67,6 +88,7 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
     // request is in flight, and a composer that empties on Enter is the whole
     // point of not blocking on the turn.
     setInput('');
+    setActiveView('conversation');
     onMessageSent?.();
     sendMessage(content);
   };
@@ -95,6 +117,21 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
         </div>
       </div>
 
+      {interaction && (
+        <div className="chat__tabs" role="tablist" aria-label="Chat panel view">
+          <button type="button" role="tab" id="chat-conversation-tab"
+            aria-controls="chat-conversation-panel" aria-selected={activeView === 'conversation'}
+            onClick={() => setActiveView('conversation')}>
+            {japaneseInteraction ? '会話' : 'Chat'}
+          </button>
+          <button type="button" role="tab" id="chat-interaction-tab"
+            aria-controls="chat-interaction-panel" aria-selected={activeView === 'interaction'}
+            onClick={() => setActiveView('interaction')}>
+            {interactionLabel}
+          </button>
+        </div>
+      )}
+
       <input
         type="file"
         ref={fileInputRef}
@@ -104,7 +141,11 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
       />
 
       <div className="chat__body">
-        <div className="chat__scroll" ref={scrollRef} onScroll={handleScroll}>
+        <div className="chat__scroll" id="chat-conversation-panel"
+          role={interaction ? 'tabpanel' : undefined}
+          aria-labelledby={interaction ? 'chat-conversation-tab' : undefined}
+          ref={scrollRef} onScroll={handleScroll}
+          style={{ display: activeView === 'conversation' ? undefined : 'none' }}>
           {messages.length === 0 && !isLoading && (
             <div className="chat__empty">
               {nodes.length > 0
@@ -114,7 +155,8 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
           )}
 
           {messages.map((message) => (
-            <ChatMessage key={message.id} message={message} onRetry={retryMessage} />
+            <ChatMessage key={message.id} message={message} onRetry={retryMessage}
+              detachedInteractionKey={currentInteractionKey} />
           ))}
 
           <TurnStatus
@@ -125,7 +167,21 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
           />
         </div>
 
-        {showJump && (
+        {interaction && activeView === 'interaction' && (
+          <div className="chat__interaction-scroll" id="chat-interaction-panel"
+            role="tabpanel" aria-labelledby="chat-interaction-tab"
+            aria-label={interactionLabel}>
+            {interaction.kind === 'choice'
+              ? <InputRequest request={interaction.data} />
+              : <ParameterTuning tuning={interaction.data} />}
+            <button type="button" className="chat__back-to-conversation"
+              onClick={() => setActiveView('conversation')}>
+              {japaneseInteraction ? 'チャットで答える' : 'Reply in chat instead'}
+            </button>
+          </div>
+        )}
+
+        {showJump && activeView === 'conversation' && (
           <button
             type="button"
             className="chat__jump"
@@ -137,7 +193,7 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
         )}
       </div>
 
-      <Composer
+      {activeView === 'conversation' && <Composer
         value={input}
         onChange={setInput}
         onSubmit={handleSend}
@@ -146,7 +202,7 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
         onCancelContext={onCancelContext}
         queuedCount={queuedCount}
         busy={isLoading}
-      />
+      />}
     </div>
   );
 };

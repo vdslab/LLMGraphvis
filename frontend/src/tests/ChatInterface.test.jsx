@@ -9,6 +9,12 @@ vi.mock('../stores/networkStore');
 vi.mock('react-markdown', () => ({ default: ({ children }) => <div>{children}</div> }));
 vi.mock('remark-gfm', () => ({ default: () => {} }));
 vi.mock('remark-breaks', () => ({ default: () => {} }));
+vi.mock('../components/chat/InputRequest', () => ({
+    default: ({ request }) => <div>Choice form {request.id}</div>,
+}));
+vi.mock('../components/chat/ParameterTuning', () => ({
+    default: ({ tuning }) => <div>Tuning panel {tuning.id}</div>,
+}));
 
 const PLACEHOLDER = 'Ask about this network…';
 
@@ -169,5 +175,43 @@ describe('ChatInterface', () => {
         expect(container.querySelector('.composer__row--has-attach')).not.toBeInTheDocument();
         expect(screen.queryByTitle('Upload GraphML')).not.toBeInTheDocument();
     });
-});
 
+    it('opens a new choice separately from the conversation and allows a chat reply', () => {
+        setStore({ messages: [{
+            id: 10,
+            role: 'assistant',
+            content: '<tool_execution_marker index="0"/>Choose how to continue.',
+            tool_executions: [{
+                tool_name: 'ask_user', status: 'completed',
+                result: { input_request: { id: 'question-1' } },
+            }],
+        }] });
+        render(<ChatInterface />);
+
+        expect(screen.getByRole('tab', { name: 'Choice' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByText('Choice form question-1')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('tab', { name: 'Chat' }));
+        expect(screen.getByText('Choose how to continue.')).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(PLACEHOLDER)).toBeInTheDocument();
+        expect(screen.queryByText('Choice form question-1')).not.toBeInTheDocument();
+    });
+
+    it('opens a new tuning panel in the same chat area', () => {
+        setStore({ messages: [{
+            id: 11,
+            role: 'assistant',
+            content: '<tool_execution_marker index="0"/>Adjust the layout.',
+            tool_executions: [{
+                tool_name: 'offer_parameter_tuning', status: 'completed',
+                result: { parameter_tuning: { id: 'tuning-1' } },
+            }],
+        }] });
+        render(<ChatInterface />);
+
+        expect(screen.getByRole('tab', { name: 'Adjust' })).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByText('Tuning panel tuning-1')).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Reply in chat instead' }));
+        expect(screen.getByText('Adjust the layout.')).toBeInTheDocument();
+    });
+});
