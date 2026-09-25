@@ -12,6 +12,7 @@ one stdio MCP server containing only these evaluation operations:
 
 - discover/read the current prompt surfaces;
 - start, message, observe, or reset a GraphVisAgent test conversation;
+- record what confused the evaluator AI during an observed analysis probe;
 - save the final structured evaluation report.
 
 Cline runs in Plan mode with an otherwise empty workspace. Other configured Cline
@@ -25,6 +26,12 @@ GraphVisAgent itself calls the existing NetworkX MCP. The evaluation bridge reco
 the response, Skills, tool executions and arguments, visualization state/diff, model
 identity, browser consistency checks, JavaScript errors, and a frontend PNG. Its
 internal Playwright browser is not exposed to Cline.
+
+The evaluator calls `record_analysis_friction` when an analysis step or result is
+hard to understand. The tool requires an observed session and probe, the exact
+point of confusion, and evidence. It saves a note immediately under
+`.evaluation/runs/<run-id>/friction.json` and includes it in the final report.
+It does not display anything to GraphVisAgent users or alter their conversation.
 
 ## Setup
 

@@ -29,7 +29,7 @@ related_tools: [visualization_get_state, ask_user]
 
 ## When the User Reports Confusion
 
-The turn-start context may include a saved clarity report from an earlier analysis response. Treat it as the user's observation, identify the part that caused trouble, and explain that part in the current conversation language. If it describes a wrong or unreadable view and the current request asks you to fix it, inspect the current state and use the normal tools. Do not claim that the application itself or its Skills were changed by this report. Do not ask the same feedback question again in prose; the optional form on the completed response collects it.
+If the user says a result or step is unclear, explain that specific part in the current conversation language. If the user asks to fix an unreadable view, inspect the current state and use the normal tools. Do not make the user repeat a question they already asked.
 
 ## User Interaction with `ask_user`
 

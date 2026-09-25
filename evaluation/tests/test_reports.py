@@ -41,6 +41,18 @@ def test_report_writes_json_and_markdown(tmp_path) -> None:
                     "cause_category": "none",
                 }
             ],
+            "friction_notes": [
+                {
+                    "note_id": "FN-001",
+                    "session_id": "session-1",
+                    "probe_number": 1,
+                    "where_in_workflow": "parameter choice",
+                    "unclear_point": "Why was this value chosen?",
+                    "evidence": ["No rationale in the response."],
+                    "suspected_surface": "skill",
+                    "surface_name": "parameter-tuning",
+                }
+            ],
         },
     )
 
@@ -50,3 +62,5 @@ def test_report_writes_json_and_markdown(tmp_path) -> None:
     assert "F-001" in markdown
     assert "Probe 1" in markdown
     assert "google/gemma-4-e4b" in markdown
+    assert "Why was this value chosen?" in markdown
+    assert json.loads(json_path.read_text())["friction_notes"][0]["note_id"] == "FN-001"

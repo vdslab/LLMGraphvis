@@ -9,7 +9,6 @@ import TurnStatus from './chat/TurnStatus';
 import Composer from './chat/Composer';
 import InputRequest from './chat/InputRequest';
 import ParameterTuning from './chat/ParameterTuning';
-import AnalysisFeedback from './chat/AnalysisFeedback';
 import { interactionKey, latestInteraction } from '../utils/chatInteraction';
 import './chat/chat.css';
 
@@ -107,12 +106,6 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
   };
 
   const queuedCount = messages.filter((m) => m.status === 'queued').length;
-  const lastMessage = messages.at(-1);
-  const feedbackMessage = lastMessage?.role === 'assistant' && !lastMessage.isStreaming
-    && Number.isInteger(lastMessage.id) && !isLoading
-    && lastMessage.tool_executions?.some((execution) =>
-      /^(analysis_|layout_|visualization_|subgraph_)/.test(execution.tool_name ?? ''))
-    ? lastMessage : null;
 
   return (
     <div className="chat">
@@ -165,10 +158,6 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
             <ChatMessage key={message.id} message={message} onRetry={retryMessage}
               detachedInteractionKey={currentInteractionKey} />
           ))}
-
-          {feedbackMessage && chatId && (
-            <AnalysisFeedback key={feedbackMessage.id} chatId={chatId} message={feedbackMessage} />
-          )}
 
           <TurnStatus
             isLoading={isLoading}

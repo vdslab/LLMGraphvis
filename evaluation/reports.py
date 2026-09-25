@@ -39,6 +39,32 @@ class Finding(BaseModel):
     follow_up_example: str = ""
 
 
+class FrictionNote(BaseModel):
+    """An evaluator observation captured while an analysis probe is fresh."""
+
+    note_id: str = Field(min_length=1)
+    session_id: str = Field(min_length=1)
+    probe_number: int = Field(ge=1)
+    where_in_workflow: str = Field(min_length=1)
+    unclear_point: str = Field(min_length=1)
+    evidence: list[str] = Field(min_length=1)
+    suspected_surface: Literal[
+        "system_prompt",
+        "skill",
+        "mcp_description",
+        "implementation",
+        "frontend",
+        "model_variability",
+        "environment",
+        "unknown",
+    ] = "unknown"
+    surface_name: str = ""
+    suggested_change: str = ""
+    recorded_at: str = Field(
+        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+    )
+
+
 class EvaluationReport(BaseModel):
     target: str
     evaluator_model: str
@@ -46,6 +72,7 @@ class EvaluationReport(BaseModel):
     summary: str
     trials: list[dict[str, Any]] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)
+    friction_notes: list[FrictionNote] = Field(default_factory=list)
     implementation_issues: list[str] = Field(default_factory=list)
     completed_at: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
@@ -91,12 +118,27 @@ def render_markdown(report: EvaluationReport, run_id: str) -> str:
             ]
         )
 
-    lines.extend(
-        [
-            "## Findings",
-            "",
-        ]
-    )
+    lines.extend(["## Analysis friction notes", ""])
+    if not report.friction_notes:
+        lines.extend(["No analysis friction was recorded.", ""])
+    for note in report.friction_notes:
+        lines.extend(
+            [
+                f"### {note.note_id}: probe {note.probe_number}",
+                "",
+                f"- Session: `{note.session_id}`",
+                f"- Where: {note.where_in_workflow}",
+                f"- Unclear point: {note.unclear_point}",
+                f"- Suspected surface: `{note.suspected_surface}`",
+                f"- Surface name: `{note.surface_name or 'not identified'}`",
+                "- Evidence:",
+                *[f"  - {item}" for item in note.evidence],
+                f"- Suggested change: {note.suggested_change or 'not proposed'}",
+                "",
+            ]
+        )
+
+    lines.extend(["## Findings", ""])
     if not report.findings:
         lines.extend(["No findings were recorded.", ""])
 

@@ -103,6 +103,39 @@ async def reset_test(session_id: str) -> str:
 
 
 @mcp.tool()
+def record_analysis_friction(
+    session_id: str,
+    probe_number: int,
+    where_in_workflow: str,
+    unclear_point: str,
+    evidence: list[str],
+    suspected_surface: str = "unknown",
+    surface_name: str = "",
+    suggested_change: str = "",
+) -> str:
+    """Record what confused the evaluator AI during one observed analysis probe.
+
+    Call this just after a `send_message` result, while the confusing step is fresh.
+    Name where it occurred, explain exactly what was unclear, and cite concrete
+    response, tool, or visualization evidence. A suspected prompt surface and a
+    possible change are optional hypotheses, not verified causes. This saves an
+    evaluation artifact; it does not show anything to GraphVisAgent users.
+    """
+    return _json(
+        bridge.record_analysis_friction(
+            session_id,
+            probe_number,
+            where_in_workflow,
+            unclear_point,
+            evidence,
+            suspected_surface,
+            surface_name,
+            suggested_change,
+        )
+    )
+
+
+@mcp.tool()
 async def finish_evaluation(
     summary: str,
     findings: list[dict[str, Any]],
@@ -123,6 +156,9 @@ async def finish_evaluation(
             if observation.get("model"):
                 graphvis_model = observation["model"]
                 break
+    friction_notes = [
+        note for session in bridge.sessions.values() for note in session.friction_notes
+    ]
     recorded_probes = {int(trial["probe_number"]) for trial in trials}
     finding_probes = {
         int(finding["probe_number"])
@@ -145,6 +181,7 @@ async def finish_evaluation(
             "summary": summary,
             "trials": trials,
             "findings": findings,
+            "friction_notes": friction_notes,
             "implementation_issues": implementation_issues or [],
         },
     )
@@ -152,8 +189,12 @@ async def finish_evaluation(
         {
             "status": "saved",
             "finding_count": len(report.findings),
+            "friction_note_count": len(report.friction_notes),
             "json_report": str(json_path),
             "markdown_report": str(markdown_path),
+            "friction_journal": (
+                str(config.run_dir / "friction.json") if friction_notes else None
+            ),
         }
     )
 

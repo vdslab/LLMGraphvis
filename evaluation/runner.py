@@ -22,6 +22,7 @@ EVALUATION_TOOLS = [
     "send_message",
     "observe_session",
     "reset_test",
+    "record_analysis_friction",
     "finish_evaluation",
 ]
 

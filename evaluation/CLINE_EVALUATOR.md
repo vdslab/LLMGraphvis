@@ -32,6 +32,15 @@ the loaded Skills, MCP calls and arguments, errors, before/after visualization
 summary, browser checks, and PNG. Objective evidence outweighs your own visual
 impression. Stay within {max_probes} total `send_message` calls.
 
+After each probe, consider whether any part of **using or understanding the
+analysis** was unclear: the next action, a parameter's effect, a tool result,
+the explanation, or how the drawing supports the claim. When you encounter such
+friction, call `record_analysis_friction` immediately with the probe number,
+the exact point of confusion, and concrete evidence from the observation.
+Record a suspected prompt surface only as a hypothesis. Do not call this tool
+for a probe where nothing was unclear. This is your evaluator notebook; it is
+not a question to the GraphVisAgent user and does not alter the conversation.
+
 Distinguish prompt-surface defects from code, frontend, model-variability, and
 environment defects. Never recommend hiding an implementation bug with prompt text.
 Prompt-change recommendations should normally target only:
