@@ -1,4 +1,5 @@
 import { useNetworkStore } from '../stores/networkStore';
+import './LegendPanel.css';
 
 const swatchStyle = {
   display: 'inline-block',
@@ -39,8 +40,20 @@ const formatValue = (value) =>
       })
     : value ?? '';
 
+const issueLabels = {
+  node_overlap: 'Some nodes overlap',
+  outliers_compress_core: 'Outlying nodes squeeze the center',
+  clumped: 'Nodes cluster in a small area',
+  uneven_edge_lengths: 'Connected nodes have uneven spacing',
+  distorted_aspect: 'The layout is stretched',
+};
+
+const percent = (value) => typeof value === 'number'
+  ? `${Math.round(value * 100)}%` : '—';
+
 const LegendPanel = () => {
   const legend = useNetworkStore((state) => state.legend);
+  const quality = useNetworkStore((state) => state.layoutQuality);
 
   if (!legend || (!legend.node_color && !legend.node_size && !legend.layout)) {
     return null;
@@ -65,6 +78,8 @@ const LegendPanel = () => {
         padding: '12px 16px',
         boxShadow: 'var(--md-sys-elevation-2)',
         maxWidth: '240px',
+        maxHeight: '55vh',
+        overflowY: 'auto',
         fontFamily: 'inherit',
       }}
     >
@@ -146,6 +161,38 @@ const LegendPanel = () => {
           >
             {layout}
           </div>
+          {quality && (
+            <>
+              <div style={{ ...rowStyle, marginTop: '6px' }}>
+                {quality.issues?.length
+                  ? issueLabels[quality.issues[0]] || 'Check the layout details'
+                  : 'No major readability issues detected'}
+              </div>
+              <details className="layout-quality" aria-label="Layout readability details">
+                <summary>Readability details</summary>
+                {quality.issues?.length > 1 && (
+                  <ul>
+                    {quality.issues.slice(1).map((issue) => (
+                      <li key={issue}>{issueLabels[issue] || issue}</li>
+                    ))}
+                  </ul>
+                )}
+                <dl>
+                  <dt>Nodes overlapping</dt><dd>{percent(quality.node_overlap)}</dd>
+                  <dt>Edge crossings</dt>
+                  <dd>{formatValue(quality.crossings)}{quality.crossings_sampled ? ' (estimated)' : ''}</dd>
+                  {quality.core_extent != null && (
+                    <><dt>Central area used</dt><dd>{percent(quality.core_extent)}</dd></>
+                  )}
+                  {quality.edge_length_cv != null && (
+                    <><dt>Edge length variation</dt><dd>{formatValue(quality.edge_length_cv)}</dd></>
+                  )}
+                  <dt>Shape stretch</dt><dd>{formatValue(quality.aspect)}×</dd>
+                </dl>
+                <p>Use these measures to compare layouts of this network.</p>
+              </details>
+            </>
+          )}
         </div>
       )}
     </div>

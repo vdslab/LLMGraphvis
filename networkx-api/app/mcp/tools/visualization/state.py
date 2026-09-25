@@ -82,11 +82,13 @@ def visualization_apply_layout(
     configuration, which includes the most recently computed layout.
 
     Returns:
-        dict: The updated visualization object (nodes, links, legend).
+        dict: The updated visualization object (nodes, links, legend, layout_quality).
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
-        vis_data = visualization_builder.build_visualization(db, network_id)
+        vis_data = visualization_builder.build_visualization(
+            db, network_id, with_quality=True
+        )
         vis_data["network_id"] = network_id
         return vis_data
 
@@ -110,13 +112,15 @@ def visualization_reset_style(
     centrality metric) are kept.
 
     Returns:
-        dict: The re-rendered visualization object, plus `reset` listing the channels that
+        dict: The re-rendered visualization object (including layout_quality), plus `reset` listing the channels that
         actually had a configuration to clear.
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
         cleared = visualization_builder.reset_style(db, network_id, targets)
-        vis_data = visualization_builder.build_visualization(db, network_id)
+        vis_data = visualization_builder.build_visualization(
+            db, network_id, with_quality=True
+        )
         vis_data["network_id"] = network_id
         vis_data["reset"] = cleared
         return vis_data
@@ -134,10 +138,12 @@ def visualization_switch_network(
     loaded networks. The last known layout and styles for the target network are preserved.
 
     Returns:
-        dict: The visualization object of the target network (nodes, links, legend).
+        dict: The visualization object of the target network (nodes, links, legend, layout_quality).
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
-        vis_data = visualization_builder.build_visualization(db, network_id)
+        vis_data = visualization_builder.build_visualization(
+            db, network_id, with_quality=True
+        )
         vis_data["network_id"] = network_id
         return vis_data

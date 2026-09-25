@@ -132,7 +132,7 @@ def test_runs_under_a_second_on_a_few_thousand_nodes():
 
 
 class TestRenderedQuality:
-    """`visualization_generate` carries the metrics; plain renders do not."""
+    """Visible renders carry metrics; low-level builds may omit them."""
 
     def test_generate_reports_quality_after_a_layout(self, db):
         from app.logic.layout import calculate_layout
@@ -145,3 +145,24 @@ class TestRenderedQuality:
         assert vis["layout_quality"]["layout"] == "spring"
         assert "issues" in vis["layout_quality"]
         assert "layout_quality" not in build_visualization(db, 1)
+
+    def test_style_render_updates_quality_for_the_current_view(self, db):
+        from contextlib import contextmanager
+        from unittest.mock import patch
+
+        from app.logic.layout import calculate_layout
+        from app.mcp.tools.visualization.style import visualization_set_node_labels
+        from tests.test_layout_parameters import setup_graph
+
+        setup_graph(db, n=8)
+        calculate_layout(1, "spring", db)
+
+        @contextmanager
+        def current_db():
+            yield db
+
+        with patch("app.mcp.tools.visualization.style.get_db_context", current_db):
+            vis = visualization_set_node_labels(1)
+
+        assert vis["layout_quality"]["layout"] == "spring"
+        assert vis["layout_quality"]["node_overlap"] >= 0

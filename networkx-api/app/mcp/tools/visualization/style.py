@@ -37,7 +37,7 @@ def visualization_set_node_color(
     passing an empty mapping here does not clear anything.
 
     Returns:
-        dict: The updated visualization object (nodes, links, legend).
+        dict: The updated visualization object (nodes, links, legend, layout_quality).
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
@@ -56,7 +56,8 @@ def visualization_set_node_color(
         vis_data = visualization_builder.build_visualization(
             db,
             network_id,
-            node_color_config=config
+            node_color_config=config,
+            with_quality=True,
         )
         vis_data["network_id"] = network_id
         return vis_data
@@ -84,7 +85,7 @@ def visualization_set_node_size(
     roughly quadruple the size or max_size value (~4x area).
 
     Returns:
-        dict: The updated visualization object (nodes, links, legend).
+        dict: The updated visualization object (nodes, links, legend, layout_quality).
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
@@ -100,7 +101,8 @@ def visualization_set_node_size(
         vis_data = visualization_builder.build_visualization(
             db,
             network_id,
-            node_size_config=config
+            node_size_config=config,
+            with_quality=True,
         )
         vis_data["network_id"] = network_id
         return vis_data
@@ -121,7 +123,7 @@ def visualization_set_node_labels(
     Pass attribute=None to revert to the default label column.
 
     Returns:
-        dict: The updated visualization object (nodes, links, legend).
+        dict: The updated visualization object (nodes, links, legend, layout_quality).
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
@@ -131,7 +133,8 @@ def visualization_set_node_labels(
         vis_data = visualization_builder.build_visualization(
             db,
             network_id,
-            node_label_config=config
+            node_label_config=config,
+            with_quality=True,
         )
         vis_data["network_id"] = network_id
         return vis_data
@@ -154,7 +157,7 @@ def visualization_set_edge_color(
     Use `network_list_edge_attributes` first to see what edge attributes are available.
 
     Returns:
-        dict: The updated visualization object (nodes, links, legend).
+        dict: The updated visualization object (nodes, links, legend, layout_quality).
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
@@ -170,7 +173,8 @@ def visualization_set_edge_color(
         vis_data = visualization_builder.build_visualization(
             db,
             network_id,
-            edge_color_config=config
+            edge_color_config=config,
+            with_quality=True,
         )
         vis_data["network_id"] = network_id
         return vis_data
@@ -192,7 +196,7 @@ def visualization_set_edge_width(
     Commonly used with the 'weight' attribute to show edge strength.
 
     Returns:
-        dict: The updated visualization object (nodes, links, legend).
+        dict: The updated visualization object (nodes, links, legend, layout_quality).
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
@@ -207,7 +211,8 @@ def visualization_set_edge_width(
         vis_data = visualization_builder.build_visualization(
             db,
             network_id,
-            edge_width_config=config
+            edge_width_config=config,
+            with_quality=True,
         )
         vis_data["network_id"] = network_id
         return vis_data

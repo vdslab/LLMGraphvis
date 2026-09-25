@@ -714,7 +714,7 @@ def build_visualization(
     Helper function to instantiate and run VisualizationBuilder.
 
     `with_quality` adds `layout_quality` (see logic/layout_quality) for the
-    model to read; the frontend ignores it.
+    agent and the canvas's layout information panel.
     """
     # Convert Pydantic models to dicts if needed
     nc_conf = node_color_config.model_dump() if hasattr(node_color_config, "model_dump") else node_color_config
