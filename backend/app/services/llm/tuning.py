@@ -30,13 +30,27 @@ TUNABLE_PREFIXES = ("analysis_", "layout_", "visualization_")
 # The layout evaluation tools compute nothing that is drawn; re-running the
 # parameter search on every panel change would only cost time (ADR 0017).
 UNTUNABLE_TOOLS = frozenset(
-    {"visualization_switch_network", "layout_profile", "layout_suggest_parameters"}
+    {
+        "visualization_switch_network",
+        "visualization_get_state",
+        "layout_profile",
+        "layout_suggest_parameters",
+    }
 )
 MAX_HISTORY = 10
 
 
 def is_tunable_tool(name: str) -> bool:
     return name.startswith(TUNABLE_PREFIXES) and name not in UNTUNABLE_TOOLS
+
+
+def is_rendering_tool(name: str) -> bool:
+    """True only for visualization calls that update the drawing."""
+    return name.startswith("visualization_set_") or name in {
+        "visualization_generate",
+        "visualization_apply_layout",  # retained for old conversations
+        "visualization_reset_style",
+    }
 
 
 class TuningError(ValueError):
@@ -777,7 +791,9 @@ def offerable_pipeline(db, chat_id, network_id, user_text: str) -> list[str] | N
     starts = [i for i, name in enumerate(names) if not name.startswith("visualization_")]
     if not starts:
         return None
-    after = [n for n in dict.fromkeys(names[starts[-1] + 1 :]) if n.startswith("visualization_")]
+    after = [
+        n for n in dict.fromkeys(names[starts[-1] + 1 :]) if is_rendering_tool(n)
+    ]
     return [names[starts[-1]], *after]
 
 

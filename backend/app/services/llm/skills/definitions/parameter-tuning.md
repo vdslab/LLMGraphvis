@@ -2,7 +2,7 @@
 name: parameter-tuning
 description: Adjusting parameters from the user's words ("a bit finer", "spread it out", "resolution 1.3", "the previous one was better"), and attaching an expert tuning panel to parameter-sensitive results. Load this when a request changes how an existing result was computed or laid out.
 triggers: [parameter, parameters, tune, tuning, adjust, slider, resolution, finer, coarser, spread, previous, パラメーター, パラメータ, 調整, 解像度, 細かく, 粗く, もう少し, もっと, 半分, 倍, 広げ, 狭め, さっき, 戻して, スライダー]
-related_tools: [offer_parameter_tuning, apply_parameter_tuning, visualization_get_state, analysis_louvain_communities, analysis_greedy_modularity_communities, layout_forceatlas2, layout_spring, layout_suggest_parameters, visualization_set_node_size, visualization_generate]
+related_tools: [offer_parameter_tuning, apply_parameter_tuning, visualization_get_state, analysis_louvain_communities, analysis_greedy_modularity_communities, analysis_pagerank, layout_forceatlas2, layout_spring, layout_arf, layout_suggest_parameters, visualization_set_node_color, visualization_set_node_size, visualization_generate]
 ---
 
 ## Words Are the Main Path
@@ -24,7 +24,7 @@ Users tune by saying what they want. Turn that into concrete values and act; the
 
 Offer `offer_parameter_tuning` in the same turn when the result depends strongly on a few parameters and the user is likely to compare settings (community granularity, force-layout spread, node-size range). One panel per view; skip it for results with no meaningful knob.
 
-- **Run first.** List in `tools` the calls that produced the current view, in order (e.g. `analysis_louvain_communities`, `visualization_set_node_color`). They may have run in an earlier turn; their latest arguments are reused.
+- **Draw first.** Offer a panel only after the result is visible. List in `tools` the calls that produced the current view, in order (e.g. `analysis_louvain_communities`, `visualization_set_node_color`). A metric saved as an attribute or a layout whose coordinates were stored but not rendered is not yet a view to tune. Calls may have run in an earlier turn; their latest arguments are reused.
 - **Fields**: 1–4, most influential first. Pair parameters that act together (ForceAtlas2 `scaling_ratio` + `gravity`; `min_size` + `max_size`).
 - **Ranges** should cover what is worth exploring on this data, not the whole mathematical domain, and must include the current value.
 - **low_label / high_label**: what each end does to the view, in the conversation language.

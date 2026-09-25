@@ -23,6 +23,7 @@ SENSITIVE_TOOLS = {
     "analysis_greedy_modularity_communities": "resolution",
     "layout_forceatlas2": "scaling_ratio and gravity",
     "layout_spring": "k",
+    "layout_arf": "scaling and a",
 }
 
 
@@ -67,11 +68,13 @@ def nudge_tuning_offer(ctx: HookContext) -> None:
         return
 
     start = sensitive[-1]
+    if not any(tuning.is_rendering_tool(name) for name in completed[start + 1 :]):
+        return  # a computed attribute or stored layout is not yet a drawn view
     tool = completed[start]
     pipeline = [tool] + [
         name
         for name in dict.fromkeys(completed[start + 1 :])
-        if name.startswith("visualization_") and tuning.is_tunable_tool(name)
+        if tuning.is_rendering_tool(name)
     ]
     state["tuning_nudged"] = True
     ctx.request_continuation(

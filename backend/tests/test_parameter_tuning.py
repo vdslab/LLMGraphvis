@@ -595,10 +595,25 @@ def test_nudge_offers_a_panel_once_after_a_sensitive_result(db, chat):
     assert state["continuation"] is None
 
 
+def test_arf_result_can_offer_a_panel_after_render(db, chat):
+    from app.services.llm.hooks.builtin.tuning import nudge_tuning_offer
+
+    state = _turn(
+        chat,
+        ("layout_arf", {}, "completed"),
+        ("visualization_generate", {}, "completed"),
+    )
+    nudge_tuning_offer(_no_calls(chat, db, state))
+    assert "layout_arf's scaling and a" in state["continuation"]["prompt"]
+
+
 @pytest.mark.parametrize(
     "calls, text, active",
     [
         ([(COLOR, {"attribute": "x"}, "completed")], "done", False),
+        ([(LOUVAIN, {}, "completed")], "done", False),
+        ([(LOUVAIN, {}, "completed"), ("visualization_get_state", {}, "completed")], "done", False),
+        ([(FA2, {}, "completed")], "done", False),
         ([(LOUVAIN, {}, "completed"), ("offer_parameter_tuning", {}, "failed")], "done", False),
         ([(LOUVAIN, {}, "completed")], "", False),
         ([(LOUVAIN, {}, "completed")], "done", True),
@@ -651,4 +666,8 @@ def test_layout_evaluation_tools_are_not_tunable():
 
     assert not tuning.is_tunable_tool("layout_suggest_parameters")
     assert not tuning.is_tunable_tool("layout_profile")
+    assert not tuning.is_tunable_tool("visualization_get_state")
     assert tuning.is_tunable_tool("layout_forceatlas2")
+    assert tuning.is_rendering_tool("visualization_set_node_color")
+    assert tuning.is_rendering_tool("visualization_generate")
+    assert not tuning.is_rendering_tool("visualization_get_state")
