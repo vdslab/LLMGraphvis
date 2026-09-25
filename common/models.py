@@ -110,6 +110,25 @@ class ChatMessage(Base):
     chat = relationship("Chat", back_populates="messages")
     tool_executions = relationship("ToolExecution", back_populates="message", cascade="all, delete-orphan")
     usage = relationship("LlmUsage", back_populates="message", uselist=False, cascade="all, delete-orphan")
+    feedback = relationship("AnalysisFeedback", back_populates="message", uselist=False, cascade="all, delete-orphan")
+
+
+class AnalysisFeedback(Base):
+    """A user's clarity report tied to the assistant turn that performed analysis."""
+
+    __tablename__ = "analysis_feedback"
+
+    id = Column(Integer, primary_key=True)
+    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False, index=True)
+    message_id = Column(Integer, ForeignKey("chat_messages.id", ondelete="CASCADE"), nullable=False, unique=True)
+    clarity = Column(String, nullable=False)  # clear | unclear
+    area = Column(String, nullable=True)  # goal | steps | result | controls
+    detail = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    reported_at = Column(DateTime(timezone=True), nullable=True)
+
+    message = relationship("ChatMessage", back_populates="feedback")
 
 
 class ToolExecution(Base):

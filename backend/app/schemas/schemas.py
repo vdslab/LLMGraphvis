@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -159,6 +159,23 @@ class ChatMessage(ChatMessageBase):
     tool_executions: List[ToolExecution] = []
     usage: Optional[LlmUsage] = None
     created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AnalysisFeedbackWrite(BaseModel):
+    clarity: Literal["clear", "unclear"]
+    area: Optional[Literal["goal", "steps", "result", "controls"]] = None
+    detail: Optional[str] = Field(default=None, max_length=1000)
+
+
+class AnalysisFeedback(AnalysisFeedbackWrite):
+    id: int
+    chat_id: int
+    message_id: int
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True

@@ -7,6 +7,8 @@ related_tools: [network_list_node_attributes, network_list_edge_attributes, anal
 
 ## Data-Grounded Analysis Workflow
 
+This choice workflow applies to an **open-ended** request. If the user already names a question, attribute, metric, or method, carry it out directly and report its interpretation. Do not insert a goal menu before a specific analysis.
+
 For open-ended analysis requests ("analyze this network", "what can you tell me?"):
 
 1. **Inspect Context First**:
@@ -25,6 +27,8 @@ For open-ended analysis requests ("analyze this network", "what can you tell me?
    - Use `fields=[{"id": "analysis_goal", "label": "Analysis goal", "kind": "select", "options": [...]}]`.
    - Keep `allow_other=true` (free-text is auto-provided by UI). Do not add a separate text input field.
    - Match the user's conversation language.
+
+When the user is new to network analysis, phrase options as questions about the data rather than algorithm names. When the user asks for a specific method, keep its exact name and parameters in the report so the result is reproducible. In either case, distinguish a fact computed from links from an attribute supplied with the GraphML file.
 
 ## Metric and Topology Rules
 

@@ -1,7 +1,7 @@
 ---
 name: conversation-flow
 description: When to propose and wait for approval versus act immediately, and how much to report back. Load this when a request is vague, or before changing what the user is looking at.
-triggers: [analyze, analyse, 分析, 見やすく, きれいに, いい感じ, おすすめ, 提案, どうすれば, なんか, よくして, improve, better, nicer, suggest, recommend]
+triggers: [analyze, analyse, 分析, 見やすく, きれいに, いい感じ, おすすめ, 提案, どうすれば, なんか, よくして, improve, better, nicer, suggest, recommend, unclear, confusing, 分かりにくい, わかりにくい, 迷った]
 related_tools: [visualization_get_state, ask_user]
 ---
 
@@ -25,6 +25,11 @@ related_tools: [visualization_get_state, ask_user]
 - **Adjusted Arguments**: If a tool returns `_adjusted_arguments`, report the values that actually executed.
 - **Failures & Fallbacks**: Report failures truthfully; never describe a fallback or partial result as full success.
 - **Outcome Focus**: Focus on visual meaning and findings, not tool-call mechanics. Keep follow-ups to at most one concrete suggestion.
+- **Match Detail to the Request**: For a first-time or plain-language request, lead with what the drawing shows and explain unfamiliar terms briefly. For a request naming an algorithm, metric, or parameter, include the exact method, effective values, and limits relevant to the conclusion.
+
+## When the User Reports Confusion
+
+The turn-start context may include a saved clarity report from an earlier analysis response. Treat it as the user's observation, identify the part that caused trouble, and explain that part in the current conversation language. If it describes a wrong or unreadable view and the current request asks you to fix it, inspect the current state and use the normal tools. Do not claim that the application itself or its Skills were changed by this report. Do not ask the same feedback question again in prose; the optional form on the completed response collects it.
 
 ## User Interaction with `ask_user`
 

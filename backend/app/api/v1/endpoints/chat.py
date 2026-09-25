@@ -150,6 +150,72 @@ def get_messages(
     return messages
 
 
+@router.get("/{chat_id}/feedback", response_model=List[schemas.AnalysisFeedback])
+def list_analysis_feedback(
+    chat_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Retrieve the chat owner's feedback with message IDs for evaluation review."""
+    verify_chat_ownership(chat_id, current_user.id, db)
+    return (
+        db.query(models.AnalysisFeedback)
+        .filter(models.AnalysisFeedback.chat_id == chat_id)
+        .order_by(models.AnalysisFeedback.id)
+        .all()
+    )
+
+
+@router.put(
+    "/{chat_id}/messages/{message_id}/feedback",
+    response_model=schemas.AnalysisFeedback,
+)
+def save_analysis_feedback(
+    chat_id: int,
+    message_id: int,
+    payload: schemas.AnalysisFeedbackWrite,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Save or revise a clarity report for one completed analysis response."""
+    verify_chat_ownership(chat_id, current_user.id, db)
+    message = (
+        db.query(models.ChatMessage)
+        .filter(models.ChatMessage.id == message_id, models.ChatMessage.chat_id == chat_id)
+        .first()
+    )
+    if not message or message.role not in {"assistant", "model"}:
+        raise HTTPException(status_code=404, detail="Analysis response not found")
+    has_operation = any(
+        execution.tool_name.startswith(("analysis_", "layout_", "visualization_", "subgraph_"))
+        for execution in message.tool_executions
+    )
+    if not has_operation:
+        raise HTTPException(status_code=422, detail="Response has no analysis operation")
+    if payload.clarity == "unclear" and not (payload.area or (payload.detail or "").strip()):
+        raise HTTPException(status_code=422, detail="Select an area or describe what was unclear")
+
+    feedback = (
+        db.query(models.AnalysisFeedback)
+        .filter(models.AnalysisFeedback.message_id == message_id)
+        .first()
+    )
+    if feedback is None:
+        feedback = models.AnalysisFeedback(chat_id=chat_id, message_id=message_id)
+        db.add(feedback)
+    feedback.clarity = payload.clarity
+    feedback.area = payload.area if payload.clarity == "unclear" else None
+    feedback.detail = (
+        (payload.detail or "").strip() or None
+        if payload.clarity == "unclear"
+        else None
+    )
+    feedback.reported_at = None
+    db.commit()
+    db.refresh(feedback)
+    return feedback
+
+
 @router.get("/{chat_id}/export")
 async def export_network(
     chat_id: int,
