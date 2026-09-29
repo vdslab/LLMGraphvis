@@ -122,6 +122,37 @@ def get_visualization_state(db: Session, network_id: int) -> Dict[str, Any]:
     }
 
 
+# Listing budget (ADR 0024): a free-text attribute such as a biography would
+# otherwise contribute ten paragraphs to every listing.
+LISTED_VALUE_CHARS = 40
+LISTED_TOP_VALUES = 5
+
+
+def _compact_listing(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Drop an empty description and clip example values; counts stay exact.
+
+    Provenance (`is_derived`, `derived_from`) is kept even when false/null:
+    it is how a reader tells a computed metric from imported data.
+    """
+    compact = []
+    for entry in entries:
+        item = dict(entry)
+        if item.get("description") is None:
+            item.pop("description", None)
+        stats = dict(item.get("stats") or {})
+        values = stats.get("top_values")
+        if isinstance(values, list):
+            stats["top_values"] = [
+                v if not isinstance(v, str) or len(v) <= LISTED_VALUE_CHARS
+                else v[:LISTED_VALUE_CHARS] + "…"
+                for v in values[:LISTED_TOP_VALUES]
+            ]
+        if stats:
+            item["stats"] = stats
+        compact.append(item)
+    return compact
+
+
 def list_node_attributes(db: Session, network_id: int) -> List[Dict[str, Any]]:
     """Lists available node attributes."""
     from app.logic import attributes
@@ -133,7 +164,7 @@ def list_node_attributes(db: Session, network_id: int) -> List[Dict[str, Any]]:
         models.NodeTextAttributeValue,
         db
     )
-    return stats
+    return _compact_listing(stats)
 
 
 def list_edge_attributes(db: Session, network_id: int) -> List[Dict[str, Any]]:
@@ -147,4 +178,4 @@ def list_edge_attributes(db: Session, network_id: int) -> List[Dict[str, Any]]:
         models.EdgeTextAttributeValue,
         db
     )
-    return stats
+    return _compact_listing(stats)

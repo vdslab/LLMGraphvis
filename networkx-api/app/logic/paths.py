@@ -4,6 +4,7 @@ import math
 
 import networkx as nx
 
+from .result_shaping import limit_values, summarize_values
 from .utils.graph_builder import build_graph_from_db
 
 
@@ -54,7 +55,8 @@ def shortest_path(network_id, source, target, db, weight=None, method="dijkstra"
 
 
 def single_source_distances(
-    network_id, source, db, weight=None, method="dijkstra", cutoff=None
+    network_id, source, db, weight=None, method="dijkstra", cutoff=None,
+    limit=None, targets=None,
 ):
     if cutoff is not None and (not math.isfinite(cutoff) or cutoff < 0):
         raise ValueError("cutoff must be a finite nonnegative distance")
@@ -73,10 +75,20 @@ def single_source_distances(
         distances = {
             node: value for node, value in distances.items() if value <= cutoff
         }
+    reachable = distances
+    if targets is not None:
+        for node in targets:
+            require_node(graph, node)
+        # Asked-for nodes are reported even when unreachable, as null.
+        distances = {node: reachable.get(node) for node in targets}
+    elif limit is not None:
+        distances = limit_values(reachable, limit, ascending=True)
     return {
         "source": source,
         "distances": distances,
         "returned_count": len(distances),
+        "reachable_count": len(reachable),
+        "summary": summarize_values(reachable),
         "node_count": len(graph),
         "cutoff": cutoff,
         "weight": weight,

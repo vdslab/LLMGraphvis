@@ -34,7 +34,7 @@ def test_converts_history_and_preserves_tool_call_ids():
             "tool",
             [
                 LLMFunctionResponsePart(
-                    "analysis_degree", {"values": [1, 2]}, "call_1"
+                    "analysis_degree", {"values":[1,2]}, "call_1"
                 )
             ],
         ),
@@ -55,7 +55,7 @@ def test_converts_history_and_preserves_tool_call_ids():
     assert messages[2]["content"][0] == {
         "type": "tool_result",
         "tool_use_id": "call_1",
-        "content": '{"values": [1, 2]}',
+        "content": '{"values":[1,2]}',
     }
 
 

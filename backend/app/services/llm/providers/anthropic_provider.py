@@ -4,6 +4,7 @@ from typing import Any, AsyncIterator, List, Optional
 
 from app.core.logging import get_logger
 
+from ..observations import serialize_observation
 from .base import LLMProvider
 from .defaults import DEFAULT_CLAUDE_MODEL
 from .types import (
@@ -118,9 +119,7 @@ class AnthropicProvider(LLMProvider):
                 content = []
                 for part in msg.parts:
                     if isinstance(part, LLMFunctionResponsePart):
-                        resp = part.response
-                        if not isinstance(resp, str):
-                            resp = json.dumps(resp)
+                        resp = serialize_observation(part.response)
                         content.append({
                             "type": "tool_result",
                             "tool_use_id": part.call_id or f"call_{part.name}",

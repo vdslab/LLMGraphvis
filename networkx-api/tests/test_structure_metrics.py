@@ -45,3 +45,31 @@ def test_directed_triangles_rejected_without_conversion(db):
     db.commit()
     with pytest.raises(ValueError, match="undirected"):
         metrics.triangle_counts(1, db)
+
+
+def test_limited_results_list_extremes_and_summarize_every_node(db):
+    setup_graph(db)
+    graph = build_graph_from_db(1, db)
+    full = nx.core_number(graph)
+
+    result = metrics.core_numbers(1, db, limit=2)
+
+    assert result["returned_count"] == 2
+    assert result["omitted"] == len(full) - 2
+    assert list(result["core_numbers"].values()) == sorted(full.values(), reverse=True)[:2]
+    assert sum(result["summary"]["distribution"].values()) == len(full)
+
+    triangles = metrics.triangle_counts(1, db, limit=1)
+    assert triangles["returned_count"] == 1 and "total_triangles" in triangles
+
+
+def test_limited_edge_betweenness_keeps_the_busiest_edges(db):
+    setup_graph(db)
+    graph = build_graph_from_db(1, db)
+    expected = max(nx.edge_betweenness_centrality(graph).values())
+
+    result = metrics.edge_betweenness(1, db, limit=1)
+
+    assert result["edges"][0]["value"] == pytest.approx(expected)
+    assert result["returned_count"] == 1
+    assert result["omitted"] == result["edge_count"] - 1

@@ -6,18 +6,23 @@ import networkx as nx
 
 from .attributes import load_node_attribute_values
 from .paths import path_graph, require_node
+from .result_shaping import shaped_per_node
 from .utils.graph_builder import build_graph_from_db
 
 
-def core_numbers(network_id, db):
+def core_numbers(network_id, db, limit=None):
     graph = build_graph_from_db(network_id, db)
     if nx.number_of_selfloops(graph):
         raise ValueError("Core numbers require a graph without self-loops")
     values = nx.core_number(graph)
-    return {"core_numbers": values, "is_directed": graph.is_directed()}
+    if limit is None:
+        return {"core_numbers": values, "is_directed": graph.is_directed()}
+    result = shaped_per_node(values, limit, key="core_numbers")
+    result["is_directed"] = graph.is_directed()
+    return result
 
 
-def triangle_counts(network_id, db, nodes=None):
+def triangle_counts(network_id, db, nodes=None, limit=None):
     graph = build_graph_from_db(network_id, db)
     if graph.is_directed():
         raise ValueError("Triangle counts require an undirected graph")
@@ -25,13 +30,20 @@ def triangle_counts(network_id, db, nodes=None):
         for node in nodes:
             require_node(graph, node)
     values = nx.triangles(graph, nodes=nodes)
-    result = {"triangles_by_node": values}
-    if nodes is None:
-        result["total_triangles"] = sum(values.values()) // 3
+    if nodes is not None:
+        # An explicit subset is the question itself; return it whole.
+        return {"triangles_by_node": values}
+    if limit is None:
+        result = {"triangles_by_node": values}
+    else:
+        result = shaped_per_node(values, limit, key="triangles_by_node")
+    result["total_triangles"] = sum(values.values()) // 3
     return result
 
 
-def edge_betweenness(network_id, db, k=None, normalized=True, weight=None, seed=42):
+def edge_betweenness(
+    network_id, db, k=None, normalized=True, weight=None, seed=42, limit=None
+):
     graph, weight = path_graph(network_id, db, weight)
     if weight and any(data[weight] <= 0 for _, _, data in graph.edges(data=True)):
         raise ValueError("Weighted betweenness requires strictly positive distances")
@@ -40,11 +52,17 @@ def edge_betweenness(network_id, db, k=None, normalized=True, weight=None, seed=
     values = nx.edge_betweenness_centrality(
         graph, k=k, normalized=normalized, weight=weight, seed=seed
     )
+    # Highest traffic first, so a limited result keeps the edges that matter.
+    ranked = sorted(values.items(), key=lambda kv: (-kv[1], kv[0]))
+    shown = ranked if limit is None else ranked[:limit]
     return {
         "edges": [
             {"source": source, "target": target, "value": value}
-            for (source, target), value in sorted(values.items())
+            for (source, target), value in shown
         ],
+        "edge_count": len(values),
+        "returned_count": len(shown),
+        "omitted": len(values) - len(shown),
         "parameters": {
             "k": k,
             "normalized": normalized,

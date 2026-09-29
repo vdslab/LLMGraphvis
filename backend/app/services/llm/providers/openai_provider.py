@@ -4,6 +4,7 @@ from typing import AsyncIterator, List, Optional
 
 from app.core.logging import get_logger
 
+from ..observations import serialize_observation
 from .base import LLMProvider
 from .defaults import DEFAULT_OPENAI_MODEL
 from .types import (
@@ -64,9 +65,7 @@ class OpenAIProvider(LLMProvider):
                 for part in msg.parts:
                     if not isinstance(part, LLMFunctionResponsePart):
                         continue
-                    response = part.response
-                    if not isinstance(response, str):
-                        response = json.dumps(response)
+                    response = serialize_observation(part.response)
                     messages.append(
                         {
                             "role": "tool",

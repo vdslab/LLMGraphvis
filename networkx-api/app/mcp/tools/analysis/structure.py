@@ -9,34 +9,43 @@ from app.logic import structure_metrics
 from pydantic import Field
 
 NetworkId = Annotated[int, Field(description="Network to measure.")]
+Limit = Annotated[int, Field(ge=1, le=500, description="How many nodes to list, highest value first. The summary (min/max/mean/median, and the full histogram for small integer ranges) always covers every node, so raise this only when the individual values of more nodes are actually needed.")]
 
 
 @mcp.tool()
 @handle_tool_errors
-def analysis_core_number(network_id: NetworkId) -> dict:
+def analysis_core_number(network_id: NetworkId, limit: Limit = 20) -> dict:
     """Return each node's highest k-core membership, without extracting a core.
 
     Directed graphs use in-degree plus out-degree. Self-loops are rejected.
     Isolated nodes have core number zero. Read-only: no saved attributes or view
     changes. This measures cohesive structure, not shortest-path importance.
+
+    Returns the `limit` nodes with the highest core number in `core_numbers`,
+    a `summary` of all nodes (its `distribution` maps core number -> node
+    count), and `omitted`, the number of nodes not listed. Use
+    `subgraph_k_core` to extract or view a core.
     """
     with get_db_context() as db:
-        return structure_metrics.core_numbers(network_id, db)
+        return structure_metrics.core_numbers(network_id, db, limit)
 
 
 @mcp.tool()
 @handle_tool_errors
 def analysis_triangles(
     network_id: NetworkId,
-    nodes: Annotated[Optional[list[str]], Field(description="Exact node IDs to measure; omit/null for all nodes. A subset measures triangles in the full graph, not its induced subgraph.")] = None,
+    nodes: Annotated[Optional[list[str]], Field(description="Exact node IDs to measure; omit/null for all nodes. A subset measures triangles in the full graph, not its induced subgraph, and is returned in full.")] = None,
+    limit: Limit = 20,
 ) -> dict:
     """Count triangles incident to nodes in an undirected graph; ignore self-loops.
 
     Unweighted. When measuring all nodes, also returns the unique graph-wide
-    triangle count. Partial-node sums are not a graph-wide count. Read-only.
+    triangle count, lists only the `limit` nodes in the most triangles, and
+    summarizes the rest (`summary`, `omitted`). Partial-node sums are not a
+    graph-wide count. Read-only.
     """
     with get_db_context() as db:
-        return structure_metrics.triangle_counts(network_id, db, nodes)
+        return structure_metrics.triangle_counts(network_id, db, nodes, limit)
 
 
 @mcp.tool()
@@ -47,15 +56,18 @@ def analysis_edge_betweenness(
     normalized: Annotated[bool, Field(description="Normalize by the number of possible node pairs, accounting for direction.")] = True,
     weight: Annotated[Optional[str], Field(description="Edge distance/cost attribute. All costs must be positive and finite. Omit/null/'none' for unweighted; strength is not automatically treated as cost.")] = None,
     seed: Annotated[Optional[int], Field(description="Seed for sampling when k is set. Default 42; null uses fresh randomness.")] = 42,
+    limit: Annotated[int, Field(ge=1, le=500, description="How many edges to list, highest betweenness first. `edge_count` and `omitted` report the rest.")] = 20,
 ) -> dict:
     """Measure shortest-path traffic through each edge, without changing the graph.
 
     Supports directed graphs. Exact computation can be expensive; use k for
-    approximation and report that choice. Returns source/target/value records;
-    does not remove edges, save attributes, style, switch, or render.
+    approximation and report that choice. Returns source/target/value records,
+    highest first; does not remove edges, save attributes, style, switch, or render.
     """
     with get_db_context() as db:
-        return structure_metrics.edge_betweenness(network_id, db, k, normalized, weight, seed)
+        return structure_metrics.edge_betweenness(
+            network_id, db, k, normalized, weight, seed, limit
+        )
 
 
 @mcp.tool()

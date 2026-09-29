@@ -44,16 +44,21 @@ def analysis_single_source_distances(
     weight: Cost = None,
     method: Method = "dijkstra",
     cutoff: Annotated[float | None, Field(ge=0, allow_inf_nan=False, description="Maximum returned distance/cost, inclusive. Omit for all reachable nodes. With negative costs filtering occurs after Bellman-Ford finishes.")] = None,
+    limit: Annotated[int, Field(ge=1, le=500, description="How many of the nearest reachable nodes to list in `distances`. `reachable_count` and `summary` (whose `distribution` maps hop count -> node count for unweighted queries) always cover every reachable node.")] = 30,
+    target_node_ids: Annotated[list[str] | None, Field(description="Exact node IDs whose distance you need. When given, `distances` lists exactly these (null = unreachable or beyond cutoff) and `limit` is ignored.")] = None,
 ) -> dict:
     """Return distances from one node to reachable nodes, optionally within a cutoff.
 
-    The source has distance zero. Omitted nodes are unreachable or outside the
-    cutoff; never interpret omission as distance zero. Read-only; follows outgoing
-    edges of directed graphs. No node attributes or visualization are changed.
+    The source has distance zero. `distances` lists the nearest `limit` nodes,
+    or exactly `target_node_ids`; nodes not listed are not thereby unreachable,
+    so read `reachable_count` for how many are. Never interpret an unlisted
+    node as distance zero. Read-only; follows outgoing edges of directed
+    graphs. No node attributes or visualization are changed.
     """
     with get_db_context() as db:
         return paths.single_source_distances(
-            network_id, source_node_id, db, weight, method, cutoff
+            network_id, source_node_id, db, weight, method, cutoff,
+            limit=limit, targets=target_node_ids,
         )
 
 

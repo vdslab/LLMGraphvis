@@ -59,6 +59,18 @@ def test_distances_exclude_unreachable_and_apply_cutoff(db, network):
     assert paths.single_source_distances(network.id, "c", db)["distances"] == {"c": 0}
 
 
+def test_limited_distances_list_nearest_and_count_all_reachable(db, network):
+    result = paths.single_source_distances(network.id, "a", db, limit=2)
+    assert result["distances"] == {"a": 0, "b": 1}
+    assert result["reachable_count"] == 3
+    assert result["summary"]["distribution"] == {"0": 1, "1": 2}
+
+    targeted = paths.single_source_distances(
+        network.id, "a", db, targets=["c", "isolated"]
+    )
+    assert targeted["distances"] == {"c": 1, "isolated": None}
+
+
 def test_negative_cost_requires_bellman_ford(db, network):
     edge = db.query(models.Edge).filter_by(edge_id="bc").one()
     edge.weight = -3

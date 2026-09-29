@@ -59,3 +59,12 @@ def test_small_past_observation_is_unchanged():
     result = {"reachable": True, "source": "a", "target": "b"}
 
     assert compact_past_observation(result) == result
+
+
+def test_serialized_observation_keeps_japanese_literal_and_compact():
+    from app.services.llm.observations import serialize_observation
+
+    text = serialize_observation({"composer": "モーツァルト", "count": 2})
+
+    assert text == '{"composer":"モーツァルト","count":2}'
+    assert serialize_observation("already text") == "already text"
