@@ -32,6 +32,7 @@ async def process_chat(
     """Process a chat message using the configured LLM provider with function calling."""
     logger.info(f"Processing chat_id={chat_id}, message='{user_message[:50]}...'")
     queue = await events.get_event_queue(chat_id)
+    agent = None
 
     try:
         # 1. Setup Context
@@ -59,8 +60,9 @@ async def process_chat(
         # model's reasoning, so it goes out as `progress` — see emitters.py.
         await emitters.emit_progress(queue, "Analyzing your request")
 
-        # 2. Delegate to GraphVisAgent, honoring this chat's pinned provider/model (if any)
-        agent = engine.GraphVisAgent(db, provider_name=chat.provider, model_name=chat.model)
+        # 2. Delegate to GraphVisAgent, honoring the chat's pin, else the user's default
+        provider_name, model_name = engine.resolve_chat_model(chat)
+        agent = engine.GraphVisAgent(db, provider_name=provider_name, model_name=model_name)
 
         final_response_text, execution_log, total_usage = await agent.process_turn(
             history=chat_history,
@@ -79,4 +81,13 @@ async def process_chat(
         await queue.put({"event": "error", "data": json.dumps(str(e))})
 
         error_msg = _format_exception_message(e)
+        # Tokens spent before the failure were still billed.
+        if agent is not None:
+            return (
+                f"I encountered an error: {error_msg}",
+                [],
+                agent.turn_usage,
+                agent.provider_name,
+                agent.provider.model_name,
+            )
         return f"I encountered an error: {error_msg}", [], UsageData(), "", ""

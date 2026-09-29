@@ -24,6 +24,13 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
+    # Bumped on password change; tokens carrying an older value are rejected,
+    # which signs the user out everywhere else.
+    token_version = Column(Integer, nullable=False, default=0, server_default="0")
+    # The provider/model a chat uses when it has not pinned its own. Null falls
+    # back to the LLM_PROVIDER / *_MODEL environment defaults.
+    default_provider = Column(String, nullable=True)
+    default_model = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -336,18 +343,32 @@ class EdgeFloatAttributeValue(Base):
 
 
 class LlmUsage(Base):
+    """Tokens and estimated cost of one LLM task: an agent turn or a chat title.
+
+    Counts follow `UsageData`'s normalized meaning (ADR 0025): input includes
+    cache reads/writes, output includes reasoning. `calls` holds the same
+    counts per generate() call, in order. `message_id` is null when the turn
+    produced no stored message; `chat_id`/`user_id` keep such rows attributable.
+    """
+
     __tablename__ = "llm_usages"
 
     id = Column(Integer, primary_key=True, index=True)
-    message_id = Column(Integer, ForeignKey("chat_messages.id"), nullable=False, unique=True)
-    provider = Column(String, nullable=False)  # "google" | "anthropic" | "openai"
+    message_id = Column(Integer, ForeignKey("chat_messages.id"), nullable=True, unique=True)
+    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="SET NULL"), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    purpose = Column(String, nullable=False, default="agent_turn", server_default="agent_turn")
+    provider = Column(String, nullable=False)  # "google" | "anthropic" | "openai" | "lmstudio"
     model = Column(String, nullable=False)               # e.g. "gemini-3.8-flash", "claude-opus-4-8"
     input_tokens = Column(Integer, nullable=False, default=0)
     output_tokens = Column(Integer, nullable=False, default=0)
     cached_input_tokens = Column(Integer, nullable=False, default=0)
+    cache_write_tokens = Column(Integer, nullable=False, default=0, server_default="0")
+    reasoning_tokens = Column(Integer, nullable=False, default=0, server_default="0")
     iteration_count = Column(Integer, nullable=False, default=1)
+    calls = Column(JSON, nullable=True)
     estimated_cost_usd = Column(Float, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     message = relationship("ChatMessage", back_populates="usage")
 

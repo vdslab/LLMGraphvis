@@ -1,9 +1,9 @@
 """Provider/model options exposed to the frontend for per-chat selection.
 
 Model ids here must stay in sync with the defaults in the provider adapters and
-with pricing.py's MODEL_PRICING keys (unknown models just default to $0.0
-estimated cost rather than erroring, so drift here degrades gracefully but
-should still be avoided). LM Studio is added dynamically because its model id is
+with pricing.py's MODEL_PRICING keys (a model without a rate is shown with an
+unknown cost rather than erroring, so drift here degrades gracefully but should
+still be avoided). LM Studio is added dynamically because its model id is
 chosen by the user in LM Studio rather than by this application.
 """
 import os

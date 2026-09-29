@@ -12,6 +12,8 @@ from app.services.llm import emitters
 from app.services.llm import markup
 from app.services.llm import mcp_client
 from app.services.llm import titles
+from app.services.llm import usage as llm_usage
+from app.services.llm.providers.types import UsageData
 
 logger = get_logger(__name__)
 
@@ -65,13 +67,24 @@ async def _maybe_autoname_chat(
         if user_message_count != 1:
             return
 
+        title_usage = UsageData()
         title = await titles.generate_chat_title(
             user_message=user_message,
             assistant_message=assistant_message,
             provider_name=provider_name or None,
             model_name=model_name or None,
             current_name=chat.name,
+            usage=title_usage,
         )
+        if llm_usage.record_usage(
+            db,
+            title_usage,
+            provider=provider_name,
+            model=model_name,
+            chat_id=chat_id,
+            purpose=llm_usage.PURPOSE_TITLE,
+        ):
+            db.commit()
         if title and title != chat.name:
             await _apply_chat_name(db, chat, title)
     except Exception as e:
@@ -337,25 +350,14 @@ async def handle_process_background(
             db.refresh(db_msg)
 
             # Persist token usage for this turn, now that db_msg.id exists.
-            if total_usage and (total_usage.input_tokens or total_usage.output_tokens):
-                from app.services.llm.pricing import estimate_cost_usd
-
-                cost = estimate_cost_usd(
-                    model_name,
-                    total_usage.input_tokens,
-                    total_usage.output_tokens,
-                    total_usage.cached_input_tokens,
-                    provider=provider_name,
-                )
-                db.add(models.LlmUsage(
-                    message_id=db_msg.id,
-                    provider=provider_name,
-                    model=model_name,
-                    input_tokens=total_usage.input_tokens,
-                    output_tokens=total_usage.output_tokens,
-                    cached_input_tokens=total_usage.cached_input_tokens,
-                    estimated_cost_usd=cost,
-                ))
+            if llm_usage.record_usage(
+                db,
+                total_usage,
+                provider=provider_name,
+                model=model_name,
+                chat_id=chat_id,
+                message_id=db_msg.id,
+            ):
                 db.commit()
 
             # Persist separate Tool Executions
@@ -422,6 +424,15 @@ async def handle_process_background(
             # Even an empty response must emit a terminal event, otherwise the
             # frontend stream stays in the loading state forever.
             logger.warning(f"Empty LLM response for chat_id={chat_id}")
+            # The tokens were still spent; keep them attributed to the chat.
+            if llm_usage.record_usage(
+                db,
+                total_usage,
+                provider=provider_name,
+                model=model_name,
+                chat_id=chat_id,
+            ):
+                db.commit()
             queue = await llm_service.get_event_queue(chat_id)
             await queue.put(
                 {

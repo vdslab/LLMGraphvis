@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 
-from app.api.v1.endpoints import auth, chat, networks
+from app.api.v1.endpoints import auth, chat, networks, users
 from app.core.logging import get_logger
 from app.middleware.logging import LoggingMiddleware
 
@@ -115,6 +115,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(networks.router)
+app.include_router(users.router)
 
 
 @app.get("/")

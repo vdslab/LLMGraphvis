@@ -59,27 +59,12 @@ async def emit_render_update(queue: Any, vis_data: Dict) -> None:
 async def emit_usage_update(
     queue: Any, usage: UsageData, provider_name: str, model_name: str
 ) -> None:
-    from .pricing import estimate_cost_usd
+    """The running usage total of the turn in progress (not a delta)."""
+    from .usage import usage_payload
 
-    cost = estimate_cost_usd(
-        model_name,
-        usage.input_tokens,
-        usage.output_tokens,
-        usage.cached_input_tokens,
-        provider=provider_name,
-    )
     await queue.put(
         {
             "event": "usage_update",
-            "data": json.dumps(
-                {
-                    "input_tokens": usage.input_tokens,
-                    "output_tokens": usage.output_tokens,
-                    "cached_input_tokens": usage.cached_input_tokens,
-                    "estimated_cost_usd": cost,
-                    "provider": provider_name,
-                    "model": model_name,
-                }
-            ),
+            "data": json.dumps(usage_payload(usage, provider_name, model_name)),
         }
     )

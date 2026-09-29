@@ -160,6 +160,8 @@ async def test_stream_captures_usage_with_prompt_caching():
         chunks.append(chunk)
 
     usage_chunk = next(c for c in chunks if c.usage is not None)
-    assert usage_chunk.usage.input_tokens == 1010  # 10 + 1000
+    # Normalized: input counts cache reads and writes, like the other providers.
+    assert usage_chunk.usage.input_tokens == 1510  # 10 + 1000 + 500
     assert usage_chunk.usage.output_tokens == 50
     assert usage_chunk.usage.cached_input_tokens == 500
+    assert usage_chunk.usage.cache_write_tokens == 1000

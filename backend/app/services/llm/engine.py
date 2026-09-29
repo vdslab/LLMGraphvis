@@ -22,6 +22,7 @@ from .providers.types import (
     LLMTextPart,
     StreamChunk,
     ToolDefinition,
+    TurnUsage,
     UsageData,
 )
 from .tool_catalog import ToolCatalog, exposure_mode, tool_definition_bytes
@@ -112,6 +113,20 @@ def resolve_provider_name(provider_name: Optional[str] = None) -> str:
     return (provider_name or os.getenv("LLM_PROVIDER") or DEFAULT_PROVIDER).lower()
 
 
+def resolve_chat_model(chat: Any) -> Tuple[Optional[str], Optional[str]]:
+    """The (provider, model) a chat runs on: its own pin, else its owner's default.
+
+    None parts fall through to the environment defaults in `_create_provider`.
+    A model is only taken together with the provider it was chosen under.
+    """
+    if getattr(chat, "provider", None):
+        return chat.provider, chat.model
+    user = getattr(chat, "user", None)
+    if user is not None and getattr(user, "default_provider", None):
+        return user.default_provider, user.default_model
+    return None, None
+
+
 def create_provider(
     provider_name: Optional[str] = None, model_name: Optional[str] = None
 ) -> LLMProvider:
@@ -132,6 +147,7 @@ class GraphVisAgent:
         # the process-wide provider-specific model environment variable defaults.
         self.provider_name = resolve_provider_name(provider_name)
         self.provider = _create_provider(self.provider_name, model_name)
+        self.turn_usage = TurnUsage()
         # Full system prompt for this turn. process_turn() appends the network
         # context summary so it is always present regardless of the user prompt.
         # The thinking protocol variant is chosen per the active provider/model's
@@ -164,9 +180,7 @@ class GraphVisAgent:
                 if chunk.usage:
                     # A single generate() call typically yields usage once, at the end,
                     # but sum defensively in case a provider yields it more than once.
-                    usage.input_tokens += chunk.usage.input_tokens
-                    usage.output_tokens += chunk.usage.output_tokens
-                    usage.cached_input_tokens += chunk.usage.cached_input_tokens
+                    usage.add(chunk.usage)
         except Exception as e:
             logger.error(f"Error consuming stream: {e}")
             raise
@@ -301,7 +315,9 @@ class GraphVisAgent:
         full_transcript = ""
         execution_log = []
         tool_call_counter = 0
-        total_usage = UsageData()
+        # Kept on the agent too, so a turn that raises still reports what it
+        # spent (see service.process_chat).
+        total_usage = self.turn_usage = TurnUsage()
         provider_name = self.provider_name
 
         while iteration < max_iterations:
@@ -314,12 +330,10 @@ class GraphVisAgent:
             )
             chunk_text = markup.sanitize_model_text(chunk_text)
 
-            # Iterations are separate generate() calls, each with its own full input
-            # context, so input/cached tokens are SUMMED across iterations.
-            total_usage.input_tokens += iter_usage.input_tokens
-            total_usage.output_tokens += iter_usage.output_tokens
-            total_usage.cached_input_tokens += iter_usage.cached_input_tokens
-            if iter_usage.input_tokens or iter_usage.output_tokens:
+            # Iterations are separate generate() calls, each billed for its own full
+            # input context, so every count is SUMMED across iterations.
+            if not iter_usage.is_empty:
+                total_usage.add_call(iter_usage)
                 await self._emit_usage_update(queue, total_usage, provider_name, self.provider.model_name)
 
             if chunk_thought:

@@ -15,7 +15,7 @@ from typing import Optional
 from app.core.logging import get_logger
 
 from .engine import create_provider
-from .providers.types import LLMMessage, LLMTextPart
+from .providers.types import LLMMessage, LLMTextPart, UsageData
 
 logger = get_logger(__name__)
 
@@ -101,8 +101,12 @@ async def generate_chat_title(
     provider_name: Optional[str] = None,
     model_name: Optional[str] = None,
     current_name: Optional[str] = None,
+    usage: Optional[UsageData] = None,
 ) -> Optional[str]:
     """Ask the LLM for a title for this chat, or return None if it can't.
+
+    Tokens the call used are added to `usage`, when given, so the caller can
+    record them — even when no usable title came back.
 
     Failures are logged and swallowed: a chat keeping its placeholder name is a
     cosmetic problem, and must never break the turn that triggered the naming.
@@ -129,6 +133,8 @@ async def generate_chat_title(
         async for chunk in provider.generate(history, [], TITLE_SYSTEM_INSTRUCTION):
             if chunk.text:
                 text += chunk.text
+            if chunk.usage and usage is not None:
+                usage.add(chunk.usage)
     except Exception as e:
         logger.warning(f"Chat title generation failed: {e}")
         return None

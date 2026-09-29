@@ -21,7 +21,7 @@ from app.core.logging import get_logger
 from app.services import llm as llm_service
 from app.services.llm import mcp_client
 from app.services.llm.catalog import get_available_provider_catalog
-from app.services import chat_service, sample_networks
+from app.services import chat_service, sample_networks, usage_report
 
 logger = get_logger(__name__)
 
@@ -148,6 +148,17 @@ def get_messages(
     )
 
     return messages
+
+
+@router.get("/{chat_id}/usage", response_model=schemas.ChatUsageReport)
+def get_chat_usage(
+    chat_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Token usage and estimated cost of every LLM task in this chat, oldest first."""
+    verify_chat_ownership(chat_id, current_user.id, db)
+    return usage_report.chat_usage(db, chat_id)
 
 
 @router.get("/{chat_id}/export")

@@ -199,6 +199,7 @@ class AnthropicProvider(LLMProvider):
         # so we simply overwrite usage_output rather than summing deltas.
         usage_input = 0
         usage_cached = 0
+        usage_cache_write = 0
         usage_output = 0
 
         async with self.client.messages.stream(
@@ -247,10 +248,17 @@ class AnthropicProvider(LLMProvider):
                 elif etype == "message_start":
                     u = getattr(event.message, "usage", None)
                     if u is not None:
-                        usage_input = (getattr(u, "input_tokens", 0) or 0) + (
+                        # Anthropic's input_tokens counts only the uncached
+                        # part; cache reads and writes are reported beside it.
+                        usage_cached = getattr(u, "cache_read_input_tokens", 0) or 0
+                        usage_cache_write = (
                             getattr(u, "cache_creation_input_tokens", 0) or 0
                         )
-                        usage_cached = getattr(u, "cache_read_input_tokens", 0) or 0
+                        usage_input = (
+                            (getattr(u, "input_tokens", 0) or 0)
+                            + usage_cached
+                            + usage_cache_write
+                        )
 
                 elif etype == "message_delta":
                     u = getattr(event, "usage", None)
@@ -266,4 +274,5 @@ class AnthropicProvider(LLMProvider):
                         input_tokens=usage_input,
                         output_tokens=usage_output,
                         cached_input_tokens=usage_cached,
+                        cache_write_tokens=usage_cache_write,
                     ))

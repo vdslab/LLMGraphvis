@@ -1,16 +1,40 @@
 from datetime import timedelta
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from common import models
 from app import schemas
 from app.core import database
 from app.core import security as auth
+from common import models
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def _issue_token(response: Response, user: models.User) -> Dict[str, str]:
+    """Create an access token for `user`, set it as the auth cookie, and return it.
+
+    The token carries the user's `token_version` as `ver`; bumping the version
+    (on password change) invalidates every token issued before.
+    """
+    access_token = auth.create_access_token(
+        data={"sub": user.username, "ver": user.token_version or 0},
+        expires_delta=timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+
+    # Set cookie for browser clients
+    response.set_cookie(
+        key="access_token",
+        value=f"Bearer {access_token}",
+        httponly=True,
+        max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        samesite="lax",
+        secure=auth.COOKIE_SECURE,
+    )
+
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.post("/register", response_model=schemas.Token)
@@ -32,22 +56,7 @@ def register(
     db.commit()
     db.refresh(db_user)
 
-    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = auth.create_access_token(
-        data={"sub": db_user.username}, expires_delta=access_token_expires
-    )
-
-    # Set cookie for browser clients
-    response.set_cookie(
-        key="access_token",
-        value=f"Bearer {access_token}",
-        httponly=True,
-        max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="lax",
-        secure=auth.COOKIE_SECURE,
-    )
-
-    return {"access_token": access_token, "token_type": "bearer"}
+    return _issue_token(response, db_user)
 
 
 @router.post("/token", response_model=schemas.Token)
@@ -70,56 +79,49 @@ def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    access_token_expires = timedelta(minutes=auth.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = auth.create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
-    )
+    return _issue_token(response, user)
 
-    # Set cookie for browser clients
-    response.set_cookie(
-        key="access_token",
-        value=f"Bearer {access_token}",
-        httponly=True,
-        max_age=auth.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        samesite="lax",
-        secure=auth.COOKIE_SECURE,
-    )
 
-    return {"access_token": access_token, "token_type": "bearer"}
+def _cookie_payload(access_token: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not access_token:
+        return None
+    try:
+        scheme, cookie_token = access_token.split()
+    except ValueError:
+        return None
+    if scheme.lower() != "bearer":
+        return None
+    return auth.decode_access_token(cookie_token)
+
+
+def _user_for_payload(
+    db: Session, payload: Optional[Dict[str, Any]]
+) -> Optional[models.User]:
+    """The user a token names, or None if it names nobody or is out of date."""
+    if not payload or not payload.get("sub"):
+        return None
+    user = db.query(models.User).filter(models.User.username == payload["sub"]).first()
+    # Tokens issued before `ver` existed count as version 0.
+    if user is None or payload.get("ver", 0) != (user.token_version or 0):
+        return None
+    return user
 
 
 async def get_current_user(
     db: Session = Depends(database.get_db),
-    username: Optional[str] = Depends(auth.get_current_user),
+    bearer_payload: Optional[Dict[str, Any]] = Depends(auth.get_token_payload),
     access_token: Optional[str] = Cookie(None),
 ):
     """
     Get the current authenticated user.
 
-    This uses the token authentication from security.py first (for API/Swagger clients)
-    but also supports cookie-based auth for browser clients.
+    This uses the Bearer token first (for API/Swagger clients) but also supports
+    cookie-based auth for browser clients. A token whose `ver` no longer matches
+    the user's `token_version` is rejected.
     """
-    # First, try to get user from standard Bearer token authentication
-    user = None
-    if username:
-        user = db.query(models.User).filter(models.User.username == username).first()
-
-    # If not found but we have a cookie token, try that as fallback for browser clients
-    if user is None and access_token:
-        try:
-            scheme, cookie_token = access_token.split()
-            if scheme.lower() == "bearer":
-                payload = auth.decode_access_token(cookie_token)
-                if payload:
-                    cookie_username = payload.get("sub")
-                    if cookie_username:
-                        user = (
-                            db.query(models.User)
-                            .filter(models.User.username == cookie_username)
-                            .first()
-                        )
-        except (ValueError, AttributeError):
-            pass
+    user = _user_for_payload(db, bearer_payload)
+    if user is None:
+        user = _user_for_payload(db, _cookie_payload(access_token))
 
     # If we still don't have a user, authentication failed
     if user is None:
@@ -141,11 +143,40 @@ def read_users_me(current_user: models.User = Depends(get_current_user)):
     return current_user
 
 
+@router.post("/change-password", response_model=schemas.Token)
+def change_password(
+    body: schemas.PasswordChange,
+    response: Response,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """
+    Change the current user's password.
+
+    Signs the user out of every other session (their tokens carry the old
+    `token_version`) and returns a fresh token for this one.
+    """
+    if not auth.verify_password(body.current_password, current_user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    if body.new_password == body.current_password:
+        raise HTTPException(
+            status_code=400, detail="New password must differ from the current one"
+        )
+
+    current_user.hashed_password = auth.get_password_hash(body.new_password)
+    current_user.token_version = (current_user.token_version or 0) + 1
+    db.commit()
+    db.refresh(current_user)
+
+    return _issue_token(response, current_user)
+
+
 @router.post("/logout")
 def logout(response: Response):
     """
     Logout a user by removing the authentication cookie.
-    Note: For API clients using Bearer tokens, the token remains valid until it expires.
+    Note: For API clients using Bearer tokens, the token remains valid until it
+    expires or the password is changed.
     """
     response.delete_cookie("access_token")
     return {"message": "Logged out successfully"}

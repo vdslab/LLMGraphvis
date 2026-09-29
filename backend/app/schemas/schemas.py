@@ -29,6 +29,24 @@ class TokenData(BaseModel):
     username: Optional[str] = None
 
 
+class PasswordChange(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class UserSettings(BaseModel):
+    username: str
+    default_provider: Optional[str] = None
+    default_model: Optional[str] = None
+
+
+class UserSettingsUpdate(BaseModel):
+    """Both set to pin a default, both null to fall back to the server default."""
+
+    default_provider: Optional[str] = None
+    default_model: Optional[str] = None
+
+
 class ChatBase(BaseModel):
     name: str
 
@@ -139,17 +157,74 @@ class LlmUsageBase(BaseModel):
     input_tokens: int
     output_tokens: int
     cached_input_tokens: int
+    cache_write_tokens: int = 0
+    reasoning_tokens: int = 0
     iteration_count: int
     estimated_cost_usd: Optional[float] = None
 
 
 class LlmUsage(LlmUsageBase):
     id: int
-    message_id: int
+    message_id: Optional[int] = None
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class LlmUsageCall(BaseModel):
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cached_input_tokens: int = 0
+    cache_write_tokens: int = 0
+    reasoning_tokens: int = 0
+
+
+class LlmUsageEntry(LlmUsage):
+    chat_id: Optional[int] = None
+    purpose: str
+    calls: List[LlmUsageCall] = []
+
+
+class UsageTotals(BaseModel):
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cached_input_tokens: int = 0
+    cache_write_tokens: int = 0
+    reasoning_tokens: int = 0
+    estimated_cost_usd: float = 0.0
+    # Entries whose model has no known rate; their cost is not in the total.
+    unpriced_count: int = 0
+    # LLM tasks (agent turns, titles) and the generate() calls they made.
+    task_count: int = 0
+    request_count: int = 0
+
+
+class ChatUsageReport(BaseModel):
+    totals: UsageTotals
+    entries: List[LlmUsageEntry]
+
+
+class ModelUsage(UsageTotals):
+    provider: str
+    model: str
+
+
+class ChatUsageSummary(UsageTotals):
+    chat_id: Optional[int] = None
+    chat_name: Optional[str] = None
+
+
+class DailyUsage(UsageTotals):
+    date: str
+
+
+class UserUsageReport(BaseModel):
+    since: Optional[datetime] = None
+    totals: UsageTotals
+    by_model: List[ModelUsage]
+    by_chat: List[ChatUsageSummary]
+    by_day: List[DailyUsage]
 
 
 class ChatMessage(ChatMessageBase):

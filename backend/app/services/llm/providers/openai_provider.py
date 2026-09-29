@@ -128,15 +128,19 @@ class OpenAIProvider(LLMProvider):
         async for chunk in stream:
             usage = getattr(chunk, "usage", None)
             if usage is not None:
+                # prompt_tokens includes the cached part, and completion_tokens
+                # includes reasoning — both already match UsageData's meaning.
                 prompt_details = getattr(usage, "prompt_tokens_details", None)
+                completion_details = getattr(usage, "completion_tokens_details", None)
                 yield StreamChunk(
                     usage=UsageData(
                         input_tokens=getattr(usage, "prompt_tokens", 0) or 0,
                         output_tokens=getattr(usage, "completion_tokens", 0) or 0,
                         cached_input_tokens=(
                             getattr(prompt_details, "cached_tokens", 0) or 0
-                            if prompt_details is not None
-                            else 0
+                        ),
+                        reasoning_tokens=(
+                            getattr(completion_details, "reasoning_tokens", 0) or 0
                         ),
                     )
                 )

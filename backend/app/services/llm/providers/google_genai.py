@@ -56,6 +56,26 @@ DEFAULT_THINKING_LEVEL = "medium"
 SUPPORTED_THINKING_LEVELS = {"low", "medium", "high"}
 
 
+def usage_from_metadata(meta) -> UsageData:
+    """Normalize Gemini `usage_metadata` to UsageData's meaning.
+
+    `prompt_token_count` already includes `cached_content_token_count`, and
+    `tool_use_prompt_token_count` is billed as input beside it. Thinking is
+    billed as output but counted in `thoughts_token_count`, not in
+    `candidates_token_count`.
+    """
+    def count(name: str) -> int:
+        return getattr(meta, name, 0) or 0
+
+    thoughts = count("thoughts_token_count")
+    return UsageData(
+        input_tokens=count("prompt_token_count") + count("tool_use_prompt_token_count"),
+        output_tokens=count("candidates_token_count") + thoughts,
+        cached_input_tokens=count("cached_content_token_count"),
+        reasoning_tokens=thoughts,
+    )
+
+
 def _is_gemini_3(model_name: str) -> bool:
     return model_name.startswith("gemini-3")
 
@@ -285,8 +305,4 @@ class GoogleGenAIProvider(LLMProvider):
                     ])
 
         if last_usage is not None:
-            yield StreamChunk(usage=UsageData(
-                input_tokens=last_usage.prompt_token_count or 0,
-                output_tokens=last_usage.candidates_token_count or 0,
-                cached_input_tokens=getattr(last_usage, "cached_content_token_count", 0) or 0,
-            ))
+            yield StreamChunk(usage=usage_from_metadata(last_usage))
