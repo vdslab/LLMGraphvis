@@ -36,6 +36,10 @@ const NetworkGraph = memo(({
   const zoomTransformRef = useRef(d3.zoomIdentity);
   // A viewport instruction applies once; later renders keep the user's view.
   const appliedViewportRef = useRef(null);
+  // Where an in-flight viewport animation is heading. A rebuild (the agent's
+  // next render often arrives within the animation) must land there rather
+  // than freeze the camera halfway.
+  const viewportTargetRef = useRef(null);
 
   useEffect(() => {
     onNodeClickRef.current = onNodeClick;
@@ -247,9 +251,12 @@ const NetworkGraph = memo(({
         x: viewBoxX, y: viewBoxY, width: viewBoxW, height: viewBoxH,
       });
       if (target) {
+        const end = d3.zoomIdentity.translate(target.x, target.y).scale(target.k);
+        viewportTargetRef.current = end;
         svg.transition()
           .duration(600)
-          .call(zoom.transform, d3.zoomIdentity.translate(target.x, target.y).scale(target.k));
+          .call(zoom.transform, end)
+          .on("end", () => { viewportTargetRef.current = null; });
       }
     }
     
@@ -257,6 +264,10 @@ const NetworkGraph = memo(({
     return () => {
         if (frame) cancelAnimationFrame(frame);
         svg.interrupt();
+        if (viewportTargetRef.current) {
+          zoomTransformRef.current = viewportTargetRef.current;
+          viewportTargetRef.current = null;
+        }
         svg.on("click", null);
         svg.on(".zoom", null);
         svg.selectAll("*").remove();
