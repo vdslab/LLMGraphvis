@@ -1,0 +1,492 @@
+{
+ "analysis_articulation_points": [
+  "network_id"
+ ],
+ "analysis_attribute_distribution": [
+  "attribute",
+  "bins",
+  "group_by",
+  "network_id",
+  "top"
+ ],
+ "analysis_betweenness_centrality": [
+  "endpoints",
+  "force_recompute",
+  "k",
+  "network_id",
+  "normalized",
+  "seed",
+  "weight"
+ ],
+ "analysis_bridges": [
+  "network_id"
+ ],
+ "analysis_closeness_centrality": [
+  "force_recompute",
+  "network_id",
+  "weight",
+  "wf_improved"
+ ],
+ "analysis_clustering_coefficient": [
+  "force_recompute",
+  "network_id"
+ ],
+ "analysis_connected_components": [
+  "network_id"
+ ],
+ "analysis_core_number": [
+  "limit",
+  "network_id"
+ ],
+ "analysis_degree_centrality": [
+  "force_recompute",
+  "network_id",
+  "normalized"
+ ],
+ "analysis_detect_communities": [
+  "algorithm",
+  "best_n",
+  "force_recompute",
+  "network_id",
+  "resolution",
+  "seed"
+ ],
+ "analysis_edge_betweenness": [
+  "k",
+  "limit",
+  "network_id",
+  "normalized",
+  "seed",
+  "weight"
+ ],
+ "analysis_eigenvector_centrality": [
+  "force_recompute",
+  "max_iter",
+  "network_id",
+  "nstart",
+  "tol",
+  "weight"
+ ],
+ "analysis_greedy_modularity_communities": [
+  "best_n",
+  "cutoff",
+  "force_recompute",
+  "network_id",
+  "resolution",
+  "weight"
+ ],
+ "analysis_group_connectivity": [
+  "attribute",
+  "network_id",
+  "top"
+ ],
+ "analysis_has_path": [
+  "network_id",
+  "source_node_id",
+  "target_node_id"
+ ],
+ "analysis_in_degree_centrality": [
+  "force_recompute",
+  "network_id",
+  "normalized"
+ ],
+ "analysis_k_shortest_paths": [
+  "k",
+  "network_id",
+  "source_node_id",
+  "target_node_id",
+  "weight"
+ ],
+ "analysis_label_propagation_communities": [
+  "force_recompute",
+  "network_id"
+ ],
+ "analysis_louvain_communities": [
+  "force_recompute",
+  "max_level",
+  "network_id",
+  "resolution",
+  "seed",
+  "threshold",
+  "weight"
+ ],
+ "analysis_modularity": [
+  "attribute",
+  "network_id",
+  "resolution",
+  "weight"
+ ],
+ "analysis_out_degree_centrality": [
+  "force_recompute",
+  "network_id",
+  "normalized"
+ ],
+ "analysis_pagerank": [
+  "damping_factor",
+  "dangling",
+  "force_recompute",
+  "max_iter",
+  "network_id",
+  "nstart",
+  "personalization",
+  "tol",
+  "weight"
+ ],
+ "analysis_shortest_path": [
+  "method",
+  "network_id",
+  "source_node_id",
+  "target_node_id",
+  "weight"
+ ],
+ "analysis_single_source_distances": [
+  "cutoff",
+  "limit",
+  "method",
+  "network_id",
+  "source_node_id",
+  "target_node_ids",
+  "weight"
+ ],
+ "analysis_strongly_connected_components": [
+  "network_id"
+ ],
+ "analysis_transitivity": [
+  "network_id"
+ ],
+ "analysis_triangles": [
+  "limit",
+  "network_id",
+  "nodes"
+ ],
+ "analysis_weakly_connected_components": [
+  "network_id"
+ ],
+ "layout_arf": [
+  "a",
+  "dt",
+  "etol",
+  "force_recompute",
+  "init_from_layout",
+  "max_iter",
+  "network_id",
+  "pos",
+  "scaling",
+  "seed"
+ ],
+ "layout_bfs": [
+  "align",
+  "center",
+  "force_recompute",
+  "network_id",
+  "scale",
+  "start"
+ ],
+ "layout_bipartite": [
+  "align",
+  "aspect_ratio",
+  "center",
+  "force_recompute",
+  "network_id",
+  "nodes",
+  "partition_attribute",
+  "partition_value",
+  "scale"
+ ],
+ "layout_circular": [
+  "center",
+  "force_recompute",
+  "network_id",
+  "scale"
+ ],
+ "layout_forceatlas2": [
+  "distributed_action",
+  "force_recompute",
+  "gravity",
+  "init_from_layout",
+  "jitter_tolerance",
+  "linlog",
+  "max_iter",
+  "network_id",
+  "node_mass",
+  "node_size",
+  "pos",
+  "scaling_ratio",
+  "seed",
+  "size_aware",
+  "strong_gravity",
+  "weight"
+ ],
+ "layout_kamada_kawai": [
+  "center",
+  "dist",
+  "force_recompute",
+  "init_from_layout",
+  "network_id",
+  "pos",
+  "scale",
+  "weight"
+ ],
+ "layout_multipartite": [
+  "align",
+  "center",
+  "force_recompute",
+  "network_id",
+  "scale",
+  "subset_attribute",
+  "subset_key"
+ ],
+ "layout_planar": [
+  "center",
+  "force_recompute",
+  "network_id",
+  "scale"
+ ],
+ "layout_profile": [
+  "network_id"
+ ],
+ "layout_random": [
+  "center",
+  "force_recompute",
+  "network_id",
+  "seed"
+ ],
+ "layout_shell": [
+  "center",
+  "force_recompute",
+  "network_id",
+  "nlist",
+  "rotate",
+  "scale"
+ ],
+ "layout_spectral": [
+  "center",
+  "force_recompute",
+  "network_id",
+  "scale",
+  "weight"
+ ],
+ "layout_spiral": [
+  "center",
+  "equidistant",
+  "force_recompute",
+  "network_id",
+  "resolution",
+  "scale"
+ ],
+ "layout_spring": [
+  "center",
+  "fixed",
+  "force_recompute",
+  "gravity",
+  "init_from_layout",
+  "iterations",
+  "k",
+  "method",
+  "network_id",
+  "pos",
+  "scale",
+  "seed",
+  "threshold",
+  "weight"
+ ],
+ "layout_suggest_parameters": [
+  "layout",
+  "max_candidates",
+  "network_id"
+ ],
+ "network_get_info": [
+  "network_id"
+ ],
+ "network_import_graphml": [
+  "graphml_data",
+  "network_id"
+ ],
+ "network_initialize": [
+  "graphml_data",
+  "network_id"
+ ],
+ "network_list_all": [],
+ "network_list_edge_attributes": [
+  "network_id"
+ ],
+ "network_list_node_attributes": [
+  "network_id"
+ ],
+ "network_select": [
+  "network_id"
+ ],
+ "network_update_metadata": [
+  "description",
+  "name",
+  "network_id"
+ ],
+ "node_common_neighbors": [
+  "limit",
+  "network_id",
+  "node_a",
+  "node_b"
+ ],
+ "node_compare": [
+  "attributes",
+  "network_id",
+  "node_ids"
+ ],
+ "node_filter": [
+  "attribute_name",
+  "limit",
+  "max_value",
+  "min_value",
+  "network_id",
+  "value"
+ ],
+ "node_get_details": [
+  "network_id",
+  "node_id"
+ ],
+ "node_get_neighbors": [
+  "include_attributes",
+  "limit",
+  "network_id",
+  "node_id"
+ ],
+ "node_get_top_ranked": [
+  "metric",
+  "n",
+  "network_id",
+  "order"
+ ],
+ "node_search": [
+  "limit",
+  "network_id",
+  "query"
+ ],
+ "node_update_label": [
+  "network_id",
+  "new_label",
+  "node_id"
+ ],
+ "subgraph_community": [
+  "community_attribute",
+  "community_id",
+  "network_id"
+ ],
+ "subgraph_create_by_filter": [
+  "conditions",
+  "description",
+  "network_id",
+  "preserve_layout"
+ ],
+ "subgraph_create_from_nodes": [
+  "description",
+  "network_id",
+  "node_ids",
+  "preserve_layout"
+ ],
+ "subgraph_ego_network": [
+  "center_node_id",
+  "network_id",
+  "radius"
+ ],
+ "subgraph_extract_filter": [
+  "conditions",
+  "description",
+  "network_id"
+ ],
+ "subgraph_extract_nodes": [
+  "description",
+  "network_id",
+  "node_ids"
+ ],
+ "subgraph_high_degree_nodes": [
+  "min_degree",
+  "network_id"
+ ],
+ "subgraph_k_core": [
+  "k",
+  "network_id",
+  "preserve_layout"
+ ],
+ "subgraph_largest_component": [
+  "network_id"
+ ],
+ "subgraph_list": [
+  "network_id"
+ ],
+ "visualization_apply_layout": [
+  "network_id"
+ ],
+ "visualization_generate": [
+  "network_id"
+ ],
+ "visualization_get_state": [
+  "network_id"
+ ],
+ "visualization_highlight": [
+  "color",
+  "dim_opacity",
+  "edges",
+  "neighbor_hops",
+  "network_id",
+  "node_ids",
+  "zoom_to"
+ ],
+ "visualization_reset_style": [
+  "network_id",
+  "targets"
+ ],
+ "visualization_set_edge_color": [
+  "attribute",
+  "default_color",
+  "gradient",
+  "mapping",
+  "network_id",
+  "scale_type"
+ ],
+ "visualization_set_edge_width": [
+  "attribute",
+  "default_width",
+  "max_width",
+  "min_width",
+  "network_id"
+ ],
+ "visualization_set_node_color": [
+  "attribute",
+  "default_color",
+  "fixed",
+  "gradient",
+  "mapping",
+  "network_id",
+  "palette",
+  "ranking_rules",
+  "scale_type"
+ ],
+ "visualization_set_node_labels": [
+  "attribute",
+  "font_size",
+  "max_length",
+  "network_id",
+  "node_ids",
+  "rank_by",
+  "show_all",
+  "top_n",
+  "visibility"
+ ],
+ "visualization_set_node_size": [
+  "attribute",
+  "default_size",
+  "max_size",
+  "min_size",
+  "network_id",
+  "scaling_factor"
+ ],
+ "visualization_set_viewport": [
+  "network_id",
+  "node_ids",
+  "padding",
+  "target"
+ ],
+ "visualization_switch_network": [
+  "network_id"
+ ]
+}

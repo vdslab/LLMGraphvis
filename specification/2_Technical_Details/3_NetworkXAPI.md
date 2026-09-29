@@ -9,7 +9,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 ## 3.1. 役割
 
-- **MCP Server**: GenAIのための標準化されたインターフェース（MCP）を提供し、Tools (Act), Resources (Read), Prompts (Template) を通じて機能を提供する。
+- **MCP Server**: GenAIのための標準化されたインターフェース（MCP）を提供し、Tools (Act) と Resources (Read) を通じて機能を提供する（Prompts は使わない、3.4 節）。
 - **ステートレス計算**: 内部状態を持たず、計算結果は全てデータベースに永続化する。
 - **SSEエンドポイント**: `/mcp/sse` エンドポイントを通じてMCPプロトコルによる通信を行う。
 
@@ -152,11 +152,16 @@ nx の `nodes` / `subset_key` に解決する）。
 
 リソースは URI テンプレートで識別されるため、任意パラメータによる挙動の変化を表現できない。上位ノードの取得のように件数を変えたい操作は、既定値で応答するリソースと、パラメータを取るツールの両方を用意する。
 
-## 3.4. MCP プロンプト (Prompts)
+## 3.4. MCP プロンプト (Prompts) — 使わない
 
-分析の定型的な出発点を、モデルへのメッセージセットとして提供する。**登録されているプロンプトの一覧は `app/mcp/prompts.py` が唯一の情報源である。**
+MCP プロンプトは提供しない。分析の進め方（「何をどう考えるか」）は backend の
+Skill だけに書く（[ADR 0027](../4_Decisions/0027-skills-are-the-only-procedures.md)）。
+以前は `app/mcp/prompts.py` に手順があったが、Skill と二重管理になって陳腐化した。
 
-プロンプトとツールの境界は明確にする。**プロンプトは「何をどう考えるか」の型であり、副作用を持たない。** データを取得したり状態を変えたりするものは、たとえ会話の出発点として使われるとしてもツールである。
+その代わり、networkx-api は全ツールの名前と引数名を `common/mcp_tools.json` に
+書き出す（`python -m app.mcp.manifest`）。backend のテストはこれを読み、Skill が
+実在するツールと引数だけを参照し、すべてのツールがどれかの Skill から公開される
+ことを確かめる。
 
 ## 3.5. ツール定義詳細
 
@@ -174,7 +179,7 @@ LLM にそのまま送られる「プロンプト表面」であり、本仕様�
 - **スタイルは維持される**。`visualization_set_*` は渡されなかったチャネルを
   DB から復元する。`_save_state` は非 None のみ書き込むため、**設定ツールでは
   スタイルを解除できない**。`visualization_reset_style` が唯一の解除手段。
-- **派生属性名**。`analysis_detect_communities` は `{algorithm}_community`、
+- **派生属性名**。コミュニティ検出ツールは `{algorithm}_community`、
   レイアウトは `{layout}_x` / `{layout}_y` に保存する。固定名を仮定せず、
   ツールの戻り値メッセージから正確な名前を読む。
 - **部分グラフ作成ツールは `new_network_id` を返す**。Backend の POST_TOOL フック

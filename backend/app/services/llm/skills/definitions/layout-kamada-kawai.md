@@ -2,7 +2,7 @@
 name: layout-kamada-kawai
 description: Using Kamada-Kawai correctly — when it fits, distance-type weights, and warm-starting. Load with `layout` when Kamada-Kawai is considered.
 triggers: [kamada, kawai, カマダ, 河合, 距離を保, graph distance, 最短距離]
-related_tools: [layout_kamada_kawai, layout_profile, layout_forceatlas2, visualization_generate]
+related_tools: [layout_kamada_kawai, layout_profile, layout_forceatlas2, visualization_generate, layout_suggest_parameters]
 ---
 
 ## When It Fits

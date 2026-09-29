@@ -56,23 +56,6 @@ async def verify_mcp_resources():
     # But let's check basic availability.
     pass
 
-async def verify_mcp_prompts():
-    print("\n=== Verifying MCP Prompts ===")
-    prompts = await mcp.list_prompts()
-    prompt_names = [p.name for p in prompts]
-    print(f"Found {len(prompt_names)} prompts: {prompt_names}")
-    
-    expected_prompts = [
-        "analyze-structure", "recommend-visualization", 
-        "investigate-attributes", "find-important-nodes"
-    ]
-    
-    missing = [p for p in expected_prompts if p not in prompt_names]
-    if missing:
-        print(f"❌ FAIL: Missing prompts: {missing}")
-    else:
-        print("✅ PASS: All expected prompts registered.")
-
 async def test_tool_execution():
     print("\n=== Testing Tool Execution (Dry Run) ===")
     # Create a dummy network for testing if needed, or check mostly read-only tools
@@ -115,5 +98,4 @@ async def test_tool_execution():
 
 if __name__ == "__main__":
     asyncio.run(verify_mcp_tools())
-    asyncio.run(verify_mcp_prompts())
     asyncio.run(test_tool_execution())

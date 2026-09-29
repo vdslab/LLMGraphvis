@@ -94,32 +94,6 @@ async def get_tools() -> list[ToolDefinition]:
                         "properties": {},
                     },
                 ),
-                ToolDefinition(
-                    name="list_prompts",
-                    description="Lists all available prompts on the MCP server.",
-                    parameters={
-                        "type": "object",
-                        "properties": {},
-                    },
-                ),
-                ToolDefinition(
-                    name="get_prompt",
-                    description="Gets a prompt from the MCP server by name, with optional arguments.",
-                    parameters={
-                        "type": "object",
-                        "properties": {
-                            "name": {
-                                "type": "string",
-                                "description": "The name of the prompt to retrieve.",
-                            },
-                            "arguments": {
-                                "type": "object",
-                                "description": "Arguments for the prompt template.",
-                            },
-                        },
-                        "required": ["name"],
-                    },
-                ),
             ])
 
             _tools_cache = tool_list
@@ -309,20 +283,6 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
             # Convert Resource objects to dicts
             resources = [{"uri": r.uri, "name": r.name, "description": r.description, "mimeType": r.mimeType} for r in result.resources]
             return {"resources": resources}
-
-        if tool_name == "list_prompts":
-            result = await session.list_prompts()
-            # Convert Prompt objects to dicts
-            prompts = [{"name": p.name, "description": p.description, "arguments": [a.model_dump() for a in p.arguments] if p.arguments else []} for p in result.prompts]
-            return {"prompts": prompts}
-
-        if tool_name == "get_prompt":
-            name = arguments.get("name")
-            args = arguments.get("arguments", {})
-            result = await session.get_prompt(name, args)
-            # PromptResult has messages
-            messages = [{"role": m.role, "content": m.content.text} for m in result.messages]
-            return {"messages": messages}
 
         result = await session.call_tool(tool_name, arguments)
 

@@ -122,7 +122,13 @@ in `backend/.../local_tools.py`: `switch_to_main_network`,
 **To add a tool**: write the function with `@mcp.tool()` + `@handle_tool_errors`
 and export it from its package's `__init__.py`. There is no schema to register
 by hand — anything telling you to edit `backend/app/services/llm_service.py` is stale.
+Then run `python -m app.mcp.manifest` in `networkx-api/` to refresh
+`common/mcp_tools.json`, and add the tool to the `related_tools` of the skill
+whose procedure uses it (or to `SEARCH_ONLY` in
+`backend/tests/test_skill_tool_references.py`, with a reason). Tests on both
+sides fail otherwise (ADR 0027).
 Add a skill *only* for procedural guidance, a hook *only* for enforcement.
+Procedures live only in skills; the MCP server serves no prompts.
 The backend caches tool definitions for `MCP_TOOLS_CACHE_TTL` seconds (default 300).
 
 ### Invariants that are easy to get wrong
@@ -188,8 +194,11 @@ backend reads directly to build context in `llm/context.py`.
 
 ### Deprecated but retained
 
-`network_initialize` and `visualization_apply_layout` (same as
-`visualization_generate`) are kept for old conversations. Do not use them in new code.
+`network_initialize`, `visualization_apply_layout` (same as
+`visualization_generate`) and `analysis_detect_communities` (superseded by the
+per-algorithm `analysis_*_communities` tools) are kept for old conversations.
+Do not use them in new code. `DEPRECATED_TOOL_NAMES` in `llm/tool_catalog.py`
+hides them from `tool_search` unless named exactly.
 
 ## Running and testing
 

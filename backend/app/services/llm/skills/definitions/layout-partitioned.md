@@ -2,7 +2,7 @@
 name: layout-partitioned
 description: Layouts that place nodes by a partition or a root — bipartite, multipartite, shell and bfs — and how to pick the attribute or root they need. Load with `layout` when the user wants sides, layers, rings or a hierarchy.
 triggers: [bipartite, 二部, multipartite, 多部, layer, レイヤー, 層, shell, 同心円, ring, bfs, 幅優先, hierarchy, ヒエラルキー, 階層, root, 根, ルート, 左右, 上下]
-related_tools: [layout_bipartite, layout_multipartite, layout_shell, layout_bfs, layout_profile, visualization_generate]
+related_tools: [layout_bipartite, layout_multipartite, layout_shell, layout_bfs, layout_profile, visualization_generate, layout_suggest_parameters]
 ---
 
 ## Picking the Input

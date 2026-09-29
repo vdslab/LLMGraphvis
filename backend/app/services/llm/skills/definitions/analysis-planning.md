@@ -2,7 +2,7 @@
 name: analysis-planning
 description: How to propose analysis and visualization goals from the imported data meaning, descriptions, and existing attributes before considering computed metrics. Load this for "analyze this network" style requests, or before computing a metric or community structure.
 triggers: [visualization, possibilities, 分布, distribution, 比較, compare, 違い, 偏り, つながり方, 可視化, 何ができる, どんな, analyze, analyse, 分析, 特徴, 傾向, 構造, structure, important, 重要, influential, 中心, community, コミュニティ, クラスタ, cluster, group, グループ, centrality, 中心性, metric, 指標, attribute, 属性]
-related_tools: [network_list_node_attributes, network_list_edge_attributes, analysis_louvain_communities, analysis_greedy_modularity_communities, analysis_label_propagation_communities, ask_user, analysis_degree_centrality, analysis_pagerank, analysis_betweenness_centrality, node_get_top_ranked, analysis_core_number, analysis_triangles, analysis_transitivity, analysis_edge_betweenness, analysis_modularity, analysis_attribute_distribution, analysis_group_connectivity, node_compare, offer_parameter_tuning]
+related_tools: [network_list_node_attributes, network_list_edge_attributes, analysis_louvain_communities, analysis_greedy_modularity_communities, analysis_label_propagation_communities, ask_user, analysis_degree_centrality, analysis_pagerank, analysis_betweenness_centrality, node_get_top_ranked, analysis_core_number, analysis_triangles, analysis_transitivity, analysis_edge_betweenness, analysis_modularity, analysis_attribute_distribution, analysis_group_connectivity, node_compare, node_get_details, node_filter, offer_parameter_tuning]
 ---
 
 ## Data-Grounded Analysis Workflow
@@ -39,12 +39,13 @@ When the user is new to network analysis, phrase options as questions about the 
 ## Algorithm Selection & Controls
 
 - **Community Detection**:
-  - `analysis_louvain_communities`: Default. Accepts `resolution`, `seed`, `gain_threshold`.
+  - `analysis_louvain_communities`: Default. Accepts `resolution`, `seed`, `threshold`, `max_level`, `weight`.
   - `analysis_greedy_modularity_communities`: Use `best_n` or `cutoff` to enforce cluster count.
   - `analysis_label_propagation_communities`: Semi-synchronous; no weights or seeds.
 - **Centrality**:
   - `analysis_betweenness_centrality`: Measures bridging roles. Use `k` approximation for large networks.
   - `analysis_degree_centrality` / `analysis_pagerank`: Measures local hub activity / global prestige.
+  - Closeness, eigenvector, clustering, in/out degree, bridges, articulation points and directed components: load `network-metrics`.
 - **Read-Only Structural Metrics** (return values without saving node attributes):
   - `analysis_core_number`: Cohesive k-core depth.
   - `analysis_triangles` / `analysis_transitivity`: Local and global clustering.

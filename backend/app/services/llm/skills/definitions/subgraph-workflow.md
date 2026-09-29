@@ -2,7 +2,7 @@
 name: subgraph-workflow
 description: Extract a network, select the analysis context, lay it out, and render as separate decisions. Load before extracting or switching networks.
 triggers: [subgraph, 部分グラフ, サブグラフ, filter, フィルタ, 絞り, 抽出, extract, 切り出, only, のみ, だけ, component, 連結成分, ego, 近傍, neighbor, k-core, コア, 戻, back, parent, 親]
-related_tools: [subgraph_extract_filter, subgraph_extract_nodes, subgraph_create_from_nodes, subgraph_ego_network, subgraph_k_core, subgraph_community, subgraph_largest_component, subgraph_high_degree_nodes, network_select, subgraph_list, visualization_switch_network, analysis_connected_components, visualization_generate, layout_spring, ask_user, switch_to_parent_network, switch_to_main_network]
+related_tools: [subgraph_extract_filter, subgraph_extract_nodes, subgraph_create_from_nodes, subgraph_ego_network, subgraph_k_core, subgraph_community, subgraph_largest_component, subgraph_high_degree_nodes, network_select, subgraph_list, visualization_switch_network, analysis_connected_components, visualization_generate, layout_forceatlas2, layout_spring, layout_profile, ask_user, switch_to_parent_network, switch_to_main_network]
 ---
 
 ## Extract only to change the scope of analysis
@@ -30,7 +30,7 @@ to view it, use this sequence:
 
 1. Extract with the appropriate atomic tool.
 2. `network_select(network_id=created_network_id)` changes subsequent analysis.
-3. Calculate a layout on that network.
+3. Calculate a layout on that network (`layout_profile` picks one when the user named none; see `layout`).
 4. Recompute any metrics needed for encoding; use the returned attribute names.
 5. `visualization_generate` draws the result.
 
