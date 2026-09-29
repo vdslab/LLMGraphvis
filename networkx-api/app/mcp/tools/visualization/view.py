@@ -5,12 +5,11 @@ Neither changes the graph, the active network, or any attribute encoding.
 
 from typing import Annotated, List, Literal, Optional
 
-from pydantic import Field
-
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
 from app.core.mcp import mcp
 from app.logic import view_state
+from pydantic import Field
 
 
 @mcp.tool()
@@ -79,6 +78,7 @@ def visualization_set_viewport(
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
+
         from common import models
 
         if target == "nodes":
