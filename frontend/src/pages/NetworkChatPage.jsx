@@ -29,7 +29,7 @@ const NetworkChatPage = () => {
     fetchSampleNetworks,
     loadSampleNetwork,
   } = useChatStore();
-  const { nodes, links } = useNetworkStore();
+  const { nodes, links, labelStyle, viewport } = useNetworkStore();
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
   const [loadingSampleId, setLoadingSampleId] = useState(null);
@@ -424,6 +424,8 @@ const NetworkChatPage = () => {
             nodes={nodes}
             links={links}
             showLabels={showLabels}
+            labelStyle={labelStyle}
+            viewport={viewport}
             onNodeClick={handleNodeClick}
             onBackgroundClick={handleBackgroundClick}
           />
