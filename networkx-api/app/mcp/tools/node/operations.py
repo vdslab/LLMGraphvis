@@ -1,4 +1,4 @@
-from typing import Annotated, Optional
+from typing import Annotated, List, Optional
 from pydantic import Field
 from app.core.mcp import mcp
 from app.core.database import get_db_context
@@ -133,55 +133,93 @@ def node_filter(
 def node_get_neighbors(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     node_id: Annotated[str, Field(description="The string ID of the node.")],
-    include_attributes: Annotated[bool, Field(description="If True, include all attributes for each neighbor node.")] = False
+    include_attributes: Annotated[bool, Field(description="If True, include each listed neighbour's attributes (layout coordinates excluded). Costly for many neighbours; prefer node_compare on a few chosen IDs.")] = False,
+    limit: Annotated[int, Field(ge=1, le=500, description="How many neighbours to list, best-connected first. `degree` always reports the full count.")] = 30,
 ) -> str:
     """
-    Returns the immediate neighbors (1-hop) of a specific node.
+    Returns the immediate neighbors (1-hop) of a specific node, ignoring edge direction.
 
     Useful for exploring local graph structure around a node of interest.
-    Use `node_search` first to find the node ID if needed.
+    Use `node_search` first to find the node ID if needed. To show the
+    neighbourhood on the canvas, use visualization_highlight(node_ids=[node_id],
+    neighbor_hops=1, edges='incident').
 
     Returns:
-        str: JSON list of neighbor nodes with id, label, and optionally attributes.
+        str: JSON with `degree`, and `neighbors` (id, label, degree, optionally
+        attributes) for the `limit` best-connected neighbours.
     """
     with get_db_context() as db:
+        from app.logic import exploration
+        from app.logic.utils.graph_builder import build_graph_from_db
         from common import models
 
-        node = db.query(models.Node).filter(
-            models.Node.network_id == network_id,
-            models.Node.node_id == node_id
-        ).first()
-
-        if not node:
+        graph = build_graph_from_db(network_id, db).to_undirected(as_view=True)
+        if node_id not in graph:
             return json.dumps({"error": f"Node '{node_id}' not found in network {network_id}."})
 
-        edges = db.query(models.Edge).filter(
-            models.Edge.network_id == network_id,
-            (models.Edge.source_node_id == node.id) | (models.Edge.target_node_id == node.id)
-        ).all()
-
-        neighbor_db_ids = set()
-        for e in edges:
-            if e.source_node_id != node.id:
-                neighbor_db_ids.add(e.source_node_id)
-            if e.target_node_id != node.id:
-                neighbor_db_ids.add(e.target_node_id)
-
-        neighbors = db.query(models.Node).filter(
-            models.Node.id.in_(neighbor_db_ids)
-        ).all()
-
-        if include_attributes:
-            from app.logic import search
-            result = [search.get_node_details(network_id, n.node_id, db) for n in neighbors]
+        ranked = sorted(graph[node_id], key=lambda n: (-graph.degree(n), n))
+        listed = [n for n in ranked if n != node_id][:limit]
+        if include_attributes and listed:
+            rows = exploration.compare_nodes(network_id, db, listed[:25])["nodes"]
+            result = [{"id": n, **rows[n]} for n in listed[:25]]
         else:
-            result = [{"id": n.node_id, "label": n.label} for n in neighbors]
+            labels = dict(
+                db.query(models.Node.node_id, models.Node.label)
+                .filter(
+                    models.Node.network_id == network_id,
+                    models.Node.node_id.in_(listed),
+                )
+                .all()
+            )
+            result = [
+                {"id": n, "label": labels.get(n), "degree": graph.degree(n)}
+                for n in listed
+            ]
 
+        degree = sum(1 for n in graph[node_id] if n != node_id)
         return json.dumps({
             "node_id": node_id,
-            "degree": len(result),
-            "neighbors": result
+            "degree": degree,
+            "neighbors": result,
+            "omitted": degree - len(result),
         }, default=str)
+
+
+@mcp.tool()
+@handle_tool_errors
+def node_common_neighbors(
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    node_a: Annotated[str, Field(description="Exact ID of the first node.")],
+    node_b: Annotated[str, Field(description="Exact ID of the second node.")],
+    limit: Annotated[int, Field(ge=1, le=200, description="How many shared neighbours to list, best-connected first.")] = 30,
+) -> dict:
+    """
+    Returns the nodes connected to both A and B, whether A and B are directly linked, and their Jaccard overlap.
+
+    Answers "what do A and B have in common" or "who links these two".
+    Direction is ignored. Read-only.
+    """
+    with get_db_context() as db:
+        from app.logic import exploration
+        return exploration.common_neighbors(network_id, db, node_a, node_b, limit)
+
+
+@mcp.tool()
+@handle_tool_errors
+def node_compare(
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    node_ids: Annotated[List[str], Field(description="Exact IDs of up to 25 nodes to compare.")],
+    attributes: Annotated[Optional[List[str]], Field(description="Attributes to include. None includes every node attribute except layout coordinates.")] = None,
+) -> dict:
+    """
+    Returns a side-by-side table (label, degree, attributes) for several nodes in one call.
+
+    Use this instead of calling node_get_details once per node when comparing
+    or describing a handful of nodes. Read-only.
+    """
+    with get_db_context() as db:
+        from app.logic import exploration
+        return exploration.compare_nodes(network_id, db, node_ids, attributes)
 
 
 @mcp.tool()

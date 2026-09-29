@@ -1,6 +1,7 @@
 from .centrality import *
 from .community import *
 from .path import *
+from .groups import analysis_attribute_distribution, analysis_group_connectivity
 from .connectivity import (
     analysis_articulation_points,
     analysis_bridges,

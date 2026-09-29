@@ -76,3 +76,28 @@ def analysis_has_path(
     """
     with get_db_context() as db:
         return paths.has_path(network_id, source_node_id, target_node_id, db)
+
+
+@mcp.tool()
+@handle_tool_errors
+def analysis_k_shortest_paths(
+    network_id: NetworkId,
+    source_node_id: NodeId,
+    target_node_id: NodeId,
+    k: Annotated[int, Field(ge=1, le=10, description="How many alternative routes to return, shortest first.")] = 3,
+    weight: Cost = None,
+) -> dict:
+    """Return up to k loopless routes between two nodes, shortest first.
+
+    Use when the user asks for several routes, alternatives, or "other ways"
+    from A to B; for the single best route use analysis_shortest_path. Each
+    route has its node sequence, hops and total cost (length). Respects edge
+    direction; costs must be nonnegative. Read-only: to show a route, pass its
+    `path` to visualization_highlight(edges='path').
+    """
+    from app.logic import exploration
+
+    with get_db_context() as db:
+        return exploration.k_shortest_paths(
+            network_id, db, source_node_id, target_node_id, k, weight
+        )
