@@ -76,3 +76,34 @@ sequenceDiagram
     Backend-->>Frontend: 200 OK
     Frontend->>User: ログイン画面に遷移
 ```
+
+ログアウトは Cookie を消すだけである。Bearer トークンは期限かパスワード変更まで有効である。
+
+### 5.1.4. パスワード変更フロー
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Backend
+    participant Database
+
+    User->>Frontend: 現在と新しいパスワードを入力
+    Frontend->>Backend: POST /auth/change-password
+    alt 現在のパスワードが一致
+        Backend->>Database: パスワードハッシュを更新し token_version を +1
+        Backend->>Backend: 新しい ver を含む JWT を生成
+        Backend-->>Frontend: 200 OK (Set-Cookie に新しい JWT)
+        Frontend->>User: 変更完了を表示（この端末はログインのまま）
+    else 不一致
+        Backend-->>Frontend: 400 Bad Request
+    end
+```
+
+## 5.2. トークンの版
+
+JWT は `sub`（ユーザー名）と `ver`（発行時の `token_version`）を持つ。認証時に
+`ver` がユーザーの現在の版と一致しなければ拒否する。パスワード変更で版を上げると、
+それ以前に発行したトークンはすべて無効になり、他の端末はログアウトされる。
+失効リストを持たずに済む代わりに、1 つのセッションだけを失効させることはできない。
+`ver` のない旧トークンは版 0 とみなす（ADR [0026](../4_Decisions/0026-user-settings.md)）。

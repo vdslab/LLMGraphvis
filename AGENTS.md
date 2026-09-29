@@ -52,6 +52,7 @@ reintroduce them.
 | Enforced rules and side effects | `backend/app/services/llm/hooks/builtin/` |
 | What a tool does and what its parameters mean | the tool's docstring and `Field(description=...)` in `networkx-api/app/mcp/tools/` |
 | What the model sees of a tool result | `backend/app/services/llm/observations.py` |
+| What a token count means, and its cost | `UsageData` in `llm/providers/types.py` (every adapter converts to it, ADR 0025), `llm/pricing.py` |
 
 Tool docstrings and `Field` descriptions are **prompt surface**, sent to the
 model verbatim. Write them for a reader with no other context, and never describe
