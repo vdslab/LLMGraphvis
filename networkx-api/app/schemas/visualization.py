@@ -94,10 +94,26 @@ class EdgeColorConfig(BaseModel):
 
 
 class NodeLabelConfig(BaseModel):
-    attribute: str = Field(..., description="Name of the attribute to show as label.")
+    attribute: Optional[str] = Field(
+        None, description="Attribute shown as label text; None keeps the node's own label."
+    )
     show_all: bool = Field(
         False,
-        description="If True, shows labels for all nodes. If False, likely only on hover/select.",
+        description="Legacy switch equivalent to visibility='all'.",
+    )
+    visibility: Optional[
+        Literal["auto", "all", "hover", "top_n", "nodes", "highlighted"]
+    ] = Field(None, description="Which nodes carry a permanent label.")
+    top_n: Optional[int] = Field(None, ge=1, description="Label count for top_n.")
+    rank_by: Optional[str] = Field(
+        None, description="Numeric attribute ranking nodes for top_n/auto; degree if None."
+    )
+    node_ids: Optional[List[str]] = Field(None, description="Nodes labelled in 'nodes' mode.")
+    font_size: Optional[float] = Field(
+        None, gt=0, description="Label font size in screen pixels."
+    )
+    max_length: Optional[int] = Field(
+        None, ge=1, description="Longer labels are shortened with an ellipsis."
     )
 
 

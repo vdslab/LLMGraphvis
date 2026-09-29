@@ -97,7 +97,7 @@ def visualization_apply_layout(
 @handle_tool_errors
 def visualization_reset_style(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    targets: Annotated[List[str], Field(description="Which visual channels to return to their default. Any of: 'node_color', 'node_size', 'node_label', 'edge_color', 'edge_width'. Pass several to reset several at once; pass only the ones you mean, since the rest are preserved.")]
+    targets: Annotated[List[str], Field(description="Which visual channels to return to their default. Any of: 'node_color', 'node_size', 'node_label', 'edge_color', 'edge_width', 'highlight'. Pass several to reset several at once; pass only the ones you mean, since the rest are preserved.")]
 ) -> dict:
     """
     Returns one or more visual channels to their default (uniform) appearance.

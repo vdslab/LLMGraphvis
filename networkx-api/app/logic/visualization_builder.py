@@ -8,6 +8,7 @@ from app.logic.style_service import DEFAULT_NODE_GRADIENT, StyleService
 from app.logic.attributes import fetch_attribute_values
 from app.logic.layout_quality import evaluate as evaluate_layout
 from app.logic.layout_quality import normalize_like_renderer
+from app.logic.view_state import Highlight, label_flags
 
 
 class VisualizationBuilder:
@@ -25,6 +26,7 @@ class VisualizationBuilder:
         focus_config: Optional[Dict] = None,
         custom_node_colors: Optional[List[Dict]] = None,
         node_label_config: Optional[Dict] = None,
+        highlight_config: Optional[Dict] = None,
     ):
         self.network_id = network_id
         self.db = db
@@ -38,6 +40,8 @@ class VisualizationBuilder:
         self.focus_config = focus_config
         self.custom_node_colors = custom_node_colors
         self.node_label_config = node_label_config
+        self.highlight_config = highlight_config
+        self.highlight = Highlight(None, directed=False)
 
         # State to be populated
         self.network = None
@@ -91,6 +95,12 @@ class VisualizationBuilder:
         if self.node_label_config is None and self.network.last_node_label_config:
             self.node_label_config = self.network.last_node_label_config
 
+        if self.highlight_config is None and self.network.last_highlight_config:
+            self.highlight_config = self.network.last_highlight_config
+        self.highlight = Highlight(
+            self.highlight_config, directed=bool(self.network.is_directed)
+        )
+
         # Resolve Layout Name from DB if not provided
         if self.layout_name is None:
             self.layout_name = (
@@ -118,6 +128,9 @@ class VisualizationBuilder:
         global_node_attrs = StyleService.collect_required_attributes(
             global_attrs_configs
         )
+        rank_by = (self.node_label_config or {}).get("rank_by")
+        if rank_by:
+            global_node_attrs.add(rank_by)
 
         # Layout attributes
         global_node_attrs.add(self.layout_x_attr)
@@ -206,12 +219,58 @@ class VisualizationBuilder:
     def build(self) -> Dict[str, List[Dict]]:
         vis_nodes = self._build_vis_nodes()
         vis_edges = self._build_vis_edges(vis_nodes)
+        label_style = self._apply_labels(vis_nodes, vis_edges)
 
         self._save_state()
 
         legend = self._build_summary()
+        if self.highlight.active:
+            legend["highlight"] = self.highlight.summary(vis_nodes, vis_edges)
 
-        return {"nodes": vis_nodes, "links": vis_edges, "legend": legend}
+        vis_data = {"nodes": vis_nodes, "links": vis_edges, "legend": legend}
+        if label_style:
+            vis_data["label_style"] = label_style
+        return vis_data
+
+    def _apply_labels(self, vis_nodes: List[Dict], vis_edges: List[Dict]) -> Dict:
+        """Set per-node `show_label` and return the canvas's label style."""
+        config = self.node_label_config or {}
+        rank_values = None
+        rank_by = config.get("rank_by")
+        if rank_by:
+            db_ids = {
+                node_id: db_id
+                for db_id, node_id in self.db.query(models.Node.id, models.Node.node_id)
+                .filter(models.Node.network_id == self.network_id)
+                .all()
+            }
+            rank_values = {}
+            for n in vis_nodes:
+                val = StyleService.get_val(
+                    db_ids.get(n["id"]),
+                    rank_by,
+                    self.global_node_attr_map,
+                    self.global_node_values,
+                )
+                try:
+                    rank_values[n["id"]] = float(val) if val is not None else None
+                except (TypeError, ValueError):
+                    raise ValueError(
+                        f"rank_by attribute '{rank_by}' must be numeric"
+                    ) from None
+        flags = label_flags(config, vis_nodes, vis_edges, rank_values)
+        if flags is not None:
+            for n in vis_nodes:
+                n["show_label"] = flags.get(n["id"], False)
+        style = {
+            key: config[key]
+            for key in ("font_size", "max_length")
+            if config.get(key) is not None
+        }
+        if flags is not None:
+            style["visibility"] = config.get("visibility") or "all"
+            style["labeled_count"] = sum(1 for v in flags.values() if v)
+        return style
 
     def layout_quality(self, vis_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Readability metrics of what `build()` drew (see logic/layout_quality)."""
@@ -369,6 +428,15 @@ class VisualizationBuilder:
                         elif not self.node_size_stats[0]:
                             size = smart_defaults["min"]
 
+            highlighted = False
+            if self.highlight.active:
+                highlighted = self.highlight.node(n.node_id)
+                if highlighted:
+                    if self.highlight.color:
+                        color = self.highlight.color
+                else:
+                    opacity = min(opacity, self.highlight.dim_opacity)
+
             # Layout
             x = StyleService.get_val(
                 n.id,
@@ -410,6 +478,7 @@ class VisualizationBuilder:
                     "size": size,
                     "color": color,
                     "opacity": opacity,
+                    **({"highlighted": True} if highlighted else {}),
                 }
             )
 
@@ -492,6 +561,15 @@ class VisualizationBuilder:
                     if self.context_config.get("color"):
                         color = self.context_config["color"]
 
+            highlighted = False
+            if self.highlight.active:
+                highlighted = self.highlight.edge(source_node_id, target_node_id)
+                if highlighted:
+                    if self.highlight.color:
+                        color = self.highlight.color
+                else:
+                    opacity = min(opacity, self.highlight.dim_opacity)
+
             vis_edges.append(
                 {
                     "source": source_node_id,
@@ -499,6 +577,7 @@ class VisualizationBuilder:
                     "width": width,
                     "color": color,
                     "opacity": opacity,
+                    **({"highlighted": True} if highlighted else {}),
                 }
             )
 
@@ -518,6 +597,8 @@ class VisualizationBuilder:
                 self.network.last_edge_color_config = self.edge_color_config
             if self.node_label_config is not None:
                 self.network.last_node_label_config = self.node_label_config
+            if self.highlight_config is not None:
+                self.network.last_highlight_config = self.highlight_config
             self.db.commit()
 
     # --- Helpers ---
@@ -648,7 +729,8 @@ def get_current_visualization(db: Session, network_id: int) -> Dict[str, Any]:
         "node_color": network.last_node_color_config,
         "edge_width": network.last_edge_width_config,
         "edge_color": network.last_edge_color_config,
-        "node_label": network.last_node_label_config
+        "node_label": network.last_node_label_config,
+        "highlight": network.last_highlight_config,
     }
 
 
@@ -660,6 +742,7 @@ RESETTABLE_STYLE_TARGETS = {
     "node_label": "last_node_label_config",
     "edge_color": "last_edge_color_config",
     "edge_width": "last_edge_width_config",
+    "highlight": "last_highlight_config",
 }
 
 
@@ -709,6 +792,7 @@ def build_visualization(
     node_label_config: Optional[Any] = None,
     custom_node_colors: Optional[list] = None,
     with_quality: bool = False,
+    highlight_config: Optional[dict] = None,
 ) -> Dict[str, Any]:
     """
     Helper function to instantiate and run VisualizationBuilder.
@@ -734,7 +818,8 @@ def build_visualization(
         context_config=context_config,
         focus_config=focus_config,
         node_label_config=nl_conf,
-        custom_node_colors=custom_node_colors
+        custom_node_colors=custom_node_colors,
+        highlight_config=highlight_config,
     )
     builder.validate_and_prepare()
     builder.fetch_data()

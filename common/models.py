@@ -51,6 +51,7 @@ class Network(Base):
     last_edge_width_config = Column(JSON, nullable=True)
     last_edge_color_config = Column(JSON, nullable=True)
     last_node_label_config = Column(JSON, nullable=True)
+    last_highlight_config = Column(JSON, nullable=True)
 
 
     parent_network_id = Column(Integer, ForeignKey("networks.id"), nullable=True, index=True)

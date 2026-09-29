@@ -112,24 +112,59 @@ def visualization_set_node_size(
 @handle_tool_errors
 def visualization_set_node_labels(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    attribute: Annotated[Optional[str], Field(description="Node attribute to display as label (e.g., 'country', 'score'). Pass None to revert to default node labels.")] = None,
-    show_all: Annotated[bool, Field(description="If True, shows labels for all nodes simultaneously. If False, labels appear on hover/select only.")] = False
+    attribute: Annotated[Optional[str], Field(description="Node attribute whose value becomes the label text (e.g. 'country', 'score'). None keeps each node's own label (its name, else its ID).")] = None,
+    visibility: Annotated[Optional[Literal["auto", "all", "hover", "top_n", "nodes", "highlighted"]], Field(description="Which nodes show a permanent label. 'auto': every node of a small network, otherwise only the best-connected ones. 'all': every node. 'hover': none (labels appear on hover). 'top_n': the top_n nodes by rank_by. 'nodes': exactly node_ids. 'highlighted': the nodes of the current visualization_highlight. None with show_all=False leaves visibility to the user's Labels button.")] = None,
+    top_n: Annotated[Optional[int], Field(ge=1, le=500, description="For visibility='top_n' (or to override 'auto' on a large network): how many nodes to label.")] = None,
+    rank_by: Annotated[Optional[str], Field(description="Numeric node attribute that decides which nodes are 'top' (e.g. 'pagerank'). None ranks by degree in the drawn graph.")] = None,
+    node_ids: Annotated[Optional[List[str]], Field(description="For visibility='nodes': exact node IDs to label (resolve names with node_search).")] = None,
+    font_size: Annotated[Optional[float], Field(gt=0, le=48, description="Label size in screen pixels; it stays the same while the user zooms. None uses the canvas default.")] = None,
+    max_length: Annotated[Optional[int], Field(ge=1, le=200, description="Labels longer than this many characters are shortened with an ellipsis; the full text stays in the hover tooltip.")] = None,
+    show_all: Annotated[bool, Field(description="Legacy shortcut for visibility='all'.")] = False,
 ) -> dict:
     """
-    Updates which attribute is displayed as the node label.
+    Sets the label channel: what text each node shows, which nodes show it, and how it looks.
 
-    Use this to switch from default node IDs/names to showing a specific attribute value
-    (e.g., display each node's 'country' or 'score' as its label).
-    Pass attribute=None to revert to the default label column.
+    The whole label channel is replaced by this call: parameters you omit return
+    to their defaults rather than keeping earlier values. Overlapping labels are
+    thinned on the canvas, higher-ranked nodes first, so a dense view may show
+    fewer labels than requested; label fewer nodes or zoom in rather than
+    shrinking the font below legibility.
+    To return labels to the default, use `visualization_reset_style(targets=['node_label'])`.
 
     Returns:
-        dict: The updated visualization object (nodes, links, legend, layout_quality).
+        dict: The updated visualization object; `label_style.labeled_count` is
+        how many nodes carry a permanent label before overlap thinning.
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
         from app.schemas.visualization import NodeLabelConfig
+        from common import models
 
-        config = NodeLabelConfig(attribute=attribute, show_all=show_all) if attribute else {}
+        if visibility == "nodes":
+            if not node_ids:
+                raise ValueError("visibility='nodes' needs node_ids")
+            known = {
+                row[0]
+                for row in db.query(models.Node.node_id)
+                .filter(models.Node.network_id == network_id)
+                .all()
+            }
+            missing = [n for n in node_ids if n not in known]
+            if missing:
+                raise ValueError(
+                    f"Unknown node ID(s): {', '.join(missing[:10])}. "
+                    "Use node_search to resolve labels to exact IDs."
+                )
+        config = NodeLabelConfig(
+            attribute=attribute,
+            show_all=show_all,
+            visibility=visibility,
+            top_n=top_n,
+            rank_by=rank_by,
+            node_ids=node_ids,
+            font_size=font_size,
+            max_length=max_length,
+        )
         vis_data = visualization_builder.build_visualization(
             db,
             network_id,
