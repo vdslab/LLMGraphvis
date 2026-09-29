@@ -119,6 +119,15 @@ the container egress issue described in `.env.sample` (`PREFER_IPV6_GAI_CONF` /
 
 **SSE connection issues** — confirm you are logged in, then reload the page.
 
+## Gemini CLI (optional)
+
+`.gemini/settings.json` holds the MCP server config. It refers to the GitHub
+token as `${GITHUB_MCP_PAT}` (Gemini CLI expands `$VAR` and loads the root
+`.env`) and must set `context.fileName` to `AGENTS.md`; without it Gemini CLI
+looks for a `GEMINI.md` that does not exist. `.gemini/` is gitignored, so a
+fresh clone has to recreate that setting. Do not create `.gemini/.env`: it
+takes precedence over the root `.env` and hides the Google credentials.
+
 ## Stopping
 
 ```bash

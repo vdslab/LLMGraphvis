@@ -21,18 +21,14 @@ Setup: `QUICKSTART.md`.
 
 ## Documentation policy
 
-Three places hold knowledge, each with one job. Putting a fact in the wrong one
-is how documentation rots.
-
 | Place | Holds |
 |---|---|
 | **Code** — docstrings, `Field(description=...)`, types | The facts: what a tool does, what a parameter means, the schema |
 | **AGENTS.md** (this file) | How to work here: where things live, how to add one, how to run and test, the invariants |
-| **`specification/`** (Japanese) | **Why** it is this way: design decisions and rationale, contracts, diagrams of intent |
+| **`specification/`** (Japanese) | **Why**: design decisions and rationale, contracts, diagrams of intent |
 
-The test: **can this fact be derived mechanically from the code?** If yes it
-belongs in the code, not in `specification/`. Endpoint tables, tool listings,
-DDL, component inventories and point-in-time counts went stale before; do not
+If a fact can be derived mechanically from the code, it belongs in the code.
+Endpoint tables, tool listings, DDL and counts went stale before; do not
 reintroduce them.
 
 **New features are spec-driven**: write a short ADR in `specification/4_Decisions/`
@@ -49,14 +45,13 @@ reintroduce them.
 
 ## Where behaviour lives
 
-Agent behaviour is split across four places. Know which one you are changing.
-
 | Concern | Location |
 |---|---|
 | Always-true policy (role, minimalism, user agency, tool-execution rule) | `backend/app/services/llm/prompts.py` |
 | Procedural know-how, loaded on demand | `backend/app/services/llm/skills/definitions/*.md` |
 | Enforced rules and side effects | `backend/app/services/llm/hooks/builtin/` |
 | What a tool does and what its parameters mean | the tool's docstring and `Field(description=...)` in `networkx-api/app/mcp/tools/` |
+| What the model sees of a tool result | `backend/app/services/llm/observations.py` |
 
 Tool docstrings and `Field` descriptions are **prompt surface**, sent to the
 model verbatim. Write them for a reader with no other context, and never describe
@@ -65,22 +60,20 @@ a parameter as effective when it is not (see `scale`/`center`).
 ### Skills
 
 Markdown files with a frontmatter block (`name`, `description`, `triggers`,
-`related_tools`). The system prompt carries only a one-line index; the model
-pulls a full procedure with `skill_load`.
+`related_tools`). The system prompt carries a one-line index; the model pulls a
+full procedure with `skill_load`. Triggers are substring-matched against the
+user's message, so avoid one-character or generic triggers.
 
-Adding one: drop a `.md` file in `skills/definitions/`; it is discovered
-automatically. Give it **both English and Japanese triggers** — the app's users
-write Japanese, so an English-only trigger list makes the skill invisible to
-them (`tests/test_skills_loader.py` enforces this). The frontmatter parser takes
-scalars and string lists only; anything richer belongs in the body.
+Adding one: drop a `.md` file in `skills/definitions/`. Give it **both English
+and Japanese triggers** — users write Japanese (`tests/test_skills_loader.py`
+enforces this). The frontmatter takes scalars and string lists only.
 
 Exposure lasts the whole turn and survives an `ask_user` answer or a confirmed
 tuning panel (ADR 0014, 0016), never the response that activated it. Four places tell the model this; change them together.
 
 ### Hooks
 
-Registered by decorator against tool-name patterns, dispatched from the ReAct
-loop in `engine.py`:
+Registered by decorator against tool-name patterns, dispatched from `engine.py`:
 
 | Event | Can |
 |---|---|
@@ -91,36 +84,26 @@ loop in `engine.py`:
 | `NO_TOOL_CALLS` | request one more round |
 | `TURN_END` | log the turn summary |
 
-Priority bands, ascending — lower runs first:
-
-```
-10-39  normalize     rewrite arguments
-40-69  guards        validate and refuse (sees corrected arguments)
-90-100 audit         tallies and logging
-```
-
-**Ordering is load-bearing**: a new guard belongs in 40–69, a new normalizer in
-10–39. A `deny` is not an exception — the engine records it as the tool result,
-so the model reads the reason and self-corrects. Use `defer` for a recoverable
-unmet prerequisite; it does not fire `TOOL_ERROR`. Hooks fail **open**.
-Rationale: `specification/2_Technical_Details/1_Backend.md`.
+Priority bands, lower runs first: **10-39 normalize** (rewrite arguments),
+**40-69 guards** (validate and refuse), **90-100 audit**. Ordering is
+load-bearing. A `deny` is recorded as the tool result so the model can
+self-correct; use `defer` for a recoverable unmet prerequisite (no
+`TOOL_ERROR`). Hooks fail **open**. Rationale: `specification/2_Technical_Details/1_Backend.md`.
 
 Adding a hook: write it in `hooks/builtin/`, decorate with `@hook(...)`, and add
-the module to the import list in `registry.load_builtin_hooks()`. Note that
-`app.services.llm.hooks.registry` is the `HookRegistry` *instance* exported by
-the package `__init__`, which shadows the same-named submodule — import
-`load_builtin_hooks` from the package, not the module.
+the module to `registry.load_builtin_hooks()`. `app.services.llm.hooks.registry`
+is the `HookRegistry` *instance*, shadowing the submodule — import
+`load_builtin_hooks` from the package.
 
 ### What the chat panel is told
 
-Two one-sided contracts run backend → frontend, so they change together; both
-are specified in `specification/2_Technical_Details/2_Frontend.md`.
+Two backend → frontend contracts, specified in `specification/2_Technical_Details/2_Frontend.md`.
 
 **SSE events** are emitted from `llm/emitters.py` and consumed in
 `frontend/src/hooks/useChatConnection.js`. `thinking_stream` means *model
-reasoning* and nothing else — a pipeline step or status line goes through
-`emit_progress`. Only a terminal event (`message`, `message_complete`, `error`)
-ends a turn and calls `chatStore.endTurn()`; `render_update` must not.
+reasoning* only — pipeline status goes through `emit_progress`. Only a terminal
+event (`message`, `message_complete`, `error`) ends a turn and calls
+`chatStore.endTurn()`; `render_update` must not.
 
 **In-band markup** survives into the stored message: `llm/markup.py` lists the
 tags, `frontend/src/utils/parseMessageContent.js` parses them. `<thought>` is
@@ -128,89 +111,84 @@ written by `engine.py` and by nothing else.
 
 ## MCP tools
 
-Auto-discovered from `@mcp.tool()`-decorated functions in
+Auto-discovered from `@mcp.tool()` functions in
 `networkx-api/app/mcp/tools/{domain}/`. Naming is `domain_verb`: `network_*`,
 `node_*`, `subgraph_*`, `analysis_*`, `layout_*`, `visualization_*`. Local tools
 in `backend/.../local_tools.py`: `switch_to_main_network`,
 `switch_to_parent_network`, `skill_load`, `tool_search`, `ask_user`,
 `offer_parameter_tuning`, `apply_parameter_tuning`.
 
-**To add a tool**: write the function in the right `tools/` module with
-`@mcp.tool()` + `@handle_tool_errors` and export it from that package's
-`__init__.py`. There is no schema to register by hand — anything telling you to
-edit `backend/app/services/llm_service.py` is stale.
-Add a skill *only* if it needs procedural guidance, a hook *only* if it needs
-enforcement.
-
-The backend caches tool definitions for `MCP_TOOLS_CACHE_TTL` seconds (default
-300); call `mcp_client.invalidate_tools_cache()` or wait.
+**To add a tool**: write the function with `@mcp.tool()` + `@handle_tool_errors`
+and export it from its package's `__init__.py`. There is no schema to register
+by hand — anything telling you to edit `backend/app/services/llm_service.py` is stale.
+Add a skill *only* for procedural guidance, a hook *only* for enforcement.
+The backend caches tool definitions for `MCP_TOOLS_CACHE_TTL` seconds (default 300).
 
 ### Invariants that are easy to get wrong
 
-The rationale for each is in `specification/2_Technical_Details/3_NetworkXAPI.md`.
+Rationale: `specification/2_Technical_Details/3_NetworkXAPI.md`.
 
 - **`size` is an area, not a radius**: the frontend renders
-  `r = sqrt(size * 10 / π)` (`NetworkGraph.jsx`). The tool descriptions and
+  `r = sqrt(size * 10 / π)` (`NetworkGraph.jsx`). Tool descriptions and
   `visualization_builder` say so too; keep the three in sync.
 - **Layout, then render.** `layout_*` only stores coordinates; nothing is drawn
   until `visualization_generate`.
 - **Coordinates are renormalized to [-1000, 1000]**, making every layout's
-  `scale`/`center` visually inert. Say so; never offer them as a zoom.
-- **Layouts are weighted by default, but only from the imported weight.** A
-  layout declares what a weight *means* to it (`WeightRole` in
-  `logic/layouts/base.py`): `STRENGTH` applies automatically, `DISTANCE` never
-  does, `NONE` has no weight parameter. Any *other* numeric edge attribute is
-  offered, never chosen. `weight='<name>'` picks one, `'none'` opts out. Weights
-  live in `edges.weight`, never as an EdgeAttribute.
+  `scale`/`center` visually inert. Never offer them as a zoom; zoom is
+  `visualization_set_viewport`.
+- **Layouts are weighted by default, but only from the imported weight.**
+  `WeightRole` in `logic/layouts/base.py`: `STRENGTH` applies automatically,
+  `DISTANCE` never does, `NONE` has no weight parameter. Other numeric edge
+  attributes are offered, never chosen. Weights live in `edges.weight`.
 - **Styles persist and cannot be cleared by setting them.**
-  `visualization_reset_style` is the only way back to uniform.
+  `visualization_reset_style` is the only way back. The highlight is a style
+  channel too; the viewport is a one-shot instruction and is never saved (ADR 0023).
+- **Focus is a view, not an extraction.** Highlight to look; extract only to
+  change the scope of analysis.
+- **Results do not grow with the network** (ADR 0024). A tool returning one
+  entry per node or edge takes a `limit`, returns the top entries plus a
+  whole-graph summary and says what it omitted.
 - **One layout, one declaration.** Each declares its nx call, parameter
   allowlist, tuning, `WeightRole` and `prepare` step in one `@register` in
-  `logic/layouts/`; `logic/layout.py` never branches on a layout name. Adding a
-  layout = one `@register`ed function plus its MCP tool.
-- **Derived attribute names** come from the tool's return message: communities
-  save to `{algorithm}_community`, layouts to `{layout}_x`/`{layout}_y`.
+  `logic/layouts/`; `logic/layout.py` never branches on a layout name.
+- **Derived attribute names** come from the tool's return message:
+  `{algorithm}_community`, `{layout}_x`/`{layout}_y`.
 - **Layout quality is measured where it is drawn.** `layout_quality.normalize_like_renderer`
-  is the only coordinate transform; the renderer calls it too. Change it, and you
-  change what every metric means.
-- **Strength weights are median-normalized** before networkx sees them, so only
-  their ratios shape a layout. Distance weights are not.
+  is the only coordinate transform; the renderer calls it too.
+- **Strength weights are median-normalized** before networkx sees them.
+  Distance weights are not.
 
 ### Layout rules (ADR 0017)
 
-- **Numbers live in code.** Defaults, recommended ranges and thresholds belong in a
-  layout's `@register` (`tune`, `knobs`) and in `layout_quality.py`, never in a
-  skill; skills point at tool output instead. Tests reject digits in layout skills.
+- **Numbers live in code**: defaults, ranges and thresholds in a layout's
+  `@register` (`tune`, `knobs`) and `layout_quality.py`, never in a skill.
+  Tests reject digits in layout skills.
 - **Meaning and direction of a parameter** go in its `Field(description=...)`;
-  skills carry only strategy (order, interactions, procedure).
+  skills carry only strategy.
 - **Two skill layers**: `layout` holds the shared procedure. An algorithm gets a
   `layout-<name>` skill only if it has `knobs` or a prerequisite procedure, and
-  its `related_tools` must list its `layout_<name>` tool (that is how the skill
-  for the layout on screen is found). The partitioned layouts share
-  `layout-partitioned`. A skill may name only parameters its tool accepts.
-- **`layout_suggest_parameters` is read-only.** Applying a candidate is always a
-  call to the real `layout_*` tool, so tuning replay (ADR 0016) stays correct.
-- Adding a tunable layout: declare `knobs` on its `@register`, add it to
-  `FORCE_LAYOUTS` in `hooks/builtin/tuning.py` (the post-layout question, ADR
-  0018), then add a `layout-<name>` skill if its knobs interact.
+  its `related_tools` must list its `layout_<name>` tool. The partitioned
+  layouts share `layout-partitioned`. A skill may name only parameters its tool accepts.
+- **`layout_suggest_parameters` is read-only.** Applying a candidate is a call
+  to the real `layout_*` tool, so tuning replay (ADR 0016) stays correct.
+- Adding a tunable layout: `knobs` on its `@register`, add it to
+  `FORCE_LAYOUTS` in `hooks/builtin/tuning.py` (ADR 0018), then a
+  `layout-<name>` skill if its knobs interact.
 
 ### MCP resources
 
 `networkx-api/app/mcp/resources.py` serves the `network://…` resources the
-backend reads directly (not via the LLM) to build the system-prompt context and
-post-upload overview in `llm/context.py`.
+backend reads directly to build context in `llm/context.py`.
 
 - Every resource must pass **`mime_type="application/json"`** (enforced by
   `tests/test_mcp_integration.py`).
-- Resources swallow exceptions into `{"error": ...}`, so one pointed at a renamed
-  helper fails **silently** — it looks like an empty network. Hence
-  `test_resources_return_data_not_errors`, which runs each against a real DB.
+- Resources swallow exceptions into `{"error": ...}`, so a broken one looks like
+  an empty network. Hence `test_resources_return_data_not_errors`.
 
 ### Deprecated but retained
 
-`network_initialize` (import + a hardcoded layout + render) and
-`visualization_apply_layout` (same as `visualization_generate`) are kept so old
-conversations do not break. Do not use them in new code.
+`network_initialize` and `visualization_apply_layout` (same as
+`visualization_generate`) are kept for old conversations. Do not use them in new code.
 
 ## Running and testing
 
@@ -223,29 +201,20 @@ cd networkx-api  && pytest tests     # run from this dir; there is no pytest.ini
 cd frontend      && npm test && npm run lint
 ```
 
-Lint/typecheck config is the single root `pyproject.toml` (ruff line-length 88,
-mypy). The codebase does not fully comply with E501 — long
-`Field(description=...)` strings are the established style in `mcp/tools/`. New
-non-tool modules should be clean. There is **no CI** and no pre-commit.
+Schema changes need an Alembic revision in `backend/alembic/versions/`.
+Lint/typecheck config is the root `pyproject.toml` (ruff line-length 88, mypy).
+Long `Field(description=...)` strings in `mcp/tools/` are the established
+exception to E501; new non-tool modules should be clean. There is **no CI**.
 
 ## Known rough edges
 
-- `mypy` reports pre-existing errors in `common/models.py` (SQLAlchemy
-  `declarative_base` typing) and the provider/history modules.
-- Dozens of ad-hoc `verify_*.py` / `repro_*.py` / `debug_*.py` scripts sit under
-  `networkx-api/`, `backend/` and `scripts/`. Not tests.
+- `mypy` reports pre-existing errors in `common/models.py` and the
+  provider/history modules.
+- Ad-hoc `verify_*.py` / `repro_*.py` / `debug_*.py` scripts under
+  `networkx-api/`, `backend/` and `scripts/` are not tests.
 
 ## Secrets and local config
 
-`.env` (repo root) holds every credential: Postgres, `SECRET_KEY`, the LLM
-provider keys and `GITHUB_MCP_PAT`. It is gitignored (`.gitignore:276`) and has
-never been committed. Keep it that way — put new secrets there and reference
-them rather than inlining them.
-
-`.gemini/settings.json` holds MCP server config, refers to the token as
-`${GITHUB_MCP_PAT}` (Gemini CLI expands `$VAR` and loads the root `.env`), and
-sets `context.fileName` to `AGENTS.md` — without it Gemini CLI looks for a
-`GEMINI.md` that is gone. **`.gemini/` is gitignored**, so a fresh
-clone must recreate that setting. **Do not create `.gemini/.env`** — it takes
-precedence over the root `.env` in the same directory and would shadow the
-Google credentials the CLI needs.
+`.env` (repo root) holds every credential and is gitignored; keep it that way
+and reference new secrets from it. Gemini CLI setup (`.gemini/settings.json`)
+is in `QUICKSTART.md`; never create `.gemini/.env`, which shadows the root `.env`.

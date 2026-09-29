@@ -1,15 +1,19 @@
 ---
 name: path-analysis
 description: Choose reachability, shortest paths, or source distances and clarify edge-cost semantics.
-triggers: [path, reachability, distance, shortest, 経路, 最短, 距離, 到達, 何ステップ, ホップ]
-related_tools: [node_search, analysis_has_path, analysis_shortest_path, analysis_single_source_distances, network_list_edge_attributes]
+triggers: [path, route, reachability, distance, shortest, alternative, 経路, 最短, 距離, 到達, 何ステップ, ホップ, パス, ルート, 道筋, 別の経路, 迂回, 共通の隣, 共通点]
+related_tools: [node_search, analysis_has_path, analysis_shortest_path, analysis_k_shortest_paths, analysis_single_source_distances, node_common_neighbors, visualization_highlight, visualization_set_viewport, network_list_edge_attributes]
 ---
 
 ## Choose the question
 
 - Can A reach B? Use `analysis_has_path`; do not compute centrality or extract a graph.
 - Which route is shortest? Use `analysis_shortest_path` with both exact node IDs.
-- How far can we go from A? Use `analysis_single_source_distances`, optionally with a cutoff.
+- What other routes exist? Use `analysis_k_shortest_paths` (shortest first).
+- How far can we go from A? Use `analysis_single_source_distances`, optionally
+  with a cutoff. It lists only the nearest nodes (`limit`) plus a summary of
+  all reachable ones; pass `target_node_ids` when specific distances matter.
+- What connects A and B directly? Use `node_common_neighbors`.
 
 Resolve labels using `node_search`. Ambiguous matches require the user's choice.
 Paths follow outgoing edges (source -> target) when the network is directed;
@@ -36,5 +40,7 @@ that condition instead of retrying the same query or changing weights silently.
 Distinguish hops from total cost. A returned path is one optimum, not proof of a
 unique route. No path is an answer, not a tool malfunction. Missing nodes in a
 distance result may be unreachable or excluded by cutoff; do not report zero.
-These tools do not change the view. Extracting or styling a route is a separate
-operation, only when it serves the user's request.
+These tools do not change the view. When the user wants to *see* a route
+("show", "display", "見せて", "表示"), draw it with
+`visualization_highlight(node_ids=<path>, edges='path', zoom_to=True)` in the
+next response; see `view-navigation`. Do not extract a subgraph to show a path.

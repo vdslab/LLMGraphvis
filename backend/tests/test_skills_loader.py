@@ -257,6 +257,24 @@ class TestShippedSkills:
         assert "visualization_set_node_color" in skill.related_tools
         assert "visualization_set_node_size" in skill.related_tools
 
+    @pytest.mark.parametrize(
+        "request_text, expected, not_first",
+        [
+            ("このノードに注目したい", "view-navigation", "subgraph-workflow"),
+            ("AからBへの経路を表示して", "view-navigation", None),
+            ("もう少しズームして", "view-navigation", "subgraph-workflow"),
+            ("ラベルの文字サイズを大きくして", "labels", "visual-encoding"),
+            ("このコミュニティだけ抽出して", "subgraph-workflow", None),
+        ],
+    )
+    def test_view_requests_reach_view_skills(self, request_text, expected, not_first):
+        """Looking at part of the network must not be routed to extraction."""
+        registry = SkillRegistry()
+        names = [s.name for s in registry.suggest(request_text)]
+        assert expected in names, names
+        if not_first:
+            assert names[0] != not_first, names
+
     def test_index_block_is_much_smaller_than_the_bodies(self):
         """Progressive disclosure only pays off if the index stays small."""
         skills = load_skills()
@@ -282,6 +300,7 @@ class TestShippedSkills:
                 suffixes = (
                     "-tuning", "-flow", "-planning",
                     "-encoding", "-workflow", "-recovery",
+                    "-navigation", "-analysis",
                 )
                 if ref.endswith(suffixes) or ref.startswith("layout-"):
                     assert ref in names, (

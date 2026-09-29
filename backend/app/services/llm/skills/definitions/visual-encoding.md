@@ -1,7 +1,7 @@
 ---
 name: visual-encoding
 description: Choosing which visual channels encode which attributes, combining colour and size into one readable view, picking the right scale_type, and reporting the resulting legend. Load this before any colour, size, or label change.
-triggers: [color, colour, 色, 色分け, カラー, size, サイズ, 大きさ, label, ラベル, 凡例, legend, encode, マッピング, mapping, highlight, 強調, 目立, gradient, グラデーション, uniform, リセット, reset, combine, 組み合わせ, 同時, 両方, 併用, 複数, multiple, both]
+triggers: [color, colour, 色, 色分け, カラー, size, サイズ, 大きさ, 凡例, legend, encode, マッピング, mapping, highlight, 強調, 目立, gradient, グラデーション, uniform, リセット, reset, combine, 組み合わせ, 同時, 両方, 併用, 複数, multiple, both]
 related_tools: [visualization_set_node_color, visualization_set_node_size, visualization_set_node_labels, visualization_set_edge_color, visualization_set_edge_width, visualization_get_state, visualization_reset_style, analysis_betweenness_centrality, analysis_degree_centrality, apply_parameter_tuning]
 ---
 
@@ -15,7 +15,8 @@ related_tools: [visualization_set_node_color, visualization_set_node_size, visua
   Use `scale_type='RANKING'` with `ranking_rules=[{"top": N, "color": "#HEX"}]`.
 - **Size**: Exactly one continuous quantity (importance/weight).
   Rendered radius is area-proportional: $r = \sqrt{\text{size} \times 10 / \pi}$. To double visual diameter, roughly quadruple `max_size` (~4x area).
-- **Labels**: Node identity. Keep `show_all=False` for large graphs; label selectively unless the user requests all.
+- **Labels**: Node identity. Which nodes are labelled, their size and truncation: load `labels`.
+- **Highlight a specific set or route**: not a colour mapping — use `visualization_highlight` (`view-navigation`). `RANKING` is for "top N by a metric".
 - **Edge Color / Width**: Edge attributes (`weight`). Use sparingly to avoid visual clutter.
 
 ## Composite Encodings (Multiple Channels)
@@ -37,7 +38,7 @@ When the user's intent involves multiple aspects (e.g. affiliation + importance)
 ## State Preservation & Reset
 
 - Each `visualization_set_*` call updates only its channel and preserves others.
-- Passing empty or omitted fields does **not** clear a style. Use `visualization_reset_style(target='node_color')` to return to default uniform style.
+- Passing empty or omitted fields does **not** clear a style. Use `visualization_reset_style(targets=['node_color'])` to return to default uniform style (`'highlight'` clears a highlight).
 - Calling the same `set_*` tool twice in one turn for different attributes replaces the first mapping; use different channels instead.
 
 ## Legend Reporting

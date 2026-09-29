@@ -1,9 +1,16 @@
 ---
 name: subgraph-workflow
 description: Extract a network, select the analysis context, lay it out, and render as separate decisions. Load before extracting or switching networks.
-triggers: [subgraph, 部分グラフ, サブグラフ, filter, フィルタ, 絞り, 抽出, extract, focus, フォーカス, 注目, zoom, ズーム, only, のみ, だけ, component, 連結成分, ego, 近傍, neighbor, k-core, コア, 戻, back, parent, 親]
+triggers: [subgraph, 部分グラフ, サブグラフ, filter, フィルタ, 絞り, 抽出, extract, 切り出, only, のみ, だけ, component, 連結成分, ego, 近傍, neighbor, k-core, コア, 戻, back, parent, 親]
 related_tools: [subgraph_extract_filter, subgraph_extract_nodes, subgraph_create_from_nodes, subgraph_ego_network, subgraph_k_core, subgraph_community, subgraph_largest_component, subgraph_high_degree_nodes, network_select, subgraph_list, visualization_switch_network, analysis_connected_components, visualization_generate, layout_spring, ask_user, switch_to_parent_network, switch_to_main_network]
 ---
+
+## Extract only to change the scope of analysis
+
+"Focus on", "show", "zoom in on" or "look at" a set of nodes is a view
+request: use `visualization_highlight` / `visualization_set_viewport`
+(`view-navigation`). The whole network stays on screen and in scope. Extract
+when the user wants later analysis or layout to run on the subset alone.
 
 ## Separate selection, extraction, and viewing
 

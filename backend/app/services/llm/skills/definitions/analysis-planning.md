@@ -1,8 +1,8 @@
 ---
 name: analysis-planning
 description: How to propose analysis and visualization goals from the imported data meaning, descriptions, and existing attributes before considering computed metrics. Load this for "analyze this network" style requests, or before computing a metric or community structure.
-triggers: [visualization, possibilities, 可視化, 何ができる, どんな, analyze, analyse, 分析, 特徴, 傾向, 構造, structure, important, 重要, influential, 中心, community, コミュニティ, クラスタ, cluster, group, グループ, centrality, 中心性, metric, 指標, attribute, 属性]
-related_tools: [network_list_node_attributes, network_list_edge_attributes, analysis_louvain_communities, analysis_greedy_modularity_communities, analysis_label_propagation_communities, ask_user, analysis_degree_centrality, analysis_pagerank, analysis_betweenness_centrality, node_get_top_ranked, analysis_core_number, analysis_triangles, analysis_transitivity, analysis_edge_betweenness, analysis_modularity, offer_parameter_tuning]
+triggers: [visualization, possibilities, 分布, distribution, 比較, compare, 違い, 偏り, つながり方, 可視化, 何ができる, どんな, analyze, analyse, 分析, 特徴, 傾向, 構造, structure, important, 重要, influential, 中心, community, コミュニティ, クラスタ, cluster, group, グループ, centrality, 中心性, metric, 指標, attribute, 属性]
+related_tools: [network_list_node_attributes, network_list_edge_attributes, analysis_louvain_communities, analysis_greedy_modularity_communities, analysis_label_propagation_communities, ask_user, analysis_degree_centrality, analysis_pagerank, analysis_betweenness_centrality, node_get_top_ranked, analysis_core_number, analysis_triangles, analysis_transitivity, analysis_edge_betweenness, analysis_modularity, analysis_attribute_distribution, analysis_group_connectivity, node_compare, offer_parameter_tuning]
 ---
 
 ## Data-Grounded Analysis Workflow
@@ -50,3 +50,17 @@ When the user is new to network analysis, phrase options as questions about the 
   - `analysis_triangles` / `analysis_transitivity`: Local and global clustering.
   - `analysis_edge_betweenness`: Shortest-path traffic on edges (interprets weight as distance).
   - `analysis_modularity`: Partition quality evaluation.
+
+## Ask Precise Questions, Read Small Answers
+
+Tool results are re-sent on every later request, so prefer the tool whose
+answer is already the summary the user needs:
+
+- "How is X spread / which group has the most X" → `analysis_attribute_distribution`
+  (with `group_by` for per-group statistics), not a list of nodes.
+- "How do the groups connect / are they separated" → `analysis_group_connectivity`.
+- Describing or contrasting several nodes → one `node_compare`, not repeated
+  `node_get_details`.
+- Per-node results (`analysis_core_number`, `analysis_triangles`, distances)
+  list only the top entries plus a whole-network `summary`; raise `limit` only
+  when more individual values are needed.

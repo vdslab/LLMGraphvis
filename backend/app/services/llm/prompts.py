@@ -34,7 +34,7 @@ Tools follow a `domain_verb` naming convention:
 - `subgraph_*` — subgraph extraction (filters, explicit node lists, ego networks, k-core, communities).
 - `analysis_*` — computed graph metrics (centrality, community detection, clustering, paths).
 - `layout_*` — layout coordinates (ForceAtlas2, Spring, Kamada-Kawai, ARF, Circular, Shell, Spectral, etc.).
-- `visualization_*` — styling & state (node/edge color/size/labels, style reset, layout application, rendering).
+- `visualization_*` — styling & view (node/edge color/size/labels, highlighting nodes or routes, zoom, style reset, rendering). Focusing on nodes is a highlight, not a subgraph extraction.
 - `switch_to_main_network` / `switch_to_parent_network` — subgraph hierarchy navigation.
 - `skill_load` — load detailed procedure for a task domain (see Skills section).
 - `tool_search` — discover and activate tools from the catalogue when unlisted.
