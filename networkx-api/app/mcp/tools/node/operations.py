@@ -97,7 +97,8 @@ def node_filter(
     by filtering server-side.
 
     Returns:
-        dict: {"count": int, "truncated": bool, "nodes": [{"id": str, "label": str}]}
+        dict: {"count": int (all matches), "truncated": bool (True when more than
+        `limit` matched), "nodes": [{"id": str, "label": str}] (at most `limit`)}
     """
     with get_db_context() as db:
         from app.logic import filter as filter_logic
@@ -106,25 +107,23 @@ def node_filter(
         condition = AttributeCondition(attribute_name=attribute_name)
 
         if value is not None:
+            # Match the text form and, when it parses, the numeric form: a
+            # community label "3" is stored as text, a year 2001 as a float.
+            condition.categories = [value]
             try:
-                condition.categories = [float(value)]
+                condition.categories.append(float(value))
             except ValueError:
-                condition.categories = [value]
+                pass
 
         if min_value is not None or max_value is not None:
             condition.ranges = [Range(min=min_value, max=max_value)]
 
         nodes = filter_logic.get_nodes_by_filter(network_id, [condition], db)
 
-        truncated = False
-        if len(nodes) > limit:
-            nodes = nodes[:limit]
-            truncated = True
-
         return {
             "count": len(nodes),
-            "truncated": truncated,
-            "nodes": nodes
+            "truncated": len(nodes) > limit,
+            "nodes": nodes[:limit],
         }
 
 

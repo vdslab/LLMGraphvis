@@ -74,7 +74,7 @@ def subgraph_community(
         result = filter_logic.create_subgraph_by_filter(
             network_id=network_id,
             conditions=[condition],
-            suffix="_community",
+            suffix=f"Community {community_id} ({community_attribute})",
             db=db,
             preserve_layout=True,
             description=f"Community '{community_id}' subgraph (attribute='{community_attribute}')."
