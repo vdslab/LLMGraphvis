@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import NetworkChatPage from './pages/NetworkChatPage';
+import SettingsPage from './pages/SettingsPage';
 import Layout from './components/Layout';
 
 const ProtectedRoute = ({ children }) => {
@@ -90,6 +91,16 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } 
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <SettingsPage />
+              </Layout>
+            </ProtectedRoute>
+          }
         />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

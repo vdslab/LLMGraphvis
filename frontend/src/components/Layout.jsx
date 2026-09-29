@@ -1,5 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Settings } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import { useSettingsStore } from '../stores/settingsStore';
 
 const Layout = ({ children, fullScreen = false }) => {
   const { isAuthenticated, user, logout } = useAuthStore();
@@ -8,6 +10,7 @@ const Layout = ({ children, fullScreen = false }) => {
 
   const handleLogout = () => {
     logout();
+    useSettingsStore.getState().reset();
     navigate('/login');
   };
 
@@ -94,18 +97,25 @@ const Layout = ({ children, fullScreen = false }) => {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           {isAuthenticated ? (
             <>
-              <div
+              <Link
+                to="/settings"
+                title="Settings"
+                aria-current={location.pathname === '/settings' ? 'page' : undefined}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '0.625rem',
                   padding: '0.25rem 0.875rem 0.25rem 0.375rem',
-                  backgroundColor: 'var(--md-sys-color-surface-container)',
+                  backgroundColor:
+                    location.pathname === '/settings'
+                      ? 'var(--md-sys-color-secondary-container)'
+                      : 'var(--md-sys-color-surface-container)',
                   borderRadius: 'var(--md-sys-shape-full)',
                   border: '1px solid var(--md-sys-color-outline-subtle)',
                   fontSize: '0.8125rem',
                   fontWeight: 600,
                   color: 'var(--md-sys-color-on-surface)',
+                  textDecoration: 'none',
                 }}
               >
                 <div
@@ -125,7 +135,8 @@ const Layout = ({ children, fullScreen = false }) => {
                   {user?.username?.[0]?.toUpperCase() || 'U'}
                 </div>
                 <span>{user?.username}</span>
-              </div>
+                <Settings size={14} aria-hidden style={{ color: 'var(--md-sys-color-on-surface-variant)' }} />
+              </Link>
 
               <button
                 onClick={handleLogout}

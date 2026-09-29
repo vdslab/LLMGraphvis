@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useChatStore } from '../stores/chatStore';
+import { useSettingsStore } from '../stores/settingsStore';
+import { defaultModelLabel } from '../utils/llmModels';
 
 const DEFAULT_VALUE = 'default';
 const encodeValue = (provider, model) => `${provider}::${model}`;
@@ -11,20 +13,19 @@ const ModelSelector = () => {
   const llmProviders = useChatStore((state) => state.llmProviders);
   const fetchLlmProviders = useChatStore((state) => state.fetchLlmProviders);
   const updateChatSettings = useChatStore((state) => state.updateChatSettings);
+  const settings = useSettingsStore((state) => state.settings);
+  const fetchSettings = useSettingsStore((state) => state.fetchSettings);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     fetchLlmProviders();
-  }, [fetchLlmProviders]);
+    fetchSettings().catch(() => {});
+  }, [fetchLlmProviders, fetchSettings]);
 
   if (llmProviders.length === 0 || !chatId) return null;
 
   const value = chatProvider && chatModel ? encodeValue(chatProvider, chatModel) : DEFAULT_VALUE;
-
-  const defaultModel = llmProviders
-    .flatMap((provider) => provider.models)
-    .find((model) => model.default);
-  const defaultLabel = defaultModel ? `Default (${defaultModel.label})` : 'Default';
+  const defaultLabel = defaultModelLabel(llmProviders, settings);
 
   const handleChange = async (e) => {
     const raw = e.target.value;
@@ -48,7 +49,7 @@ const ModelSelector = () => {
       value={value}
       onChange={handleChange}
       disabled={isSaving}
-      title="LLM provider/model used for this chat"
+      title="LLM provider/model used for this chat. Default follows your settings."
       style={{
         padding: '0.3125rem 0.75rem',
         borderRadius: 'var(--md-sys-shape-full)',

@@ -10,10 +10,34 @@ import {
   processMessage as processMessageAPI,
   uploadGraphML,
   getLlmProviders,
+  getChatUsage,
   getSampleNetworks,
   loadSampleNetwork as loadSampleNetworkAPI,
   getApiErrorMessage,
 } from '../services/api';
+
+export const EMPTY_USAGE_TOTALS = {
+  input_tokens: 0,
+  output_tokens: 0,
+  cached_input_tokens: 0,
+  cache_write_tokens: 0,
+  reasoning_tokens: 0,
+  estimated_cost_usd: 0,
+  unpriced_count: 0,
+  task_count: 0,
+  request_count: 0,
+};
+const EMPTY_CHAT_USAGE = { chatId: null, totals: EMPTY_USAGE_TOTALS, entries: [] };
+const EMPTY_TURN_USAGE = {
+  input_tokens: 0,
+  output_tokens: 0,
+  cached_input_tokens: 0,
+  cache_write_tokens: 0,
+  reasoning_tokens: 0,
+  estimated_cost_usd: 0,
+  provider: null,
+  model: null,
+};
 
 export const useChatStore = create((set, get) => ({
   chatId: null,
@@ -41,9 +65,11 @@ export const useChatStore = create((set, get) => ({
   sampleNetworksStatus: 'idle',
   sampleNetworksError: null,
 
-  // Token/cost usage tracking (Stage 7)
-  chatUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0 },   // lifetime total for this chat session (client-side accumulation across turns)
-  currentTurnUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0, provider: null, model: null },  // running total for the turn currently in progress
+  // Token/cost usage (ADR 0025). chatUsage is what the backend stored for this
+  // chat — the only source of truth; currentTurnUsage is the live running total
+  // of the turn in progress, shown on top of it until the turn is stored.
+  chatUsage: EMPTY_CHAT_USAGE,
+  currentTurnUsage: EMPTY_TURN_USAGE,
 
   // Get all chats for current user
   fetchChats: async () => {
@@ -120,22 +146,24 @@ export const useChatStore = create((set, get) => ({
     // Race condition guard
     if (get().chatId !== id) return;
 
-    let inputTokens = 0;
-    let outputTokens = 0;
-    let estimatedCostUsd = 0;
-
-    res.data.forEach(msg => {
-      if (msg.usage) {
-        inputTokens += msg.usage.input_tokens || 0;
-        outputTokens += msg.usage.output_tokens || 0;
-        estimatedCostUsd += msg.usage.estimated_cost_usd || 0;
-      }
+    set({ messages: res.data });
+    // Usage is loaded on its own so a failure there never hides the messages.
+    get().fetchChatUsage(id).catch((error) => {
+      console.warn('Failed to load chat usage:', error);
     });
+    return res.data;
+  },
 
-    set({ 
-      messages: res.data,
-      chatUsage: { inputTokens, outputTokens, estimatedCostUsd },
-      currentTurnUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0, provider: null, model: null }
+  // Load what the backend stored for this chat: every turn and chat title,
+  // including turns that ended in an error. Replaces the live turn total.
+  fetchChatUsage: async (chatId = null) => {
+    const id = chatId || get().chatId;
+    if (!id) return null;
+    const res = await getChatUsage(id);
+    if (get().chatId !== id) return null;
+    set({
+      chatUsage: { chatId: id, totals: res.data.totals, entries: res.data.entries },
+      currentTurnUsage: EMPTY_TURN_USAGE,
     });
     return res.data;
   },
@@ -466,34 +494,22 @@ export const useChatStore = create((set, get) => ({
 
   setChatId: (id) => set({ chatId: id }),
 
-  // Usage tracking (Stage 7): usage_update SSE events carry a RUNNING TOTAL for the
-  // in-progress turn (not deltas), so this replaces currentTurnUsage wholesale each time.
+  // usage_update SSE events carry a RUNNING TOTAL for the in-progress turn (not
+  // deltas), so this replaces currentTurnUsage wholesale each time.
   setCurrentTurnUsage: (data) => set({
-    currentTurnUsage: {
-      inputTokens: data.input_tokens ?? 0,
-      outputTokens: data.output_tokens ?? 0,
-      estimatedCostUsd: data.estimated_cost_usd ?? 0,
-      provider: data.provider ?? null,
-      model: data.model ?? null,
-    }
+    currentTurnUsage: { ...EMPTY_TURN_USAGE, ...data },
   }),
 
-  // Folds the now-final currentTurnUsage into the lifetime chatUsage total, then
-  // resets currentTurnUsage for the next turn. Call this once, when a turn fully completes.
-  commitTurnUsage: () => set((state) => ({
-    chatUsage: {
-      inputTokens: state.chatUsage.inputTokens + state.currentTurnUsage.inputTokens,
-      outputTokens: state.chatUsage.outputTokens + state.currentTurnUsage.outputTokens,
-      estimatedCostUsd: state.chatUsage.estimatedCostUsd + state.currentTurnUsage.estimatedCostUsd,
-    },
-    currentTurnUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0, provider: null, model: null },
-  })),
+  // The turn (or a chat title) has been stored: reload the stored totals, which
+  // now include it, instead of adding the live numbers client-side.
+  refreshUsage: () => {
+    get().fetchChatUsage().catch((error) => {
+      console.warn('Failed to refresh chat usage:', error);
+    });
+  },
 
-  // Note: no existing reset()/clearChat()-style action was found in this store to hook into
-  // (chat switches go through setChatId + fetchChat + fetchMessages, none of which "reset" state).
-  // This action is provided for future wiring but is not currently called anywhere.
   resetUsage: () => set({
-    chatUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0 },
-    currentTurnUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0, provider: null, model: null }
+    chatUsage: EMPTY_CHAT_USAGE,
+    currentTurnUsage: EMPTY_TURN_USAGE,
   })
 }));

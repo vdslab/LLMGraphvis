@@ -121,6 +121,25 @@ export const getSampleNetworks = () => api.get('/chat/samples');
 export const loadSampleNetwork = (chatId, sampleId) =>
   api.post(`/chat/${chatId}/samples/${sampleId}`);
 
+// Token usage and estimated cost of every LLM task in a chat
+export const getChatUsage = (chatId) => api.get(`/chat/${chatId}/usage`);
+
+// Current user's settings, usage report and password
+export const getUserSettings = () => api.get('/users/me/settings');
+
+export const updateUserSettings = (data) => api.patch('/users/me/settings', data);
+
+export const getUserUsage = ({ days, allTime, tz } = {}) =>
+  api.get('/users/me/usage', {
+    params: { days, all_time: allTime || undefined, tz },
+  });
+
+export const changePassword = (currentPassword, newPassword) =>
+  api.post('/auth/change-password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  });
+
 // Process message
 export const processMessage = (chatId, content, inputResponse = {}) =>
   api.post(`/chat/${chatId}/process`, {

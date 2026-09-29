@@ -78,13 +78,13 @@ export const useChatConnection = (id, isAuthenticated) => {
         },
         message_complete: (data) => {
             useChatStore.getState().finalizeStreamingMessage(data.id, data.content, data.tool_executions);
-            // Turn is fully done: fold the final currentTurnUsage into the lifetime chatUsage total.
-            useChatStore.getState().commitTurnUsage();
+            // The backend stores the turn's usage before this event: reload it.
+            useChatStore.getState().refreshUsage();
         },
-        // usage_update: { input_tokens, output_tokens, cached_input_tokens, estimated_cost_usd, provider, model }
-        // Fired potentially multiple times per turn (once per ReAct-loop iteration), each carrying
-        // the running total for the turn so far. commitTurnUsage() (above) folds it into the lifetime
-        // total once the turn is fully complete.
+        // usage_update: { input_tokens, output_tokens, cached_input_tokens, cache_write_tokens,
+        // reasoning_tokens, estimated_cost_usd, provider, model }
+        // Fired once per ReAct-loop iteration, each carrying the running total for the
+        // turn so far. refreshUsage() replaces it with the stored total once the turn ends.
         usage_update: (data) => {
             useChatStore.getState().setCurrentTurnUsage(data);
         },
@@ -94,6 +94,8 @@ export const useChatConnection = (id, isAuthenticated) => {
             if (data && data.name) {
                 useChatStore.getState().setChatName(data.name);
             }
+            // A generated title spent tokens that are now stored.
+            useChatStore.getState().refreshUsage();
         },
         system_message: (data) => {
             console.log("System:", data);
@@ -101,6 +103,8 @@ export const useChatConnection = (id, isAuthenticated) => {
         error: (data) => {
             console.error("Backend reported error:", data);
             useChatStore.getState().endTurn();
+            // Tokens spent before the failure are stored too.
+            useChatStore.getState().refreshUsage();
         }
     }), []);
 
