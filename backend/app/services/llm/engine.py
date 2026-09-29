@@ -2,7 +2,6 @@ import base64
 import json
 import logging
 import os
-import re
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
@@ -11,6 +10,8 @@ from app.core.logging import get_logger
 
 from . import emitters, hooks, inputs, local_tools, markup, mcp_client
 from .catalog import DEFAULT_PROVIDER
+from .observations import _list_cardinality  # noqa: F401  (re-exported)
+from .observations import truncate_tool_result as _truncate_tool_result
 from .prompts import build_system_instruction
 from .providers.base import LLMProvider
 from .providers.types import (
@@ -87,51 +88,6 @@ AGENT_MAX_ITERATIONS = int(os.getenv("AGENT_MAX_ITERATIONS") or 10)
 # injection, the stalled-intent nudge, the forced summary) now lives in
 # hooks/builtin/ and is dispatched from the loop below.
 hooks.load_builtin_hooks()
-
-
-def _list_cardinality(items: List[Any]) -> int:
-    """Recover the original size of a list truncated by older app versions."""
-    if items and isinstance(items[-1], str):
-        match = re.fullmatch(r"\[(\d+) items omitted for brevity\]", items[-1])
-        if match:
-            return len(items) - 1 + int(match.group(1))
-    return len(items)
-
-
-def _truncate_tool_result(result: Any, max_list_items: int = 15) -> Any:
-    """Create the compact observation stored in history and shown to the LLM.
-
-    Hooks and SSE receive the original result before this runs. A rendered graph
-    is represented semantically instead of copying node/link rows into every
-    subsequent model request.
-    """
-    if (
-        isinstance(result, dict)
-        and isinstance(result.get("nodes"), list)
-        and isinstance(result.get("links"), list)
-    ):
-        compact = {
-            "rendered": True,
-            "node_count": _list_cardinality(result["nodes"]),
-            "link_count": _list_cardinality(result["links"]),
-        }
-        compact.update(
-            {
-                key: _truncate_tool_result(value, max_list_items)
-                for key, value in result.items()
-                if key not in {"nodes", "links"}
-            }
-        )
-        return compact
-    if isinstance(result, list):
-        if len(result) > max_list_items:
-            truncated = [_truncate_tool_result(item, max_list_items) for item in result[:max_list_items]]
-            truncated.append(f"[{len(result) - max_list_items} items omitted for brevity]")
-            return truncated
-        return [_truncate_tool_result(item, max_list_items) for item in result]
-    elif isinstance(result, dict):
-        return {k: _truncate_tool_result(v, max_list_items) for k, v in result.items()}
-    return result
 
 
 def _create_provider(provider_name: str, model_name: Optional[str] = None) -> LLMProvider:

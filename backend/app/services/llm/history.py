@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from common import models
 
-from .engine import _truncate_tool_result
+from .observations import compact_past_observation, truncate_tool_result
 from .providers.types import (
     LLMFunctionCallPart,
     LLMFunctionResponsePart,
@@ -70,7 +70,9 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[LLMMessa
                         if exc.status == "failed":
                             result_data = {"error": exc.error}
                         else:
-                            result_data = _truncate_tool_result(result_data)
+                            result_data = compact_past_observation(
+                                truncate_tool_result(result_data)
+                            )
                         tool_parts.append(LLMFunctionResponsePart(
                             name=exc.tool_name,
                             response=result_data,
@@ -106,7 +108,9 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[LLMMessa
                         if tc.get("status") == "failed":
                             result_data = {"error": tc.get("error")}
                         else:
-                            result_data = _truncate_tool_result(result_data)
+                            result_data = compact_past_observation(
+                                truncate_tool_result(result_data)
+                            )
                         tool_parts.append(LLMFunctionResponsePart(
                             name=tc["name"],
                             response=result_data,
