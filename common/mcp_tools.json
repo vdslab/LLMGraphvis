@@ -1,5 +1,6 @@
 {
  "analysis_articulation_points": [
+  "limit",
   "network_id"
  ],
  "analysis_attribute_distribution": [
@@ -19,6 +20,7 @@
   "weight"
  ],
  "analysis_bridges": [
+  "limit",
   "network_id"
  ],
  "analysis_closeness_centrality": [
@@ -32,7 +34,9 @@
   "network_id"
  ],
  "analysis_connected_components": [
-  "network_id"
+  "limit",
+  "network_id",
+  "node_limit"
  ],
  "analysis_core_number": [
   "limit",
@@ -149,7 +153,9 @@
   "weight"
  ],
  "analysis_strongly_connected_components": [
-  "network_id"
+  "limit",
+  "network_id",
+  "node_limit"
  ],
  "analysis_transitivity": [
   "network_id"
@@ -160,7 +166,9 @@
   "nodes"
  ],
  "analysis_weakly_connected_components": [
-  "network_id"
+  "limit",
+  "network_id",
+  "node_limit"
  ],
  "layout_arf": [
   "a",
