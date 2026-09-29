@@ -26,9 +26,10 @@ def analysis_detect_communities(
     force_recompute: Annotated[bool, Field(description="If True, bypasses the cache and always recomputes, even if a valid cached result exists for this exact graph state and parameters. Default False preserves current auto-caching behavior.")] = False
 ) -> str:
     """
-    Legacy algorithm-selecting community tool. Prefer analysis_louvain_communities,
-    analysis_greedy_modularity_communities, or analysis_label_propagation_communities
-    for algorithm-specific parameters. Saves a node attribute without rendering.
+    DEPRECATED — use analysis_louvain_communities, analysis_greedy_modularity_communities
+    or analysis_label_propagation_communities, which expose each algorithm's own
+    parameters (weight, threshold, cutoff, ...). Retained so old conversations and
+    tuning replays keep working. Saves a node attribute without rendering.
 
     Community detection finds groups of nodes that are more densely connected to each other
     than to the rest of the network. Results can be used to color nodes by community

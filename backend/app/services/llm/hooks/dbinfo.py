@@ -75,7 +75,7 @@ def cached_attribute_names(
 
     A turn can make many attribute-taking calls; without this each one would
     re-query. Invalidation is not needed within a turn for the common case, but
-    tools like `analysis_detect_communities` do create attributes mid-turn, so
+    tools like `analysis_louvain_communities` do create attributes mid-turn, so
     `invalidate_attributes()` is called from the POST_TOOL audit hook.
     """
     kind = "edge" if edges else "node"

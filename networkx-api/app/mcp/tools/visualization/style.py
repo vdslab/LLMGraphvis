@@ -25,7 +25,7 @@ def visualization_set_node_color(
     Updates ONLY the node colors in the visualization based on a node attribute.
 
     All other visual settings (layout, node sizes, edge styles) are preserved.
-    Call `analysis_detect_communities` or `analysis_degree_centrality` first if needed.
+    Call `analysis_louvain_communities` or `analysis_degree_centrality` first if needed.
 
     Examples:
     - Color by community: attribute='louvain_community', scale_type='CATEGORICAL'

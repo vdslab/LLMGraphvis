@@ -47,15 +47,15 @@ def subgraph_ego_network(
 @handle_tool_errors
 def subgraph_community(
     network_id: Annotated[int, Field(description="The ID of the source network.")],
-    community_id: Annotated[str, Field(description="The community label to extract (as assigned by analysis_detect_communities).")],
-    community_attribute: Annotated[str, Field(description="The exact node attribute name holding community labels. Pass the exact attribute name returned by `analysis_detect_communities` (e.g. 'louvain_community').")]
+    community_id: Annotated[str, Field(description="The community label to extract (a value of community_attribute, e.g. '3').")],
+    community_attribute: Annotated[str, Field(description="The exact node attribute name holding community labels. Pass the exact attribute name returned by the community detection tool (e.g. 'louvain_community').")]
 ) -> dict:
     """
     Creates a subgraph containing only nodes belonging to a specific community.
 
-    Run `analysis_detect_communities` first, then use this to isolate one community for
+    Run a community detection tool (e.g. `analysis_louvain_communities`) first, then use this to isolate one community for
     deeper analysis. The community_attribute MUST match the exact attribute name reported
-    by `analysis_detect_communities` (e.g. 'louvain_community', 'greedy_modularity_community') —
+    by that tool (e.g. 'louvain_community', 'greedy_modularity_community') —
     it is NOT a fixed attribute called 'community'. The community_id corresponds to values
     of that attribute.
     The new subgraph becomes the active view automatically.

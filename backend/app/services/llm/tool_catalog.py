@@ -9,7 +9,7 @@ from .providers.types import ToolDefinition
 
 INITIAL_TOOL_NAMES = ("skill_load", "tool_search", "ask_user")
 DEPRECATED_TOOL_NAMES = frozenset(
-    {"network_initialize", "visualization_apply_layout"}
+    {"network_initialize", "visualization_apply_layout", "analysis_detect_communities"}
 )
 
 

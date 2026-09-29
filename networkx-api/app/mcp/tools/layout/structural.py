@@ -93,7 +93,7 @@ def layout_multipartite(
     edges flow between them: a citation graph by year, an org chart by level, or detected
     communities placed side by side.
 
-    Pairs well with `analysis_detect_communities`: run it first, then pass the community
+    Pairs well with community detection (`analysis_louvain_communities`): run it first, then pass the community
     attribute it saved (e.g. 'louvain_community') as `subset_attribute` to see each
     community as its own column and the edges that bridge them.
 
