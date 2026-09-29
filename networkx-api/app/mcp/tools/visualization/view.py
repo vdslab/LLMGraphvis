@@ -53,6 +53,10 @@ def visualization_highlight(
             vis_data["viewport"] = view_state.viewport_directive(
                 "nodes", config["node_ids"]
             )
+            vis_data["view"] = (
+                "The view now frames the highlighted nodes; "
+                "no visualization_set_viewport call is needed."
+            )
         return vis_data
 
 

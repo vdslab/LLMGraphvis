@@ -203,6 +203,7 @@ def load_builtin_hooks() -> HookRegistry:
         normalize,
         side_effects,
         tuning,
+        view,
     )
 
     _builtins_loaded = True

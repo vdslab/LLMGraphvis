@@ -11,7 +11,7 @@ from pydantic import Field
 
 NetworkId = Annotated[int, Field(description="ID of the network to query.")]
 NodeId = Annotated[str, Field(description="Exact string node ID; use node_search for labels.")]
-Cost = Annotated[str | None, Field(description="Numeric edge attribute interpreted as distance/cost, NOT connection strength. 'weight' uses the imported weight; another name uses that numeric attribute. Missing edge values default to 1. Omit or pass null/'none' for hop count.")]
+Cost = Annotated[str | None, Field(description="Omit (the default) to count hops, which is the right answer unless the user said edges are distances, costs or travel times. A named numeric edge attribute is summed as a COST: larger means farther. The imported 'weight' of most networks (co-occurrences, interaction counts, similarities) is a STRENGTH, where larger means closer; passing it here makes the most tightly connected pairs look farthest apart. Missing edge values default to 1.")]
 Method = Annotated[Literal["dijkstra", "bellman-ford"], Field(description="Weighted-path algorithm. Dijkstra requires nonnegative costs. Bellman-Ford supports negative costs but rejects reachable negative cycles. With no weight, unweighted traversal is used.")]
 
 

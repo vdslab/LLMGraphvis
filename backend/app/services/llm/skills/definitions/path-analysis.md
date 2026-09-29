@@ -2,7 +2,7 @@
 name: path-analysis
 description: Choose reachability, shortest paths, or source distances and clarify edge-cost semantics.
 triggers: [path, route, reachability, distance, shortest, alternative, 経路, 最短, 距離, 到達, 何ステップ, ホップ, パス, ルート, 道筋, 別の経路, 迂回, 共通の隣, 共通点]
-related_tools: [node_search, analysis_has_path, analysis_shortest_path, analysis_k_shortest_paths, analysis_single_source_distances, node_common_neighbors, visualization_highlight, visualization_set_viewport, network_list_edge_attributes]
+related_tools: [node_search, analysis_has_path, analysis_shortest_path, analysis_k_shortest_paths, analysis_single_source_distances, node_common_neighbors, visualization_highlight, visualization_set_viewport, visualization_set_node_labels, network_list_edge_attributes]
 ---
 
 ## Choose the question
@@ -22,7 +22,9 @@ Undirected networks allow traversal in both directions.
 
 ## Clarify what distance means
 
-Unweighted paths minimize hop count. In path algorithms, an edge weight is
+**Default: omit `weight`** and report hops. Unweighted paths minimize hop
+count. Pass a weight only when the user says what makes an edge long (distance,
+cost, time) and names or confirms the attribute. In path algorithms, an edge weight is
 interpreted as a **cost or distance**: larger values make an edge less
 desirable (longer). This is the **opposite** of layout or community algorithms,
 where weights represent connection strength (larger = closer/stronger).
@@ -43,4 +45,7 @@ distance result may be unreachable or excluded by cutoff; do not report zero.
 These tools do not change the view. When the user wants to *see* a route
 ("show", "display", "見せて", "表示"), draw it with
 `visualization_highlight(node_ids=<path>, edges='path', zoom_to=True)` in the
-next response; see `view-navigation`. Do not extract a subgraph to show a path.
+next response, together with `visualization_set_node_labels(visibility='highlighted')`
+when the user wants the route's names. `zoom_to` already moves the view; do not
+follow it with `visualization_set_viewport`. See `view-navigation`. Do not
+extract a subgraph to show a path.
