@@ -23,8 +23,8 @@ const NetworkGraph = memo(({
   onNodeClick,
   onBackgroundClick,
 }) => {
-  const svgRef = useRef();
-  const containerRef = useRef();
+  const svgRef = useRef(null);
+  const containerRef = useRef(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
   // Keep refs for callbacks to avoid re-triggering the effect
