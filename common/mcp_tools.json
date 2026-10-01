@@ -449,14 +449,21 @@
   "gradient",
   "mapping",
   "network_id",
-  "scale_type"
+  "opacity",
+  "scale_type",
+  "transform",
+  "value_max",
+  "value_min"
  ],
  "visualization_set_edge_width": [
   "attribute",
   "default_width",
   "max_width",
   "min_width",
-  "network_id"
+  "network_id",
+  "transform",
+  "value_max",
+  "value_min"
  ],
  "visualization_set_node_color": [
   "attribute",
@@ -467,7 +474,10 @@
   "network_id",
   "palette",
   "ranking_rules",
-  "scale_type"
+  "scale_type",
+  "transform",
+  "value_max",
+  "value_min"
  ],
  "visualization_set_node_labels": [
   "attribute",
@@ -486,7 +496,10 @@
   "max_size",
   "min_size",
   "network_id",
-  "scaling_factor"
+  "scaling_factor",
+  "transform",
+  "value_max",
+  "value_min"
  ],
  "visualization_set_viewport": [
   "network_id",

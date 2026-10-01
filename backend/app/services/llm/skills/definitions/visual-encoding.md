@@ -18,6 +18,17 @@ related_tools: [visualization_set_node_color, visualization_set_node_size, visua
 - **Labels**: Node identity. Which nodes are labelled, their size and truncation: load `labels`.
 - **Highlight a specific set or route**: not a colour mapping — use `visualization_highlight` (`view-navigation`). `RANKING` is for "top N by a metric".
 - **Edge Color / Width**: Edge attributes (`weight`). Use sparingly to avoid visual clutter.
+- **All edges at once** ("fainter / thinner edges"): omit `attribute`. `visualization_set_edge_color(opacity=...)` changes how strongly edges show; `visualization_set_edge_width(default_width=...)` their width. Restate `attribute` to keep an existing edge mapping.
+
+## Skewed Values and Outliers
+
+A numeric mapping spreads values linearly by default. When a few nodes have much larger values (typical of centrality), every other node gets nearly the same colour or size. The legend's range and the user's complaint ("all the same colour", "色の違いがわからない") are the signal.
+
+- `transform='log'`: keeps the values' order and magnitude but compresses the top. The default fix for a skewed metric.
+- `transform='rank'`: spreads nodes evenly by order. Use when only the order matters.
+- `value_max` / `value_min`: values beyond are drawn like the end. Use when the user wants the bulk of nodes distinguished and the outliers simply marked as "at least this much".
+
+Experts may name these directly; a beginner's complaint is reason enough to apply `log`, then say in one sentence that the colours now follow a log scale. The same three parameters work on node size and on edge colour and width. They persist with the channel; pass `transform='linear'` to undo.
 
 ## Composite Encodings (Multiple Channels)
 

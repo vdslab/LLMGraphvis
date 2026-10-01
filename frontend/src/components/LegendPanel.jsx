@@ -40,6 +40,17 @@ const formatValue = (value) =>
       })
     : value ?? '';
 
+// ADR 0029: a numeric mapping may be log- or rank-scaled, and values beyond an
+// explicit range are drawn like its ends.
+const scaleNote = (mapping) => (
+  mapping.transform === 'log' ? ' (log scale)'
+    : mapping.transform === 'rank' ? ' (by rank)' : ''
+);
+const lowEnd = (mapping, value) =>
+  `${mapping.value_min != null ? '≤ ' : ''}${formatValue(value)}`;
+const highEnd = (mapping, value) =>
+  `${mapping.value_max != null ? '≥ ' : ''}${formatValue(value)}`;
+
 const issueLabels = {
   node_overlap: 'Some nodes overlap',
   outliers_compress_core: 'Outlying nodes squeeze the center',
@@ -106,7 +117,7 @@ const LegendPanel = () => {
 
       {nodeColor && nodeColor.type?.toLowerCase() === 'linear' && (
         <div style={sectionStyle}>
-          <div style={sectionTitleStyle}>Color: {nodeColor.attribute}</div>
+          <div style={sectionTitleStyle}>Color: {nodeColor.attribute}{scaleNote(nodeColor)}</div>
           <div
             style={{
               height: '10px',
@@ -125,21 +136,21 @@ const LegendPanel = () => {
               fontFamily: 'var(--font-family-code)',
             }}
           >
-            <span>{formatValue(nodeColor.min)}</span>
-            <span>{formatValue(nodeColor.max)}</span>
+            <span>{lowEnd(nodeColor, nodeColor.min)}</span>
+            <span>{highEnd(nodeColor, nodeColor.max)}</span>
           </div>
         </div>
       )}
 
       {nodeSize && (
         <div style={sectionStyle}>
-          <div style={sectionTitleStyle}>Size: {nodeSize.attribute}</div>
+          <div style={sectionTitleStyle}>Size: {nodeSize.attribute}{scaleNote(nodeSize)}</div>
           {(nodeSize.data_min !== undefined || nodeSize.data_max !== undefined) && (
             <div style={rowStyle}>
               <span style={{ fontFamily: 'var(--font-family-code)', fontSize: '0.75rem' }}>
-                {formatValue(nodeSize.data_min) || '?'}
+                {nodeSize.data_min !== undefined ? lowEnd(nodeSize, nodeSize.data_min) : '?'}
                 {' – '}
-                {formatValue(nodeSize.data_max) || '?'}
+                {nodeSize.data_max !== undefined ? highEnd(nodeSize, nodeSize.data_max) : '?'}
               </span>
             </div>
           )}

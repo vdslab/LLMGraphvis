@@ -7,6 +7,20 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Shared by every numeric mapping (node colour/size, edge colour/width), ADR 0029.
+Transform = Annotated[
+    Literal["linear", "log", "rank"],
+    Field(description="How numeric values spread over the range. 'linear' (default): in proportion to the value. 'log': compresses large values, so a few very high values (typical of centrality) no longer make every other element look the same; zero and negative values keep their order. 'rank': spreads elements evenly by their order, ignoring how far apart the values are. Ignored for CATEGORICAL and RANKING."),
+]
+ValueMin = Annotated[
+    Optional[float],
+    Field(description="Value placed at the low end of the range; lower values are drawn like it. Omit to use the attribute's minimum."),
+]
+ValueMax = Annotated[
+    Optional[float],
+    Field(description="Value placed at the high end of the range; higher values are drawn like it. Omit to use the attribute's maximum. Lower it so a few outliers stop compressing everything else."),
+]
+
 
 @mcp.tool()
 @handle_tool_errors
@@ -19,7 +33,10 @@ def visualization_set_node_color(
     gradient: Annotated[Optional[List[str]], Field(description="For LINEAR: list of hex strings ordered from low value to high, e.g. [\"#C6DBEF\", \"#6BAED6\", \"#08306B\"].")] = None,
     ranking_rules: Annotated[Optional[List[Dict[str, Any]]], Field(description="For RANKING: list of rules applied in order, each {\"top\": N, \"color\": \"#RRGGBB\"} — e.g. [{\"top\": 10, \"color\": \"#e15759\"}, {\"top\": 50, \"color\": \"#f28e2b\"}] colors the 10 highest-valued nodes red and the next 40 orange. Everything unmatched gets default_color. Use this for 'highlight the top N' requests, where position in the ordering matters more than the value itself.")] = None,
     default_color: Annotated[str, Field(description="Fallback color for nodes with missing attribute values, or unmatched by any RANKING rule.")] = "#d3d3d3",
-    fixed: Annotated[bool, Field(description="If True, only colors nodes whose value is in the mapping; others get default_color.")] = False
+    fixed: Annotated[bool, Field(description="If True, only colors nodes whose value is in the mapping; others get default_color.")] = False,
+    transform: Transform = "linear",
+    value_min: ValueMin = None,
+    value_max: ValueMax = None,
 ) -> dict:
     """
     Updates ONLY the node colors in the visualization based on a node attribute.
@@ -31,9 +48,10 @@ def visualization_set_node_color(
     - Color by community: attribute='louvain_community', scale_type='CATEGORICAL'
     - Color by centrality: attribute='betweenness_centrality', scale_type='LINEAR', gradient=['#C6DBEF', '#08306B']
     - Highlight the top 10: attribute='pagerank', scale_type='RANKING', ranking_rules=[{'top': 10, 'color': '#e15759'}]
+    - Skewed metric where most nodes look alike: scale_type='LINEAR', transform='log' (or 'rank')
 
     Report the returned `legend` mapping to the user using its exact hex codes.
-    To return colors to uniform, use `visualization_reset_style(target='node_color')` —
+    To return colors to uniform, use `visualization_reset_style(targets=['node_color'])` —
     passing an empty mapping here does not clear anything.
 
     Returns:
@@ -51,7 +69,10 @@ def visualization_set_node_color(
             ranking_rules=ranking_rules,
             default_color=default_color or "#d3d3d3",
             fixed_mapping=fixed,
-            gradient=gradient
+            gradient=gradient,
+            transform=transform,
+            value_min=value_min,
+            value_max=value_max,
         )
         vis_data = visualization_builder.build_visualization(
             db,
@@ -71,7 +92,10 @@ def visualization_set_node_size(
     min_size: Annotated[Optional[float], Field(description="Minimum node size (area-proportional; rendered radius = sqrt(size * 10 / π)). Leave as None for adaptive auto-sizing (recommended).")] = None,
     max_size: Annotated[Optional[float], Field(description="Maximum node size (area-proportional; rendered radius = sqrt(size * 10 / π)). Leave as None for adaptive auto-sizing (recommended).")] = None,
     default_size: Annotated[Optional[float], Field(description="Default node size (area-proportional; rendered radius = sqrt(size * 10 / π)) for nodes with missing attribute values.")] = None,
-    scaling_factor: Annotated[float, Field(description="Global size multiplier. Use > 1.0 to enlarge all nodes, < 1.0 to shrink.")] = 1.0
+    scaling_factor: Annotated[float, Field(description="Global size multiplier. Use > 1.0 to enlarge all nodes, < 1.0 to shrink.")] = 1.0,
+    transform: Transform = "linear",
+    value_min: ValueMin = None,
+    value_max: ValueMax = None,
 ) -> dict:
     """
     Updates ONLY the node sizes in the visualization based on a node attribute.
@@ -97,6 +121,9 @@ def visualization_set_node_size(
             max=max_size,
             default=default_size,
             scaling_factor=scaling_factor,
+            transform=transform,
+            value_min=value_min,
+            value_max=value_max,
         )
         vis_data = visualization_builder.build_visualization(
             db,
@@ -179,17 +206,24 @@ def visualization_set_node_labels(
 @handle_tool_errors
 def visualization_set_edge_color(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    attribute: Annotated[str, Field(description="Edge attribute name to use for coloring (e.g., 'weight', 'type').")],
-    scale_type: Annotated[str, Field(description="Color scale type: 'CATEGORICAL' (for text/discrete values) or 'LINEAR' (for numeric ranges).")],
+    attribute: Annotated[Optional[str], Field(description="Edge attribute name to use for coloring (e.g., 'weight', 'type'). Omit to draw every edge in default_color.")] = None,
+    scale_type: Annotated[str, Field(description="Color scale type: 'CATEGORICAL' (for text/discrete values) or 'LINEAR' (for numeric ranges).")] = "LINEAR",
     mapping: Annotated[Optional[Dict[str, str]], Field(description="For CATEGORICAL: dict mapping attribute values to hex colors.")] = None,
     gradient: Annotated[Optional[List[str]], Field(description="For LINEAR: list of [start_color, end_color] hex strings.")] = None,
-    default_color: Annotated[Optional[str], Field(description="Fallback color for edges with missing attribute values.")] = None
+    default_color: Annotated[Optional[str], Field(description="Color of every edge when attribute is omitted, and of edges missing the attribute's value. Defaults to grey.")] = None,
+    opacity: Annotated[Optional[float], Field(ge=0.05, le=1, description="Opacity of every edge, from 0.05 (almost invisible) to 1 (solid). Omit for the canvas default of 0.3. Use for 'make the edges fainter / stronger'; edges dimmed by a highlight stay fainter still.")] = None,
+    transform: Transform = "linear",
+    value_min: ValueMin = None,
+    value_max: ValueMax = None,
 ) -> dict:
     """
-    Updates ONLY the edge colors in the visualization based on an edge attribute.
+    Sets the edge color channel: color by an edge attribute, or one color for all edges, and edge opacity.
 
-    All other visual settings (layout, node colors/sizes, edge widths) are preserved.
+    The whole edge color channel is replaced by this call: restate `attribute`
+    to keep a color mapping while changing only `opacity`. All other visual
+    settings (layout, node colors/sizes, edge widths) are preserved.
     Use `network_list_edge_attributes` first to see what edge attributes are available.
+    To return edges to the default, use `visualization_reset_style(targets=['edge_color'])`.
 
     Returns:
         dict: The updated visualization object (nodes, links, legend, layout_quality).
@@ -203,7 +237,11 @@ def visualization_set_edge_color(
             scale_type=scale_type.upper(),
             color_map=mapping,
             gradient=gradient,
-            default_color=default_color
+            default_color=default_color,
+            opacity=opacity,
+            transform=transform,
+            value_min=value_min,
+            value_max=value_max,
         )
         vis_data = visualization_builder.build_visualization(
             db,
@@ -219,16 +257,21 @@ def visualization_set_edge_color(
 @handle_tool_errors
 def visualization_set_edge_width(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    attribute: Annotated[str, Field(description="Edge attribute name to use for width (e.g., 'weight').")],
+    attribute: Annotated[Optional[str], Field(description="Edge attribute name to use for width (e.g., 'weight'). Omit to draw every edge at default_width.")] = None,
     min_width: Annotated[Optional[float], Field(description="Minimum edge width in pixels. Defaults to adaptive.")] = None,
     max_width: Annotated[Optional[float], Field(description="Maximum edge width in pixels. Defaults to adaptive.")] = None,
-    default_width: Annotated[Optional[float], Field(description="Default width for edges with missing attribute values.")] = None
+    default_width: Annotated[Optional[float], Field(gt=0, description="Width in pixels of every edge when attribute is omitted, and of edges missing the attribute's value. Defaults to adaptive.")] = None,
+    transform: Transform = "linear",
+    value_min: ValueMin = None,
+    value_max: ValueMax = None,
 ) -> dict:
     """
-    Updates ONLY the edge widths in the visualization based on an edge attribute.
+    Sets the edge width channel: width by an edge attribute, or one width for all edges.
 
     All other visual settings (layout, node styles, edge colors) are preserved.
-    Commonly used with the 'weight' attribute to show edge strength.
+    Commonly used with the 'weight' attribute to show edge strength, or without
+    an attribute for 'thinner / thicker edges'.
+    To return widths to the default, use `visualization_reset_style(targets=['edge_width'])`.
 
     Returns:
         dict: The updated visualization object (nodes, links, legend, layout_quality).
@@ -241,7 +284,10 @@ def visualization_set_edge_width(
             attribute=attribute,
             min=min_width,
             max=max_width,
-            default=default_width
+            default=default_width,
+            transform=transform,
+            value_min=value_min,
+            value_max=value_max,
         )
         vis_data = visualization_builder.build_visualization(
             db,

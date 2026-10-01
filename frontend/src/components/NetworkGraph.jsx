@@ -157,7 +157,8 @@ const NetworkGraph = memo(({
       .attr("stroke-opacity", d => (
         d.highlighted
           ? HIGHLIGHT_EDGE_OPACITY
-          : EDGE_OPACITY * (d.opacity !== undefined ? d.opacity : 1)
+          // base_opacity: the user's edge opacity (ADR 0029); opacity: dimming.
+          : (d.base_opacity ?? EDGE_OPACITY) * (d.opacity !== undefined ? d.opacity : 1)
       ))
       .attr("stroke-width", d => (d.highlighted ? Math.max(d.width || 1, 2) : d.width || 1));
 

@@ -1,10 +1,60 @@
+import math
 import unicodedata
-from typing import Any, Dict, List, Set, Tuple
+from bisect import bisect_left, bisect_right
+from typing import Any, Dict, List, NamedTuple, Set, Tuple
 
 from app.logic import common_utils as utils
 
 DEFAULT_NODE_GRADIENT = ["#C6DBEF", "#6BAED6", "#08306B"]
 DEFAULT_EDGE_GRADIENT = ["#CCCCCC", "#000000"]
+DEFAULT_EDGE_COLOR = "#999"
+
+
+class NumericStats(NamedTuple):
+    """The range one numeric mapping covers, and how values are placed in it.
+
+    The first three fields keep the old ``(is_valid, min, max)`` shape. ``min``
+    and ``max`` are the mapped range: the data range unless the config's
+    ``value_min``/``value_max`` set it, in which case values beyond it are
+    clamped to its ends (ADR 0029).
+    """
+
+    valid: bool
+    min: float
+    max: float
+    transform: str = "linear"
+    values: Tuple[float, ...] = ()  # sorted and clamped; read by "rank"
+    log_offset: float = 1.0  # smallest positive gap above min; read by "log"
+
+    def position(self, value: float) -> float:
+        """Where `value` falls in the mapped range, from 0 (low end) to 1."""
+        lo, hi = self.min, self.max
+        if hi <= lo:
+            return 0.0
+        v = min(max(value, lo), hi)
+        if self.transform == "log":
+            # log of the distance from the low end, shifted so the low end (often
+            # 0, e.g. betweenness of a leaf) stays finite and order is kept.
+            base = math.log(self.log_offset)
+            return (math.log(v - lo + self.log_offset) - base) / (
+                math.log(hi - lo + self.log_offset) - base
+            )
+        if self.transform == "rank" and len(self.values) > 1:
+            left = bisect_left(self.values, v)
+            right = bisect_right(self.values, v)
+            if right == left:  # not a data value: place it between neighbours
+                return left / len(self.values)
+            return ((left + right - 1) / 2) / (len(self.values) - 1)
+        return (v - lo) / (hi - lo)
+
+
+def _position(value: float, stats: Tuple) -> float:
+    if isinstance(stats, NumericStats):
+        return stats.position(value)
+    lo, hi = stats[1], stats[2]
+    if hi <= lo:
+        return 0.0
+    return min(max((value - lo) / (hi - lo), 0.0), 1.0)
 
 
 class StyleService:
@@ -79,17 +129,19 @@ class StyleService:
         config: Dict[str, Any],
         attr_map: Dict[str, int],
         values_map: Dict[int, Dict[int, Any]],
-    ) -> Tuple[bool, float, float]:
-        """
-        Calculate min/max statistics for a numeric attribute.
-        Returns (is_valid, min_val, max_val).
+    ) -> NumericStats:
+        """The mapped range of a numeric attribute, with the config's transform.
+
+        `valid` is False when the config names no attribute or the attribute
+        has no numeric values (callers then fall back to defaults or treat it
+        as categorical).
         """
         if not config or not config.get("attribute"):
-            return False, 0, 0
+            return NumericStats(False, 0, 0)
 
         attr_name = config["attribute"]
         if attr_name not in attr_map:
-            return False, 0, 0
+            return NumericStats(False, 0, 0)
 
         attr_id = attr_map[attr_name]
         vals = []
@@ -100,9 +152,29 @@ class StyleService:
                     vals.append(v)
 
         if not vals:
-            return False, 0, 0
+            return NumericStats(False, 0, 0)
 
-        return True, min(vals), max(vals)
+        lo = config.get("value_min")
+        hi = config.get("value_max")
+        lo = min(vals) if lo is None else lo
+        hi = max(vals) if hi is None else hi
+        if lo > hi:
+            raise ValueError(
+                f"value_min ({lo}) is above value_max ({hi}) for '{attr_name}', "
+                f"whose values run from {min(vals)} to {max(vals)}."
+            )
+
+        transform = config.get("transform") or "linear"
+        clamped = sorted(min(max(v, lo), hi) for v in vals)
+        gaps = [v - lo for v in clamped if v > lo]
+        return NumericStats(
+            True,
+            lo,
+            hi,
+            transform,
+            tuple(clamped) if transform == "rank" else (),
+            min(gaps) if gaps else 1.0,
+        )
 
     @staticmethod
     def prepare_ranking_map(
@@ -250,6 +322,8 @@ class StyleService:
     ) -> float:
         """Resolve node size based on config and stats."""
         size = smart_defaults["default"]
+        if config and config.get("default") is not None:
+            size = config["default"]
         if config and stats[0]:
             val = cls.get_val(db_id, config["attribute"], attr_map, values_map)
             if isinstance(val, (int, float)):
@@ -261,7 +335,9 @@ class StyleService:
                 if target_max is None:
                     target_max = smart_defaults["max"]
                     
-                size = utils.normalize(val, stats[1], stats[2], target_min, target_max)
+                size = utils.normalize(
+                    _position(val, stats), 0.0, 1.0, target_min, target_max
+                )
         
         # Apply scaling factor if present
         if config:
@@ -313,7 +389,7 @@ class StyleService:
                 if isinstance(val, (int, float)) and stats[0]:
                     gradient = (config.get("gradient") or DEFAULT_NODE_GRADIENT)
                     return utils.interpolate_gradient(
-                        val, stats[1], stats[2], gradient
+                        _position(val, stats), 0.0, 1.0, gradient
                     )
 
             elif scale_type == "CATEGORICAL":
@@ -339,6 +415,8 @@ class StyleService:
         smart_defaults: Dict[str, float],
     ) -> float:
         width = smart_defaults["default"]
+        if config and config.get("default") is not None:
+            width = config["default"]
         if config and stats[0]:
             val = cls.get_val(db_id, config["attribute"], attr_map, values_map)
             if isinstance(val, (int, float)):
@@ -350,7 +428,9 @@ class StyleService:
                 if target_max is None:
                     target_max = smart_defaults["max"]
                     
-                width = utils.normalize(val, stats[1], stats[2], target_min, target_max)
+                width = utils.normalize(
+                    _position(val, stats), 0.0, 1.0, target_min, target_max
+                )
         return width
 
     @classmethod
@@ -362,19 +442,18 @@ class StyleService:
         attr_map: Dict[str, int],
         values_map: Dict[int, Dict[int, Any]],
     ) -> str:
-        color = "#999"  # Default
-        if config and stats[0]:
-            val = cls.get_val(db_id, config["attribute"], attr_map, values_map)
-            scale_type = config.get("scale_type", "LINEAR")
-            if scale_type == "LINEAR" and isinstance(val, (int, float)):
-                gradient = (config.get("gradient") or DEFAULT_EDGE_GRADIENT)
-                color = utils.interpolate_gradient(
-                    val, stats[1], stats[2], gradient
-                )
-            elif scale_type == "CATEGORICAL":
-                color_map = config.get("color_map")
-                if not color_map:
-                    color_map = {}
-                if str(val) in color_map:
-                    color = color_map[str(val)]
-        return color
+        default = (config or {}).get("default_color") or DEFAULT_EDGE_COLOR
+        if not config or not config.get("attribute"):
+            return default
+        val = cls.get_val(db_id, config["attribute"], attr_map, values_map)
+        scale_type = config.get("scale_type", "LINEAR")
+        if scale_type == "LINEAR" and stats[0] and isinstance(val, (int, float)):
+            gradient = config.get("gradient") or DEFAULT_EDGE_GRADIENT
+            return utils.interpolate_gradient(
+                _position(val, stats), 0.0, 1.0, gradient
+            )
+        if scale_type == "CATEGORICAL" and val is not None:
+            color_map = config.get("color_map") or {}
+            if str(val) in color_map:
+                return color_map[str(val)]
+        return default

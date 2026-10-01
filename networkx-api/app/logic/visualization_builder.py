@@ -4,7 +4,11 @@ from sqlalchemy.orm import Session
 
 from common import models
 from app.logic.common_utils import calculate_smart_edge_width, calculate_smart_node_size
-from app.logic.style_service import DEFAULT_NODE_GRADIENT, StyleService
+from app.logic.style_service import (
+    DEFAULT_EDGE_COLOR,
+    DEFAULT_NODE_GRADIENT,
+    StyleService,
+)
 from app.logic.attributes import fetch_attribute_values
 from app.logic.layout_quality import evaluate as evaluate_layout
 from app.logic.layout_quality import normalize_like_renderer
@@ -312,7 +316,8 @@ class VisualizationBuilder:
                 info["min"] = self.node_color_stats[1]
                 info["max"] = self.node_color_stats[2]
                 info["gradient"] = nc.get("gradient") or DEFAULT_NODE_GRADIENT
-            
+                info.update(_mapping_summary(nc))
+
             summary["node_color"] = info
 
         # 2. Node Size
@@ -325,9 +330,36 @@ class VisualizationBuilder:
                 info["data_max"] = self.node_size_stats[2]
                 info["size_min"] = ns.get("min")
                 info["size_max"] = ns.get("max")
+                info.update(_mapping_summary(ns))
             summary["node_size"] = info
-            
-        # 3. Layout
+
+        # 3. Edges, when styled: the model reports them, the panel does not draw them.
+        if self.edge_color_config:
+            ec = self.edge_color_config
+            info = {"attribute": ec.get("attribute")}
+            if ec.get("attribute"):
+                info["type"] = (ec.get("scale_type") or "LINEAR").lower()
+                if self.edge_color_stats[0] and info["type"] == "linear":
+                    info["min"] = self.edge_color_stats[1]
+                    info["max"] = self.edge_color_stats[2]
+                    info.update(_mapping_summary(ec))
+            info["default_color"] = ec.get("default_color") or DEFAULT_EDGE_COLOR
+            if ec.get("opacity") is not None:
+                info["opacity"] = ec["opacity"]
+            summary["edge_color"] = info
+        if self.edge_width_config:
+            ew = self.edge_width_config
+            info = {"attribute": ew.get("attribute")}
+            if self.edge_width_stats[0]:
+                info["data_min"] = self.edge_width_stats[1]
+                info["data_max"] = self.edge_width_stats[2]
+                info.update(_mapping_summary(ew))
+            elif ew.get("default") is not None:
+                info["width"] = ew["default"]
+            summary["edge_width"] = info
+
+
+        # 4. Layout
         if self.layout_name:
             summary["layout"] = self.layout_name
 
@@ -554,6 +586,7 @@ class VisualizationBuilder:
                 self.edge_values,
             )
             opacity = 1.0
+            base_opacity = (self.edge_color_config or {}).get("opacity")
 
             if self.focus_network_id and not is_focused:
                 if self.context_config:
@@ -577,6 +610,7 @@ class VisualizationBuilder:
                     "width": width,
                     "color": color,
                     "opacity": opacity,
+                    **({"base_opacity": base_opacity} if base_opacity is not None else {}),
                     **({"highlighted": True} if highlighted else {}),
                 }
             )
@@ -713,6 +747,17 @@ class VisualizationBuilder:
             self.db, model_val, model_float, model_text, attr_ids
         )
 
+
+
+def _mapping_summary(config: Dict[str, Any]) -> Dict[str, Any]:
+    """The transform and explicit range of a numeric mapping, when not the default."""
+    info: Dict[str, Any] = {}
+    if (config.get("transform") or "linear") != "linear":
+        info["transform"] = config["transform"]
+    for key in ("value_min", "value_max"):
+        if config.get(key) is not None:
+            info[key] = config[key]
+    return info
 
 
 def get_current_visualization(db: Session, network_id: int) -> Dict[str, Any]:

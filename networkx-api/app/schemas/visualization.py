@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from .base import BaseSchema
 
@@ -22,7 +22,40 @@ CategoricalPaletteName = Literal[
 ]
 
 
-class NodeColorConfig(BaseModel):
+Transform = Literal["linear", "log", "rank"]
+
+
+class NumericMapping(BaseModel):
+    """How a numeric attribute is placed on a colour or size range (ADR 0029)."""
+
+    transform: Transform = Field(
+        "linear",
+        description=(
+            "'linear', 'log' (compresses large values) "
+            "or 'rank' (even spread by order)."
+        ),
+    )
+    value_min: Optional[float] = Field(
+        None,
+        description="Low end of the mapped range; lower values are clamped to it.",
+    )
+    value_max: Optional[float] = Field(
+        None,
+        description="High end of the mapped range; higher values are clamped to it.",
+    )
+
+    @model_validator(mode="after")
+    def _range_is_ordered(self):
+        if (
+            self.value_min is not None
+            and self.value_max is not None
+            and self.value_min >= self.value_max
+        ):
+            raise ValueError("value_min must be below value_max")
+        return self
+
+
+class NodeColorConfig(NumericMapping):
     scale_type: Literal["LINEAR", "CATEGORICAL", "RANKING"] = Field(
         ..., description="Type of color scaling to apply."
     )
@@ -52,7 +85,7 @@ class NodeColorConfig(BaseModel):
     )
 
 
-class NodeSizeConfig(BaseModel):
+class NodeSizeConfig(NumericMapping):
     attribute: str = Field(
         ..., description="Name of the node attribute to map to size."
     )
@@ -66,9 +99,10 @@ class NodeSizeConfig(BaseModel):
     )
 
 
-class EdgeWidthConfig(BaseModel):
-    attribute: str = Field(
-        ..., description="Name of the edge attribute to map to width."
+class EdgeWidthConfig(NumericMapping):
+    attribute: Optional[str] = Field(
+        None,
+        description="Edge attribute mapped to width; None: every edge at the default.",
     )
     min: Optional[float] = Field(None, description="Minimum edge width (default: 1).")
     max: Optional[float] = Field(None, description="Maximum edge width (default: 10).")
@@ -77,12 +111,13 @@ class EdgeWidthConfig(BaseModel):
     )
 
 
-class EdgeColorConfig(BaseModel):
-    attribute: str = Field(
-        ..., description="Name of the edge attribute to map to color."
+class EdgeColorConfig(NumericMapping):
+    attribute: Optional[str] = Field(
+        None,
+        description="Edge attribute mapped to color; None: all edges in default_color.",
     )
     scale_type: Literal["LINEAR", "CATEGORICAL"] = Field(
-        ..., description="Type of color scaling."
+        "LINEAR", description="Type of color scaling."
     )
     gradient: Optional[List[str]] = Field(
         None, description="List of [start_color, end_color] for LINEAR scale."
@@ -91,6 +126,12 @@ class EdgeColorConfig(BaseModel):
         None, description="Dictionary mapping attribute values to hex colors."
     )
     default_color: Optional[str] = Field(None, description="Fallback color.")
+    opacity: Optional[float] = Field(
+        None,
+        gt=0,
+        le=1,
+        description="Stroke opacity of every edge; None keeps the canvas default.",
+    )
 
 
 class NodeLabelConfig(BaseModel):
