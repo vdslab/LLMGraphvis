@@ -16,7 +16,7 @@ const RegisterPage = () => {
     try {
       await register(username, password);
       navigate('/');
-    } catch (err) {
+    } catch {
       setError('Registration failed. Username might be taken.');
     }
   };

@@ -51,7 +51,7 @@ export const useAuthStore = create(
           // but we still verify with the backend
           const user = await api.get('/auth/users/me');
           set({ user: user.data, isAuthenticated: true });
-        } catch (error) {
+        } catch {
           set({ user: null, isAuthenticated: false });
         } finally {
           set({ isLoading: false });

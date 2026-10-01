@@ -23,7 +23,7 @@ const LoginPage = () => {
     try {
       await login(username, password);
       navigate('/');
-    } catch (err) {
+    } catch {
       setError('Login failed. Please check your credentials.');
     }
   };
