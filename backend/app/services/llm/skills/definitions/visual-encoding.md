@@ -1,7 +1,7 @@
 ---
 name: visual-encoding
 description: Choosing which visual channels encode which attributes, combining colour and size into one readable view, picking the right scale_type, and reporting the resulting legend. Load this before any colour, size, or label change.
-triggers: [color, colour, 色, 色分け, カラー, size, サイズ, 大きさ, 凡例, legend, encode, マッピング, mapping, highlight, 強調, 目立, gradient, グラデーション, uniform, リセット, reset, combine, 組み合わせ, 同時, 両方, 併用, 複数, multiple, both]
+triggers: [color, colour, 色, 色分け, カラー, size, サイズ, 大きさ, 凡例, legend, encode, マッピング, mapping, highlight, 強調, 目立, gradient, グラデーション, uniform, リセット, reset, combine, 組み合わせ, 同時, 両方, 併用, 複数, multiple, both, エッジ, edge colo, edge width, リンクの, 太さ, 太く, 細く, 薄く, 透明, opacity, transparen, 対数, logarithm, log scale, 外れ値, outlier, 色の違い, 差が分から, 差がわから, 見分け]
 related_tools: [visualization_set_node_color, visualization_set_node_size, visualization_set_node_labels, visualization_set_edge_color, visualization_set_edge_width, visualization_get_state, visualization_reset_style, analysis_betweenness_centrality, analysis_degree_centrality, apply_parameter_tuning, visualization_generate]
 ---
 

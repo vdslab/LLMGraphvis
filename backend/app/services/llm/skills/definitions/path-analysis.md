@@ -1,7 +1,7 @@
 ---
 name: path-analysis
 description: Choose reachability, shortest paths, or source distances and clarify edge-cost semantics.
-triggers: [path, route, reachability, distance, shortest, alternative, 経路, 最短, 距離, 到達, 何ステップ, ホップ, パス, ルート, 道筋, 別の経路, 迂回, 共通の隣, 共通点]
+triggers: [path, route, reachability, distance, shortest, alternative, 経路, 最短, 距離, 到達, 何ステップ, ホップ, パス, ルート, 道筋, 別の経路, 迂回, 共通の隣, 共通点, どうつながって, どう繋がって, 介して, degrees of separation]
 related_tools: [node_search, analysis_has_path, analysis_shortest_path, analysis_k_shortest_paths, analysis_single_source_distances, node_common_neighbors, visualization_highlight, visualization_set_viewport, visualization_set_node_labels, network_list_edge_attributes]
 ---
 

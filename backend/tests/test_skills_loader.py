@@ -275,6 +275,48 @@ class TestShippedSkills:
         if not_first:
             assert names[0] != not_first, names
 
+    @pytest.mark.parametrize(
+        "request_text, expected",
+        [
+            ("このデータで何がわかる？", "analysis-planning"),
+            ("全体像が知りたい", "analysis-planning"),
+            ("どこから見ればいい？", "analysis-planning"),
+            ("誰が一番影響力ある？", "analysis-planning"),
+            ("人気者は誰？", "analysis-planning"),
+            ("まとめ役は誰？", "analysis-planning"),
+            ("who is the most popular person?", "analysis-planning"),
+            ("橋渡しをしている人を知りたい", "network-metrics"),
+            ("孤立している人はいる？", "network-metrics"),
+            ("who acts as a broker?", "network-metrics"),
+            ("AさんとBさんはどうつながってる？", "path-analysis"),
+            ("初めてなので何をすればいいかわからない", "conversation-flow"),
+            ("外れ値で色の違いがわからない", "visual-encoding"),
+            ("make the edges more transparent", "visual-encoding"),
+        ],
+    )
+    def test_plain_language_requests_reach_a_skill(self, request_text, expected):
+        """Beginners describe the question, not the method.
+
+        Only skill_load, tool_search and ask_user are callable at turn start, so
+        a request no trigger matches leaves a small model to guess the skill.
+        """
+        names = [s.name for s in SkillRegistry().suggest(request_text)]
+        assert expected in names, names
+
+    @pytest.mark.parametrize(
+        "request_text, expected",
+        [
+            ("エッジを細く薄くして", "visual-encoding"),
+            ("他のノードを薄くして", "view-navigation"),
+        ],
+    )
+    def test_faint_means_style_for_edges_and_focus_for_others(
+        self, request_text, expected
+    ):
+        """'薄く' is a focus when it dims the rest, a style when it names edges."""
+        names = [s.name for s in SkillRegistry().suggest(request_text)]
+        assert names and names[0] == expected, names
+
     def test_index_block_is_much_smaller_than_the_bodies(self):
         """Progressive disclosure only pays off if the index stays small."""
         skills = load_skills()

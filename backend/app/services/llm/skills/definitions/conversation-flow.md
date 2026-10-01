@@ -1,7 +1,7 @@
 ---
 name: conversation-flow
 description: When to propose and wait for approval versus act immediately, and how much to report back. Load this when a request is vague, or before changing what the user is looking at.
-triggers: [analyze, analyse, 分析, 見やすく, きれいに, いい感じ, おすすめ, 提案, どうすれば, なんか, よくして, improve, better, nicer, suggest, recommend, unclear, confusing, 分かりにくい, わかりにくい, 迷った]
+triggers: [analyze, analyse, 分析, 見やすく, きれいに, いい感じ, おすすめ, 提案, どうすれば, なんか, よくして, improve, better, nicer, suggest, recommend, unclear, confusing, 分かりにくい, わかりにくい, 迷った, 初めて, 初心者, beginner, new to, わからない, 分からない]
 related_tools: [visualization_get_state, ask_user]
 ---
 

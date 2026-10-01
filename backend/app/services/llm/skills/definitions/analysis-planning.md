@@ -1,8 +1,8 @@
 ---
 name: analysis-planning
 description: How to propose analysis and visualization goals from the imported data meaning, descriptions, and existing attributes before considering computed metrics. Load this for "analyze this network" style requests, or before computing a metric or community structure.
-triggers: [visualization, possibilities, 分布, distribution, 比較, compare, 違い, 偏り, つながり方, 可視化, 何ができる, どんな, analyze, analyse, 分析, 特徴, 傾向, 構造, structure, important, 重要, influential, 中心, community, コミュニティ, クラスタ, cluster, group, グループ, centrality, 中心性, metric, 指標, attribute, 属性]
-related_tools: [network_list_node_attributes, network_list_edge_attributes, analysis_louvain_communities, analysis_greedy_modularity_communities, analysis_label_propagation_communities, ask_user, analysis_degree_centrality, analysis_pagerank, analysis_betweenness_centrality, node_get_top_ranked, analysis_core_number, analysis_triangles, analysis_transitivity, analysis_edge_betweenness, analysis_modularity, analysis_attribute_distribution, analysis_group_connectivity, node_compare, node_get_details, node_filter, offer_parameter_tuning]
+triggers: [visualization, possibilities, 分布, distribution, 比較, compare, 違い, 偏り, つながり方, 可視化, 何ができる, どんな, analyze, analyse, 分析, 特徴, 傾向, 構造, structure, important, 重要, influential, 中心, community, コミュニティ, クラスタ, cluster, group, グループ, centrality, 中心性, metric, 指標, attribute, 属性, 影響力, influence, 人気, popular, まとめ役, リーダー, leader, key player, 何がわか, 何が分か, 全体像, overview, どこから, where to start, 主要]
+related_tools: [network_list_node_attributes, visualization_set_node_color, visualization_set_node_size, visualization_set_node_labels, network_list_edge_attributes, analysis_louvain_communities, analysis_greedy_modularity_communities, analysis_label_propagation_communities, ask_user, analysis_degree_centrality, analysis_pagerank, analysis_betweenness_centrality, node_get_top_ranked, analysis_core_number, analysis_triangles, analysis_transitivity, analysis_edge_betweenness, analysis_modularity, analysis_attribute_distribution, analysis_group_connectivity, node_compare, node_get_details, node_filter, offer_parameter_tuning, analysis_connected_components]
 ---
 
 ## Data-Grounded Analysis Workflow
@@ -27,6 +27,20 @@ For open-ended analysis requests ("analyze this network", "what can you tell me?
    - Use `fields=[{"id": "analysis_goal", "label": "Analysis goal", "kind": "select", "options": [...]}]`.
    - Keep `allow_other=true` (free-text is auto-provided by UI). Do not add a separate text input field.
    - Match the user's conversation language.
+
+## Plain Questions Are Specific Requests
+
+A question without metric names ("who is most influential?", "who connects the groups?", "is anyone isolated?") is a specific request, not an open-ended one. Pick the matching metric, compute it, and answer on the canvas in the same turn:
+
+| The user asks | Metric |
+|---|---|
+| Who is popular / has the most ties | `analysis_degree_centrality` |
+| Who is influential / connected to important others | `analysis_pagerank` |
+| Who bridges or mediates between groups | `analysis_betweenness_centrality` |
+| Which groups form | a recorded categorical attribute first, else `analysis_louvain_communities` |
+| Who is isolated or cut off | `analysis_connected_components` (see `network-metrics`) |
+
+Then show the answer: size by the saved metric (`visualization_set_node_size`), label the top nodes (`visualization_set_node_labels(visibility='top_n', rank_by=<metric>)`), and say in one sentence what the metric measures on this data. Add colour only for a second part of the question.
 
 When the user is new to network analysis, phrase options as questions about the data rather than algorithm names. When the user asks for a specific method, keep its exact name and parameters in the report so the result is reproducible. In either case, distinguish a fact computed from links from an attribute supplied with the GraphML file.
 
