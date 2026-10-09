@@ -20,8 +20,15 @@ export default defineConfig(({ mode }) => {
         proxy.on('proxyReq', (proxyReq, req) => {
           console.log('Sending Request to the Target:', req.method, req.url);
         });
-        proxy.on('proxyRes', (proxyRes, req) => {
+        proxy.on('proxyRes', (proxyRes, req, res) => {
           console.log('Received Response from the Target:', proxyRes.statusCode, req.url);
+          // Vite 8's proxy holds response headers until the first body chunk,
+          // so an SSE stream would not open until the backend's first ping.
+          // The proxy copies headers synchronously after this event; flush
+          // them right after that.
+          if (proxyRes.headers['content-type']?.startsWith('text/event-stream')) {
+            queueMicrotask(() => res.flushHeaders());
+          }
         });
       },
     },
