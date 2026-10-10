@@ -118,22 +118,27 @@ graph TD
 
 LLMが「現在のネットワーク状態」を正確に把握し、効率的にツールを選択できるよう、Backendは独自の**コンテキスト注入メカニズム**を実装しています。
 
-- **概要**: ユーザーの各メッセージの直前に、現在のネットワークのメタ情報（ID, ノード数, エッジ数, 利用可能な属性リスト）を自動的に挿入します。
+- **概要**: 毎ターン、システムプロンプトの末尾に現在のネットワークのメタ情報（ID、名前と説明、ノード数とエッジ数、エッジの重み、計算済みのレイアウト、属性の一覧）を付けます。LLM がツールを呼ぶ必要はなく、Backend が MCP リソースを直接読みます（`llm/context.py`）。
 - **目的**:
   1.  **Verification Firstの高速化**: 属性リストが既に提示されているため、単純な可視化指示であれば `read_resource` による確認ステップをスキップ可能にします。
   2.  **ハルシネーション防止**: 存在しない属性を使用しようとするLLMのミスを防ぎます。
   3.  **状態追従**: サブグラフへのコンテキスト切り替えが発生した場合でも、次のターンで最新のサブグラフ情報が注入されるため、LLMは常に正しい対象を分析できます。
+  4.  **エンコーディングの根拠**: 各属性に尺度（`measurement`）と来歴を添えるため、LLM は属性名から推測せずに色・サイズの割り当てを選べます（[ADR 0030](../4_Decisions/0030-attribute-role-and-measurement.md)）。
 
-**注入される情報の例:**
+**注入される情報の形（例示。正確な文言は `context.py` が正）:**
 
 ```text
 [Current Network Context]
 Network ID: 5
 Stats: 150 Nodes, 300 Edges
+Computed layouts: forceatlas2 (coordinates, not attributes to encode)
 Available Node Attributes:
-- department (string)
-- tenure (integer)
+- department (string, categorical) [values: 'Sales', 'R&D', ...]
+- tenure (float, discrete) [min: 1.00, max: 12.00]
+- degree_centrality (float, quantitative) [min: 0.00, max: 0.15] [derived: centrality:degree; normalized=True]
 ```
+
+この文脈は毎ターン送られるため、短さが要件になる。レイアウト座標は属性として列挙せず、計算済みレイアウトの 1 行にまとめる。座標を属性として数えていた頃は、レイアウトを計算するたびに元データの属性が上限（15 件）の外へ押し出されていた。DB の情報がこの文脈とツール結果を通って LLM に届く経路は [4_Database.md](./4_Database.md) 4.7 に図示している。
 
 ### 1.3.2. Skills (手続き知識の外部化)
 
@@ -479,7 +484,8 @@ POST_TOOL / TOOL_ERROR フックが完了してから次へ進む。レイアウ
 
 色・サイズ・ラベル・エッジ幅は独立し、`visualization_set_*` は渡さなかった
 チャネルを保持する。問いが二つの要素を持つなら、同じ応答で二つのチャネルを
-設定する。既定の組は「カテゴリ属性→色、連続量→サイズ」で、ノード2チャネル、
+設定する。既定の組は「`categorical` の属性→色、`quantitative` の属性→サイズ」で
+（尺度は属性定義の `measurement`、[4_Database.md](./4_Database.md) 4.5）、ノード2チャネル、
 ラベルまたはエッジ幅を加えて3チャネルを上限とする。装飾の禁止はチャネル数の
 上限ではない。同一属性を二つのチャネルに載せることは情報を増やさないため
 引き続き避ける。提案はチャネル単体ではなく、その画面から読み取れることとして

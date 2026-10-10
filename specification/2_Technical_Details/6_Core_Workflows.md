@@ -59,11 +59,11 @@ sequenceDiagram
     note right of F: SSE接続を確立し、<br/>ネットワークの初期化完了を待つ。<br/>この間、ローディング画面などを表示。
 
     %% Step 5: Background processing in NetworkXAPI
-    N->>N: 1. GraphMLを正規化<br/>(属性型の推論とdata_typeの決定)
+    N->>N: 1. GraphMLを正規化<br/>(格納型 data_type と尺度 measurement の推定)
     N->>DB: 2. ノードとエッジをDBに保存<br/>(値は型別のテーブルへ)
     DB-->>N: 保存成功
     N->>N: 3. 初期レイアウト(ForceAtlas2)を計算
-    N->>DB: 4. 計算したx, y座標を属性として保存
+    N->>DB: 4. 計算したx, y座標を属性として保存<br/>(role=coordinate、来歴付き)
     DB-->>N: 保存成功
     N->>N: 5. デフォルトスタイルを適用した<br/>初期レンダリングデータを生成
     N-->>B: 実行成功応答 (initial_render_data)
