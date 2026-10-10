@@ -206,11 +206,19 @@ class NodeAttribute(Base):
 
     # What the attribute means, beyond which value table holds it. See
     # networkx-api/app/logic/attribute_semantics.py for the vocabularies.
-    # role: data | metric | community | coordinate
-    role = Column(String, nullable=False, default="data", server_default="data")
-    # measurement: categorical | discrete | quantitative | identifier | text.
+    role = Column(
+        String,
+        nullable=False,
+        default="data",
+        server_default="data",
+        comment="data | metric | community | coordinate",
+    )
     # Exact for derived attributes, inferred from the values for imported ones.
-    measurement = Column(String, nullable=True)
+    measurement = Column(
+        String,
+        nullable=True,
+        comment="categorical | discrete | quantitative | identifier | text",
+    )
 
     network = relationship("Network", back_populates="node_attributes")
     values = relationship("NodeAttributeValue", back_populates="attribute", cascade="all, delete-orphan")
@@ -294,11 +302,19 @@ class EdgeAttribute(Base):
 
     # What the attribute means, beyond which value table holds it. See
     # networkx-api/app/logic/attribute_semantics.py for the vocabularies.
-    # role: data | metric | community | coordinate
-    role = Column(String, nullable=False, default="data", server_default="data")
-    # measurement: categorical | discrete | quantitative | identifier | text.
+    role = Column(
+        String,
+        nullable=False,
+        default="data",
+        server_default="data",
+        comment="data | metric | community | coordinate",
+    )
     # Exact for derived attributes, inferred from the values for imported ones.
-    measurement = Column(String, nullable=True)
+    measurement = Column(
+        String,
+        nullable=True,
+        comment="categorical | discrete | quantitative | identifier | text",
+    )
 
     network = relationship("Network", back_populates="edge_attributes")
     values = relationship("EdgeAttributeValue", back_populates="attribute", cascade="all, delete-orphan")

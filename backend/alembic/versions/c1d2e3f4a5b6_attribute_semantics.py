@@ -72,9 +72,23 @@ def upgrade() -> None:
     for table in TABLES:
         op.add_column(
             table,
-            sa.Column("role", sa.String(), nullable=False, server_default="data"),
+            sa.Column(
+                "role",
+                sa.String(),
+                nullable=False,
+                server_default="data",
+                comment="data | metric | community | coordinate",
+            ),
         )
-        op.add_column(table, sa.Column("measurement", sa.String(), nullable=True))
+        op.add_column(
+            table,
+            sa.Column(
+                "measurement",
+                sa.String(),
+                nullable=True,
+                comment="categorical | discrete | quantitative | identifier | text",
+            ),
+        )
         for pattern, role, measurement in BACKFILL:
             op.execute(
                 sa.text(
