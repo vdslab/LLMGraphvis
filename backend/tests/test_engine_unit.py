@@ -28,6 +28,15 @@ def mock_agent():
     return agent
 
 
+@pytest.fixture(autouse=True)
+def _owns_every_network():
+    """The agent here has no database; ownership is tested in test_hooks_guards."""
+    with patch(
+        "app.services.llm.hooks.builtin.guards._owns_network", return_value=True
+    ):
+        yield
+
+
 @pytest.fixture
 def mock_queue():
     return AsyncMock()

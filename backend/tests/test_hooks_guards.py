@@ -692,3 +692,66 @@ def test_unexposed_known_tool_is_deferred():
     decision = guard_tool_is_exposed(ctx)
     assert decision.action == "defer"
     assert "same response" in decision.reason
+
+
+# --------------------------------------------------------------------------
+# guard_network_ownership
+# --------------------------------------------------------------------------
+
+
+class TestGuardNetworkOwnership:
+    """The model can be told any network ID; only the owner's tree may run."""
+
+    @pytest.fixture
+    def owned(self, db):
+        from common import models
+
+        db.add_all(
+            [
+                models.User(id=1, username="owner", hashed_password="pw"),
+                models.User(id=2, username="victim", hashed_password="pw"),
+                models.Network(id=10, name="Root"),
+                models.Network(id=11, name="Sub", parent_network_id=10),
+                models.Network(id=20, name="Victim root"),
+                models.Chat(id=1, user_id=1, network_id=11, name="Mine"),
+                models.Chat(id=2, user_id=2, network_id=20, name="Theirs"),
+            ]
+        )
+        db.commit()
+        return db
+
+    def _ctx(self, db, tool, args):
+        c = ctx(tool, args, network_id=11)
+        c.db = db
+        return c
+
+    def test_allows_own_subgraph_and_root(self, owned):
+        for network_id in (10, 11):
+            c = self._ctx(owned, "visualization_switch_network", {"network_id": network_id})
+            assert guards.guard_network_ownership(c) is None
+
+    def test_denies_another_users_network(self, owned):
+        for tool in ("network_select", "visualization_switch_network", "layout_spring"):
+            c = self._ctx(owned, tool, {"network_id": 20})
+            decision = guards.guard_network_ownership(c)
+            assert decision.action == "deny", tool
+
+    def test_denies_any_network_id_argument(self, owned):
+        c = self._ctx(owned, "subgraph_future", {"network_id": 11, "source_network_id": 20})
+        assert guards.guard_network_ownership(c).action == "deny"
+
+    def test_denies_missing_network(self, owned):
+        c = self._ctx(owned, "layout_spring", {"network_id": 999})
+        assert guards.guard_network_ownership(c).action == "deny"
+
+    def test_denies_listing_every_network(self, owned):
+        c = self._ctx(owned, "network_list_all", {})
+        assert guards.guard_network_ownership(c).action == "deny"
+
+    def test_fails_closed_when_the_check_errors(self):
+        c = ctx("layout_spring", {"network_id": 7})  # FakeDB cannot query
+        assert guards.guard_network_ownership(c).action == "deny"
+
+    def test_local_tools_are_not_checked(self):
+        c = ctx("switch_to_main_network", {})
+        assert guards.guard_network_ownership(c) is None

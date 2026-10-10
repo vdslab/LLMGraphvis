@@ -1,6 +1,12 @@
+from typing import Optional
+
 from sqlalchemy.orm import Session
 
 from common import models
+
+# Upper bound on the parent chain walked to find a root. Subgraphs of subgraphs
+# are legitimate, so this is a cycle/corruption stop, not a design limit.
+MAX_NETWORK_DEPTH = 100
 
 
 class NetworkService:
@@ -9,14 +15,34 @@ class NetworkService:
     """
 
     @staticmethod
+    def root_network_id(network_id: int, db: Session) -> Optional[int]:
+        """The root of `network_id`'s subgraph tree, or None if it cannot be found.
+
+        None covers a missing network, a broken parent link, and a cycle.
+        """
+        current: Optional[int] = network_id
+        seen = set()
+        while current is not None and len(seen) < MAX_NETWORK_DEPTH:
+            if current in seen:
+                return None
+            network = db.get(models.Network, current)
+            if network is None:
+                return None
+            if network.parent_network_id is None:
+                return network.id
+            seen.add(current)
+            current = network.parent_network_id
+        return None
+
+    @staticmethod
     def verify_network_access(network_id: int, user_id: int, db: Session) -> bool:
         """
         Verify if a user has access to a specific network.
 
-        Logic:
-        1. Check direct ownership via Chat (Network -> Chat -> User).
-        2. If network is a subgraph, traverse up to the parent network recursively
-           and check ownership of the parent.
+        A user owns every network in the subgraph tree of each of their chats.
+        Ownership is decided by the tree's root rather than by the network a
+        chat currently points at: a chat that has switched into a subgraph
+        still owns its root and the root's other subgraphs.
 
         Args:
             network_id: The ID of the network to check.
@@ -26,47 +52,17 @@ class NetworkService:
         Returns:
             True if access is allowed, False otherwise.
         """
-        # Check direct ownership via Chat
-        chat = (
-            db.query(models.Chat)
-            .filter(
-                models.Chat.network_id == network_id, models.Chat.user_id == user_id
-            )
-            .first()
+        target_root = NetworkService.root_network_id(network_id, db)
+        if target_root is None:
+            return False
+
+        chat_network_ids = (
+            db.query(models.Chat.network_id)
+            .filter(models.Chat.user_id == user_id)
+            .all()
         )
-
-        if chat:
-            return True
-
-        # Check if it's a subgraph (traverse up)
-        current_id = network_id
-
-        # Limit depth to avoid infinite loops if cycle exists (should not happen in DAG)
-        MAX_DEPTH = 10
-        for _ in range(MAX_DEPTH):
-            network = db.query(models.Network).get(current_id)
-            if not network:
-                return False
-
-            if network.parent_network_id:
-                current_id = network.parent_network_id
-
-                # Check permission for the parent network (via associated chat)
-                # Note: Currently, we assume if you own the parent, you own the subgraph.
-                # Access is controlled via Chat ownership.
-                chat = (
-                    db.query(models.Chat)
-                    .filter(
-                        models.Chat.network_id == current_id,
-                        models.Chat.user_id == user_id,
-                    )
-                    .first()
-                )
-
-                if chat:
-                    return True
-            else:
-                # Reached root with no match
-                return False
-
-        return False
+        return any(
+            NetworkService.root_network_id(chat_network_id, db) == target_root
+            for (chat_network_id,) in chat_network_ids
+            if chat_network_id is not None
+        )

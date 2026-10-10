@@ -7,6 +7,9 @@ in the system prompt — and that a model could therefore skip:
 - some computations are too expensive to run on a large graph,
 - stop retrying after repeated identical calls or repeated failures.
 
+`guard_network_ownership` is different in kind: it is the authorization check
+for every network the agent touches, and it fails closed.
+
 A denied call is not an exception. The engine records
 `{"error": ..., "blocked_by": ...}` as the tool result, so the model reads the
 reason and corrects itself on the next iteration.
@@ -48,6 +51,74 @@ def guard_tool_is_exposed(ctx: HookContext) -> Optional[ToolCallDecision]:
         f"'{ctx.tool_name}' is not in the live tool catalogue. Use tool_search "
         "with a capability or domain prefix and choose a returned live name."
     )
+
+
+# Tools the agent may never call: they read across every user's networks.
+CROSS_TENANT_TOOLS = {
+    "network_list_all": (
+        "it lists every user's networks. This chat works on one network tree; "
+        "use the active network or a subgraph created in this chat."
+    ),
+}
+
+
+def _network_id_args(args: Dict[str, Any]) -> Dict[str, Any]:
+    """Every argument naming a network (`network_id`, `source_network_id`, ...)."""
+    return {k: v for k, v in args.items() if k.endswith("network_id") and v is not None}
+
+
+def _owns_network(ctx: HookContext, network_id: int) -> bool:
+    """Whether the chat's owner owns `network_id`, memoized for the turn."""
+    from app.services.network_service import NetworkService
+    from common import models
+
+    owned = ctx.turn_state.setdefault("_owned_networks", {})
+    if network_id not in owned:
+        user_id = ctx.db.get(models.Chat, ctx.chat_id).user_id
+        owned[network_id] = NetworkService.verify_network_access(
+            network_id, user_id, ctx.db
+        )
+    return owned[network_id]
+
+
+@hook(HookEvent.PRE_TOOL, tools="*", priority=41, name="guard_network_ownership")
+def guard_network_ownership(ctx: HookContext) -> Optional[ToolCallDecision]:
+    """Refuse any call on a network the chat's owner does not own.
+
+    networkx-api has no authorization of its own and trusts every `network_id`
+    it is given, and the model can be told any ID. This is the only check
+    between the two, so unlike other hooks it fails *closed*: an error while
+    checking is a denial.
+    """
+    from ...local_tools import is_local_tool
+
+    if is_local_tool(ctx.tool_name):
+        return None
+    if ctx.tool_name in CROSS_TENANT_TOOLS:
+        return ToolCallDecision.deny(
+            f"'{ctx.tool_name}' is not available to the agent: "
+            f"{CROSS_TENANT_TOOLS[ctx.tool_name]}"
+        )
+
+    targets = _network_id_args(ctx.args)
+    if not targets:
+        return None
+
+    try:
+        for name, value in targets.items():
+            network_id = int(value)
+            if not _owns_network(ctx, network_id):
+                return ToolCallDecision.deny(
+                    f"Network {network_id} ({name}) does not exist or belongs to "
+                    "another user. Work on the active network or on a subgraph "
+                    "created in this chat."
+                )
+    except Exception as e:
+        logger.exception(f"Network ownership check failed for {ctx.tool_name}: {e}")
+        return ToolCallDecision.deny(
+            "Could not verify access to the requested network; the call was refused."
+        )
+    return None
 
 
 def _env_int(name: str, default: int) -> int:

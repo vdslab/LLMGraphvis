@@ -104,3 +104,53 @@ def test_verify_network_access_subgraph_denied(db):
     # Test
     allowed = NetworkService.verify_network_access(child_net.id, user.id, db)
     assert allowed is False
+
+
+def _tree_with_chat_on_subgraph(db):
+    """User 1's chat has switched into subgraph 11; 12 is a sibling of 11."""
+    db.add_all(
+        [
+            models.User(id=1, username="owner", hashed_password="pw"),
+            models.User(id=2, username="other", hashed_password="pw"),
+            models.Network(id=10, name="Root"),
+            models.Network(id=11, name="Sub A", parent_network_id=10),
+            models.Network(id=12, name="Sub B", parent_network_id=10),
+            models.Network(id=20, name="Other root"),
+            models.Chat(id=100, user_id=1, network_id=11, name="Chat"),
+            models.Chat(id=200, user_id=2, network_id=20, name="Other chat"),
+        ]
+    )
+    db.commit()
+
+
+def test_chat_on_subgraph_still_owns_root_and_siblings(db):
+    _tree_with_chat_on_subgraph(db)
+    assert NetworkService.verify_network_access(10, 1, db) is True
+    assert NetworkService.verify_network_access(12, 1, db) is True
+
+
+def test_chat_on_subgraph_does_not_grant_other_trees(db):
+    _tree_with_chat_on_subgraph(db)
+    assert NetworkService.verify_network_access(20, 1, db) is False
+    assert NetworkService.verify_network_access(10, 2, db) is False
+
+
+def test_missing_network_is_denied(db):
+    _tree_with_chat_on_subgraph(db)
+    assert NetworkService.verify_network_access(999, 1, db) is False
+
+
+def test_parent_cycle_is_denied_not_looped(db):
+    db.add_all(
+        [
+            models.User(id=1, username="owner", hashed_password="pw"),
+            models.Network(id=30, name="A"),
+            models.Network(id=31, name="B", parent_network_id=30),
+        ]
+    )
+    db.commit()
+    db.get(models.Network, 30).parent_network_id = 31
+    db.add(models.Chat(id=100, user_id=1, network_id=30, name="Chat"))
+    db.commit()
+    assert NetworkService.root_network_id(31, db) is None
+    assert NetworkService.verify_network_access(31, 1, db) is False
