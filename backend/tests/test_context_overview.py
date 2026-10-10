@@ -207,13 +207,58 @@ async def test_overview_is_omitted_when_nothing_can_be_read():
 
 
 @pytest.mark.asyncio
-async def test_context_summary_keeps_layout_coordinates():
-    """The agent needs to know which layouts exist, unlike the user-facing overview."""
+async def test_context_summary_names_layouts_instead_of_listing_coordinates():
+    """The agent needs to know which layouts exist, but a coordinate is not an
+    attribute to encode."""
     with _patch_resources():
         summary = await context.build_context_summary(1)
 
     assert "Stats: 1144 Nodes, 8608 Edges" in summary
-    assert "forceatlas2_x" in summary
+    assert "Computed layouts: forceatlas2 (coordinates" in summary
+    assert "- forceatlas2_x" not in summary
+
+
+@pytest.mark.asyncio
+async def test_coordinates_do_not_crowd_out_imported_attributes():
+    """Coordinates once counted toward the listing cap, so a few layouts pushed
+    the dataset's own attributes behind '... and N more'."""
+    layouts = [f"layout{i}" for i in range(10)]
+    coordinates = [
+        {"name": f"{name}_{axis}", "data_type": "float", "role": "coordinate",
+         "is_derived": True, "derived_from": f"layout:{name}"}
+        for name in layouts
+        for axis in ("x", "y")
+    ]
+    data = [{"name": f"col{i}", "data_type": "string", "role": "data"} for i in range(5)]
+    with _patch_resources(nodes=coordinates + data):
+        summary = await context.build_context_summary(1)
+
+    assert all(f"- col{i}" in summary for i in range(5))
+    assert "more" not in summary
+    assert "Computed layouts: " + ", ".join(layouts) in summary
+
+
+@pytest.mark.asyncio
+async def test_context_summary_shows_measurement_and_parameters():
+    """The measurement decides the encoding, and the parameters say what a
+    computed value is a result of."""
+    nodes = [
+        {"name": "group", "data_type": "float", "measurement": "discrete",
+         "role": "data", "is_derived": False, "stats": {"min": 1.0, "max": 4.0}},
+        {"name": "louvain_community", "data_type": "string",
+         "measurement": "categorical", "role": "community", "is_derived": True,
+         "derived_from": "community:louvain",
+         "parameters": {"resolution": 1.0, "seed": 42}},
+    ]
+    with _patch_resources(nodes=nodes):
+        summary = await context.build_context_summary(1)
+
+    assert "- group (float, discrete) [min: 1.00, max: 4.00]\n" in summary
+    assert (
+        "- louvain_community (string, categorical) "
+        "[derived: community:louvain; resolution=1.0, seed=42]"
+    ) in summary
+    assert "storage type, measurement" in summary
 
 
 @pytest.mark.asyncio

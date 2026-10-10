@@ -68,6 +68,15 @@ def network_list_node_attributes(
     Lists all available node attributes in the network (e.g., 'degree_centrality', 'community', 'country').
     Use this before coloring/sizing nodes to discover what attributes exist.
 
+    Each entry carries `measurement`, how its values compare, which decides the
+    fitting encoding: 'categorical' (groups: CATEGORICAL colour), 'quantitative'
+    (magnitudes: LINEAR/RANKING colour, size), 'discrete' (few whole numbers:
+    codes or counts, decide from the name and description), 'identifier'
+    (one value per node: labels only), 'text' (prose: read, do not encode).
+    It is exact for computed attributes and inferred from the values for
+    imported ones. `role` says why the attribute exists: 'data' (came with the
+    file), 'metric', 'community' or 'coordinate' (computed here).
+
     Returns:
         str: JSON list of attribute names and their types/stats.
     """
@@ -84,6 +93,10 @@ def network_list_edge_attributes(
     """
     Lists all available edge attributes in the network (e.g., 'weight', 'type').
     Use this before styling edges to discover what attributes exist.
+
+    Each entry carries `measurement` and `role` with the same meaning as in
+    `network_list_node_attributes`: colour a 'categorical' attribute with
+    CATEGORICAL, and map only 'quantitative' ones to width or LINEAR colour.
 
     Returns:
         str: JSON list of attribute names and their types/stats.

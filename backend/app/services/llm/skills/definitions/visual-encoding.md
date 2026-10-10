@@ -5,19 +5,33 @@ triggers: [color, colour, 色, 色分け, カラー, size, サイズ, 大きさ,
 related_tools: [visualization_set_node_color, visualization_set_node_size, visualization_set_node_labels, visualization_set_edge_color, visualization_set_edge_width, visualization_get_state, visualization_reset_style, analysis_betweenness_centrality, analysis_degree_centrality, apply_parameter_tuning, visualization_generate]
 ---
 
+## Choosing by Measurement
+
+Each attribute in `[Current Network Context]` reads `name (storage type, measurement)`. Choose the channel and scale from the measurement, not from the storage type: an integer group code and a score are both `float`.
+
+| Measurement | Fits | Avoid |
+|---|---|---|
+| `categorical` | Color with `scale_type='CATEGORICAL'` | Size, width, `LINEAR`/`RANKING` (they imply an order the data lacks) |
+| `quantitative` | Size, edge width, color with `LINEAR` or `RANKING` | `CATEGORICAL` (every value gets its own unrelated colour) |
+| `discrete` | Codes (`group`, `type_id`): as `categorical`. Counts or ordered numbers (`papers`, `year`): as `quantitative` | Guessing: decide from the name and description, and say which reading you used |
+| `identifier` | Labels only | Any colour or size mapping |
+| `text` | Reading and quoting | Any encoding |
+
+Measurements of imported attributes are inferred from the values; when the name or description contradicts one (a `quantitative` postal code, a `categorical` rating scale), follow the meaning and say so. A tool result with `encoding_note` reports a mismatch: switch to the fitting encoding, unless the user asked for this one.
+
 ## Channel Mapping Rules
 
-- **Color (Categorical)**: Discrete categories (`club`, `country`, `louvain_community`).
+- **Color (Categorical)**: `categorical` attributes (`club`, `country`, `louvain_community`).
   Use `scale_type='CATEGORICAL'`. Palette is auto-assigned (`tableau10` for <=10, `paired` for 11-12, `extended20` for >12). Supply `mapping` only for explicit user colors.
-- **Color (Sequential)**: Continuous metrics (`degree_centrality`, `pagerank`, `year`).
+- **Color (Sequential)**: `quantitative` attributes (`degree_centrality`, `pagerank`).
   Use `scale_type='LINEAR'`. Optional `gradient` as hex list low-to-high.
-- **Color (Ranking)**: Top-N emphasis ("top 10 nodes").
+- **Color (Ranking)**: Top-N emphasis ("top 10 nodes") on a `quantitative` attribute.
   Use `scale_type='RANKING'` with `ranking_rules=[{"top": N, "color": "#HEX"}]`.
-- **Size**: Exactly one continuous quantity (importance/weight).
+- **Size**: Exactly one `quantitative` attribute (importance/weight).
   Rendered radius is area-proportional: $r = \sqrt{\text{size} \times 10 / \pi}$. To double visual diameter, roughly quadruple `max_size` (~4x area).
 - **Labels**: Node identity. Which nodes are labelled, their size and truncation: load `labels`.
 - **Highlight a specific set or route**: not a colour mapping — use `visualization_highlight` (`view-navigation`). `RANKING` is for "top N by a metric".
-- **Edge Color / Width**: Edge attributes (`weight`). Use sparingly to avoid visual clutter.
+- **Edge Color / Width**: Edge attributes (`weight`). Width needs a `quantitative` attribute; a `categorical` one (`kind`) goes on edge color. Use sparingly to avoid visual clutter.
 - **All edges at once** ("fainter / thinner edges"): omit `attribute`. `visualization_set_edge_color(opacity=...)` changes how strongly edges show; `visualization_set_edge_width(default_width=...)` their width. Restate `attribute` to keep an existing edge mapping.
 
 ## Skewed Values and Outliers
@@ -61,7 +75,7 @@ When the user's intent involves multiple aspects (e.g. affiliation + importance)
 ## Procedures
 
 ### Creating a Composite View
-1. Check `[Current Network Context]` for existing/imported attributes.
+1. Check `[Current Network Context]` for existing/imported attributes and their measurements.
 2. Compute any missing metric (e.g. `analysis_betweenness_centrality`), reading the exact saved attribute name from the tool result.
 3. In one response, call `visualization_set_node_color` and `visualization_set_node_size`. (No trailing `visualization_generate` needed; styling tools render automatically).
 4. Report both legends with hex codes and describe the joint reading.

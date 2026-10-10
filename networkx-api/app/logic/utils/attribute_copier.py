@@ -102,6 +102,12 @@ class AttributeCopier:
                     "attribute_name": attr.attribute_name,
                     "data_type": attr.data_type,
                     "description": attr.description,
+                    # Meaning and provenance travel with the values; the cache
+                    # stamp does not, since the subgraph is a different graph.
+                    "role": attr.role,
+                    "measurement": attr.measurement,
+                    "is_derived": attr.is_derived,
+                    "derived_from": attr.derived_from,
                 }
             )
 

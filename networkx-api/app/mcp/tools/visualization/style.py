@@ -22,12 +22,43 @@ ValueMax = Annotated[
 ]
 
 
+def _add_encoding_note(
+    db,
+    vis_data: dict,
+    network_id: int,
+    attribute: Optional[str],
+    scope: str,
+    channel: str,
+) -> None:
+    """Warn in the result when the drawn scale does not fit the attribute.
+
+    Read from the legend, so a LINEAR request the builder already fell back to
+    CATEGORICAL is judged by what was drawn. A warning, not a refusal: the
+    user may want an unusual mapping on purpose.
+    """
+    if not attribute:
+        return
+    from app.logic.attribute_semantics import encoding_note
+    from app.logic.attributes import get_measurement
+
+    legend = (vis_data.get("legend") or {}).get(f"{scope}_{channel}") or {}
+    scale = legend.get("type") if channel == "color" else None
+    note = encoding_note(
+        attribute,
+        get_measurement(network_id, attribute, scope, db),
+        channel,
+        scale,
+    )
+    if note:
+        vis_data["encoding_note"] = note
+
+
 @mcp.tool()
 @handle_tool_errors
 def visualization_set_node_color(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     attribute: Annotated[str, Field(description="Node attribute name to use for coloring (e.g., 'community', 'degree_centrality', 'country').")],
-    scale_type: Annotated[str, Field(description="Color scale type: 'CATEGORICAL' (for text/discrete values), 'LINEAR' (for numeric ranges), or 'RANKING' (top-N rules).")],
+    scale_type: Annotated[str, Field(description="Color scale type, chosen from the attribute's measurement in [Current Network Context]: 'CATEGORICAL' for categorical values (groups, communities), 'LINEAR' for quantitative values (magnitudes), or 'RANKING' (top-N rules on a quantitative value). A discrete attribute (few whole numbers) is CATEGORICAL when its numbers are codes and LINEAR when they are counts; decide from its name and description.")],
     mapping: Annotated[Optional[Dict[str, str]], Field(description="For CATEGORICAL: dict mapping values that actually occur in the named attribute to hex colors, e.g. {\"A\": \"#FF0000\"}. Copy category names exactly from the network data or a previous legend. Omitted categories are filled from the selected named palette.")] = None,
     palette: Annotated[Optional[Literal["accent", "category10", "dark2", "observable10", "paired", "pastel1", "pastel2", "set1", "set2", "set3", "tableau10", "extended20"]], Field(description="For CATEGORICAL: named D3 categorical palette for values omitted from mapping. Omit to choose tableau10 for up to 10 values, paired for 11-12, or extended20 for larger sets.")] = None,
     gradient: Annotated[Optional[List[str]], Field(description="For LINEAR: list of hex strings ordered from low value to high, e.g. [\"#C6DBEF\", \"#6BAED6\", \"#08306B\"].")] = None,
@@ -55,7 +86,8 @@ def visualization_set_node_color(
     passing an empty mapping here does not clear anything.
 
     Returns:
-        dict: The updated visualization object (nodes, links, legend, layout_quality).
+        dict: The updated visualization object (nodes, links, legend, layout_quality),
+            plus `encoding_note` when the scale does not fit the attribute's measurement.
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
@@ -80,6 +112,7 @@ def visualization_set_node_color(
             node_color_config=config,
             with_quality=True,
         )
+        _add_encoding_note(db, vis_data, network_id, attribute, "node", "color")
         vis_data["network_id"] = network_id
         return vis_data
 
@@ -88,7 +121,7 @@ def visualization_set_node_color(
 @handle_tool_errors
 def visualization_set_node_size(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    attribute: Annotated[str, Field(description="Node attribute name to use for sizing (e.g., 'degree_centrality', 'pagerank'). Calculate first if needed.")],
+    attribute: Annotated[str, Field(description="Node attribute name to use for sizing (e.g., 'degree_centrality', 'pagerank'). Size implies 'more', so use a quantitative attribute (or a discrete one holding counts), never a categorical one. Calculate first if needed.")],
     min_size: Annotated[Optional[float], Field(description="Minimum node size (area-proportional; rendered radius = sqrt(size * 10 / π)). Leave as None for adaptive auto-sizing (recommended).")] = None,
     max_size: Annotated[Optional[float], Field(description="Maximum node size (area-proportional; rendered radius = sqrt(size * 10 / π)). Leave as None for adaptive auto-sizing (recommended).")] = None,
     default_size: Annotated[Optional[float], Field(description="Default node size (area-proportional; rendered radius = sqrt(size * 10 / π)) for nodes with missing attribute values.")] = None,
@@ -109,7 +142,8 @@ def visualization_set_node_size(
     roughly quadruple the size or max_size value (~4x area).
 
     Returns:
-        dict: The updated visualization object (nodes, links, legend, layout_quality).
+        dict: The updated visualization object (nodes, links, legend, layout_quality),
+            plus `encoding_note` when the attribute has no numeric order (categorical, identifier, text).
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
@@ -131,6 +165,7 @@ def visualization_set_node_size(
             node_size_config=config,
             with_quality=True,
         )
+        _add_encoding_note(db, vis_data, network_id, attribute, "node", "size")
         vis_data["network_id"] = network_id
         return vis_data
 
@@ -207,7 +242,7 @@ def visualization_set_node_labels(
 def visualization_set_edge_color(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     attribute: Annotated[Optional[str], Field(description="Edge attribute name to use for coloring (e.g., 'weight', 'type'). Omit to draw every edge in default_color.")] = None,
-    scale_type: Annotated[str, Field(description="Color scale type: 'CATEGORICAL' (for text/discrete values) or 'LINEAR' (for numeric ranges).")] = "LINEAR",
+    scale_type: Annotated[str, Field(description="Color scale type, chosen from the attribute's measurement: 'CATEGORICAL' for categorical values (edge types, groups) or 'LINEAR' for quantitative values (magnitudes such as weight).")] = "LINEAR",
     mapping: Annotated[Optional[Dict[str, str]], Field(description="For CATEGORICAL: dict mapping attribute values to hex colors.")] = None,
     gradient: Annotated[Optional[List[str]], Field(description="For LINEAR: list of [start_color, end_color] hex strings.")] = None,
     default_color: Annotated[Optional[str], Field(description="Color of every edge when attribute is omitted, and of edges missing the attribute's value. Defaults to grey.")] = None,
@@ -226,7 +261,8 @@ def visualization_set_edge_color(
     To return edges to the default, use `visualization_reset_style(targets=['edge_color'])`.
 
     Returns:
-        dict: The updated visualization object (nodes, links, legend, layout_quality).
+        dict: The updated visualization object (nodes, links, legend, layout_quality),
+            plus `encoding_note` when the scale does not fit the attribute's measurement.
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
@@ -249,6 +285,7 @@ def visualization_set_edge_color(
             edge_color_config=config,
             with_quality=True,
         )
+        _add_encoding_note(db, vis_data, network_id, attribute, "edge", "color")
         vis_data["network_id"] = network_id
         return vis_data
 
@@ -257,7 +294,7 @@ def visualization_set_edge_color(
 @handle_tool_errors
 def visualization_set_edge_width(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    attribute: Annotated[Optional[str], Field(description="Edge attribute name to use for width (e.g., 'weight'). Omit to draw every edge at default_width.")] = None,
+    attribute: Annotated[Optional[str], Field(description="Edge attribute name to use for width (e.g., 'weight'). Width implies 'more', so use a quantitative attribute. Omit to draw every edge at default_width.")] = None,
     min_width: Annotated[Optional[float], Field(description="Minimum edge width in pixels. Defaults to adaptive.")] = None,
     max_width: Annotated[Optional[float], Field(description="Maximum edge width in pixels. Defaults to adaptive.")] = None,
     default_width: Annotated[Optional[float], Field(gt=0, description="Width in pixels of every edge when attribute is omitted, and of edges missing the attribute's value. Defaults to adaptive.")] = None,
@@ -274,7 +311,8 @@ def visualization_set_edge_width(
     To return widths to the default, use `visualization_reset_style(targets=['edge_width'])`.
 
     Returns:
-        dict: The updated visualization object (nodes, links, legend, layout_quality).
+        dict: The updated visualization object (nodes, links, legend, layout_quality),
+            plus `encoding_note` when the attribute has no numeric order (categorical, identifier, text).
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
@@ -295,5 +333,6 @@ def visualization_set_edge_width(
             edge_width_config=config,
             with_quality=True,
         )
+        _add_encoding_note(db, vis_data, network_id, attribute, "edge", "width")
         vis_data["network_id"] = network_id
         return vis_data

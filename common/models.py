@@ -204,6 +204,14 @@ class NodeAttribute(Base):
     graph_state_hash = Column(String, nullable=True)
     computed_at = Column(DateTime(timezone=True), nullable=True)
 
+    # What the attribute means, beyond which value table holds it. See
+    # networkx-api/app/logic/attribute_semantics.py for the vocabularies.
+    # role: data | metric | community | coordinate
+    role = Column(String, nullable=False, default="data", server_default="data")
+    # measurement: categorical | discrete | quantitative | identifier | text.
+    # Exact for derived attributes, inferred from the values for imported ones.
+    measurement = Column(String, nullable=True)
+
     network = relationship("Network", back_populates="node_attributes")
     values = relationship("NodeAttributeValue", back_populates="attribute", cascade="all, delete-orphan")
 
@@ -283,6 +291,14 @@ class EdgeAttribute(Base):
     computation_params = Column(JSON, nullable=True)
     graph_state_hash = Column(String, nullable=True)
     computed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # What the attribute means, beyond which value table holds it. See
+    # networkx-api/app/logic/attribute_semantics.py for the vocabularies.
+    # role: data | metric | community | coordinate
+    role = Column(String, nullable=False, default="data", server_default="data")
+    # measurement: categorical | discrete | quantitative | identifier | text.
+    # Exact for derived attributes, inferred from the values for imported ones.
+    measurement = Column(String, nullable=True)
 
     network = relationship("Network", back_populates="edge_attributes")
     values = relationship("EdgeAttributeValue", back_populates="attribute", cascade="all, delete-orphan")
