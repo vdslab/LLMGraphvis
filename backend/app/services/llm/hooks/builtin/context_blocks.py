@@ -32,8 +32,16 @@ def inject_skill_suggestions(ctx: HookContext) -> None:
     """
     from ...skills import registry as skill_registry
 
+    current_layout = _current_layout(ctx)
+    # Recorded for the turn trace (ADR 0032): suggested vs. actually loaded.
+    ctx.turn_state["skills_suggested"] = [
+        skill.name
+        for skill in skill_registry.suggestions(
+            ctx.user_text, current_layout=current_layout
+        )
+    ]
     block = skill_registry.suggestion_block(
-        ctx.user_text, current_layout=_current_layout(ctx)
+        ctx.user_text, current_layout=current_layout
     )
     if block:
         ctx.add_context(block)

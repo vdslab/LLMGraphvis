@@ -133,6 +133,17 @@ class SkillRegistry:
                 return skill
         return None
 
+    def suggestions(
+        self, text: str, limit: int = 3, current_layout: Optional[str] = None
+    ) -> List[Skill]:
+        """`suggest`, plus the on-screen layout's skill when `layout` matches."""
+        matches = self.suggest(text, limit=limit)
+        if any(s.name == "layout" for s in matches):
+            extra = self.layout_skill_for(current_layout)
+            if extra is not None and extra not in matches:
+                matches.append(extra)
+        return matches
+
     def suggestion_block(
         self, text: str, limit: int = 3, current_layout: Optional[str] = None
     ) -> str:
@@ -142,11 +153,7 @@ class SkillRegistry:
         (the algorithm on screen) is added: a request like "spread it out"
         names no algorithm, so its own triggers would never match it.
         """
-        matches = self.suggest(text, limit=limit)
-        if any(s.name == "layout" for s in matches):
-            extra = self.layout_skill_for(current_layout)
-            if extra is not None and extra not in matches:
-                matches.append(extra)
+        matches = self.suggestions(text, limit=limit, current_layout=current_layout)
         if not matches:
             return ""
         names = ", ".join(f"`{s.name}`" for s in matches)

@@ -26,6 +26,7 @@ from .providers.types import (
     UsageData,
 )
 from .tool_catalog import ToolCatalog, exposure_mode, tool_definition_bytes
+from .trace import NULL_TRACE, TurnTrace, clip, clip_value
 
 logger = get_logger(__name__)
 load_dotenv()
@@ -148,6 +149,9 @@ class GraphVisAgent:
         self.provider_name = resolve_provider_name(provider_name)
         self.provider = _create_provider(self.provider_name, model_name)
         self.turn_usage = TurnUsage()
+        # Replaced per turn by process_turn(); a no-op when the loop is driven
+        # directly (tests, execute_tool_loop).
+        self.trace: TurnTrace = NULL_TRACE
         # Full system prompt for this turn. process_turn() appends the network
         # context summary so it is always present regardless of the user prompt.
         # The thinking protocol variant is chosen per the active provider/model's
@@ -235,6 +239,18 @@ class GraphVisAgent:
         sections.extend(hook_blocks)
         self.system_instruction = "\n\n---\n\n".join(sections)
 
+        self.trace = TurnTrace(chat_id=chat_id, network_id=network_id)
+        self.trace.emit(
+            "turn_start",
+            provider=self.provider_name,
+            model=self.provider.model_name,
+            user_text=clip(user_text),
+            resumed_from_input=resumed_from_input,
+            skills_suggested=list(turn_state.get("skills_suggested") or []),
+            system_prompt_chars=len(self.system_instruction),
+            hook_blocks=len(hook_blocks),
+        )
+
         # 1. Prepare Tools
         tool_catalog = ToolCatalog(await self._get_all_tools())
         # An answered question resumes the same task, so this turn starts from
@@ -262,17 +278,22 @@ class GraphVisAgent:
         )
 
         # 3. Enter Tool Execution Loop within Session Scope
-        async with mcp_client.session_scope() as session:
-            final_text, execution_log, total_usage = await self._execute_tool_loop(
-                initial_stream=initial_stream,
-                history=history,
-                all_tools=tool_catalog,
-                queue=queue,
-                chat_id=chat_id,
-                network_id=network_id,
-                session=session,
-                turn_state=turn_state,
-            )
+        try:
+            async with mcp_client.session_scope() as session:
+                final_text, execution_log, total_usage = await self._execute_tool_loop(
+                    initial_stream=initial_stream,
+                    history=history,
+                    all_tools=tool_catalog,
+                    queue=queue,
+                    chat_id=chat_id,
+                    network_id=network_id,
+                    session=session,
+                    turn_state=turn_state,
+                )
+        except Exception as exc:
+            self._trace_turn_end(turn_state, self.turn_usage, error=str(exc))
+            raise
+        self._trace_turn_end(turn_state, total_usage, final_text=final_text)
 
         end_ctx = hooks.build_context(
             hooks.HookEvent.TURN_END,
@@ -329,6 +350,15 @@ class GraphVisAgent:
                 current_stream, queue
             )
             chunk_text = markup.sanitize_model_text(chunk_text)
+            self.trace.emit(
+                "model_response",
+                iteration=iteration,
+                text=clip(markup.visible_text(chunk_text) if chunk_text else ""),
+                thought_chars=len(chunk_thought or ""),
+                tool_calls=[call.name for call in function_calls],
+                input_tokens=iter_usage.input_tokens,
+                output_tokens=iter_usage.output_tokens,
+            )
 
             # Iterations are separate generate() calls, each billed for its own full
             # input context, so every count is SUMMED across iterations.
@@ -366,6 +396,12 @@ class GraphVisAgent:
                     )
                     logger.info(
                         f"Continuation requested by {continuation.get('requested_by')}; regenerating"
+                    )
+                    self.trace.emit(
+                        "continuation",
+                        iteration=iteration,
+                        requested_by=continuation.get("requested_by"),
+                        prompt=clip(continuation.get("prompt")),
                     )
                     history.append(LLMMessage(
                         role="model",
@@ -562,6 +598,25 @@ class GraphVisAgent:
             call_record["error"] = error_msg
             call_record["started_at"] = started_at
             call_record["completed_at"] = completed_at
+            decision = turn_state.pop("_last_decision", None) or {}
+            self.trace.emit(
+                "tool",
+                iteration=turn_state.get("iteration"),
+                name=feature_name,
+                args=clip_value(call.args),
+                effective_args=clip_value(decision.get("effective_args")),
+                status=status,
+                decision=decision.get("action", "allow"),
+                decided_by=decision.get("hook_name"),
+                reason=clip(decision.get("reason")),
+                error=clip(error_msg),
+                duration_ms=(
+                    int((completed_at - started_at).total_seconds() * 1000)
+                    if started_at and completed_at
+                    else None
+                ),
+                result=clip_value(truncated_result),
+            )
 
         tool_parts = [tool_parts_by_call[id(call)] for call in model_function_calls]
 
@@ -632,6 +687,12 @@ class GraphVisAgent:
             turn_state=turn_state,
         )
 
+        # Read back by the caller for the trace; not shared with any hook.
+        turn_state["_last_decision"] = {
+            "action": decision.action,
+            "hook_name": decision.hook_name,
+            "reason": decision.reason,
+        }
         if decision.action in {"deny", "defer"}:
             # The decision is handed back as a tool result so the model reads
             # the reason and can correct itself next iteration.
@@ -673,6 +734,7 @@ class GraphVisAgent:
             turn_state["tools_modified"] = turn_state.get("tools_modified", 0) + 1
             effective_args = decision.args
             modification_note = decision.reason
+            turn_state["_last_decision"]["effective_args"] = effective_args
 
         result, status, error_msg = await self._run_tool(
             feature_name, effective_args, chat_id, session, turn_state, queue=queue
@@ -754,7 +816,44 @@ class GraphVisAgent:
             definition_bytes,
             turn_state.get("tool_searches", 0),
         )
+        self.trace.emit(
+            "generation",
+            iteration=iteration,
+            exposure_mode=exposure_mode(),
+            tools=sorted(tool.name for tool in tools),
+            definition_bytes=definition_bytes,
+        )
         return tools
+
+    def _trace_turn_end(
+        self,
+        turn_state: Dict[str, Any],
+        usage: UsageData,
+        final_text: Optional[str] = None,
+        error: Optional[str] = None,
+    ) -> None:
+        keys = (
+            "iteration", "max_iterations", "tools_run", "preparation_tools_run",
+            "tool_searches", "tools_blocked", "tools_deferred", "tools_modified",
+            "tools_failed", "hook_errors", "continuations_granted", "should_abort",
+            "abort_reason",
+        )
+        self.trace.emit(
+            "turn_end",
+            **{key: turn_state.get(key) for key in keys},
+            skills_suggested=list(turn_state.get("skills_suggested") or []),
+            skills_loaded=list(turn_state.get("skills_loaded") or []),
+            asked_user=bool(turn_state.get("input_request")),
+            final_network_id=turn_state.get("network_id"),
+            final_text=clip(markup.visible_text(final_text) if final_text else None),
+            error=clip(error),
+            usage={
+                "input_tokens": usage.input_tokens,
+                "output_tokens": usage.output_tokens,
+                "cached_input_tokens": usage.cached_input_tokens,
+                "reasoning_tokens": usage.reasoning_tokens,
+            },
+        )
 
     # Emission is shared with the hooks (which have a queue but no agent
     # instance), so the event shapes live in emitters.py. These stay as methods
