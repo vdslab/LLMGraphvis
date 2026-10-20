@@ -1,7 +1,7 @@
 ---
 name: view-navigation
 description: Focusing on nodes, showing a route or a neighbourhood, and zooming the view — without extracting a subgraph. Load before any "focus on / show the path / zoom in / zoom out" request.
-triggers: [focus, フォーカス, 注目, 着目, 注視, 強調, highlight, ハイライト, 目立たせ, 浮き上が, 薄く, dim, zoom, ズーム, 拡大, 縮小, 寄って, 寄せ, 近づ, 引いて, 引きで, 全体を表示, 全体表示, 全体が見え, 全体を見, 元に戻, 画面に収め, zoom out, show everything, show the whole, fit to screen, 経路を表示, パスを表示, 経路を見, ルート, route, show the path, 近傍, 隣接, 周り, 周辺, neighborhood, neighbourhood, neighbors]
+triggers: [focus, フォーカス, 注目, 着目, 注視, 強調, highlight, ハイライト, 目立たせ, 浮き上が, 薄く, dim, zoom, ズーム, 拡大, 縮小, 寄って, 寄せ, 近づ, 引いて, 引きで, 全体を表示, 全体表示, 全体が見え, 見えるように戻, 表示を戻, ズームを戻, 元の表示, 全体を見, 元に戻, 画面に収め, zoom out, show everything, show the whole, fit to screen, 経路を表示, パスを表示, 経路を見, ルート, route, show the path, 近傍, 隣接, 周り, 周辺, neighborhood, neighbourhood, neighbors]
 related_tools: [node_search, visualization_highlight, visualization_set_viewport, visualization_reset_style, visualization_set_node_labels, analysis_shortest_path, analysis_k_shortest_paths, node_get_neighbors, node_common_neighbors, visualization_get_state]
 ---
 

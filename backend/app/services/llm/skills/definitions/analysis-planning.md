@@ -1,7 +1,7 @@
 ---
 name: analysis-planning
 description: How to propose analysis and visualization goals from the imported data meaning, descriptions, and existing attributes before considering computed metrics. Load this for "analyze this network" style requests, or before computing a metric or community structure.
-triggers: [visualization, possibilities, 分布, distribution, 比較, compare, 違い, 偏り, つながり方, 可視化, 何ができる, どんな, analyze, analyse, 分析, 特徴, 傾向, 構造, structure, important, 重要, influential, 中心, community, コミュニティ, クラスタ, cluster, group, グループ, centrality, 中心性, metric, 指標, attribute, 属性, 影響力, influence, 人気, popular, まとめ役, リーダー, leader, key player, 何がわか, 何が分か, 全体像, overview, どこから, where to start, 主要]
+triggers: [visualization, possibilities, 分布, distribution, 比較, compare, 違い, 偏り, つながり方, 可視化, 何ができる, analyze, analyse, 特徴, 傾向, 構造, structure, important, influential, 中心, community, コミュニティ, クラスタ, cluster, group, centrality, 中心性, metric, 指標, attribute, 属性, 影響力, influence, 人気, popular, まとめ役, リーダー, leader, key player, 重要人物, 何がわか, 何が分か, 全体像, overview, どこから, where to start, 主要]
 related_tools: [network_list_node_attributes, visualization_set_node_color, visualization_set_node_size, visualization_set_node_labels, network_list_edge_attributes, analysis_louvain_communities, analysis_greedy_modularity_communities, analysis_label_propagation_communities, ask_user, analysis_degree_centrality, analysis_pagerank, analysis_betweenness_centrality, node_get_top_ranked, analysis_core_number, analysis_triangles, analysis_transitivity, analysis_edge_betweenness, analysis_modularity, analysis_attribute_distribution, analysis_group_connectivity, node_compare, node_get_details, node_filter, offer_parameter_tuning, analysis_connected_components]
 ---
 
