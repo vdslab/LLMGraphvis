@@ -95,6 +95,13 @@ ACTIVATION_NOTE = (
     "Activated tools are callable in later responses of this turn and after "
     "ask_user answers, but not in this same response."
 )
+NO_MATCH_NOTE = (
+    "No tool matched this query, which does not mean the capability is missing: "
+    "a guessed tool name usually does not exist. Before telling the user something "
+    "cannot be done, search again by domain prefix (network_, node_, analysis_, "
+    "subgraph_, layout_, visualization_) or by a plain capability word, and check "
+    "similar_names."
+)
 
 
 async def skill_load(name: str, turn_state: dict) -> dict:
@@ -156,7 +163,7 @@ async def tool_search(query: str, limit: int, offset: int, turn_state: dict) -> 
     page = matches[offset : offset + limit]
     activated, _missing = catalog.activate((tool.name for tool in page), turn_state)
     turn_state["tool_searches"] = turn_state.get("tool_searches", 0) + 1
-    return {
+    result = {
         "query": query,
         "results": [
             {
@@ -173,6 +180,10 @@ async def tool_search(query: str, limit: int, offset: int, turn_state: dict) -> 
         "has_more": offset + len(page) < len(matches),
         "activation_note": ACTIVATION_NOTE,
     }
+    if not matches:
+        result["similar_names"] = catalog.similar_names(query)
+        result["note"] = NO_MATCH_NOTE
+    return result
 
 
 def _short_description(description: str, limit: int = 220) -> str:

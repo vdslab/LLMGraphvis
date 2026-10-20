@@ -127,6 +127,42 @@ def test_search_uses_japanese_skill_metadata():
     ]
 
 
+def test_guessed_tool_name_retries_on_its_words():
+    """'node_list_attributes' does not exist; its words name a tool that does."""
+    catalog = ToolCatalog(
+        [
+            tool("network_list_node_attributes", "List node attributes"),
+            tool("node_get_top_ranked", "Top nodes by attribute"),
+            tool("layout_circular", "Circle"),
+        ]
+    )
+    names = [item.name for item in catalog.search("node_list_attributes")]
+    assert names[0] == "network_list_node_attributes"
+
+
+@pytest.mark.asyncio
+async def test_zero_result_search_tells_the_model_to_keep_looking(monkeypatch):
+    monkeypatch.delenv("TOOL_EXPOSURE_MODE", raising=False)
+    catalog = ToolCatalog(
+        [
+            tool("node_get_top_ranked", "Top nodes"),
+            tool("skill_load"),
+            tool("tool_search"),
+            tool("ask_user"),
+        ]
+    )
+    state = {}
+    catalog.initialize_turn(state)
+    result = await local_tools.tool_search("node_get_top", 5, 0, state)
+    assert result["total"] == 1
+    assert "note" not in result
+
+    result = await local_tools.tool_search("nodetopranked", 5, 0, state)
+    assert result["total"] == 0
+    assert "node_get_top_ranked" in result["similar_names"]
+    assert "domain prefix" in result["note"]
+
+
 @pytest.mark.asyncio
 async def test_tool_search_paginates_and_activates_results(monkeypatch):
     monkeypatch.delenv("TOOL_EXPOSURE_MODE", raising=False)

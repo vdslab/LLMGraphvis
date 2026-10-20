@@ -85,6 +85,26 @@ class ToolCatalog:
         if not normalized:
             return []
         terms = [term for term in re.split(r"[\s,、]+", normalized) if term]
+        matches = self._rank(normalized, terms)
+        if not matches and "_" in normalized:
+            # A guessed tool name ("node_list_attributes") is one term that no
+            # real name contains. Its words still point at the right tools
+            # (network_list_node_attributes), so retry on them rather than
+            # report a capability as missing.
+            words = [word for word in re.split(r"[\s,、_]+", normalized) if word]
+            if len(words) > 1:
+                matches = self._rank(normalized, words)
+        return matches
+
+    def similar_names(self, query: str, limit: int = 5) -> list[str]:
+        """Closest real tool names to `query`, for a search that found nothing."""
+        import difflib
+
+        normalized = query.strip().lower().replace("-", "_").replace(" ", "_")
+        candidates = [name for name in self._by_name if name not in DEPRECATED_TOOL_NAMES]
+        return difflib.get_close_matches(normalized, candidates, n=limit, cutoff=0.5)
+
+    def _rank(self, normalized: str, terms: list[str]) -> list[ToolDefinition]:
         skill_text = self._skill_search_text()
         matches: list[SearchResult] = []
 
