@@ -206,3 +206,28 @@ describe('chatStore sample networks', () => {
     expect(state().isLoading).toBe(false);
   });
 });
+
+describe('chatStore finalizing a turn', () => {
+  beforeEach(() => {
+    useChatStore.setState({
+      messages: [{ id: 1, role: 'user', content: 'hi' }],
+      isLoading: true,
+      streamingMessageId: null,
+    });
+  });
+
+  it('shows a reply that arrives without any streamed chunk', () => {
+    state().endTurn(); // agent_error ends the turn before message_complete
+    state().finalizeStreamingMessage(42, 'I encountered an error: boom', []);
+
+    expect(state().messages.at(-1)).toMatchObject({ id: 42, content: 'I encountered an error: boom' });
+    expect(state().isLoading).toBe(false);
+  });
+
+  it('does not add the reply twice', () => {
+    state().finalizeStreamingMessage(42, 'answer', []);
+    state().finalizeStreamingMessage(42, 'answer', []);
+
+    expect(state().messages.filter((m) => m.id === 42)).toHaveLength(1);
+  });
+});

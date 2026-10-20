@@ -477,6 +477,16 @@ export const useChatStore = create((set, get) => ({
         if (tool_executions) {
             messages[idx].tool_executions = tool_executions;
         }
+      } else if (realId && content && !messages.some(m => m.id === realId)) {
+        // Nothing streamed (e.g. the model failed before its first chunk):
+        // the stored reply arrives only here, so add it.
+        messages.push({
+          id: realId,
+          role: 'assistant',
+          content,
+          created_at: new Date().toISOString(),
+          tool_executions: tool_executions || [],
+        });
       }
       return { messages };
     });
