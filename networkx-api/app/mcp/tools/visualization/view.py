@@ -55,7 +55,9 @@ def visualization_highlight(
             )
             vis_data["view"] = (
                 "The view now frames the highlighted nodes; "
-                "no visualization_set_viewport call is needed."
+                "no visualization_set_viewport call is needed. To show the whole "
+                "network again later, call visualization_set_viewport(target='all'); "
+                "visualization_reset_style does not touch the zoom."
             )
         return vis_data
 

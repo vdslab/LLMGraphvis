@@ -97,7 +97,7 @@ def visualization_apply_layout(
 @handle_tool_errors
 def visualization_reset_style(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    targets: Annotated[List[str], Field(description="Which visual channels to return to their default. Any of: 'node_color', 'node_size', 'node_label', 'edge_color', 'edge_width', 'highlight'. Pass several to reset several at once; pass only the ones you mean, since the rest are preserved.")]
+    targets: Annotated[List[str], Field(description="Which visual channels to return to their default. Any of: 'node_color', 'node_size', 'node_label', 'edge_color', 'edge_width', 'highlight'. Pass several to reset several at once; pass only the ones you mean, since the rest are preserved. The zoom is not a channel: reset it with visualization_set_viewport(target='all').")]
 ) -> dict:
     """
     Returns one or more visual channels to their default (uniform) appearance.
@@ -105,6 +105,10 @@ def visualization_reset_style(
     This is the ONLY way to un-set a style. The `visualization_set_*` tools deliberately
     preserve any channel you do not pass, which means there is no value you can pass them
     to clear one — an omitted or empty argument reads as "keep what is there".
+
+    The zoom (viewport) is not a style and this tool never moves it. To show the whole
+    network again after a zoom or a `zoom_to` highlight, call
+    `visualization_set_viewport(target='all')`.
 
     The main use is after filtering a subgraph down to a single value of the attribute that
     color encodes: every remaining node then has the same color and the legend is
