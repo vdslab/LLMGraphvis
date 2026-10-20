@@ -122,4 +122,9 @@ def visualization_set_viewport(
         )
         vis_data["network_id"] = network_id
         vis_data["viewport"] = directive
+        framed = "the whole network" if target == "all" else "the requested nodes"
+        vis_data["view"] = (
+            f"The view now shows {framed}; no further visualization_set_viewport "
+            "call is needed."
+        )
         return vis_data

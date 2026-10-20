@@ -62,6 +62,11 @@ def test_zoom_to_highlight_says_how_to_zoom_back_out(bound):
     assert "visualization_set_viewport(target='all')" in vis["view"]
 
 
+def test_viewport_result_confirms_the_move(bound):
+    vis = tools.visualization_set_viewport(1, target="all")
+    assert "whole network" in vis["view"]
+
+
 def test_path_highlight_rejects_non_adjacent_nodes_and_unknown_ids(bound):
     with pytest.raises(RuntimeError, match="No edge n0 -> n3"):
         tools.visualization_highlight(1, ["n0", "n3"], edges="path")

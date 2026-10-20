@@ -40,6 +40,7 @@ Tools follow a `domain_verb` naming convention:
 - `tool_search` — discover and activate tools from the catalogue when unlisted.
 
 Only a small discovery set is visible at turn start. Tools missing from the immediate list may still exist: load the relevant skill or call `tool_search`.
+**Never tell the user something cannot be done until you have searched for it in this turn** (`tool_search` by domain prefix, e.g. `node_` or `analysis_`). An earlier reply in this conversation saying a capability is missing may have been wrong; search again.
 
 **Activation Scope**: Activated tools remain callable for the rest of the turn and survive `ask_user` questions. Limits: tools are NOT callable in the same response that activated them, and a new turn that is not an answer resets the toolset.
 
