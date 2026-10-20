@@ -86,10 +86,65 @@ def visible_text(text: str) -> str:
     return _MODEL_AUTHORED_TOOL_MARKER.sub("", without_thoughts).strip()
 
 
+# Gemini sometimes writes a function call in its code-execution text format
+# instead of calling it: a `tool_code` block (as a fence, or a `::tool_code`
+# line copied from our `::tool-execution` markers) of `print(default_api.f(...))`
+# lines. Text is never executed, so such a block only misleads the reader.
+_TEXTUAL_TOOL_CALL_FENCE = re.compile(
+    r"(?ms)^[ \t]*```[ \t]*tool[_-]code[ \t]*\n.*?(?:^[ \t]*```[ \t]*(?:\n|\Z)|\Z)",
+    re.IGNORECASE,
+)
+# A line that is only `tool_code`; the block runs until the first blank line.
+_TEXTUAL_TOOL_CALL_BLOCK = re.compile(
+    r"(?m)^[ \t]*:*[ \t]*tool[_-]code[ \t]*(?:\n|\Z)(?:[ \t]*\S[^\n]*(?:\n|\Z))*",
+    re.IGNORECASE,
+)
+_TEXTUAL_TOOL_CALL_LINE = re.compile(
+    r"(?m)^[ \t]*(?:print\(\s*)?default_api\.\w+\([^\n]*(?:\n|\Z)"
+)
+_TEXTUAL_TOOL_CALL_NAME = re.compile(r"default_api\.(\w+)\(")
+
+
+def split_textual_tool_calls(text: str) -> tuple[str, list[str]]:
+    """Remove tool calls written as text; return the rest and the tools named.
+
+    The names are in order of appearance, repeats kept. A block that names no
+    tool is still removed: `tool_code` is never prose meant for the user.
+    """
+    names: list[str] = []
+
+    def remove(match: re.Match) -> str:
+        names.extend(_TEXTUAL_TOOL_CALL_NAME.findall(match.group(0)))
+        return ""
+
+    for pattern in (
+        _TEXTUAL_TOOL_CALL_FENCE,
+        _TEXTUAL_TOOL_CALL_BLOCK,
+        _TEXTUAL_TOOL_CALL_LINE,
+    ):
+        text = pattern.sub(remove, text)
+    return text, names
+
+
 def sanitize_model_text(text: str) -> str:
     """Remove engine-owned control markers copied into a model text part."""
     text = _UNSUPPORTED_VISUALIZATION_TAG.sub("", text)
+    text, _names = split_textual_tool_calls(text)
     return _MODEL_AUTHORED_TOOL_MARKER.sub("", text)
+
+
+def history_text(content: str) -> str:
+    """A stored reply as the model should see it in a later turn's history.
+
+    The tool calls of a past turn are replayed as real function-call parts, so
+    the `::tool-execution` markers that place them in the chat panel carry
+    nothing for the model. Left in, a reply made only of markers teaches it to
+    answer with directive lines, which is how `::tool_code` text first appeared.
+    A reply that leaked tool calls as text is cleaned for the same reason.
+    """
+    text = _MODEL_AUTHORED_TOOL_MARKER.sub("", content)
+    text, _names = split_textual_tool_calls(text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 def steps_block(steps: list[str]) -> str:
