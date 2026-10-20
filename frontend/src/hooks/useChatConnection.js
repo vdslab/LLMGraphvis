@@ -100,7 +100,9 @@ export const useChatConnection = (id, isAuthenticated) => {
         system_message: (data) => {
             console.log("System:", data);
         },
-        error: (data) => {
+        // Not named `error`: EventSource also routes a server event of that
+        // name to onerror, which would show a lost connection that never clears.
+        agent_error: (data) => {
             console.error("Backend reported error:", data);
             useChatStore.getState().endTurn();
             // Tokens spent before the failure are stored too.

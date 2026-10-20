@@ -126,7 +126,7 @@ def _name_network_after_file(network_id: int, filename: Optional[str]) -> None:
 async def _handle_background_error(chat_id: int, e: Exception, message: str) -> None:
     logger.exception(f"{message}: {e}")
     queue = await llm_service.get_event_queue(chat_id)
-    await queue.put({"event": "training_error" if "training" in message else "error", "data": json.dumps(str(e))})
+    await queue.put({"event": "training_error" if "training" in message else "agent_error", "data": json.dumps(str(e))})
 
     # If it's a process error, persist to DB
     if "process" in message:

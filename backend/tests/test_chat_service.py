@@ -119,3 +119,21 @@ async def test_handle_upload_background_success(db):
                     if call[0][0]["event"] == "render_update":
                         found_render = True
                 assert found_render
+
+
+@pytest.mark.asyncio
+async def test_process_chat_failure_emits_agent_error(db):
+    """A backend failure must not be sent as an SSE event named `error`:
+    EventSource routes that name to onerror, which shows a lost connection."""
+    import asyncio
+    import json
+    from app.services.llm import service
+
+    queue = asyncio.Queue()
+    with patch.object(service.events, "get_event_queue", AsyncMock(return_value=queue)):
+        text, *_ = await service.process_chat(999999, "hi", db)
+
+    event = queue.get_nowait()
+    assert event["event"] == "agent_error"
+    assert "Chat not found" in json.loads(event["data"])
+    assert text.startswith("I encountered an error")

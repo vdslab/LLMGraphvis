@@ -78,7 +78,7 @@ async def process_chat(
 
     except Exception as e:
         logger.exception(f"Error in process_chat: {e}")
-        await queue.put({"event": "error", "data": json.dumps(str(e))})
+        await queue.put({"event": "agent_error", "data": json.dumps(str(e))})
 
         error_msg = _format_exception_message(e)
         # Tokens spent before the failure were still billed.
