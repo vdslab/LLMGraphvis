@@ -264,7 +264,11 @@ class TestShippedSkills:
             ("AからBへの経路を表示して", "view-navigation", None),
             ("もう少しズームして", "view-navigation", "subgraph-workflow"),
             ("全体が見えるように戻して", "view-navigation", None),
-            ("全体が見えるように戻して、分析をまとめて", "view-navigation", "parameter-tuning"),
+            (
+                "全体が見えるように戻して、分析をまとめて",
+                "view-navigation",
+                "parameter-tuning",
+            ),
             ("引きで見せて", "view-navigation", None),
             ("zoom out and show everything", "view-navigation", None),
             ("ラベルの文字サイズを大きくして", "labels", "visual-encoding"),

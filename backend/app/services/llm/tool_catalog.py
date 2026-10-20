@@ -101,7 +101,9 @@ class ToolCatalog:
         import difflib
 
         normalized = query.strip().lower().replace("-", "_").replace(" ", "_")
-        candidates = [name for name in self._by_name if name not in DEPRECATED_TOOL_NAMES]
+        candidates = [
+            name for name in self._by_name if name not in DEPRECATED_TOOL_NAMES
+        ]
         return difflib.get_close_matches(normalized, candidates, n=limit, cutoff=0.5)
 
     def _rank(self, normalized: str, terms: list[str]) -> list[ToolDefinition]:
