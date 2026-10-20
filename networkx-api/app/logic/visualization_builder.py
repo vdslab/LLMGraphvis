@@ -789,6 +789,8 @@ RESETTABLE_STYLE_TARGETS = {
     "edge_width": "last_edge_width_config",
     "highlight": "last_highlight_config",
 }
+# Names a model reaches for when it means the zoom, which is not a style channel.
+VIEW_TARGET_GUESSES = frozenset({"viewport", "zoom", "view", "camera", "pan"})
 
 
 def reset_style(db: Session, network_id: int, targets: List[str]) -> List[str]:
@@ -807,10 +809,16 @@ def reset_style(db: Session, network_id: int, targets: List[str]) -> List[str]:
 
     unknown = [t for t in targets if t not in RESETTABLE_STYLE_TARGETS]
     if unknown:
-        raise ValueError(
+        message = (
             f"Unknown style target(s): {', '.join(unknown)}. "
             f"Valid targets: {', '.join(sorted(RESETTABLE_STYLE_TARGETS))}."
         )
+        if any(t in VIEW_TARGET_GUESSES for t in unknown):
+            message += (
+                " The zoom is not a style: call "
+                "visualization_set_viewport(target='all') to show the whole network."
+            )
+        raise ValueError(message)
 
     cleared = []
     for target in targets:

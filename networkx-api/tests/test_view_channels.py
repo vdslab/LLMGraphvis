@@ -50,6 +50,18 @@ def test_highlight_persists_through_other_channels_until_reset(bound):
     assert all(n["opacity"] == 1.0 for n in reset["nodes"])
 
 
+def test_resetting_the_zoom_as_a_style_points_to_set_viewport(bound):
+    """The zoom is not a channel; a guessed 'viewport' target must say what is."""
+    hint = r"visualization_set_viewport\(target='all'\)"
+    with pytest.raises(RuntimeError, match=hint):
+        tools.visualization_reset_style(1, ["viewport"])
+
+
+def test_zoom_to_highlight_says_how_to_zoom_back_out(bound):
+    vis = tools.visualization_highlight(1, ["n1", "n2"], zoom_to=True)
+    assert "visualization_set_viewport(target='all')" in vis["view"]
+
+
 def test_path_highlight_rejects_non_adjacent_nodes_and_unknown_ids(bound):
     with pytest.raises(RuntimeError, match="No edge n0 -> n3"):
         tools.visualization_highlight(1, ["n0", "n3"], edges="path")
