@@ -69,6 +69,7 @@ def get_network_structure(db: Session, network_id: int) -> Dict[str, Any]:
     # (see graph_builder.WEIGHT_COLUMN), so this is the only place a reader —
     # including the agent's system-prompt context — can learn that the network
     # is weighted at all.
+    from app.logic import reduction
     from app.logic.utils.graph_builder import summarize_edge_weights
 
     return {
@@ -77,6 +78,10 @@ def get_network_structure(db: Session, network_id: int) -> Dict[str, Any]:
         "density": density,
         "is_directed": network.is_directed,
         "edge_weights": summarize_edge_weights(db=db, network_id=network_id),
+        # The backend reads these rather than keeping its own threshold, so
+        # "large" means one thing everywhere (ADR 0034).
+        "large": reduction.is_large(node_count),
+        "large_threshold_nodes": reduction.large_threshold_nodes(),
     }
 
 

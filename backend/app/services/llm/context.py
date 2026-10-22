@@ -201,12 +201,28 @@ def _format_type(attr: Dict[str, Any]) -> str:
     return f" ({', '.join(parts)})" if parts else ""
 
 
+def is_large(structure: Any) -> bool:
+    """Whether networkx-api marked the network as large (ADR 0034).
+
+    The threshold lives there; the backend only reads the flag.
+    """
+    return not _failed(structure) and bool(structure.get("large"))
+
+
 async def build_context_summary(network_id: int) -> str:
-    """Fetches network stats and attributes to build a context summary string.
+    """The per-turn system-prompt summary; see `build_turn_context`."""
+    summary, _large = await build_turn_context(network_id)
+    return summary
+
+
+async def build_turn_context(network_id: int) -> Tuple[str, bool]:
+    """The network's context summary, and whether the network is large.
 
     This runs on every turn (via the backend, not an LLM tool call) and is
     appended to the system prompt so the agent always knows the network's
-    contents regardless of the user's message.
+    contents regardless of the user's message. The flag comes from the same
+    fetch, so the skill-suggestion hook can act on it without a second round
+    trip.
     """
     try:
         metadata, structure, node_attrs, edge_attrs = await _fetch_network_resources(
@@ -235,7 +251,13 @@ async def build_context_summary(network_id: int) -> str:
         if not _failed(structure):
             n_count = structure.get("node_count", "?")
             e_count = structure.get("edge_count", "?")
-            summary_lines.append(f"Stats: {n_count} Nodes, {e_count} Edges")
+            stats_line = f"Stats: {n_count} Nodes, {e_count} Edges"
+            if is_large(structure):
+                stats_line += (
+                    " (large network: default layouts are cut short and costly "
+                    "analyses are slow; see skill `network-reduction`)"
+                )
+            summary_lines.append(stats_line)
             weight_line = _weight_line(structure)
             if weight_line:
                 summary_lines.append(weight_line)
@@ -275,10 +297,10 @@ async def build_context_summary(network_id: int) -> str:
         format_attrs(node_attrs, "Node Attributes")
         format_attrs(edge_attrs, "Edge Attributes")
 
-        return "\n".join(summary_lines)
+        return "\n".join(summary_lines), is_large(structure)
     except Exception as e:
         logger.error(f"Error building context summary: {e}")
-        return ""
+        return "", False
 
 
 def _overview_title(metadata: Any, structure: Any) -> str:
@@ -353,6 +375,12 @@ async def build_data_overview(network_id: int) -> Tuple[str, str]:
             if isinstance(n_count, int) and isinstance(e_count, int) and n_count:
                 size_line += f" (average degree {2 * e_count / n_count:.1f})"
             lines.append(size_line)
+            if is_large(structure):
+                lines.append(
+                    "- **Large network:** the first layout was shortened to finish "
+                    "quickly, and the drawing is dense. Ask to narrow it down "
+                    "(e.g. \"reduce the network\") to see measured options."
+                )
 
             density = structure.get("density")
             kind = "directed" if structure.get("is_directed") else "undirected"

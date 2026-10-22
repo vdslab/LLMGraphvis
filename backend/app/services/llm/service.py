@@ -49,8 +49,11 @@ async def process_chat(
         # so the agent always knows the current network's contents, regardless
         # of what the user asked.
         context_summary = ""
+        network_large = False
         try:
-            context_summary = await context.build_context_summary(network_id)
+            context_summary, network_large = await context.build_turn_context(
+                network_id
+            )
             if context_summary:
                 logger.info("Injected Context Summary into System Prompt")
         except Exception as e:
@@ -70,6 +73,7 @@ async def process_chat(
             chat_id=chat_id,
             network_id=network_id,
             context_summary=context_summary,
+            network_large=network_large,
             user_text=user_message,
             resumed_from_input=resumed_from_input,
         )

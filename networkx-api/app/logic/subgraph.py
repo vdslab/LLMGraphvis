@@ -416,7 +416,12 @@ def create_largest_component_subgraph(
     logger.info("Creating largest component subgraph")
     G = build_graph_from_db(source_network_id, db)
 
-    components = list(nx.connected_components(G))
+    # Directed graphs have no plain connected components; "connected" here
+    # means connected ignoring direction.
+    if G.is_directed():
+        components = list(nx.weakly_connected_components(G))
+    else:
+        components = list(nx.connected_components(G))
     if not components:
         raise ValueError("Network is empty")
 

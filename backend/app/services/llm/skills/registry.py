@@ -23,6 +23,9 @@ from .loader import Skill, load_skills
 
 logger = get_logger(__name__)
 
+# Suggested on every turn of a large network, whatever the request says.
+REDUCTION_SKILL = "network-reduction"
+
 
 class SkillRegistry:
     def __init__(self, directory: Optional[Path] = None) -> None:
@@ -134,26 +137,49 @@ class SkillRegistry:
         return None
 
     def suggestions(
-        self, text: str, limit: int = 3, current_layout: Optional[str] = None
+        self,
+        text: str,
+        limit: int = 3,
+        current_layout: Optional[str] = None,
+        large_network: bool = False,
     ) -> List[Skill]:
-        """`suggest`, plus the on-screen layout's skill when `layout` matches."""
+        """`suggest`, plus skills the request's words cannot reach.
+
+        The on-screen layout's skill joins when `layout` matches, and
+        `network-reduction` joins whenever the network is large (ADR 0034).
+        """
         matches = self.suggest(text, limit=limit)
         if any(s.name == "layout" for s in matches):
             extra = self.layout_skill_for(current_layout)
             if extra is not None and extra not in matches:
                 matches.append(extra)
+        if large_network:
+            reduction = self.get(REDUCTION_SKILL)
+            if reduction is not None and reduction not in matches:
+                matches.append(reduction)
         return matches
 
     def suggestion_block(
-        self, text: str, limit: int = 3, current_layout: Optional[str] = None
+        self,
+        text: str,
+        limit: int = 3,
+        current_layout: Optional[str] = None,
+        large_network: bool = False,
     ) -> str:
         """Skills to load for `text`.
 
         When the common `layout` skill matches, the skill for `current_layout`
         (the algorithm on screen) is added: a request like "spread it out"
-        names no algorithm, so its own triggers would never match it.
+        names no algorithm, so its own triggers would never match it. On a
+        large network `network-reduction` is added for the same reason: nobody
+        says "my network is large".
         """
-        matches = self.suggestions(text, limit=limit, current_layout=current_layout)
+        matches = self.suggestions(
+            text,
+            limit=limit,
+            current_layout=current_layout,
+            large_network=large_network,
+        )
         if not matches:
             return ""
         names = ", ".join(f"`{s.name}`" for s in matches)

@@ -200,6 +200,7 @@ class GraphVisAgent:
         context_summary: str = "",
         user_text: str = "",
         resumed_from_input: bool = False,
+        network_large: bool = False,
     ) -> Tuple[str, List[Dict[str, Any]], UsageData]:
         """
         Orchestrates a single turn of the agent (User Input -> [Thoughts/Actions] -> Final Response).
@@ -215,6 +216,8 @@ class GraphVisAgent:
         turn_state = hooks.new_turn_state(AGENT_MAX_ITERATIONS)
         turn_state["network_id"] = network_id
         turn_state["resumed_from_input"] = resumed_from_input
+        # From the context fetch; read by inject_skill_suggestions (ADR 0034).
+        turn_state["network_large"] = network_large
 
         # Fix the system prompt for this turn: the network context summary and
         # any hook-contributed blocks are appended once here so every generate()

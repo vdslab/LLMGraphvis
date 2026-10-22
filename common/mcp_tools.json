@@ -421,6 +421,10 @@
  "subgraph_list": [
   "network_id"
  ],
+ "subgraph_suggest_reduction": [
+  "network_id",
+  "target_nodes"
+ ],
  "visualization_apply_layout": [
   "network_id"
  ],

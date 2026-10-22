@@ -336,3 +336,39 @@ async def test_resource_non_json_body_yields_empty_dict():
     session = _FakeSession("not json at all", "text/plain")
 
     assert await mcp_client.get_resource("network://1/structure", session=session) == {}
+
+
+LARGE_STRUCTURE = {
+    "node_count": 3393,
+    "edge_count": 5119,
+    "density": 0.001,
+    "large": True,
+    "large_threshold_nodes": 3163,
+}
+
+
+@pytest.mark.asyncio
+async def test_turn_context_flags_a_large_network():
+    """The flag drives the reduction skill; the threshold stays in networkx-api."""
+    with _patch_resources(structure=LARGE_STRUCTURE):
+        summary, large = await context.build_turn_context(1)
+
+    assert large is True
+    assert "large network" in summary and "network-reduction" in summary
+
+
+@pytest.mark.asyncio
+async def test_turn_context_is_not_large_without_the_flag():
+    with _patch_resources():
+        summary, large = await context.build_turn_context(1)
+
+    assert large is False
+    assert "large network" not in summary
+
+
+@pytest.mark.asyncio
+async def test_overview_tells_the_user_a_large_network_can_be_narrowed():
+    with _patch_resources(structure=LARGE_STRUCTURE):
+        _title, body = await context.build_data_overview(1)
+
+    assert "Large network" in body and "reduce the network" in body

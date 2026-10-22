@@ -476,3 +476,21 @@ class TestLayoutSkills:
 def test_skill_dataclass_index_line():
     skill = Skill(name="a", description="B.", body="x")
     assert skill.index_line() == "- `a` — B."
+
+    def test_a_large_network_brings_the_reduction_skill(self):
+        """Nobody says "my network is large", so its words never match (ADR 0034)."""
+        from app.services.llm.skills.registry import SkillRegistry
+
+        registry = SkillRegistry()
+        assert "`network-reduction`" in registry.suggestion_block(
+            "次数中心性を計算して", large_network=True
+        )
+        assert "network-reduction" not in registry.suggestion_block(
+            "次数中心性を計算して"
+        )
+
+    def test_reduction_skill_matches_a_japanese_complaint(self):
+        from app.services.llm.skills.registry import SkillRegistry
+
+        names = [s.name for s in SkillRegistry().suggest("ノードが多すぎて見づらい")]
+        assert "network-reduction" in names
