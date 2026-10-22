@@ -1,5 +1,5 @@
 import json
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
@@ -308,7 +308,52 @@ async def handle_upload_background(
         await queue.put({"event": "render_update", "data": json.dumps(vis_data)})
 
     except Exception as e:
-        await _handle_background_error(chat_id, e, "Error in upload background task")
+        await _report_upload_failure(chat_id, queue, steps, e)
+
+
+async def _report_upload_failure(
+    chat_id: int, queue: Any, steps: list[str], e: Exception
+) -> None:
+    """Tell the user which upload step failed, and keep it in the chat.
+
+    `_handle_background_error` only persists turn errors, so a failed upload
+    used to stop the spinner and leave nothing on screen or in history.
+    """
+    logger.exception(f"Error in upload background task: {e}")
+    failed_step = steps[-1] if steps else "Upload"
+    content = "\n\n".join(
+        part
+        for part in (
+            markup.steps_block(steps),
+            f"The upload failed during \"{failed_step}\": {e}",
+        )
+        if part
+    )
+
+    db_session = database.SessionLocal()
+    try:
+        db_msg = models.ChatMessage(chat_id=chat_id, role="model", content=content)
+        db_session.add(db_msg)
+        db_session.commit()
+        db_session.refresh(db_msg)
+        # `message` is terminal on the frontend, so this also ends the turn.
+        await queue.put({
+            "event": "message",
+            "data": json.dumps({
+                "id": db_msg.id,
+                "role": "assistant",
+                "content": db_msg.content,
+                "created_at": (
+                    db_msg.created_at.isoformat() if db_msg.created_at else None
+                ),
+            }),
+        })
+    except Exception as inner_e:
+        logger.error(f"Failed to save upload error for chat {chat_id}: {inner_e}")
+        db_session.rollback()
+        await queue.put({"event": "agent_error", "data": json.dumps(str(e))})
+    finally:
+        db_session.close()
 
 
 async def handle_process_background(

@@ -20,7 +20,13 @@ def _events(mock_queue):
     return [call[0][0] for call in mock_queue.put.call_args_list]
 
 
-async def _run_upload(overview=("", ""), *, name_is_custom=True, network_name="New Chat Network"):
+async def _run_upload(
+    overview=("", ""),
+    *,
+    name_is_custom=True,
+    network_name="New Chat Network",
+    exec_side_effect=None,
+):
     with patch(
         "app.services.llm.mcp_client.execute_tool", new_callable=AsyncMock
     ) as mock_exec, patch(
@@ -31,6 +37,7 @@ async def _run_upload(overview=("", ""), *, name_is_custom=True, network_name="N
         "app.core.database.SessionLocal"
     ) as mock_session_cls:
         mock_exec.return_value = {"network_id": 100, "nodes": [], "links": []}
+        mock_exec.side_effect = exec_side_effect
         mock_overview.return_value = overview
         mock_queue = AsyncMock()
         mock_get_queue.return_value = mock_queue
@@ -127,3 +134,21 @@ async def test_upload_leaves_a_real_network_name_alone():
     _, _, network = await _run_upload(network_name="Concert co-performance")
 
     assert network.name == "Concert co-performance"
+
+
+@pytest.mark.asyncio
+async def test_a_failed_step_is_saved_with_its_name_and_error():
+    """A failed upload used to stop the spinner and leave nothing behind, so
+    the user could not tell a stall from a broken file."""
+    from app.services.llm.mcp_client import ToolTimeoutError
+
+    events, content, _ = await _run_upload(
+        exec_side_effect=ToolTimeoutError("network_import_graphml", 600)
+    )
+
+    assert ":::steps" in content
+    assert 'failed during "Importing GraphML data"' in content
+    assert "did not respond within 600 seconds" in content
+    # `message` is terminal on the frontend: it ends the turn.
+    assert events[-1]["event"] == "message"
+    assert not [e for e in events if e["event"] == "render_update"]

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import time
@@ -25,6 +26,28 @@ _tools_cache_at = 0.0
 # development and a silent source of "tool not found" in production after a
 # one-sided deploy. 0 disables expiry.
 TOOLS_CACHE_TTL_SECONDS = float(os.getenv("MCP_TOOLS_CACHE_TTL") or 300)
+
+# Seconds to open an MCP session (connect and `initialize`). Short: a healthy
+# server answers in well under a second.
+CONNECT_TIMEOUT_SECONDS = float(os.getenv("MCP_CONNECT_TIMEOUT") or 15)
+
+# Seconds a whole tool call may take, session setup included. Without a bound, a
+# session that stalled after `initialize` left the upload spinner turning
+# forever with nothing in any log. It must stay above the slowest legitimate
+# call (a large layout requested from chat), so it is generous.
+CALL_TIMEOUT_SECONDS = float(os.getenv("MCP_CALL_TIMEOUT") or 600)
+
+
+class ToolTimeoutError(RuntimeError):
+    """A tool call that did not finish within CALL_TIMEOUT_SECONDS."""
+
+    def __init__(self, tool_name: str, seconds: float):
+        super().__init__(
+            f"Tool '{tool_name}' did not respond within {seconds:g} seconds. "
+            "The connection to the analysis server may have stalled; try again."
+        )
+        self.tool_name = tool_name
+        self.seconds = seconds
 
 
 def invalidate_tools_cache() -> None:
@@ -215,9 +238,13 @@ async def session_scope():
              await session.call_tool(...)
     """
     try:
-        async with sse_client(SSE_ENDPOINT) as (read, write):
+        async with sse_client(SSE_ENDPOINT, timeout=CONNECT_TIMEOUT_SECONDS) as (
+            read,
+            write,
+        ):
             async with ClientSession(read, write) as session:
-                await session.initialize()
+                async with asyncio.timeout(CONNECT_TIMEOUT_SECONDS):
+                    await session.initialize()
                 yield session
     except Exception as e:
         _log_exception_details(e, "MCP Session connection")
@@ -245,12 +272,20 @@ async def execute_tool(tool_name: str, arguments: dict, session: ClientSession =
         f"Executing tool: {tool_name} with arguments: {_truncate_args_for_log(arguments)}"
     )
 
-    if session:
-        return await _execute_internal(session, tool_name, arguments)
-    
-    # Transient session
-    async with session_scope() as new_session:
-        return await _execute_internal(new_session, tool_name, arguments)
+    try:
+        async with asyncio.timeout(CALL_TIMEOUT_SECONDS):
+            if session:
+                return await _execute_internal(session, tool_name, arguments)
+
+            # Transient session
+            async with session_scope() as new_session:
+                return await _execute_internal(new_session, tool_name, arguments)
+    except TimeoutError as e:
+        logger.error(
+            f"Tool {tool_name} timed out after {CALL_TIMEOUT_SECONDS:g}s "
+            f"(args {_truncate_args_for_log(arguments)})"
+        )
+        raise ToolTimeoutError(tool_name, CALL_TIMEOUT_SECONDS) from e
 
 async def _execute_internal(session: ClientSession, tool_name: str, arguments: dict):
     try:

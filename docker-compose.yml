@@ -48,6 +48,8 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - POSTGRES_DB=${POSTGRES_DB:-graphvis}
       - NETWORKX_API_URL=http://networkx-api:8001
+      - MCP_CONNECT_TIMEOUT=${MCP_CONNECT_TIMEOUT:-}
+      - MCP_CALL_TIMEOUT=${MCP_CALL_TIMEOUT:-}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - LLM_PROVIDER=${LLM_PROVIDER:-google}
       - GEMINI_MODEL=${GEMINI_MODEL:-}
