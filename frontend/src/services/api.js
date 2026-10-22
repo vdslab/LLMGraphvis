@@ -25,6 +25,17 @@ export const getApiErrorMessage = (error) => {
   return error.message || 'Unknown error occurred';
 };
 
+// A `responseType: 'blob'` request gets its JSON error body as a Blob too,
+// which would hide FastAPI's `detail` from getApiErrorMessage.
+export const readBlobErrorBody = async (data) => {
+  if (!(data instanceof Blob)) return data;
+  try {
+    return JSON.parse(await data.text());
+  } catch {
+    return data;
+  }
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -75,6 +86,9 @@ api.interceptors.response.use(
       window.location.href = '/login';
     }
     // Dispatch global error event for UI notification
+    if (error.response) {
+      error.response.data = await readBlobErrorBody(error.response.data);
+    }
     const errorMessage = getApiErrorMessage(error);
     window.dispatchEvent(new CustomEvent('api-error', { 
         detail: { 

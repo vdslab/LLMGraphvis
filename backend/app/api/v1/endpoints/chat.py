@@ -21,7 +21,7 @@ from app.core.logging import get_logger
 from app.services import llm as llm_service
 from app.services.llm import mcp_client
 from app.services.llm.catalog import get_available_provider_catalog
-from app.services import chat_service, sample_networks, usage_report
+from app.services import chat_service, network_service, sample_networks, usage_report
 
 logger = get_logger(__name__)
 
@@ -167,18 +167,22 @@ async def export_network(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """Export network as GraphML file"""
-    # Verify ownership
+    """Export the chat's active network (a subgraph, if one is selected) as GraphML."""
     chat = verify_chat_ownership(chat_id, current_user.id, db)
 
-    # Call NetworkXAPI to get GraphML
-    graphml_data = await mcp_client.execute_tool(
-        "export_network", {"network_id": chat.network_id}
-    )
+    try:
+        graphml_data = await network_service.export_graphml(chat.network_id)
+    except network_service.NetworkNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Network not found") from exc
+    except network_service.NetworkExportError as exc:
+        logger.error(f"GraphML export failed for chat {chat_id}: {exc}")
+        raise HTTPException(
+            status_code=502, detail="The network could not be exported."
+        ) from exc
 
     return Response(
         content=graphml_data,
-        media_type="application/xml",
+        media_type="application/graphml+xml",
         headers={
             "Content-Disposition": f"attachment; filename=network_{chat.network_id}.graphml"
         },

@@ -343,15 +343,22 @@ export const useChatStore = create((set, get) => ({
     if (!id) return;
     
     const response = await exportNetwork(id);
-    
-    // Create a download link
-    const url = window.URL.createObjectURL(new Blob([response.data]));
+
+    // Prefer the server's filename: it names the network actually exported,
+    // which is a subgraph when one is selected.
+    const disposition = response.headers?.['content-disposition'] || '';
+    const filename =
+      disposition.match(/filename="?([^";]+)"?/)?.[1] || `network_${id}.graphml`;
+    const blob = new Blob([response.data], { type: 'application/graphml+xml' });
+    const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `network_${id}.graphml`);
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     link.remove();
+    // Revoked after the browser has started the download, not before.
+    setTimeout(() => window.URL.revokeObjectURL(url), 1000);
   },
 
   addMessage: (message) => {

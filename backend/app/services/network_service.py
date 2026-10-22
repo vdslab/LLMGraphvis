@@ -1,8 +1,50 @@
 from typing import Optional
 
+import httpx
 from sqlalchemy.orm import Session
 
+from app.services.llm.mcp_client import NETWORKX_API_URL
 from common import models
+
+# A large network's GraphML is built row by row on networkx-api.
+EXPORT_TIMEOUT_SECONDS = 120.0
+
+
+class NetworkNotFoundError(LookupError):
+    """networkx-api has no network with the requested id."""
+
+
+class NetworkExportError(RuntimeError):
+    """networkx-api could not be reached or failed to build the GraphML."""
+
+
+def _networkx_client() -> httpx.AsyncClient:
+    return httpx.AsyncClient(base_url=NETWORKX_API_URL, timeout=EXPORT_TIMEOUT_SECONDS)
+
+
+async def export_graphml(network_id: int) -> str:
+    """The network as a GraphML document, from networkx-api's REST export.
+
+    Export is not an MCP tool: it is a user action, not something the agent
+    does, so it stays off the model's tool surface.
+    """
+    try:
+        async with _networkx_client() as client:
+            response = await client.get(f"/api/v1/networks/{network_id}/export")
+    except httpx.HTTPError as exc:
+        raise NetworkExportError(f"networkx-api unreachable: {exc}") from exc
+
+    if response.status_code == 404:
+        raise NetworkNotFoundError(f"Network {network_id} not found")
+    if response.status_code != 200:
+        raise NetworkExportError(
+            f"networkx-api export failed ({response.status_code}): "
+            f"{response.text[:500]}"
+        )
+    graphml = response.json().get("graphml")
+    if not isinstance(graphml, str):
+        raise NetworkExportError("networkx-api export returned no GraphML")
+    return graphml
 
 # Upper bound on the parent chain walked to find a root. Subgraphs of subgraphs
 # are legitimate, so this is a cycle/corruption stop, not a design limit.

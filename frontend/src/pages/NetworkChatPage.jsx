@@ -11,7 +11,7 @@ import NodeDetailsPanel from '../components/NodeDetailsPanel';
 import ChatList from '../components/ChatList';
 import NetworkDataChooser from '../components/NetworkDataChooser';
 import * as api from '../services/api';
-import { Menu, Tag, X, AlertTriangle } from 'lucide-react';
+import { Menu, Tag, X, AlertTriangle, Download } from 'lucide-react';
 
 const NetworkChatPage = () => {
   const { id } = useParams();
@@ -28,6 +28,7 @@ const NetworkChatPage = () => {
     sampleNetworksError,
     fetchSampleNetworks,
     loadSampleNetwork,
+    exportNetworkAsGraphML,
   } = useChatStore();
   const { nodes, links, labelStyle, viewport } = useNetworkStore();
   const fileInputRef = useRef(null);
@@ -266,6 +267,19 @@ const NetworkChatPage = () => {
   }, [isResizing, resize, stopResizing]);
 
   const [showLabels, setShowLabels] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      await exportNetworkAsGraphML(parseInt(id));
+    } catch (error) {
+      // The api-error event has already shown the reason.
+      console.error('GraphML export failed:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   if (!isAuthenticated) return null;
 
@@ -408,6 +422,27 @@ const NetworkChatPage = () => {
               >
                 <Tag size={14} />
                 <span>Labels</span>
+              </button>
+            )}
+
+            {nodes.length > 0 && (
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={isExporting}
+                className="btn btn-ghost"
+                title="Download the displayed network as GraphML"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.8125rem',
+                  borderRadius: 'var(--md-sys-shape-full)',
+                  gap: '6px',
+                  color: 'var(--md-sys-color-on-surface-variant)',
+                  border: 'none',
+                }}
+              >
+                <Download size={14} />
+                <span>{isExporting ? 'Exporting…' : 'Export'}</span>
               </button>
             )}
           </div>
