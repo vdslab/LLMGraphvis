@@ -1,4 +1,6 @@
 
+import os
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -7,6 +9,10 @@ from common.models import Base
 from app.core.database import get_db
 from app.main import app
 from httpx import AsyncClient, ASGITransport
+
+# Tests must not append to the developer's turn traces (ADR 0032); trace tests
+# opt back in with their own directory.
+os.environ["AGENT_TRACE"] = "0"
 
 # In-memory SQLite for testing
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"

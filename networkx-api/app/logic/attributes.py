@@ -7,6 +7,16 @@ from sqlalchemy.orm import Session
 from common import models
 from app.core.logging import get_logger
 
+from .attribute_semantics import (
+    IDENTIFIER,
+    QUANTITATIVE,
+    ROLE_DATA,
+    infer_measurement,
+    measurement_for_role,
+    role_for_source,
+    summarize_parameters,
+)
+
 logger = get_logger(__name__)
 
 # --- Attributes Helper Functions ---
@@ -166,6 +176,7 @@ def ensure_attributes(
     db: Session,
     commit: bool = True,
     descriptions: Optional[Dict[str, str]] = None,
+    measurements: Optional[Dict[str, Optional[str]]] = None,
 ) -> Dict[str, int]:
     """
     Ensure attributes exist for the given keys and return a map of {name: id}.
@@ -177,6 +188,8 @@ def ensure_attributes(
         db: Database session.
         commit: Whether to commit the transaction.
         descriptions: Optional Dict mapping attribute name to description text.
+        measurements: Optional Dict mapping attribute name to its inferred
+            measurement (see attribute_semantics).
 
     Returns:
         A dictionary mapping attribute names to their database IDs.
@@ -192,6 +205,7 @@ def ensure_attributes(
             "attribute_name": key,
             "data_type": attr_types.get(key, "string"),
             "description": descriptions.get(key) if descriptions else None,
+            "measurement": measurements.get(key) if measurements else None,
         }
         for key in keys
     ]
@@ -201,7 +215,9 @@ def ensure_attributes(
     # If conflict, updated description if provided to ensure it's captured
     update_dict = {}
     if descriptions:
-        update_dict = {"description": stmt.excluded.description}
+        update_dict["description"] = stmt.excluded.description
+    if measurements:
+        update_dict["measurement"] = stmt.excluded.measurement
 
     if update_dict:
         stmt = stmt.on_conflict_do_update(
@@ -328,8 +344,8 @@ def update_attribute_cache_metadata(
     derived_from: Optional[str] = None,
 ) -> None:
     """
-    Stamps cache metadata onto an existing NodeAttribute/EdgeAttribute row after
-    (re)computation. Call AFTER bulk_save_node_attributes/bulk_save_edge_attributes,
+    Stamps cache metadata, role and measurement onto an existing
+    NodeAttribute/EdgeAttribute row after (re)computation. Call AFTER bulk_save_node_attributes/bulk_save_edge_attributes,
     since that is what creates/refreshes the attribute row in the first place.
     """
     attr = get_cached_attribute(network_id, attr_name, model_class, db)
@@ -339,6 +355,9 @@ def update_attribute_cache_metadata(
     attr.computation_params = computation_params
     attr.is_derived = is_derived
     attr.derived_from = derived_from
+    # The computation knows what its values mean; nothing needs inferring.
+    attr.role = role_for_source(derived_from) if is_derived else ROLE_DATA
+    attr.measurement = measurement_for_role(attr.role) or attr.measurement
 
     from datetime import datetime, timezone
 
@@ -458,6 +477,106 @@ def delete_attribute_values(
         db.commit()
 
 
+def _value_join(model_val, model_child):
+    """Join condition between a value row and its typed child row."""
+    if model_val == models.NodeAttributeValue:
+        return model_val.id == model_child.node_attribute_value_id
+    return model_val.id == model_child.edge_attribute_value_id
+
+
+def _stored_measurement(
+    attr: models.Base,
+    model_val: Type[models.Base],
+    model_float: Type[models.Base],
+    model_text: Type[models.Base],
+    db: Session,
+) -> Optional[str]:
+    """The attribute's measurement, inferring and saving it on first read.
+
+    Rows imported before measurements existed have none. Inferring once and
+    storing the answer keeps every later listing a plain column read.
+    """
+    if attr.measurement:
+        return attr.measurement
+    try:
+        values = [
+            row[0]
+            for row in db.query(model_float.float_value)
+            .join(model_val, _value_join(model_val, model_float))
+            .filter(model_val.attribute_id == attr.id)
+        ] + [
+            row[0]
+            for row in db.query(model_text.text_value)
+            .join(model_val, _value_join(model_val, model_text))
+            .filter(model_val.attribute_id == attr.id)
+        ]
+        measurement = measurement_for_role(attr.role) or infer_measurement(values)
+        if measurement:
+            attr.measurement = measurement
+            db.commit()
+        return measurement
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Could not infer measurement of {attr.attribute_name}: {e}")
+        return None
+
+
+def _describe_attribute(
+    attr: models.Base,
+    model_val: Type[models.Base],
+    model_float: Type[models.Base],
+    model_text: Type[models.Base],
+    db: Session,
+) -> Dict[str, Any]:
+    """Name, storage type, meaning and provenance of one attribute row."""
+    data = {
+        "name": attr.attribute_name,
+        "data_type": attr.data_type,
+        "description": attr.description,
+        "role": attr.role or ROLE_DATA,
+        "measurement": _stored_measurement(attr, model_val, model_float, model_text, db),
+        # Whether a value came with the file or was computed in the
+        # conversation cannot be recovered from its name, and a reader that
+        # cannot tell them apart will report a computed score as recorded
+        # data. Provenance travels with every listing for that reason.
+        "is_derived": bool(attr.is_derived),
+        "derived_from": attr.derived_from,
+    }
+    if attr.is_derived:
+        parameters = summarize_parameters(attr.computation_params)
+        if parameters:
+            data["parameters"] = parameters
+    return data
+
+
+def get_measurement(
+    network_id: int, attribute_name: str, scope: str, db: Session
+) -> Optional[str]:
+    """Measurement of one node ("node") or edge ("edge") attribute, or None."""
+    if scope == "edge":
+        if attribute_name == "weight":
+            return QUANTITATIVE
+        models_ = (
+            models.EdgeAttribute,
+            models.EdgeAttributeValue,
+            models.EdgeFloatAttributeValue,
+            models.EdgeTextAttributeValue,
+        )
+    else:
+        if attribute_name == "label":
+            return IDENTIFIER
+        models_ = (
+            models.NodeAttribute,
+            models.NodeAttributeValue,
+            models.NodeFloatAttributeValue,
+            models.NodeTextAttributeValue,
+        )
+    attr = get_cached_attribute(network_id, attribute_name, models_[0], db)
+    if attr is None:
+        return None
+    return _stored_measurement(attr, *models_[1:], db)
+
+
 def get_attribute_stats(
     network_id: int,
     model_attr: Type[models.Base],
@@ -484,11 +603,7 @@ def get_attribute_stats(
     result = []
 
     for attr in attributes:
-        attr_data = {
-            "name": attr.attribute_name,
-            "data_type": attr.data_type,
-            "description": attr.description,
-        }
+        attr_data = _describe_attribute(attr, model_val, model_float, model_text, db)
 
         try:
             if attr.data_type == "float":
@@ -572,6 +687,9 @@ def get_attribute_stats(
                         "name": "weight",
                         "data_type": "float",
                         "description": "Edge weight (core attribute)",
+                        "role": ROLE_DATA,
+                        "measurement": QUANTITATIVE,
+                        "is_derived": False,
                         "stats": {"min": float(w_stats[0]), "max": float(w_stats[1])},
                     }
                 )
@@ -601,6 +719,9 @@ def get_attribute_stats(
                     "name": "label",
                     "data_type": "string",
                     "description": "Node label (core attribute)",
+                    "role": ROLE_DATA,
+                    "measurement": IDENTIFIER,
+                    "is_derived": False,
                     "stats": {
                         "unique_count": unique_count,
                         "top_values": [v[0] for v in top_vals],
@@ -637,11 +758,7 @@ def get_specific_attribute_stats(
     if not attr:
         return None
 
-    attr_data = {
-        "name": attr.attribute_name,
-        "data_type": attr.data_type,
-        "description": attr.description,
-    }
+    attr_data = _describe_attribute(attr, model_val, model_float, model_text, db)
 
     try:
         if attr.data_type == "float":

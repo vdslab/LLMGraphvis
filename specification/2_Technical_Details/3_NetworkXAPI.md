@@ -9,7 +9,7 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 ## 3.1. 役割
 
-- **MCP Server**: GenAIのための標準化されたインターフェース（MCP）を提供し、Tools (Act), Resources (Read), Prompts (Template) を通じて機能を提供する。
+- **MCP Server**: GenAIのための標準化されたインターフェース（MCP）を提供し、Tools (Act) と Resources (Read) を通じて機能を提供する（Prompts は使わない、3.4 節）。
 - **ステートレス計算**: 内部状態を持たず、計算結果は全てデータベースに永続化する。
 - **SSEエンドポイント**: `/mcp/sse` エンドポイントを通じてMCPプロトコルによる通信を行う。
 
@@ -28,320 +28,354 @@ NetworkXAPIは、ネットワークに関する計算処理と、その結果の
 
 ### 3.2.1. Server-Side MCP Tools (NetworkXAPI提供)
 
-モデルが**アクション**を起こすために使用する関数群です。副作用（DB更新、計算実行など）を伴う操作は全てツールとして定義します。
+ツールは `networkx-api/app/mcp/tools/{domain}/` 配下の `@mcp.tool()` 付き関数から
+**自動的に検出**される。別途スキーマを登録する箇所は存在しない。命名規則は
+`domain_verb`。
 
-| Tool Name | 説明 |
+| Prefix | 責務 |
 |:---|:---|
-| Tool Name | 説明 |
-|:---|:---|
-| `initialize_network` | GraphMLデータを受け取り、初期化（パース、DB保存、初期レイアウト計算、初期レンダリング）を行う。 |
-| `import_graphml` | GraphMLデータをDBにインポートするのみ。初期化プロセス（レイアウト計算等）は行わない。 |
-| `update_network_metadata` | ネットワークの名前や説明を更新する。 |
-| `update_node_label` | 特定のノードのラベルを更新する。 |
-| `calculate_centrality` | 中心性指標を計算して永続化する。 |
-| `calculate_community` | (Disabled) コミュニティ抽出は現在無効化されています。 |
-| `calculate_layout` | レイアウト座標を計算して永続化する（可視化データの更新は返さない）。 |
-| `update_layout` | レイアウトを計算し、即座に可視化データを返す。 |
-| `update_node_color` | ノードの色設定を更新し、即座に可視化データを返す。 |
-| `update_node_size` | ノードのサイズ設定を更新し、即座に可視化データを返す。 |
-| `generate_visualization` | 複合的な可視化設定（色、サイズ、エッジ等）を一括で適用・生成する。Full Resetや高度な設定に使用。 |
-| `get_visualization_state` | 現在の可視化設定（Config）を取得する。 |
-| `create_ego_network` | Ego Networkを作成する。 |
-| `create_subgraph_from_nodes` | 指定ノード群からサブグラフを作成する。 |
-| `create_path_subgraph` | 最短経路サブグラフを作成する。 |
-| `create_k_core_subgraph` | K-Coreサブグラフを作成する。 |
-| `create_largest_component_subgraph` | 最大連結成分サブグラフを作成する。 |
+| `network_*` | ネットワーク単位のインポート・メタデータ・属性一覧 |
+| `node_*` | 単一ノードの検索・詳細・近傍・フィルタ・改名 |
+| `subgraph_*` | 部分グラフの作成（フィルタ / 明示リスト / エゴ / k-core / コミュニティ / 最大連結成分 / 高次数） |
+| `analysis_*` | 属性として保存される計算指標（中心性各種・コミュニティ検出・クラスタ係数・最短経路） |
+| `layout_*` | ノード座標の計算（力学系・幾何・構造ベース） |
+| `visualization_*` | スタイル設定・レンダリング・状態取得・スタイルリセット・表示ネットワーク切替 |
 
-| `create_subgraph_by_filter` | 属性条件に基づいてサブグラフを作成する（サーバーサイドフィルタリング）。 |
-| `switch_to_network` | コンテキストを指定IDに切り替え、そのネットワークの可視化を返す。 |
-| `get_subgraphs` | 親ネットワークから派生したサブグラフの一覧を取得する。 |
-| `filter_nodes` | 属性条件でノードを検索・フィルタリングする（リスト取得のみ、サブグラフ作成はしない）。 |
-| `get_top_nodes` | 中心性指標の上位ノードを取得する。 |
-| `search_nodes` | ノード名や属性で検索を行う。 |
-| `list_node_attributes` | 利用可能なノード属性一覧を取得する。 |
-| `list_edge_attributes` | 利用可能なエッジ属性一覧を取得する。 |
-| `get_network_structure` | ネットワークの基本構造統計を取得する。 |
+各ツールの引数・既定値・戻り値は実装の docstring と
+`Field(description=...)` を**唯一の情報源**とする。本仕様書がそれを複製すると
+必ず乖離するため、ここでは列挙しない（実際、本節は刷新前のツール名のまま長期間
+放置されていた）。現在のツール一覧は次で取得できる。
 
-## 3.3. MCPリソース一覧 (Resources)
+```bash
+cd networkx-api && python -c "
+import app.mcp_server, asyncio
+from app.core.mcp import mcp
+print(sorted(t.name for t in asyncio.run(mcp.list_tools())))"
+```
 
-モデルが**参照**する読み取り専用データです。クライアント（LLM Service）は `read_resource(uri)` ツールを通じてこれらにアクセスします。
- 
-| Resource URI | 説明 |
-|:---|:---|
-| `network://{id}/metadata` | ネットワークのメタデータ（ID, 名前, 説明, 作成日時）をJSON形式で取得する。 |
-| `network://{id}/graphml` | ネットワークの完全なGraphMLデータを取得する。 |
-| `network://{id}/attributes/nodes` | 利用可能なノード属性（名前, 型, 統計情報）の一覧を取得する。 |
-| `network://{id}/attributes/edges` | 利用可能なエッジ属性（名前, 型, 統計情報）の一覧を取得する。 |
-| `network://{id}/subgraphs` | 親ネットワークから作成されたサブグラフの一覧を取得する。 |
-| `network://{id}/centrality/{metric}/top` | 指定された中心性指標（metric）の上位ノードを取得する。オプションパラメータには対応しないため、デフォルト設定（TOP 10）等を返す。 |
-| `network://{id}/structure` | ネットワークの基本構造情報（ノード数、エッジ数、密度、連結成分数など）を取得する。 |
+#### レイアウトの選択指針
 
-## 3.4. MCPプロンプト一覧 (Prompts)
-
-モデルに対する**定型的な指示セット**です。分析の開始点や、特定のタスク（可視化提案など）を行う際に使用されます。
-
-| Prompt Name | Arguments | 説明 |
+| ツール | 種別 | 備考 |
 |:---|:---|:---|
-| `analyze-structure` | `network_id` | ネットワークの構造的特徴（密度、連結性など）を分析し、全体像を把握するよう指示するメッセージセットを返す。 |
-| `recommend-visualization` | `network_id` | 利用可能な属性と構造に基づいて、最適な可視化（レイアウト、色、サイズ）を提案するよう指示するメッセージセットを返す。 |
-| `investigate-attributes` | `network_id` | 特定のノードやエッジの属性に注目し、異常値や特徴的なパターンを探すよう指示するメッセージセットを返す。 |
-| `find-important-nodes` | `network_id` | 複数の中心性指標や属性を組み合わせて、ネットワーク内の重要ノード（インフルエンサー、ハブなど）を特定し、その理由を説明するよう指示するメッセージセットを返す。 |
-| `search_nodes` | `network_id`, `query`, `attribute` | ノード名（ID、ラベル）または特定の属性値でノードを検索する。検索結果には、マッチした値も含まれる。 |
+| `layout_forceatlas2` | 力学系 | **既定**。反復ごとに密な斥力計算（O(N^2)、Barnes-Hut 近似なし）のため `max_iter` が実行時間を支配する |
+| `layout_spring` | 力学系 | Fruchterman-Reingold。ノード間隔がより均等 |
+| `layout_arf` | 力学系 | 引力・斥力を個別制御。ForceAtlas2 で重なりが残る場合の第二候補 |
+| `layout_kamada_kawai` | 数理 | 大域構造に優れるが密な N×N 距離行列を構築するため時間・メモリともに O(N^2)。閾値超はフックが拒否する |
+| `layout_spectral` | 数理 | ラプラシアンの固有ベクトル。高速・決定的だが密なグラフでは退化しやすい |
+| `layout_circular` / `layout_shell` / `layout_spiral` / `layout_random` | 幾何 | 位相構造を反映しない。`layout_shell` は `nlist` を与えて初めて意味を持つ |
+| `layout_bipartite` / `layout_multipartite` | 構造 | 属性による分割を軸に配置。属性値は DB から読み出してグラフに付与される |
+| `layout_planar` | 構造 | 平面グラフ限定。非平面入力では代替を案内するエラーになる |
+| `layout_bfs` | 構造 | 根からの BFS 距離で階層化 |
+
+**レイアウトごとの定義**: 実装は `app/logic/layouts/` に、MCPツールと同じ
+ファミリ単位（`force_directed` / `mathematical` / `geometric` / `structural`）で
+分かれている。1つのレイアウトは1つの `@register` 付き関数として、nx呼び出し・
+パラメータ許可リスト・グラフ規模に応じた自動調整・重みの意味（`WeightRole`）・
+事前処理（`prepare`）をまとめて宣言する。`app/logic/layout.py` はグラフ構築、
+重みの解決、キャッシュ、永続化のみを担当し、レイアウト名で分岐しない。
+レイアウトの追加は「`@register` した関数1つ + 対応するMCPツール1つ」で完結する。
+
+**パラメータの許可リスト**: 各 `@register` の `params` が、その networkx 関数に
+渡してよい引数名を定義する（`LAYOUT_PARAM_KEYS` はレジストリから導出される）。
+ここに無い引数は nx に到達せず、逆にここにある引数は握り潰されない。パラメータを
+新たに公開する際は、この集合とツール署名の両方を更新すること
+（`tests/test_layout_parameters.py` が許可リストをインストール済み networkx の
+シグネチャと、ツール署名を各レイアウトの `WeightRole` と突き合わせる）。
+
+**独自パラメータ**: `init_from_layout`（既存レイアウト名を指定してウォーム
+スタート。座標 dict を LLM に書かせるのは非現実的なため名前で指定する）、
+`partition_attribute` / `partition_value` / `subset_attribute`（分割属性を
+nx の `nodes` / `subset_key` に解決する）。
+
+**注意すべき仕様**:
+- レイアウトは座標を保存するだけで描画しない。`visualization_generate` を続けて呼ぶ。
+- `scale` / `center` は**視覚的に無効**。描画前に座標が [-1000, 1000] に再正規化されるため。
+- **重みの扱いはレイアウトごとの `WeightRole` が決める**（`logic/layouts/base.py`）。
+  - `STRENGTH`（`spring` / `forceatlas2` / `spectral`）: 重い辺ほど近くに引き寄せる。
+    ネットワークの重みが変化に富み（全辺同値でなく）かつすべて正なら、`weight` 引数
+    なしで自動的に重み付き計算になる。初期レイアウトも同じ経路を通るため、
+    アップロード直後の配置がすでに重みを反映している。
+  - `DISTANCE`（`kamada_kawai`）: `weight` が「辺の目標距離」を意味し、重い辺ほど
+    遠くに配置される。意味が反転するため**自動適用はしない**。使う場合は明示指定。
+  - `NONE`（幾何・構造系と `arf`）: 重みの概念がなく、ツールに `weight` 引数もない。
+- **自動で割り当てるのは「意味が確定している重み」だけ**。自動採用の対象は
+  インポート時の `edges.weight` のみで、それ以外の数値エッジ属性（`cost`, `year`,
+  類似度など）は「候補」として提示するだけで自動選択しない——どれが結合強度なのかは
+  データを見た者にしか判断できないため。判定は `logic/layouts/weights.py` が行い、
+  何を使い何が使えたかを説明文として返す。各レイアウトツールはこれを戻り値に付加
+  するので、LLMが読んで別の属性を提案・選択できる。
+- **強さとしての重みは中央値で割ってから networkx に渡す**（ADR 0017）。ForceAtlas2 と
+  spring は重みを引力に掛けるため、同じデータでも単位が変わると図が変わっていた。
+  強さとして意味があるのは重みの比だけなので、中央値を 1 に揃える。平均でなく中央値を
+  使うのは、一部の極端に重い辺に全体が引きずられないため。距離としての重み
+  （`kamada_kawai`）は正規化しない。DB には元の値が残り、説明文が正規化を伝える。
+- 明示指定は `weight='<属性名>'`（別の数値エッジ属性を使う）と `weight='none'`
+  （重みを無視する）。存在しない属性名は無言で無重みに劣化せず、使用可能な属性名を
+  挙げた例外になる。
+- 重みは `edges.weight` 列に入り、EdgeAttribute としては保存されない（importer が
+  `weight` キーを除外する）ため、属性一覧には現れない。重み付きか否かは
+  `network://{id}/structure` の `edge_weights` が唯一の情報源で、これがシステム
+  プロンプトの文脈行にもなる。同フィールドの `alternatives` が候補属性名を持つ。
+- 結果は「グラフ構造ハッシュ + 実効パラメータ」でキャッシュされる。パラメータを
+  変えれば自動的にキャッシュミスとなるため、`force_recompute` は利用者が明示的に
+  再計算を求めた場合のみ使う。ノード数に比例する巨大なパラメータ（`pos`, `nodes`,
+  `node_size` など）はダイジェスト化して保存する。
+
+#### 非推奨ツール
+
+後方互換のため残しているが新規利用は避けること。
+
+| ツール | 理由 | 代替 |
+|:---|:---|:---|
+| `network_initialize` | パース・レイアウト・描画の3責務が結合し、レイアウトが ForceAtlas2 固定 | `network_import_graphml` → 任意の `layout_*` → `visualization_generate` |
+| `visualization_apply_layout` | `visualization_generate` と実装が完全に同一 | `visualization_generate` |
+
+## 3.3. MCP リソース (Resources)
+
+`network://…` 名前空間の読み取り専用データ。**登録されている URI の一覧は `app/mcp/resources.py` が唯一の情報源である。** ここでは、リソースを設計・追加するときに守らなければならない規約を述べる。
+
+### 3.3.1. リソースは LLM を経由せずに読まれることがある
+
+リソースはモデルが `read_resource(uri)` で参照するだけでなく、**Backend が直接読んで**システムプロンプトの文脈やアップロード直後の概要を組み立てる（`backend/app/services/llm/context.py`）。したがってリソースの戻り値は、モデル向けの散文ではなく機械可読な構造でなければならない。
+
+### 3.3.2. `mime_type="application/json"` を必ず指定する
+
+指定を省略すると FastMCP はリソーステンプレートに `text/plain` のラベルを付ける。ラベルを信頼するクライアントは本文を破棄するため、**リソースは正常に動作しているのに空に見える**。この失敗は例外を出さないので、テストで機械的に検査する（`tests/test_mcp_integration.py`）。
+
+### 3.3.3. リソースは例外を握り潰す — だからこそ実 DB で検査する
+
+リソースは内部の例外を `{"error": ...}` に変換して返す。この設計により、リソース 1 本の失敗がエージェントのターン全体を落とすことはない。代償として、**改名された関数を指しているリソースは静かに失敗する**。症状は「ネットワークが空である」という誤った観測になる。
+
+このため、リソースのテストはロジック層をモックせず、実データベースに対して各リソースを実行して `error` キーが返らないことを確認する。モックしたテストではこの失敗形を検出できない。
+
+### 3.3.4. リソースはオプション引数を取らない
+
+リソースは URI テンプレートで識別されるため、任意パラメータによる挙動の変化を表現できない。上位ノードの取得のように件数を変えたい操作は、既定値で応答するリソースと、パラメータを取るツールの両方を用意する。
+
+## 3.4. MCP プロンプト (Prompts) — 使わない
+
+MCP プロンプトは提供しない。分析の進め方（「何をどう考えるか」）は backend の
+Skill だけに書く（[ADR 0027](../4_Decisions/0027-skills-are-the-only-procedures.md)）。
+以前は `app/mcp/prompts.py` に手順があったが、Skill と二重管理になって陳腐化した。
+
+その代わり、networkx-api は全ツールの名前と引数名を `common/mcp_tools.json` に
+書き出す（`python -m app.mcp.manifest`）。backend のテストはこれを読み、Skill が
+実在するツールと引数だけを参照し、すべてのツールがどれかの Skill から公開される
+ことを確かめる。
 
 ## 3.5. ツール定義詳細
 
-### `initialize_network`
-- **Description**: GraphMLデータを受け取り、初期化（パース、DB保存、初期レイアウト計算、初期レンダリングデータ生成）を行う。
-- **Arguments**:
-  - `network_id`: int
-  - `graphml_data`: str (XML string)
-- **Returns**: `{"network_id": int, "network": dict, "content": str}`
+各ツールの引数・既定値・戻り値は、実装側の docstring と
+`Field(description=...)` を唯一の情報源とする。これらは MCP のスキーマとして
+LLM にそのまま送られる「プロンプト表面」であり、本仕様書に転記した写しは
+必ず陳腐化する（本節は以前まさにそうなっていた）。3.2.1 のコマンドで
+現在の定義を取得すること。
 
-### `import_graphml`
-- **Description**: GraphMLデータをDBにインポートするのみ。初期化プロセス（レイアウト計算等）は行わない。
-- **Arguments**:
-  - `network_id`: int
-  - `graphml_data`: str (XML string)
+以下は、署名からは読み取れない**横断的な規約**のみを記す。
 
-### `update_network_metadata`
-- **Description**: ネットワークの名前や説明を更新する。
-- **Arguments**:
-  - `network_id`: int
-  - `description`: str (Optional)
-  - `name`: str (Optional)
+- **`size` は半径ではなく面積**。フロントエンドは `r = sqrt(size * 10 / π)` で
+  描画する（`NetworkGraph.jsx`）。この換算はツール記述・`visualization_builder`・
+  フロントエンドの3箇所に現れるので、変更時は同時に更新する。
+- **スタイルは維持される**。`visualization_set_*` は渡されなかったチャネルを
+  DB から復元する。`_save_state` は非 None のみ書き込むため、**設定ツールでは
+  スタイルを解除できない**。`visualization_reset_style` が唯一の解除手段。
+- **派生属性名**。コミュニティ検出ツールは `{algorithm}_community`、
+  レイアウトは `{layout}_x` / `{layout}_y` に保存する。固定名を仮定せず、
+  ツールの戻り値メッセージから正確な名前を読む。
+- **派生属性の意味は書き込んだ計算が刻む**。値を保存した後、必ず
+  `update_attribute_cache_metadata` を呼ぶ。来歴・キャッシュの刻印に加え、
+  `derived_from` の接頭辞から役割と尺度が決まる（[4_Database.md](./4_Database.md) 4.5）。
+  この呼び出しを省くと、計算した値が元データとして一覧される。
+- **尺度に合わないスタイルは警告で返す**。色・サイズ・太さのツールは、描いた
+  尺度が属性の `measurement` と合わないとき戻り値に `encoding_note` を含める。
+  拒否しない理由は [4_Database.md](./4_Database.md) 4.5.3。
+- **部分グラフ作成ツールは `new_network_id` を返す**。Backend の POST_TOOL フック
+  がこれを検出して自動的に描画と表示切替を行うため、ツール自身は描画しない。
 
-### `update_node_label`
-- **Description**: 特定のノードのラベルを更新する。
-- **Arguments**:
-  - `network_id`: int
-  - `node_id`: str
-  - `new_label`: str
+### 3.5.1. `size` が面積である理由
 
-### `calculate_centrality`
-- **Description**: 指定された中心性指標を計算し、ノード属性として保存する。
-- **Arguments**:
-  - `network_id`: int
-  - `centrality_type`: str ("degree", "betweenness", "closeness", "eigenvector", "pagerank")
+視覚変数としての円の大きさは、人間には**面積**として知覚される。半径を値に比例させると、値が 2 倍のノードは面積が 4 倍に見え、差が誇張される。したがって値に比例させるべきは面積であり、`r = sqrt(size * 10 / π)` はその逆算にすぎない。
 
-### `calculate_community`
-### `calculate_community`
-- **Description**: (Disabled) コミュニティ抽出は現在実装上の理由により無効化されています。
-- **Arguments**:
-  - `network_id`: int
-  - `algorithm`: str (Optional)
+この規約はエージェントにとっても重要である。ツールの説明文が `size` を半径と読める書き方をしていると、モデルは「2 倍の重要度を 2 倍の半径で」表現し、生成される図は誤ったスケールになる。
 
-### `calculate_layout`
-- **Description**: 指定されたレイアウトアルゴリズムで座標を計算し、ノード属性として保存する。
-- **Arguments**:
-  - `network_id`: int
-  - `layout_name`: str ("spring", "forceatlas2", "circular", "kamada_kawai", "shell", "spectral", "spiral")
-    - **Note**: `forceatlas2` uses dynamic iteration counts (1000-5000) based on graph size to ensure convergence.
+### 3.5.2. 座標は再正規化される — `scale` と `center` は視覚的に無効である
 
-### `update_layout`
-- **Description**: レイアウトを計算し、即座に可視化データを返す。
-- **Arguments**:
-  - `network_id`: int
-  - `layout_name`: str
+計算されたレイアウト座標は、描画前に必ず `[-1000, 1000]` の範囲へ再正規化される。ネットワークの規模やレイアウトアルゴリズムによらず、キャンバスに対する見え方を一定に保つためである。
 
-### `update_node_color`
-- **Description**: ノードの色設定を更新し、即座に可視化データを返す。
-- **Arguments**:
-  - `network_id`: int
-  - `attribute`: str
-  - `scale_type`: str ("CATEGORICAL", "LINEAR", "RANKING")
-  - `mapping`: Dict[str, str] (Optional)
-  - `default_color`: str (Optional)
-  - `fixed`: bool (Optional)
-  - `gradient`: List[str] (Optional)
+**この結果、networkx のレイアウト関数が持つ `scale` と `center` は視覚的な効果を一切持たない。** これらは相対的な配置を変えないため、再正規化によって完全に打ち消される。
 
-### `update_node_size`
-- **Description**: ノードのサイズ設定を更新し、即座に可視化データを返す。
-- **Arguments**:
-  - `network_id`: int
-  - `attribute`: str
-  - `min_size`: float
-  - `max_size`: float
+これは単なる実装上の注意ではなく、**プロンプト表面の正確性の問題**である。ツールの説明文がこれらを有効なパラメータとして提示していると、モデルは「拡大してほしい」という要求に対して `scale` を上げるツール呼び出しを行い、何も起きないまま成功を報告する。パラメータを許容しつつ「視覚的な効果はない」と明記するのが正しい記述であり、効くかのように書いてはならない。
 
-### `generate_visualization`
-- **Description**: 複合的な可視化設定を一括で適用する。Full Resetや高度な設定に使用。
-- **Arguments**:
-  - `network_id`: int
-  - `node_color_config`: NodeColorConfig (Optional)
-  - `node_size_config`: NodeSizeConfig (Optional)
-  - `edge_width_attribute`: str (Optional, Description: "Attribute for edge width.")
-  - `context_config`: dict (Optional)
-  - `focus_config`: dict (Optional)
-  - `layout_name`: str (Optional)
+### 3.5.3. 重みとレイアウト宣言
 
-### `get_visualization_state`
-- **Description**: 現在の可視化設定（Config）を取得する。
-- **Arguments**:
-  - `network_id`: int
+エッジ重みの自動適用の判断規則と、レイアウトを 1 箇所で宣言する方針は 3.2.1 に記載する。いずれも「どのレイアウトにとって重みが何を意味するか」という一点から導かれている。
 
-### `create_ego_network`
-- **Description**: 指定ノードを中心としたEgo Graphを作成する。
-- **Arguments**:
-  - `network_id`: int
-  - `center_node_id`: str
-  - `radius`: int
-  - `preserve_layout`: bool (Default: True)
+### 3.5.3a. 見ることと切り出すことを分ける
 
-### `create_subgraph_from_nodes`
-- **Description**: ノードIDリストからサブグラフを作成する。
-- **Arguments**:
-  - `network_id`: int
-  - `node_ids`: List[str]
-  - `description`: str (Optional)
-  - `preserve_layout`: bool (Default: True)
+「このノードに注目したい」「経路を見せて」は表示の要求であり、分析対象の変更ではない。
+強調（`visualization_highlight`）は指定ノードと、それを結ぶエッジを前面に出し、残りを薄くする。
+グラフも分析対象も変えないので、以後の中心性や経路の計算は全体に対して行われる。サブグラフの
+抽出は、以後の分析を部分集合に限定したいときだけ使う（[ADR 0023](../4_Decisions/0023-view-navigation-and-labels.md)）。
 
-### `create_path_subgraph`
-- **Description**: 最短経路のサブグラフを作成する。
-- **Arguments**:
-  - `network_id`: int
-  - `source_node_id`: str
-  - `target_node_id`: str
-  - `preserve_layout`: bool (Default: True)
+強調は色やサイズと同じく保存される視覚チャネルである。一時的な状態にすると、続けて色分けした
+ときに消え、「経路を残したまま色を変える」が成立しない。保存時には近傍の展開を済ませた最終的な
+ノード集合と、経路の順序を記録する。再描画のたびにグラフ計算をやり直さないためである。
 
-### `create_k_core_subgraph`
-- **Description**: K-Coreサブグラフを作成する。
-- **Arguments**:
-  - `network_id`: int
-  - `k`: int
-  - `new_name_suffix`: str (Default: "_k_core")
-  - `preserve_layout`: bool (Default: True)
+経路は順序付きのノード列として受け取り、隣り合うノードの間のエッジだけを強調する。経路の計算は
+読み取り専用の `analysis_*` に残す。計算結果を確認してから描くことで、重み付き経路や複数の候補の
+うちどれを描いたかを説明できる。
 
-### `create_largest_component_subgraph`
-- **Description**: 最大連結成分のサブグラフを作成する。
-- **Arguments**:
-  - `network_id`: int
-  - `preserve_layout`: bool (Default: True)
+表示範囲（ズーム）は保存しない。保存すると、別の操作のたびに利用者が動かした表示が引き戻される。
+レイアウトの `scale`/`center` がズームとして効かないこと（3.5.2）と合わせ、ズームの手段は
+`visualization_set_viewport` だけである。
 
+### 3.5.3b. 結果の大きさはネットワークの規模に比例させない
 
-### `create_subgraph_by_filter`
-- **Description**: 属性フィルタ条件に基づいてサブグラフを作成する。サーバーサイドで処理されるため、大量のノードIDを渡す必要がない。条件はAND、値はOR結合。
-- **Arguments**:
-  - `network_id`: int
-  - `conditions`: List[dict] (e.g. `[{'attribute': 'Country', 'categories': ['USA']}]`)
-  - `preserve_layout`: bool (Default: True)
-  - `description`: str (Optional)
+ノード単位の値を返すツール（`analysis_core_number`、`analysis_triangles`、
+`analysis_single_source_distances` など）は、`limit` 件の上位（距離は近い順）と、全ノードの
+要約（最小・最大・平均・中央値、値の種類が少ない整数なら度数分布）を返し、省略した件数を示す。
+1,144 ノードのネットワークでは、全件を返していたころ 1 回あたり約 13,000 文字あった
+（[ADR 0024](../4_Decisions/0024-bounded-tool-observations.md)）。
 
-### `get_subgraphs`
-- **Description**: 親ネットワークから派生したサブグラフの一覧を取得する。
-- **Arguments**:
-  - `network_id`: int
+同じ理由で、属性の分布（`analysis_attribute_distribution`）、グループ間の結びつき
+（`analysis_group_connectivity`）、複数ノードの比較（`node_compare`）のように、答えそのものを
+要約として返すツールを用意する。モデルに多数のノードを読ませて集計させるより、正確で小さい。
 
-### `switch_to_network`
-- **Description**: コンテキストを指定されたネットワークIDに切り替え、そのネットワークの可視化データを取得する。
-- **Arguments**:
-  - `network_id`: int
+### 3.5.4. レイアウトの品質は描画空間で数値として測る
 
-### `filter_nodes`
-### `filter_nodes`
-- **Description**: 属性条件でノードを検索・フィルタリングする。リスト取得のみで、サブグラフは作成しない。**注意: サブグラフ作成用ID取得には使用しないこと。**
-- **Arguments**:
-  - `network_id`: int
-  - `attribute_name`: str
-  - `value`: str (Optional, Exact match)
-  - `min_value`: float (Optional)
-  - `max_value`: float (Optional)
-  - `limit`: int
+エージェントは描いた図を見られず、画像を渡すとトークン量が大きい（ADR 0017）。
+そこで描画を返す可視化ツールは `layout_quality`（ノードの重なり、エッジ交差、
+エッジ長のばらつき、外れ値による中心部の縮み、縦横比の歪み、空間の使い方、総合点、
+問題のラベル）を返す。ノードサイズなどの表示設定を変えた後も指標を更新し、
+キャンバスの配置情報にも使う（ADR 0019）。
 
-### `search_nodes`
-- **Description**: ノード名（ID、ラベル）または特定の属性値でノードを検索する。
-- **Arguments**:
-  - `network_id`: int
-  - `query`: str
+測るのは**レンダラーと同じ空間**である。フロントエンドは正規化座標の範囲に viewBox を
+合わせ、ノード半径 `sqrt(size*10/π)` も同じ単位で描くため、この空間での重なりや
+広がりは画面の大きさによらずユーザーが見ているものと一致する。これが成り立つのは
+変換が1つの場合だけなので、`logic/layout_quality.normalize_like_renderer` を唯一の
+変換とし、`visualization_builder` もこれを呼ぶ。x と y は独立に拡大されるため縦横比は
+保たれず、その歪みを `aspect` として報告する。
 
-### `get_top_nodes`
-- **Description**: 中心性指標の上位ノードを取得する。
-- **Arguments**:
-  - `network_id`: int
-  - `metric`: str
-  - `n`: int (Default: 10)
-  - `order`: str ("desc" or "asc", Default: "desc")
+指標は描画のたびに計算するため、全点対最短路を要する stress などは採らない。
+エッジ交差は問題のラベルにしない。交差数はグラフの密度でほぼ決まり（les_miserables は
+どの力学レイアウトでも辺あたり約 8）、減らせない数を「問題」と伝えると無駄な調整を招く。
+交差は候補同士を比べる総合点にだけ入る。
 
-### `get_network_structure`
-- **Description**: ネットワークの基本構造統計（ノード数、エッジ数、密度）を取得する。
-- **Arguments**:
-  - `network_id`: int
+### 3.5.5. 初期値はグラフの特徴から決め、数値はコードだけが持つ
 
-### `list_node_attributes`
-- **Description**: 利用可能なノード属性一覧を取得する。
-- **Arguments**:
-  - `network_id`: int
+各レイアウトの `tune` は `GraphProfile`（規模・密度・連結成分・孤立ノード・次数の
+ばらつき・重み・平面性・二部性・森か）から初期値を決め、既定から動かした理由を
+注記として返す。注記はツールの返答に入るため、エージェントは値の根拠を説明できる。
+規則はサンプルグラフで品質指標を測って決めた。例えば 25 成分と孤立ノードからなる
+グラフで、ForceAtlas2 は gravity 1 のままだとノードの 92% が重なり、gravity 10 で 16% に
+なった。spring は `method='energy'` と gravity で 0% になった。木では spring の反復を
+networkx 既定の 50 に下げる。120〜500 ノードの木 5 種すべてで、1000 反復より重なりが
+少なかった（長く回すと枝が折り重なる）。
 
-### `list_edge_attributes`
-- **Description**: 利用可能なエッジ属性一覧を取得する。
-- **Arguments**:
-  - `network_id`: int
+各力学レイアウトは `@register` で `knobs`（動かす価値のあるパラメーター、推奨範囲、
+どの問題をどちら向きに直すか）を宣言する。方向がグラフ次第のもの（spring の
+`iterations` は木では少ないほど重なりが減った）は両方向を試す印を持つ。
+`layout_suggest_parameters` はこの宣言に沿って候補を実行・採点するだけで、
+アルゴリズム名で分岐しない。保存も描画もしないのは、適用を常に実際の `layout_*`
+呼び出しにして、パネルの再実行（ADR 0016）が元にする実行記録を正しく保つためである。
 
-### `get_node_details`
-- **Description**: 特定のノードの全属性と詳細情報（description含む）を取得する。
-- **Arguments**:
-  - `network_id`: int
-  - `node_id`: str
+既定値・範囲・閾値はこのコードと `layout_quality.py` にだけ置き、skill には書かない
+（skill 側のテストが数字の混入を検出する）。skill に書いた数値はコードを変えても
+追従せず、食い違いを検出できないためである。
 
-## 3.6. REST API エンドポイント (MCP Feature Parity)
+## 3.6. REST API と MCP ツールの二重の入口
 
-MCPツールと同等の機能をREST API経由でも利用可能にするため、以下のエンドポイントを提供します。これらは `endpoints/networks.py`, `endpoints/subgraphs.py` 等で定義されています。
+同じ機能に、エージェント経由（MCP ツール）と直接呼び出し（REST）の 2 つの入口がある。
 
-### ネットワーク管理 (`/api/v1/networks`)
+**方針**: 計算とデータ操作のロジックは `app/logic/` に一本化し、MCP ツールと REST エンドポイントはいずれもその薄いラッパとして実装する。**片方の入口にしか存在しない機能を作ってはならない。**
 
-| Method | Path | 説明 |
-| :----- | :--- | :--- |
-| `POST` | `/initialize` | GraphMLデータを受け取り、ネットワークを初期化（パース、保存、初期レイアウト計算）する。 |
-| `GET` | `/{network_id}/metadata` | ネットワークのメタデータ（名前、説明、視覚状態）を取得する。 |
-| `PUT` | `/{network_id}/metadata` | ネットワークのメタデータを更新する。 |
-| `GET` | `/{network_id}/export` | ネットワークをGraphML形式でエクスポートする。 |
+**根拠**: REST 側はフロントエンドからの直接操作とデバッグに必要であり、MCP 側はエージェントに必要である。ロジックを重複させると、片方だけが修正された状態が生まれ、「チャットでは正しいのに直接叩くと違う」という再現困難な差異になる。
 
-### ネットワーク分析・検索 (`/api/v1/networks`)
+**エンドポイントの一覧とシグネチャは `/docs`（OpenAPI）と `app/api/` を参照すること。**
 
-| Method | Path | 説明 |
-| :----- | :--- | :--- |
-| `GET` | `/{network_id}/attributes/nodes` | 利用可能なノード属性（統計情報含む）の一覧を取得する。 |
-| `GET` | `/{network_id}/attributes/edges` | 利用可能なエッジ属性（統計情報含む）の一覧を取得する。 |
-| `GET` | `/{network_id}/nodes/search` | クエリ文字列または属性値でノードを検索する。 |
-| `GET` | `/{network_id}/subgraphs` | ネットワークから派生したサブグラフの一覧を取得する。 |
+## 3.7. 内部構造の設計判断
 
-### サブグラフ作成 (`/api/v1/networks/{network_id}/subgraphs`)
+### 3.7.1. ツールはロジックを持たない
 
-| Method | Path | 説明 |
-| :----- | :--- | :--- |
-| `POST` | `/ego` | Ego Networkを作成する。 |
-| `POST` | `/from-nodes` | 指定ノード群からサブグラフを作成する。 |
-| `POST` | `/path` | 最短経路サブグラフを作成する。 |
-| `POST` | `/k-core` | K-Coreサブグラフを作成する。 |
-| `POST` | `/largest-component` | 最大連結成分サブグラフを作成する。 |
-| `POST` | `/component-containing-node` | 指定ノードを含む連結成分サブグラフを作成する。 |
-| `POST` | `/filter` | 属性条件に基づいてノードをフィルタリングし、サブグラフを作成する。 |
+`app/mcp/tools/` 配下のツール関数は、引数の受け取り・`app/logic/` の呼び出し・結果の整形に限る。アルゴリズムそのものをツール関数に書いてはならない。REST 側と同じロジックを共有するためであり（3.6）、またツール関数の本体が短いほど docstring と `Field` の記述に注意を向けやすいためでもある。
 
+### 3.7.2. 可視化生成は段階を分けて組み立てる
 
-## 3.7. 内部実装構造 (Refactoring Notes)
+可視化データの生成は、検証と初期化 → データ取得 → 統計計算とカラーマップ生成 → 最終構造の構築、という段階に分かれる。かつては単一の巨大な関数だった。段階に分けた目的は、**どの段階で失敗したかがエラーとして区別できるようにする**ことである。エージェントは失敗したツールの結果を読んで自己修正するため、「可視化に失敗した」よりも「その属性が存在しない」の方が回復可能性が高い。
 
-コードの保守性と可読性を向上させるため、以下のリファクタリングを実施しました。
+### 3.7.3. カテゴリ色の割り当ては明示指定と自動割り当てを両立させる
 
-### 3.7.1. VisualizationBuilder (`app.logic.visualization_builder`)
-- **目的**: 以前は `visualizer.py` に存在した400行を超える巨大な可視化生成ロジックをクラス化し、責務を分離しました。
-- **機能**:
-  - `validate_and_prepare`: 設定の検証と初期化
-  - `fetch_data`: 必要なノード・エッジデータの取得
-  - `calculate_statistics`: 統計情報の計算とカラーマップの生成
-  - `build`: 最終的なJSON構造の構築
+カテゴリ値への色割り当ては、ユーザーが明示したマッピングと自動割り当てを排他にしない。既定色が指定されている場合でも、頻出する上位の値にはパレットの色を割り当て、残りに既定色を適用する。
 
-### 3.7.2. StyleService (`app.logic.style_service`)
-- **目的**: 色やサイズの計算ロジックを集約しました。
-- **改善点**:
-  - `prepare_categorical_map`: カテゴリカルカラーの自動割り当てロジックを改善。`default_color` が指定された場合でも自動割り当て（Autofill）を行い、上位の頻出値にはパレット色を、それ以外にはデフォルト色を適用する「Hybrid Mode」として動作するように変更しました。これにより、明示的なマッピングがない頻出カテゴリも区別可能になります。
+**根拠**: 排他にすると、既定色を指定した瞬間にすべてのカテゴリが同色になり、カテゴリを色分けする意図そのものが失われる。ユーザーが「その他はグレーで」と言ったとき、意図しているのは「主要なカテゴリは区別したうえで、残りをグレーに」である。
 
-### 3.7.3. NetworkService (`app.logic.network_service`)
-- **目的**: `mcp_server.py` に記述されていたビジネスロジック（メタデータ更新、構造取得、サブグラフ一覧取得など）を専用のサービス層に移動しました。これにより、MCPサーバーコードはルーティングとツール定義に集中できるようになりました。
+自動割り当てには D3 scale-chromatic の名前付きカテゴリカルパレットを使う。
+10 カテゴリ以下は `tableau10`、11〜12 は `paired`、13〜20 は既存表示との
+互換用 `extended20` を選ぶ。ユーザーがパレットを指定した場合はその収容数までを
+割り当て、超過分に同じ色を循環させない。使用した名前は設定と凡例へ保存し、
+部分更新や再表示でも同じ色対応を維持する。
 
-### 3.7.4. MCP Tools Package (`app.mcp.tools`)
-- **目的**: 巨大化した `tools.py` を機能ごとに分割し、パッケージ化しました。
-- **構造**:
-  - `initialization.py`: ネットワーク初期化・インポート関連 (`initialize_network`, `import_graphml`)
-  - `computation.py`: 計算処理 (`calculate_centrality`, `calculate_layout`, `calculate_community`)
-  - `subgraph.py`: サブグラフ作成・フィルタリング (`create_X_subgraph`, `filter_nodes`)
-  - `visualization.py`: 可視化生成・更新 (`generate_visualization`, `update_node_color`, etc.)
-  - `retrieval.py`: 情報検索・参照 (`search_nodes`, `get_top_nodes`, `list_attributes`)
-- **特徴**: `Annotated` と Pydantic (`Field`) を使用し、LLM向けの正確な JSON Schema を生成可能な定義スタイルに統一しました。
+### 3.7.3a. 数値の対応付けは偏りを扱え、エッジは一様に調整できる
+
+ノードの色・サイズとエッジの色・太さは、どれも `transform`（`linear` / `log` /
+`rank`）と範囲（`value_min` / `value_max`）を受け取る。位置の計算は
+`StyleService` の `NumericStats` 1 か所で行い、4 チャネルが同じ規則に従う。
+
+**根拠**: 中心性のように一部の値だけが極端に大きい指標を線形に対応付けると、
+ほとんどのノードが同じ見た目になる。初心者は「色の違いがわからない」と言い、
+経験者は「対数尺度に」「外れ値で頭打ちに」と言う。どちらも同じ手段で
+解決できるようにした。変換は対数と順位の 2 つに絞った。分位数による段階分けは
+`RANKING` と役割が重なるためである。
+
+エッジの色と太さは属性を省略すると全エッジを一様に描き、エッジの色は
+不透明度も持つ。「エッジを細く薄く」という依頼を、強調表示の減光で
+代用しないためである。不透明度を独立したツールにしなかったのは、
+線の見た目を 1 つのツールにまとめたほうがモデルが選びやすく、リセットの単位
+（`edge_color`）とも一致するからである（ADR 0029）。
+
+### 3.7.4. ツールは機能ドメインごとにパッケージ分割する
+
+ツールは `network` / `node` / `subgraph` / `analysis` / `layout` / `visualization` のドメイン単位でパッケージに分ける。命名は `ドメイン_動詞` に統一する。
+
+**根拠**: エージェントに提示されるツール名の一覧は、それ自体がプロンプトの一部である。名前が規則的であれば、モデルは未知のツール名を推測でき、また「可視化に関するツール」を名前だけで束ねて理解できる。ファイル配置と命名を一致させているのは、この規則性を実装側で崩さないためである。
+
+**ツールの追加**は、正しいドメインのモジュールに関数を書き、パッケージの `__init__.py` から公開するだけでよい。手で登録するスキーマはどこにも存在しない。引数定義には `Annotated` と Pydantic の `Field` を用い、LLM へ送られる JSON Schema が説明文を含む状態を保つ。
+
+### 3.8. 分析の意味を入力から結果まで保つ
+
+無視された引数を成功として返すと、会話の説明と実際の計算が食い違う。
+そのため未対応の指定は明示的に拒否する。アプリ固有の引数を変換した後も、
+残った指定が計算へ届くことを検証する。重みは強度と距離を区別し、経路探索で
+強度を自動的に距離へ読み替えない。判断が必要な場合はSkillsが質問へ導く。
+
+方向性も分析の意味の一部として永続化する。辺の保存順から有向性は復元できない
+ため、方向性を保持していなかった既存データは従来の無向扱いを維持する。
+元の有向性が必要な場合は再インポートする。未対応の分析のために暗黙に無向化
+することはせず、対象に適した操作を選べるエラーを返す。
+
+経路や連結性の問い合わせは結果を返す責務に限定し、抽出や表示切り替えを
+伴わせない。これにより、結果を比較してから次の操作を利用者が選べる。
+判断の背景はADR [0003](../4_Decisions/0003-explicit-analysis-tools.md) と
+[0005](../4_Decisions/0005-graph-direction.md) を参照。
+
+### 計算条件とキャッシュの一致
+
+反復計算の初期値、乱数、収束条件も分析の一部として扱う。同じデータでも
+これらを変更すると結果が変わり得るため、計算に渡す条件をキャッシュ判定
+にも含める。元のエッジ属性を重みに使う場合やノード属性を分割条件に使う
+場合は、トポロジーだけでは変更を検出できない。元属性の値も検査し、派生
+属性の保存がその計算自身のキャッシュを無効にしないよう区別する。
+
+コミュニティ検出は手法別の引数集合を公開する。別手法の引数を無視する
+互換性より、指定が無効だと利用者に伝えられることを優先する。
+
+レイアウトの次元と保存先は、描画・永続化の契約を維持するため固定する。
+それ以外のネイティブ引数を公開したかは、固定したNetworkXのシグネチャと
+公開関数のシグネチャを照合して検査する。乱数の未指定は再現可能な既定値、
+明示的なnullは新しい乱数という違いを保存する。収束条件など分析上の数値は
+バックエンドの汎用的な範囲補正で書き換えず、個別のスキーマと計算が検証する。
+
+多重辺の集約方法には分析上の意味がある。現在の単純グラフ保存モデルで辺を
+暗黙に上書きすると重みや経路を誤るため、多重辺は保存前に拒否する。既存の
+重複辺も再構築時に検出する。合計・最小値などの集約規則は推測せず、入力側で
+明示したデータを受け取る。

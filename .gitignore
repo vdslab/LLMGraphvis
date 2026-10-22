@@ -66,6 +66,9 @@ dmypy.json
 .ruff_cache/
 .flymake*
 
+# Local prompt-evaluation runs (reports, transcripts, screenshots)
+.evaluation/
+
 # Translations
 *.mo
 *.pot
@@ -277,6 +280,7 @@ activemq-data/
 .envrc
 .env.*
 !.env.example
+!.env.sample
 .env*.local
 
 # Virtual Environments (Python)
@@ -349,3 +353,7 @@ backend/application_default_credentials.json
 # No-Docker local runner state (scripts/local): pgdata, venv, logs, pidfiles
 .local/
 .mcp.json
+
+# Playwright MCP scratch output: screenshots, page snapshots, console logs
+# written while driving the frontend. Evidence of a check, not part of the app.
+.playwright-mcp/

@@ -14,6 +14,28 @@ const api = axios.create({
 const RETRY_COUNT = 3;
 const RETRY_DELAY = 1000; // 1 second
 
+export const getApiErrorMessage = (error) => {
+  const detail = error.response?.data?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail.map((item) => item?.msg).filter(Boolean);
+    if (messages.length > 0) return messages.join(', ');
+  }
+  if (detail && typeof detail.message === 'string') return detail.message;
+  return error.message || 'Unknown error occurred';
+};
+
+// A `responseType: 'blob'` request gets its JSON error body as a Blob too,
+// which would hide FastAPI's `detail` from getApiErrorMessage.
+export const readBlobErrorBody = async (data) => {
+  if (!(data instanceof Blob)) return data;
+  try {
+    return JSON.parse(await data.text());
+  } catch {
+    return data;
+  }
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -64,7 +86,10 @@ api.interceptors.response.use(
       window.location.href = '/login';
     }
     // Dispatch global error event for UI notification
-    const errorMessage = error.response?.data?.detail || error.message || 'Unknown error occurred';
+    if (error.response) {
+      error.response.data = await readBlobErrorBody(error.response.data);
+    }
+    const errorMessage = getApiErrorMessage(error);
     window.dispatchEvent(new CustomEvent('api-error', { 
         detail: { 
             message: errorMessage,
@@ -104,10 +129,36 @@ export const updateChat = (chatId, data) => api.patch(`/chat/${chatId}`, data);
 // List available LLM providers/models a chat can be pinned to
 export const getLlmProviders = () => api.get('/chat/providers');
 
+// List and load the bundled sample networks
+export const getSampleNetworks = () => api.get('/chat/samples');
+
+export const loadSampleNetwork = (chatId, sampleId) =>
+  api.post(`/chat/${chatId}/samples/${sampleId}`);
+
+// Token usage and estimated cost of every LLM task in a chat
+export const getChatUsage = (chatId) => api.get(`/chat/${chatId}/usage`);
+
+// Current user's settings, usage report and password
+export const getUserSettings = () => api.get('/users/me/settings');
+
+export const updateUserSettings = (data) => api.patch('/users/me/settings', data);
+
+export const getUserUsage = ({ days, allTime, tz } = {}) =>
+  api.get('/users/me/usage', {
+    params: { days, all_time: allTime || undefined, tz },
+  });
+
+export const changePassword = (currentPassword, newPassword) =>
+  api.post('/auth/change-password', {
+    current_password: currentPassword,
+    new_password: newPassword,
+  });
+
 // Process message
-export const processMessage = (chatId, content) =>
+export const processMessage = (chatId, content, inputResponse = {}) =>
   api.post(`/chat/${chatId}/process`, {
-    message: { content }
+    message: { content },
+    ...inputResponse,
   });
 
 export const uploadGraphML = async (chatId, file) => {

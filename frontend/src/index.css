@@ -1,50 +1,151 @@
 :root {
-  /* Modern Clean Palette (Slate & Blue) */
-  --primary-color: #2563eb;       /* Blue 600 */
-  --primary-hover: #1d4ed8;       /* Blue 700 */
-  --secondary-color: #64748b;     /* Slate 500 */
-  
-  --background-color: #f8fafc;    /* Slate 50 */
-  --surface-color: #ffffff;       /* White */
-  
-  --text-primary: #0f172a;        /* Slate 900 */
-  --text-secondary: #475569;      /* Slate 600 */
-  --text-muted: #94a3b8;          /* Slate 400 */
-  
-  --border-color: #e2e8f0;        /* Slate 200 */
-  
-  --danger-color: #ef4444;        /* Red 500 */
-  --success-color: #22c55e;       /* Green 500 */
-  --warning-color: #f59e0b;       /* Amber 500 */
+  /* ==========================================================================
+     Material Design 3 Expressive (M3 Expressive) System Tokens
+     ========================================================================== */
 
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  /* --- Color Roles (Light Scheme) ---------------------------------------- */
+  /* Primary: Expressive Vibrant Indigo/Blue */
+  --md-sys-color-primary: #3454d1;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #dce1ff;
+  --md-sys-color-on-primary-container: #001552;
+  --md-sys-color-primary-hover: #2643bc;
 
-  /* Spacing */
+  /* Secondary: Coordinating Calm Slate */
+  --md-sys-color-secondary: #585e71;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #dce2f9;
+  --md-sys-color-on-secondary-container: #151b2c;
+
+  /* Tertiary: Warm Expressive Accent (Lilac / Plum) */
+  --md-sys-color-tertiary: #735471;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #fed7f9;
+  --md-sys-color-on-tertiary-container: #2b122c;
+
+  /* Error / Semantic */
+  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #ffdad6;
+  --md-sys-color-on-error-container: #410002;
+
+  --md-sys-color-success: #1b873f;
+  --md-sys-color-on-success: #ffffff;
+  --md-sys-color-success-container: #c4f3ce;
+  --md-sys-color-on-success-container: #00210b;
+
+  --md-sys-color-warning: #bb6200;
+  --md-sys-color-warning-container: #ffddb8;
+  --md-sys-color-on-warning-container: #2b1700;
+
+  /* Surfaces: 5-level Tonal Elevation Containers */
+  --md-sys-color-surface: #fbfcfe;
+  --md-sys-color-on-surface: #1a1c1e;
+  --md-sys-color-surface-variant: #e2e2ec;
+  --md-sys-color-on-surface-variant: #44464f;
+
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f5f6fa;
+  --md-sys-color-surface-container: #eff1f5;
+  --md-sys-color-surface-container-high: #e9ebf0;
+  --md-sys-color-surface-container-highest: #e3e5ea;
+
+  /* Outlines & Dividers */
+  --md-sys-color-outline: #757780;
+  --md-sys-color-outline-variant: #c5c6d0;
+  --md-sys-color-outline-subtle: rgba(117, 119, 128, 0.16);
+
+  /* Inverse */
+  --md-sys-color-inverse-surface: #2f3033;
+  --md-sys-color-inverse-on-surface: #f1f0f4;
+  --md-sys-color-inverse-primary: #b7c4ff;
+
+  /* --- Backward-compatible Aliases -------------------------------------- */
+  --primary-color: var(--md-sys-color-primary);
+  --primary-hover: var(--md-sys-color-primary-hover);
+  --secondary-color: var(--md-sys-color-secondary);
+  --background-color: var(--md-sys-color-surface-container-low);
+  --surface-color: var(--md-sys-color-surface-container-lowest);
+  --text-primary: var(--md-sys-color-on-surface);
+  --text-secondary: var(--md-sys-color-on-surface-variant);
+  --text-muted: var(--md-sys-color-outline);
+  --border-color: var(--md-sys-color-outline-variant);
+  --danger-color: var(--md-sys-color-error);
+  --success-color: var(--md-sys-color-success);
+  --warning-color: var(--md-sys-color-warning);
+
+  /* --- M3 Expressive Shapes ---------------------------------------------- */
+  --md-sys-shape-none: 0px;
+  --md-sys-shape-xs: 4px;
+  --md-sys-shape-sm: 8px;
+  --md-sys-shape-md: 12px;
+  --md-sys-shape-lg: 16px;
+  --md-sys-shape-xl: 24px;
+  --md-sys-shape-xxl: 28px;
+  --md-sys-shape-full: 9999px;
+
+  /* Legacy Radius Aliases */
+  --radius-sm: var(--md-sys-shape-sm);
+  --radius-md: var(--md-sys-shape-md);
+  --radius-lg: var(--md-sys-shape-lg);
+  --radius-xl: var(--md-sys-shape-xl);
+  --radius-xxl: var(--md-sys-shape-xxl);
+  --radius-full: var(--md-sys-shape-full);
+
+  /* --- M3 Tonal & Ambient Elevation Shadows ------------------------------ */
+  --md-sys-elevation-0: none;
+  --md-sys-elevation-1: 0 1px 3px 1px rgba(0, 20, 50, 0.05), 0 1px 2px 0 rgba(0, 20, 50, 0.03);
+  --md-sys-elevation-2: 0 2px 6px 2px rgba(0, 20, 50, 0.06), 0 1px 2px 0 rgba(0, 20, 50, 0.03);
+  --md-sys-elevation-3: 0 4px 14px 3px rgba(0, 20, 50, 0.07), 0 1px 3px 0 rgba(0, 20, 50, 0.03);
+  --md-sys-elevation-4: 0 6px 20px 4px rgba(0, 20, 50, 0.08), 0 2px 5px 0 rgba(0, 20, 50, 0.04);
+  --md-sys-elevation-5: 0 8px 28px 6px rgba(0, 20, 50, 0.09), 0 3px 8px 0 rgba(0, 20, 50, 0.04);
+
+  /* Legacy Shadows Aliases */
+  --shadow-sm: var(--md-sys-elevation-1);
+  --shadow-md: var(--md-sys-elevation-2);
+  --shadow-lg: var(--md-sys-elevation-3);
+  --shadow-xl: var(--md-sys-elevation-4);
+
+  /* --- Spacing ----------------------------------------------------------- */
   --spacing-xs: 0.25rem;
   --spacing-sm: 0.5rem;
   --spacing-md: 1rem;
   --spacing-lg: 1.5rem;
   --spacing-xl: 2rem;
+
+  /* --- M3 Expressive Motion --------------------------------------------- */
+  --md-sys-motion-easing-emphasized: cubic-bezier(0.2, 0.0, 0, 1.0);
+  --md-sys-motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1.0);
+  --md-sys-motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0.0, 0.8, 0.15);
+  --md-sys-motion-easing-standard: cubic-bezier(0.2, 0.0, 0, 1.0);
   
-  /* Radius */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
+  --md-sys-motion-duration-short: 150ms;
+  --md-sys-motion-duration-medium: 250ms;
+  --md-sys-motion-duration-long: 400ms;
+
+  /* --- Typography Families ---------------------------------------------- */
+  --font-family-brand: 'Outfit', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-family-plain: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-family-code: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+}
+
+/* ==========================================================================
+   Global Base Styles
+   ========================================================================== */
+
+* {
+  box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: var(--background-color);
-  color: var(--text-primary);
+  font-family: var(--font-family-plain);
+  background-color: var(--md-sys-color-surface-container-low);
+  color: var(--md-sys-color-on-surface);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  line-height: 1.6;
+  line-height: 1.5;
+  font-size: 0.875rem;
 }
 
 #root {
@@ -53,18 +154,20 @@ body {
   flex-direction: column;
 }
 
-/* Typography */
+/* Typography Hierarchy (M3 Expressive Scale) */
 h1, h2, h3, h4, h5, h6 {
   margin-top: 0;
-  margin-bottom: var(--spacing-md);
-  color: var(--text-primary);
+  margin-bottom: var(--spacing-sm);
+  color: var(--md-sys-color-on-surface);
+  font-family: var(--font-family-brand);
   font-weight: 700;
   line-height: 1.2;
 }
 
-h1 { font-size: 2.5rem; letter-spacing: -0.025em; }
-h2 { font-size: 2rem; letter-spacing: -0.025em; }
-h3 { font-size: 1.5rem; letter-spacing: -0.025em; }
+h1 { font-size: 2.5rem; letter-spacing: -0.03em; }
+h2 { font-size: 1.875rem; letter-spacing: -0.02em; }
+h3 { font-size: 1.375rem; letter-spacing: -0.01em; }
+h4 { font-size: 1.125rem; letter-spacing: 0; }
 
 p {
   margin-top: 0;
@@ -72,119 +175,202 @@ p {
 }
 
 a {
-  color: var(--primary-color);
+  color: var(--md-sys-color-primary);
   text-decoration: none;
-  transition: color 0.2s;
+  transition: color var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard);
 }
 
 a:hover {
-  color: var(--primary-hover);
+  color: var(--md-sys-color-primary-hover);
 }
 
-/* Micro-animations */
+/* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
+  animation: fadeIn var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-emphasized-decelerate) forwards;
 }
 
-/* Components */
+/* ==========================================================================
+   M3 Expressive Component Primitives
+   ========================================================================== */
 
-/* Buttons */
+/* --- Buttons (M3 Expressive Pill & State Layers) ------------------------ */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.625rem 1.25rem;
-  border-radius: var(--radius-md);
+  gap: 0.5rem;
+  padding: 0.625rem 1.375rem;
+  border-radius: var(--md-sys-shape-full);
+  font-family: var(--font-family-brand);
+  font-size: 0.875rem;
   font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.25rem;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: all 0.2s ease;
-  font-size: 0.875rem;
-  line-height: 1.25rem;
   text-decoration: none;
-  gap: 0.5rem;
+  transition: all var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-emphasized);
+  position: relative;
+  overflow: hidden;
 }
 
 .btn:disabled {
-  opacity: 0.6;
+  opacity: 0.45;
   cursor: not-allowed;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
-.btn-primary {
-  background-color: var(--primary-color);
-  color: white;
-  box-shadow: var(--shadow-sm);
+/* Filled Button (High-emphasis) */
+.btn-primary,
+.btn-m3-filled {
+  background-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  box-shadow: var(--md-sys-elevation-1);
 }
 
-.btn-primary:hover:not(:disabled) {
-  background-color: var(--primary-hover);
-  box-shadow: var(--shadow-md);
+.btn-primary:hover:not(:disabled),
+.btn-m3-filled:hover:not(:disabled) {
+  background-color: var(--md-sys-color-primary-hover);
+  box-shadow: var(--md-sys-elevation-2);
   transform: translateY(-1px);
 }
 
-.btn-secondary {
-  background-color: var(--surface-color);
-  color: var(--text-primary);
-  border-color: var(--border-color);
-  box-shadow: var(--shadow-sm);
+.btn-primary:active:not(:disabled),
+.btn-m3-filled:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--md-sys-elevation-1);
 }
 
-.btn-secondary:hover:not(:disabled) {
-  background-color: #f1f5f9;
-  border-color: #cbd5e1;
+/* Filled Tonal Button (Medium-emphasis) */
+.btn-secondary,
+.btn-m3-tonal {
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  border-color: transparent;
 }
 
-.btn-ghost {
+.btn-secondary:hover:not(:disabled),
+.btn-m3-tonal:hover:not(:disabled) {
+  background-color: #cfd6f2;
+  box-shadow: var(--md-sys-elevation-1);
+  transform: translateY(-1px);
+}
+
+/* Outlined Button (Medium-emphasis) */
+.btn-outline,
+.btn-m3-outlined {
+  background-color: var(--md-sys-color-surface-container-lowest);
+  color: var(--md-sys-color-primary);
+  border-color: var(--md-sys-color-outline-variant);
+}
+
+.btn-outline:hover:not(:disabled),
+.btn-m3-outlined:hover:not(:disabled) {
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  border-color: var(--md-sys-color-primary);
+}
+
+/* Ghost / Text Button (Low-emphasis) */
+.btn-ghost,
+.btn-m3-text {
   background-color: transparent;
-  color: var(--text-secondary);
+  color: var(--md-sys-color-on-surface-variant);
+  border-color: transparent;
 }
 
-.btn-ghost:hover:not(:disabled) {
-  background-color: rgba(0,0,0,0.05);
-  color: var(--text-primary);
+.btn-ghost:hover:not(:disabled),
+.btn-m3-text:hover:not(:disabled) {
+  background-color: rgba(52, 84, 209, 0.08);
+  color: var(--md-sys-color-primary);
 }
 
-/* Inputs */
+/* --- M3 Expressive Text Inputs ------------------------------------------ */
 .input {
   display: block;
   width: 100%;
-  padding: 0.625rem 0.875rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background-color: var(--surface-color);
-  color: var(--text-primary);
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--md-sys-shape-lg);
+  background-color: var(--md-sys-color-surface-container-lowest);
+  color: var(--md-sys-color-on-surface);
+  font-family: inherit;
   font-size: 0.875rem;
-  transition: all 0.2s;
-  box-sizing: border-box;
+  transition: all var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard);
+}
+
+.input::placeholder {
+  color: var(--md-sys-color-outline);
 }
 
 .input:focus {
   outline: none;
-  border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: var(--md-sys-color-primary);
+  box-shadow: 0 0 0 3px rgba(52, 84, 209, 0.15);
+  background-color: #ffffff;
 }
 
-/* Cards */
+/* --- M3 Expressive Cards ------------------------------------------------- */
 .card {
-  background-color: var(--surface-color);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-md);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  background-color: var(--md-sys-color-surface-container-lowest);
+  border-radius: var(--md-sys-shape-xxl);
+  box-shadow: var(--md-sys-elevation-1);
+  border: 1px solid var(--md-sys-color-outline-subtle);
+  padding: var(--spacing-xl);
+  transition: all var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-emphasized);
+}
+
+.card-elevated {
+  background-color: var(--md-sys-color-surface-container-lowest);
+  border-radius: var(--md-sys-shape-xxl);
+  box-shadow: var(--md-sys-elevation-2);
+  border: 1px solid var(--md-sys-color-outline-subtle);
   padding: var(--spacing-xl);
 }
 
-/* Layout Utilities */
+.card-elevated:hover {
+  box-shadow: var(--md-sys-elevation-3);
+  transform: translateY(-2px);
+}
+
+/* --- M3 Expressive Chips & Badges --------------------------------------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3125rem 0.75rem;
+  border-radius: var(--md-sys-shape-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1rem;
+  background-color: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+  border: 1px solid transparent;
+  transition: all var(--md-sys-motion-duration-short) ease;
+}
+
+.chip-primary {
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.chip-secondary {
+  background-color: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+/* --- Layout Utilities ---------------------------------------------------- */
 .container {
   width: 100%;
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 var(--spacing-lg);
-  box-sizing: border-box;
 }
 
 .flex { display: flex; }
@@ -198,24 +384,25 @@ a:hover {
 .w-full { width: 100%; }
 .h-full { height: 100%; }
 
-/* Auth Pages */
+/* --- Auth Pages (M3 Expressive Styling) ---------------------------------- */
 .auth-container {
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at top right, #e0f2fe, #f8fafc, #f1f5f9);
+  background: radial-gradient(circle at top right, #e8edff, var(--md-sys-color-surface-container-low), #e5e9f4);
+  padding: 1.5rem;
 }
 
 .auth-card {
   width: 100%;
-  max-width: 420px;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  padding: 2.5rem;
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-xl);
-  border: 1px solid white;
+  max-width: 440px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px);
+  padding: 2.75rem 2.25rem;
+  border-radius: var(--md-sys-shape-xxl);
+  box-shadow: var(--md-sys-elevation-3);
+  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .auth-title {
@@ -223,36 +410,35 @@ a:hover {
   font-weight: 800;
   text-align: center;
   margin-bottom: 2rem;
-  background: linear-gradient(135deg, var(--primary-color), #4f46e5);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--md-sys-color-on-surface);
+  letter-spacing: -0.02em;
 }
 
 .form-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.375rem;
 }
 
 .form-label {
   display: block;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
-  color: var(--text-secondary);
+  color: var(--md-sys-color-on-surface-variant);
+  letter-spacing: 0.01em;
 }
 
 .error-message {
-  background-color: #fef2f2;
-  color: #b91c1c;
-  padding: 0.75rem;
-  border-radius: var(--radius-md);
+  background-color: var(--md-sys-color-error-container);
+  color: var(--md-sys-color-on-error-container);
+  padding: 0.875rem 1rem;
+  border-radius: var(--md-sys-shape-md);
   margin-bottom: 1.5rem;
-  font-size: 0.875rem;
-  border: 1px solid #fecaca;
+  font-size: 0.8125rem;
+  border: 1px solid rgba(186, 26, 26, 0.2);
   display: flex;
   align-items: center;
+  gap: 0.5rem;
 }
-
 
 @keyframes spin {
   from { transform: rotate(0deg); }
@@ -264,9 +450,7 @@ a:hover {
   display: inline-block;
 }
 
-/* Chat markdown content: LLM output can contain long unbroken tokens, code
-   blocks, or GFM tables that would otherwise force the chat panel wider
-   than its container instead of wrapping/scrolling within it. */
+/* Chat markdown content */
 .markdown-content {
   overflow-wrap: break-word;
   word-break: break-word;
@@ -275,7 +459,8 @@ a:hover {
 .markdown-content pre {
   overflow-x: auto;
   max-width: 100%;
-  box-sizing: border-box;
+  border-radius: var(--md-sys-shape-md);
+  background: var(--md-sys-color-surface-container-highest);
 }
 
 .markdown-content pre code {
@@ -287,8 +472,20 @@ a:hover {
   display: block;
   overflow-x: auto;
   max-width: 100%;
+  border-collapse: collapse;
+}
+
+.markdown-content th,
+.markdown-content td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--md-sys-color-outline-variant);
+}
+
+.markdown-content th {
+  background-color: var(--md-sys-color-surface-container);
 }
 
 .markdown-content img {
   max-width: 100%;
+  border-radius: var(--md-sys-shape-md);
 }

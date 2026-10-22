@@ -1,51 +1,103 @@
-from typing import Annotated, Optional
-from pydantic import Field
-from app.core.mcp import mcp
+"""Path tools compute results without changing attributes or the active view."""
+
+import json
+from typing import Annotated, Literal
+
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
-import logging
-import json
+from app.core.mcp import mcp
+from app.logic import paths
+from pydantic import Field
 
-logger = logging.getLogger(__name__)
+NetworkId = Annotated[int, Field(description="ID of the network to query.")]
+NodeId = Annotated[str, Field(description="Exact string node ID; use node_search for labels.")]
+Cost = Annotated[str | None, Field(description="Omit (the default) to count hops, which is the right answer unless the user said edges are distances, costs or travel times. A named numeric edge attribute is summed as a COST: larger means farther. The imported 'weight' of most networks (co-occurrences, interaction counts, similarities) is a STRENGTH, where larger means closer; passing it here makes the most tightly connected pairs look farthest apart. Missing edge values default to 1.")]
+Method = Annotated[Literal["dijkstra", "bellman-ford"], Field(description="Weighted-path algorithm. Dijkstra requires nonnegative costs. Bellman-Ford supports negative costs but rejects reachable negative cycles. With no weight, unweighted traversal is used.")]
 
 
 @mcp.tool()
 @handle_tool_errors
 def analysis_shortest_path(
-    network_id: Annotated[int, Field(description="The ID of the network.")],
-    source_node_id: Annotated[str, Field(description="The string ID of the source node.")],
-    target_node_id: Annotated[str, Field(description="The string ID of the target node.")]
+    network_id: NetworkId,
+    source_node_id: NodeId,
+    target_node_id: NodeId,
+    weight: Cost = None,
+    method: Method = "dijkstra",
 ) -> str:
-    """
-    Finds the shortest path between two nodes in the network.
+    """Return one shortest path, total cost (length), and hops; respect edge direction.
 
-    Returns the sequence of node IDs forming the shortest path, along with the path length.
-    If no path exists (disconnected graph), returns an appropriate message.
-    Use `node_search` first if you need to find node IDs by label.
-
-    Returns:
-        str: JSON with {"path": [node_ids], "length": int} or {"error": str}.
+    Read-only: does not extract a subgraph, change styles, or render. Multiple
+    equally short paths may exist; this returns one. No path is a normal result.
+    Negative cycles make weighted shortest paths undefined and return an error.
     """
     with get_db_context() as db:
-        import networkx as nx
-        from app.logic.utils.graph_builder import build_graph_from_db
+        return json.dumps(paths.shortest_path(
+            network_id, source_node_id, target_node_id, db, weight, method
+        ))
 
-        G = build_graph_from_db(network_id, db)
 
-        if source_node_id not in G:
-            return json.dumps({"error": f"Source node '{source_node_id}' not found in network."})
-        if target_node_id not in G:
-            return json.dumps({"error": f"Target node '{target_node_id}' not found in network."})
+@mcp.tool()
+@handle_tool_errors
+def analysis_single_source_distances(
+    network_id: NetworkId,
+    source_node_id: NodeId,
+    weight: Cost = None,
+    method: Method = "dijkstra",
+    cutoff: Annotated[float | None, Field(ge=0, allow_inf_nan=False, description="Maximum returned distance/cost, inclusive. Omit for all reachable nodes. With negative costs filtering occurs after Bellman-Ford finishes.")] = None,
+    limit: Annotated[int, Field(ge=1, le=500, description="How many of the nearest reachable nodes to list in `distances`. `reachable_count` and `summary` (whose `distribution` maps hop count -> node count for unweighted queries) always cover every reachable node.")] = 30,
+    target_node_ids: Annotated[list[str] | None, Field(description="Exact node IDs whose distance you need. When given, `distances` lists exactly these (null = unreachable or beyond cutoff) and `limit` is ignored.")] = None,
+) -> dict:
+    """Return distances from one node to reachable nodes, optionally within a cutoff.
 
-        try:
-            path = nx.shortest_path(G, source=source_node_id, target=target_node_id)
-            return json.dumps({
-                "path": path,
-                "length": len(path) - 1,
-                "source": source_node_id,
-                "target": target_node_id
-            })
-        except nx.NetworkXNoPath:
-            return json.dumps({
-                "error": f"No path exists between '{source_node_id}' and '{target_node_id}' (disconnected graph)."
-            })
+    The source has distance zero. `distances` lists the nearest `limit` nodes,
+    or exactly `target_node_ids`; nodes not listed are not thereby unreachable,
+    so read `reachable_count` for how many are. Never interpret an unlisted
+    node as distance zero. Read-only; follows outgoing edges of directed
+    graphs. No node attributes or visualization are changed.
+    """
+    with get_db_context() as db:
+        return paths.single_source_distances(
+            network_id, source_node_id, db, weight, method, cutoff,
+            limit=limit, targets=target_node_ids,
+        )
+
+
+@mcp.tool()
+@handle_tool_errors
+def analysis_has_path(
+    network_id: NetworkId,
+    source_node_id: NodeId,
+    target_node_id: NodeId,
+) -> dict:
+    """Check reachability without computing costs or changing the graph/view.
+
+    Respects edge direction. Weights are irrelevant; a node can reach itself.
+    Unknown node IDs are errors rather than an unreachable result.
+    """
+    with get_db_context() as db:
+        return paths.has_path(network_id, source_node_id, target_node_id, db)
+
+
+@mcp.tool()
+@handle_tool_errors
+def analysis_k_shortest_paths(
+    network_id: NetworkId,
+    source_node_id: NodeId,
+    target_node_id: NodeId,
+    k: Annotated[int, Field(ge=1, le=10, description="How many alternative routes to return, shortest first.")] = 3,
+    weight: Cost = None,
+) -> dict:
+    """Return up to k loopless routes between two nodes, shortest first.
+
+    Use when the user asks for several routes, alternatives, or "other ways"
+    from A to B; for the single best route use analysis_shortest_path. Each
+    route has its node sequence, hops and total cost (length). Respects edge
+    direction; costs must be nonnegative. Read-only: to show a route, pass its
+    `path` to visualization_highlight(edges='path').
+    """
+    from app.logic import exploration
+
+    with get_db_context() as db:
+        return exploration.k_shortest_paths(
+            network_id, db, source_node_id, target_node_id, k, weight
+        )

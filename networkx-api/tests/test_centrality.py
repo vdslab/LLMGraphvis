@@ -62,9 +62,18 @@ def test_calculate_unknown_metric(db):
 
 def test_get_top_nodes(db):
     setup_simple_network(db)
-    
-    # Get top 1 node by degree
-    top = get_top_nodes(1, "degree", 1, "desc", db)
-    
+    # get_top_nodes reads an already-computed attribute, so it has to exist first.
+    calculate_centrality(1, "degree", db)
+
+    # The metric is the exact saved attribute name ('degree_centrality'), not the
+    # short centrality_type ('degree') that calculate_centrality takes.
+    top = get_top_nodes(1, "degree_centrality", 1, "desc", db)
+
     assert len(top) == 1
     assert top[0]["node_id"] == "n0"
+
+
+def test_get_top_nodes_rejects_an_uncomputed_metric(db):
+    setup_simple_network(db)
+    with pytest.raises(ValueError, match="has not been computed"):
+        get_top_nodes(1, "degree_centrality", 1, "desc", db)

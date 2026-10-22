@@ -1,7 +1,11 @@
-import pytest
 from unittest.mock import MagicMock, patch
-from app.mcp import tools
-from app.mcp import resources
+
+import pytest
+from app.core.mcp import mcp
+from app.mcp import resources, tools
+
+from common import models
+
 
 @pytest.fixture
 def mock_importer():
@@ -60,3 +64,62 @@ def test_resources_execution():
             assert res == {"name": "Test"}
             mock_meta.assert_called_with(mock_db, 1)
             mock_db.close.assert_called()
+
+
+def test_resources_return_data_not_errors(db):
+    """Every resource must reach a logic function that still exists.
+
+    Resources swallow exceptions into {"error": ...}, so a renamed logic helper
+    fails silently — which is how the attribute resources shipped broken and the
+    backend reported "no attributes" for every network.
+    """
+    net = models.Network(name="ResourceNet", description="desc")
+    db.add(net)
+    db.commit()
+
+    n1 = models.Node(network_id=net.id, node_id="n1", label="N1")
+    n2 = models.Node(network_id=net.id, node_id="n2", label="N2")
+    db.add_all([n1, n2])
+    db.commit()
+    db.add(
+        models.Edge(
+            network_id=net.id,
+            edge_id="e1",
+            source_node_id=n1.id,
+            target_node_id=n2.id,
+        )
+    )
+    db.commit()
+
+    session_proxy = MagicMock(wraps=db)
+    session_proxy.close.return_value = None
+
+    with patch("app.core.database.SessionLocal", return_value=session_proxy):
+        assert resources.get_network_metadata(net.id)["name"] == "ResourceNet"
+
+        structure = resources.get_structure_resource(net.id)
+        assert structure["node_count"] == 2
+        assert structure["edge_count"] == 1
+
+        # A list (the core attributes are always present), never an error dict.
+        node_attrs = resources.get_node_attributes_resource(net.id)
+        edge_attrs = resources.get_edge_attributes_resource(net.id)
+        assert isinstance(node_attrs, list)
+        assert isinstance(edge_attrs, list)
+        assert "label" in {a["name"] for a in node_attrs}
+        assert resources.get_subgraphs_resource(net.id) == []
+
+
+def test_resources_declare_json_mime_type():
+    """The backend parses resource bodies as JSON; FastMCP defaults templates to
+    text/plain unless mime_type is passed explicitly."""
+    templates = mcp._resource_manager._templates.values()
+    network_templates = [
+        t for t in templates if str(t.uri_template).startswith("network://")
+    ]
+
+    assert network_templates, "no network:// resource templates registered"
+    for template in network_templates:
+        assert template.mime_type == "application/json", (
+            f"{template.uri_template} declares {template.mime_type}"
+        )

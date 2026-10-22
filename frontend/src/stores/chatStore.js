@@ -9,25 +9,67 @@ import {
   updateChat as updateChatAPI,
   processMessage as processMessageAPI,
   uploadGraphML,
-  getLlmProviders
+  getLlmProviders,
+  getChatUsage,
+  getSampleNetworks,
+  loadSampleNetwork as loadSampleNetworkAPI,
+  getApiErrorMessage,
 } from '../services/api';
+
+export const EMPTY_USAGE_TOTALS = {
+  input_tokens: 0,
+  output_tokens: 0,
+  cached_input_tokens: 0,
+  cache_write_tokens: 0,
+  reasoning_tokens: 0,
+  estimated_cost_usd: 0,
+  unpriced_count: 0,
+  task_count: 0,
+  request_count: 0,
+};
+const EMPTY_CHAT_USAGE = { chatId: null, totals: EMPTY_USAGE_TOTALS, entries: [] };
+const EMPTY_TURN_USAGE = {
+  input_tokens: 0,
+  output_tokens: 0,
+  cached_input_tokens: 0,
+  cache_write_tokens: 0,
+  reasoning_tokens: 0,
+  estimated_cost_usd: 0,
+  provider: null,
+  model: null,
+};
 
 export const useChatStore = create((set, get) => ({
   chatId: null,
+  chatName: null,
   messages: [],
   isLoading: false,
   thinkingMessage: null,
   streamingMessageId: null,
   runningTool: null,
+  // Backend pipeline steps for the turn in progress. Kept apart from
+  // thinkingMessage on purpose: these are our labels, not model reasoning.
+  progressSteps: [],
+  // Tool results that finished before the assistant message they belong to
+  // existed; adopted by appendMessageChunk when it creates that message.
+  pendingToolExecutions: [],
 
   // Per-chat LLM provider/model pin (null means "use server default")
   chatProvider: null,
   chatModel: null,
   llmProviders: [],
 
-  // Token/cost usage tracking (Stage 7)
-  chatUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0 },   // lifetime total for this chat session (client-side accumulation across turns)
-  currentTurnUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0, provider: null, model: null },  // running total for the turn currently in progress
+  // Bundled starter data, loaded from the backend so the UI never hardcodes
+  // which samples are installed.
+  sampleNetworks: [],
+  sampleNetworksStatus: 'idle',
+  sampleNetworksError: null,
+
+  // Token/cost usage (ADR 0025). chatUsage is what the backend stored for this
+  // chat — the only source of truth; currentTurnUsage is the live running total
+  // of the turn in progress, shown on top of it until the turn is stored.
+  chatUsage: EMPTY_CHAT_USAGE,
+  currentTurnUsage: EMPTY_TURN_USAGE,
 
   // Get all chats for current user
   fetchChats: async () => {
@@ -53,7 +95,11 @@ export const useChatStore = create((set, get) => ({
        useNetworkStore.getState().setNetworkId(res.data.network_id);
     }
 
-    set({ chatProvider: res.data.provider ?? null, chatModel: res.data.model ?? null });
+    set({
+      chatName: res.data.name ?? null,
+      chatProvider: res.data.provider ?? null,
+      chatModel: res.data.model ?? null,
+    });
 
     return res.data;
   },
@@ -64,6 +110,23 @@ export const useChatStore = create((set, get) => ({
     const res = await getLlmProviders();
     set({ llmProviders: res.data });
     return res.data;
+  },
+
+  fetchSampleNetworks: async () => {
+    if (get().sampleNetworksStatus === 'success') return get().sampleNetworks;
+
+    set({ sampleNetworksStatus: 'loading', sampleNetworksError: null });
+    try {
+      const res = await getSampleNetworks();
+      set({ sampleNetworks: res.data, sampleNetworksStatus: 'success' });
+      return res.data;
+    } catch (error) {
+      set({
+        sampleNetworksStatus: 'error',
+        sampleNetworksError: getApiErrorMessage(error),
+      });
+      throw error;
+    }
   },
 
   // Pin (or clear, with null) this chat's provider/model
@@ -83,22 +146,24 @@ export const useChatStore = create((set, get) => ({
     // Race condition guard
     if (get().chatId !== id) return;
 
-    let inputTokens = 0;
-    let outputTokens = 0;
-    let estimatedCostUsd = 0;
-
-    res.data.forEach(msg => {
-      if (msg.usage) {
-        inputTokens += msg.usage.input_tokens || 0;
-        outputTokens += msg.usage.output_tokens || 0;
-        estimatedCostUsd += msg.usage.estimated_cost_usd || 0;
-      }
+    set({ messages: res.data });
+    // Usage is loaded on its own so a failure there never hides the messages.
+    get().fetchChatUsage(id).catch((error) => {
+      console.warn('Failed to load chat usage:', error);
     });
+    return res.data;
+  },
 
-    set({ 
-      messages: res.data,
-      chatUsage: { inputTokens, outputTokens, estimatedCostUsd },
-      currentTurnUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0, provider: null, model: null }
+  // Load what the backend stored for this chat: every turn and chat title,
+  // including turns that ended in an error. Replaces the live turn total.
+  fetchChatUsage: async (chatId = null) => {
+    const id = chatId || get().chatId;
+    if (!id) return null;
+    const res = await getChatUsage(id);
+    if (get().chatId !== id) return null;
+    set({
+      chatUsage: { chatId: id, totals: res.data.totals, entries: res.data.entries },
+      currentTurnUsage: EMPTY_TURN_USAGE,
     });
     return res.data;
   },
@@ -106,76 +171,203 @@ export const useChatStore = create((set, get) => ({
   // Create a new chat
   createChat: async (name) => {
     const res = await createChatAPI(name);
-    set({ chatId: res.data.id, messages: [] });
+    set({ chatId: res.data.id, chatName: res.data.name ?? null, messages: [] });
     useNetworkStore.getState().setNetworkId(res.data.network_id);
     return res.data;
   },
 
-  // Rename a chat
+  // Rename a chat. The backend marks any name sent from here as user-chosen, so
+  // auto-naming (upload filename / generated title) stops touching this chat.
   renameChat: async (chatId, name) => {
-    const res = await import('../services/api').then(module => module.updateChat(chatId, { name }));
-    // We don't strictly manage the chats list in store but since ChatList calls fetchChats on mount, and we might want to update it.
-    // Ideally we should just return success and let component handle or update list if we had one.
-    // Let's just return data. The component can optimistically update or refetch.
+    const res = await updateChatAPI(chatId, { name });
+    if (get().chatId === chatId) {
+      set({ chatName: res.data.name ?? null });
+    }
     return res.data;
   },
 
+  // Name assigned by the backend (chat_renamed SSE event)
+  setChatName: (name) => set({ chatName: name }),
+
   // Upload network file to chat
   uploadNetwork: async (chatId, file) => {
-    set({ isLoading: true, thinkingMessage: "" });
+    get().beginTurn();
     try {
       await uploadGraphML(chatId, file);
       // Response is 202 Accepted.
       // SSE will handle the rest.
     } catch (error) {
       console.error("Failed to upload network:", error);
-      set({ isLoading: false, thinkingMessage: null });
+      get().endTurn();
       throw error;
     }
   },
 
-  // Send message to process
-  sendMessage: async (content) => {
-    const { chatId, messages } = get();
-    // Optimistic update - add user message immediately
-    const newMessage = { role: 'user', content, id: Date.now(), created_at: new Date().toISOString() };
-    set({ messages: [...messages, newMessage], isLoading: true, thinkingMessage: "" });
+  loadSampleNetwork: async (chatId, sampleId) => {
+    get().beginTurn();
+    try {
+      await loadSampleNetworkAPI(chatId, sampleId);
+      // Response is 202 Accepted; SSE completes the shared import pipeline.
+    } catch (error) {
+      console.error("Failed to load sample network:", error);
+      get().endTurn();
+      throw error;
+    }
+  },
+
+  // --- Turn lifecycle -------------------------------------------------------
+  // A turn is one POST that the backend answers 202 to, followed by SSE events
+  // until a terminal one (message / message_complete / error). Everything that
+  // is only true *during* a turn is set and cleared here, in one place, so a
+  // mid-turn event like render_update can no longer half-end the turn.
+
+  beginTurn: () => set({
+    isLoading: true,
+    thinkingMessage: null,
+    progressSteps: [],
+    runningTool: null,
+    pendingToolExecutions: [],
+  }),
+
+  endTurn: () => {
+    set({
+      isLoading: false,
+      thinkingMessage: null,
+      progressSteps: [],
+      runningTool: null,
+      streamingMessageId: null,
+      pendingToolExecutions: [],
+    });
+    // A message the user wrote while this turn was running goes out now.
+    get().dispatchQueued();
+  },
+
+  // A new running step implicitly finishes the previous one, so the backend
+  // only has to name what it is starting.
+  setProgress: ({ label, status }) => set((state) => {
+    const steps = state.progressSteps.map((step) => ({ ...step, status: 'done' }));
+    const existing = steps.findIndex((step) => step.label === label);
+    if (existing !== -1) {
+      steps[existing].status = status;
+      return { progressSteps: steps, isLoading: true };
+    }
+    return { progressSteps: [...steps, { label, status }], isLoading: true };
+  }),
+
+  // --- Sending --------------------------------------------------------------
+
+  setMessageStatus: (localId, status) => set((state) => ({
+    messages: state.messages.map((message) =>
+      message.localId === localId ? { ...message, status } : message
+    ),
+  })),
+
+  /**
+   * Post a queued message and open a turn for it.
+   *
+   * The user message is already on screen at this point — it is added the
+   * instant the user hits send, and only its status changes here.
+   */
+  dispatchMessage: async (localId) => {
+    const message = get().messages.find((m) => m.localId === localId);
+    if (!message) return;
+
+    get().beginTurn();
+    get().setMessageStatus(localId, 'sending');
 
     try {
-      await processMessageAPI(chatId, content);
-      // Response is 202 Accepted.
-      // SSE will handle the rest.
+      const response = message.inputResponse
+        ? await processMessageAPI(get().chatId, message.content, message.inputResponse)
+        : await processMessageAPI(get().chatId, message.content);
+      if (response?.data?.status === 'already_accepted') {
+        await get().fetchMessages();
+        get().endTurn();
+        return true;
+      }
+      // 202 Accepted; SSE carries the rest of the turn.
+      get().setMessageStatus(localId, 'sent');
+      return true;
     } catch (error) {
       console.error("Failed to send message:", error);
-      set({ isLoading: false, thinkingMessage: null });
-      throw error;
+      get().setMessageStatus(localId, 'failed');
+      set({ isLoading: false, thinkingMessage: null, progressSteps: [] });
+      return false;
     }
   },
-  
+
+  /**
+   * Show the user's message immediately, then send it.
+   *
+   * Sending during a turn is allowed: the message is parked with status
+   * 'queued' and dispatched by endTurn(). One turn at a time is a backend
+   * constraint (a turn reads the chat history it is about to extend), not a
+   * reason to take the keyboard away from the user.
+   */
+  sendMessage: async (content, inputResponse = null) => {
+    const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const busy = get().isLoading;
+
+    set((state) => ({
+      messages: [...state.messages, {
+        id: localId,
+        localId,
+        role: 'user',
+        content,
+        inputResponse,
+        created_at: new Date().toISOString(),
+        status: busy ? 'queued' : 'sending',
+      }],
+    }));
+
+    if (busy) return;
+    return await get().dispatchMessage(localId);
+  },
+
+  dispatchQueued: () => {
+    if (get().isLoading) return;
+    const next = get().messages.find((message) => message.status === 'queued');
+    if (next) get().dispatchMessage(next.localId);
+  },
+
+  retryMessage: async (message) => {
+    if (get().isLoading) {
+      get().setMessageStatus(message.localId, 'queued');
+      return;
+    }
+    await get().dispatchMessage(message.localId);
+  },
+
   // Export network as GraphML
   exportNetworkAsGraphML: async (chatId = null) => {
     const id = chatId || get().chatId;
     if (!id) return;
     
     const response = await exportNetwork(id);
-    
-    // Create a download link
-    const url = window.URL.createObjectURL(new Blob([response.data]));
+
+    // Prefer the server's filename: it names the network actually exported,
+    // which is a subgraph when one is selected.
+    const disposition = response.headers?.['content-disposition'] || '';
+    const filename =
+      disposition.match(/filename="?([^";]+)"?/)?.[1] || `network_${id}.graphml`;
+    const blob = new Blob([response.data], { type: 'application/graphml+xml' });
+    const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `network_${id}.graphml`);
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     link.remove();
+    // Revoked after the browser has started the download, not before.
+    setTimeout(() => window.URL.revokeObjectURL(url), 1000);
   },
 
   addMessage: (message) => {
     set((state) => {
       // Deduplicate: Check if message with same ID already exists
       if (state.messages.some(m => m.id === message.id)) {
-        return { isLoading: false, thinkingMessage: null };
+        return {};
       }
-      
+
       // Also check if we have a streaming message that needs to be replaced/merged
       // This handles the race condition where `message` event arrives but we have a `isStreaming` placeholder
       
@@ -192,20 +384,14 @@ export const useChatStore = create((set, get) => ({
             }
             return m;
          });
-         return { 
-            messages: updatedMessages, 
-            isLoading: false, 
-            thinkingMessage: null,
-            streamingMessageId: null 
-         };
+         return { messages: updatedMessages };
       }
 
-      return { 
-        messages: [...state.messages, message],
-        isLoading: false,
-        thinkingMessage: null
-      };
+      return { messages: [...state.messages, message] };
     });
+    // `message` is terminal for the turn that produced it (the upload
+    // pipeline's only output, or an assistant reply delivered whole).
+    get().endTurn();
   },
 
   appendMessageChunk: (content) => {
@@ -233,7 +419,8 @@ export const useChatStore = create((set, get) => ({
           thinkingMessage: null 
         };
       } else {
-        // Create new
+        // Create new, adopting any tool results that finished before there was
+        // a message to hold them.
         const newId = Date.now();
         const newMessage = {
           role: 'assistant',
@@ -241,12 +428,13 @@ export const useChatStore = create((set, get) => ({
           id: newId,
           created_at: new Date().toISOString(),
           isStreaming: true,
-          tool_executions: []
+          tool_executions: state.pendingToolExecutions
         };
-        return { 
+        return {
           messages: [...messages, newMessage],
           thinkingMessage: null,
-          streamingMessageId: newId
+          streamingMessageId: newId,
+          pendingToolExecutions: []
         };
       }
     });
@@ -254,7 +442,14 @@ export const useChatStore = create((set, get) => ({
 
   addToolExecutionToStreamingMessage: (toolData) => {
       set((state) => {
-          if (!state.streamingMessageId) return {};
+          // A tool can finish before the assistant has emitted any text, so
+          // there is no message to attach it to yet. Hold it: the transcript
+          // marker that refers to it by index arrives moments later, and
+          // dropping it here left that marker rendering as a tool stuck on
+          // "running" for the rest of the turn.
+          if (!state.streamingMessageId) {
+              return { pendingToolExecutions: [...state.pendingToolExecutions, toolData] };
+          }
 
           const messages = [...state.messages];
           const idx = messages.findIndex(m => m.id === state.streamingMessageId);
@@ -289,9 +484,20 @@ export const useChatStore = create((set, get) => ({
         if (tool_executions) {
             messages[idx].tool_executions = tool_executions;
         }
+      } else if (realId && content && !messages.some(m => m.id === realId)) {
+        // Nothing streamed (e.g. the model failed before its first chunk):
+        // the stored reply arrives only here, so add it.
+        messages.push({
+          id: realId,
+          role: 'assistant',
+          content,
+          created_at: new Date().toISOString(),
+          tool_executions: tool_executions || [],
+        });
       }
-      return { messages, isLoading: false, thinkingMessage: null, streamingMessageId: null };
+      return { messages };
     });
+    get().endTurn();
   },
 
   setThinkingMessage: (msg) => set({ thinkingMessage: msg }),
@@ -305,34 +511,22 @@ export const useChatStore = create((set, get) => ({
 
   setChatId: (id) => set({ chatId: id }),
 
-  // Usage tracking (Stage 7): usage_update SSE events carry a RUNNING TOTAL for the
-  // in-progress turn (not deltas), so this replaces currentTurnUsage wholesale each time.
+  // usage_update SSE events carry a RUNNING TOTAL for the in-progress turn (not
+  // deltas), so this replaces currentTurnUsage wholesale each time.
   setCurrentTurnUsage: (data) => set({
-    currentTurnUsage: {
-      inputTokens: data.input_tokens ?? 0,
-      outputTokens: data.output_tokens ?? 0,
-      estimatedCostUsd: data.estimated_cost_usd ?? 0,
-      provider: data.provider ?? null,
-      model: data.model ?? null,
-    }
+    currentTurnUsage: { ...EMPTY_TURN_USAGE, ...data },
   }),
 
-  // Folds the now-final currentTurnUsage into the lifetime chatUsage total, then
-  // resets currentTurnUsage for the next turn. Call this once, when a turn fully completes.
-  commitTurnUsage: () => set((state) => ({
-    chatUsage: {
-      inputTokens: state.chatUsage.inputTokens + state.currentTurnUsage.inputTokens,
-      outputTokens: state.chatUsage.outputTokens + state.currentTurnUsage.outputTokens,
-      estimatedCostUsd: state.chatUsage.estimatedCostUsd + state.currentTurnUsage.estimatedCostUsd,
-    },
-    currentTurnUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0, provider: null, model: null },
-  })),
+  // The turn (or a chat title) has been stored: reload the stored totals, which
+  // now include it, instead of adding the live numbers client-side.
+  refreshUsage: () => {
+    get().fetchChatUsage().catch((error) => {
+      console.warn('Failed to refresh chat usage:', error);
+    });
+  },
 
-  // Note: no existing reset()/clearChat()-style action was found in this store to hook into
-  // (chat switches go through setChatId + fetchChat + fetchMessages, none of which "reset" state).
-  // This action is provided for future wiring but is not currently called anywhere.
   resetUsage: () => set({
-    chatUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0 },
-    currentTurnUsage: { inputTokens: 0, outputTokens: 0, estimatedCostUsd: 0, provider: null, model: null }
+    chatUsage: EMPTY_CHAT_USAGE,
+    currentTurnUsage: EMPTY_TURN_USAGE,
   })
 }));

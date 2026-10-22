@@ -68,34 +68,24 @@ def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)):
+async def get_token_payload(
+    token: Optional[str] = Depends(oauth2_scheme),
+) -> Optional[Dict[str, Any]]:
     """
-    Dependency to get the current authenticated user from a token.
+    Dependency returning the claims of a Bearer token.
 
-    Args:
-        token: JWT token from OAuth2PasswordBearer dependency
-
-    Returns:
-        Username extracted from the token, or None if no token/invalid
-
-    Raises:
-        HTTPException: If token is invalid or user not found
+    Returns None when no token was sent, so the caller can fall back to the
+    cookie. Raises 401 when a token was sent but is invalid or has no subject.
+    Checking the claims against the user (e.g. `ver`) is the caller's job.
     """
     if not token:
         return None
 
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
     payload = decode_access_token(token)
-    if payload is None:
-        raise credentials_exception
-
-    username: str = payload.get("sub")
-    if username is None:
-        raise credentials_exception
-
-    return username
+    if payload is None or payload.get("sub") is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return payload

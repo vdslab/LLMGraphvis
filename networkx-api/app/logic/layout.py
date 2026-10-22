@@ -1,105 +1,193 @@
+"""Layout orchestration: build the graph, run one layout, cache and store it.
+
+This module is deliberately layout-agnostic — it does not branch on a layout
+name anywhere. Everything specific to an algorithm (its networkx call, its
+parameters, their auto-tuning, what a weight means to it, any preparation it
+needs) is declared with that layout in `logic/layouts/`.
+"""
+
+import json
 import math
 
-import networkx as nx
 from sqlalchemy.orm import Session
 
+from app.core.logging import get_logger
 from common import models
 
-from .attributes import delete_attribute_values, get_or_create_attribute
-from app.core.logging import get_logger
+from .layouts import WeightRole, get_spec, layout_names, param_keys, resolve_weight
+from .layouts.profile import profile_graph
+from .layouts.weights import normalize_strength
 
 logger = get_logger(__name__)
 
+# The per-layout parameter allowlist, derived from the registry. Kept under its
+# old name because it is the thing tests and docs refer to when explaining why a
+# parameter did or did not reach networkx.
+LAYOUT_PARAM_KEYS = param_keys()
+
+# Parameters that can hold one entry per node. Replaced by a digest before being
+# stored as cache metadata — see the cache_params construction below.
+BULKY_PARAM_KEYS = {
+    "pos",
+    "nodes",
+    "node_mass",
+    "node_size",
+    "dist",
+    "fixed",
+    "nlist",
+    "subset_key",
+}
 
 
-def determine_layout_params(G, layout_name: str):
+def determine_layout_params(G, layout_name: str, weight=None) -> dict:
+    """The profile-derived defaults for a layout, or {} if it has none.
+
+    Thin wrapper over the registry; the tuning itself lives with each layout.
     """
-    Dynamically determine layout parameters based on graph size (scale).
-    Prioritizes 'Beautiful' high-quality layouts over speed.
-    """
-    num_nodes = len(G.nodes)
-    params = {}
-    
-    # Scale Categories
-    is_small = num_nodes < 500
-    is_medium = 500 <= num_nodes < 2000
-    is_large = num_nodes >= 2000
-
-    if layout_name == "spring" or layout_name == "fruchterman_reingold":
-        # k: Optimal distance between nodes. 
-        # Increase slightly (2.0/sqrt(N)) to reduce overlap.
-        k = 2.0 / math.sqrt(num_nodes) if num_nodes > 0 else None
-        
-        if is_small:
-            # High iterations, strict threshold for beautiful convergence
-            iterations = 1000
-            threshold = 1e-6
-        elif is_medium:
-            iterations = 500
-            threshold = 1e-5
-        else: # Large
-            iterations = 200
-            threshold = 1e-4
-
-        params = {
-            "k": k,
-            "iterations": iterations,
-            "threshold": threshold,
-            "seed": 42
-        }
-
-    elif layout_name == "forceatlas2":
-        # Native NetworkX ForceAtlas2 optimization
-        # Dynamic iterations based on graph size.
-        # Each iteration is O(N^2) (dense pairwise force computation, no
-        # Barnes-Hut approximation), so iteration count directly dominates
-        # upload/layout latency for large graphs. Floor/cap kept well above
-        # networkx's own default (100) for layout quality, but far below the
-        # previous 1000-5000 range that made large uploads extremely slow.
-        # Formula: max_iter = max(200, min(2000, num_nodes))
-        max_iter = max(200, min(2000, num_nodes))
-
-        # Dynamic Scaling Ratio for Overlap Reduction
-        # Use Average Degree as a proxy for local density clumping
-        num_edges = len(G.edges)
-        avg_degree = (2 * num_edges) / num_nodes if num_nodes > 0 else 0
-        
-        # If avg_degree is high, nodes are pulled tighter. We increase scaling to compensate.
-        # Base scaling is 2.0. Cap at 10.0.
-        # Formula: scaling_ratio = max(2.0, min(10.0, avg_degree * 0.5))
-        scaling_ratio = max(2.0, min(10.0, avg_degree * 0.5))
-
-        # Force Constants
-        params = {
-            "max_iter": max_iter,
-            "scaling_ratio": scaling_ratio, 
-            "gravity": 1.0,        # Standard gravity
-            "jitter_tolerance": 1.0, # Standard tolerance for better convergence
-            "seed": 42
-        }
-
-    elif layout_name == "kamada_kawai":
-        # O(N^2) but excellent global structure
-        params = {"scale": 1.0} # Standard
-        
+    params, _notes = get_spec(layout_name).tuned(G, profile_graph(G, weight))
     return params
 
 
-# Per-layout allowlist of override keys accepted for the geometric layouts
-# (Step 6). Keeps the override-merge generic while ensuring a parameter that
-# a given networkx layout function doesn't actually support (e.g. `scale` on
-# `random_layout`, which has no such kwarg) never leaks through and blows up
-# the nx call, and never gets silently ignored after being advertised either
-# (see force_directed/geometric tool layer, which only exposes params that
-# are in these sets).
-GEOMETRIC_OVERRIDE_KEYS = {
-    "circular": {"scale", "center"},
-    "shell": {"scale", "center", "nlist"},
-    "spiral": {"scale", "center"},
-    # NOTE: nx.random_layout(G, center=None, dim=2, seed=None) has no `scale`
-    # parameter, unlike the other three geometric layouts.
-    "random": {"center"},
-}
+def _digest_param(value):
+    """Short, stable fingerprint of a bulky parameter value.
+
+    Rounds floats before hashing so a coordinate dict that survived a float ->
+    JSON -> float round trip still compares equal, which would otherwise cause a
+    spurious cache miss on every warm-started call.
+    """
+    import hashlib
+
+    def canonical(v):
+        if isinstance(v, float):
+            return round(v, 9)
+        if isinstance(v, dict):
+            return {
+                str(k): canonical(val)
+                for k, val in sorted(v.items(), key=lambda kv: str(kv[0]))
+            }
+        if isinstance(v, (list, tuple)):
+            return [canonical(item) for item in v]
+        return v
+
+    try:
+        payload = json.dumps(canonical(value), sort_keys=True, default=str)
+    except (TypeError, ValueError):
+        payload = repr(value)
+    return f"digest:{hashlib.sha256(payload.encode('utf-8')).hexdigest()[:16]}"
+
+
+def load_layout_positions(network_id: int, layout_name: str, db: Session) -> dict:
+    """Read a previously computed layout's coordinates as `{node_id: (x, y)}`.
+
+    Used to warm-start an iterative layout from an existing one. Coordinates
+    live as the float node attributes `{layout_name}_x` / `{layout_name}_y`
+    (see the save path at the bottom of calculate_layout).
+    """
+    from sqlalchemy import text
+
+    rows = db.execute(
+        text(
+            """
+            SELECT n.node_id,
+                   MAX(CASE WHEN a.attribute_name = :x_attr
+                            THEN f.float_value END) AS x,
+                   MAX(CASE WHEN a.attribute_name = :y_attr
+                            THEN f.float_value END) AS y
+              FROM nodes n
+              JOIN node_attribute_values v ON v.node_id = n.id
+              JOIN node_attributes a ON a.id = v.attribute_id
+              JOIN node_float_attribute_values f ON f.node_attribute_value_id = v.id
+             WHERE n.network_id = :nid
+               AND a.network_id = :nid
+               AND a.attribute_name IN (:x_attr, :y_attr)
+             GROUP BY n.node_id
+            """
+        ),
+        {
+            "nid": network_id,
+            "x_attr": f"{layout_name}_x",
+            "y_attr": f"{layout_name}_y",
+        },
+    ).all()
+
+    return {
+        row.node_id: (float(row.x), float(row.y))
+        for row in rows
+        if row.x is not None and row.y is not None
+    }
+
+
+def _resolve_warm_start(spec, network_id: int, overrides: dict, db: Session):
+    """Turn our `init_from_layout` into networkx's `pos`, and return its name.
+
+    Warm-starting by layout name (rather than by a literal coordinate dict) is
+    what makes this usable from a tool call — no caller can hand over 5000 pairs
+    of floats.
+    """
+    init_from = overrides.pop("init_from_layout", None)
+    if not init_from:
+        return None
+
+    if overrides.get("pos") is not None:
+        raise ValueError("Choose either pos or init_from_layout, not both")
+
+    if not spec.supports_warm_start:
+        raise ValueError(
+            f"Layout '{spec.name}' cannot be warm-started; init_from_layout is "
+            f"only supported for "
+            f"{sorted(n for n, keys in LAYOUT_PARAM_KEYS.items() if 'pos' in keys)}."
+        )
+
+    start_pos = load_layout_positions(network_id, init_from, db)
+    if not start_pos:
+        raise ValueError(
+            f"No stored '{init_from}' layout for network {network_id}. "
+            f"Compute that layout first, or omit init_from_layout."
+        )
+    overrides["pos"] = start_pos
+    return init_from
+
+
+def format_layout_result(info, headline: str, follow_up: str = "") -> str:
+    """Assemble a layout tool's return message, including any weight note."""
+    note = (info or {}).get("weight_note") or ""
+    tuning = (info or {}).get("tuning_notes") or []
+    if tuning:
+        note = f"{note} Auto-tuned: {' '.join(tuning)}".strip()
+    settings = ""
+    if info:
+        encoded = json.dumps(info.get("parameters", {}), sort_keys=True)
+        settings = (
+            f"Saved {info.get('attributes', [])}. "
+            f"Effective parameters: {encoded}. "
+            f"Cached: {info.get('cached', False)}."
+        )
+    return " ".join(part for part in (headline, note, settings, follow_up) if part)
+
+
+def build_layout_graph(spec, network_id: int, db: Session, requested_weight=None):
+    """The graph a layout runs on, weighted as that layout reads weights.
+
+    Returns `(weight_attribute, weight_note, G, normalized_by)`. Shared by
+    `calculate_layout` and `layout_optimizer`, so a suggested parameter set is
+    scored on exactly the graph it will later be applied to.
+    """
+    weight_attribute, weight_note = resolve_weight(
+        spec, requested_weight, network_id, db
+    )
+
+    from .utils.graph_builder import build_graph_from_db
+
+    G = build_graph_from_db(network_id, db, weight_attribute=weight_attribute)
+    normalized_by = None
+    if weight_attribute and spec.weight_role is WeightRole.STRENGTH:
+        normalized_by = normalize_strength(G, weight_attribute)
+        if normalized_by is not None and normalized_by != 1:
+            weight_note = (
+                f"{weight_note} Weights were divided by their median "
+                f"({normalized_by:.3g}), so only their ratios shape the layout."
+            ).strip()
+    return weight_attribute, weight_note, G, normalized_by
 
 
 def calculate_layout(
@@ -108,21 +196,34 @@ def calculate_layout(
     db: Session,
     overrides: dict = None,
     force: bool = False,
-):
-    # Normalize layout name up front (needed for both cache-check and compute paths)
-    if layout_name in ["forceatlas2_layout", "force-directed", "force_directed"]:
-        layout_name = "forceatlas2"
+) -> dict:
+    """Compute one layout and store its coordinates as node attributes.
 
-    # Reconstruct graph from DB
-    from .utils.graph_builder import build_graph_from_db
-    G = build_graph_from_db(network_id, db)
+    Returns a summary of what was actually done — which weight was used, whether
+    the cache answered — for the tool layer to report back to the model.
+    """
+    spec = get_spec(layout_name)  # resolves aliases; raises on an unknown name
+    layout_name = spec.name
+    raw_overrides = overrides or {}
+
+    # Weighting is resolved first because it decides how the graph is built.
+    # Doing it here rather than in the tool layer means every entry point — the
+    # upload pipeline, subgraph extraction, the REST endpoint, the MCP tools —
+    # gets the same behaviour.
+    weight_attribute, weight_note, G, normalized_by = build_layout_graph(
+        spec, network_id, db, raw_overrides.get("weight")
+    )
 
     # Need node_map for saving results (str_id -> db_id)
-    nodes_query = db.query(models.Node.id, models.Node.node_id).filter(models.Node.network_id == network_id).all()
+    nodes_query = (
+        db.query(models.Node.id, models.Node.node_id)
+        .filter(models.Node.network_id == network_id)
+        .all()
+    )
     node_map = {row.node_id: row.id for row in nodes_query}
 
-    num_nodes = len(G.nodes)
-    params = determine_layout_params(G, layout_name)
+    profile = profile_graph(G, weight_attribute)
+    params, tuning_notes = spec.tuned(G, profile)
 
     # Merge caller-supplied overrides on top of the auto-computed params.
     # `None` values in `overrides` mean "use the auto-default" and are filtered
@@ -133,28 +234,96 @@ def calculate_layout(
     # cache-miss on the very next call if we stored the tuple form.
     sanitized_overrides = {
         k: (list(v) if isinstance(v, tuple) else v)
-        for k, v in (overrides or {}).items()
-        if v is not None
+        for k, v in raw_overrides.items()
+        if v is not None or k == "seed"
     }
 
-    if layout_name in GEOMETRIC_OVERRIDE_KEYS:
-        # circular / shell / spiral / random: params starts empty (these
-        # layouts have no auto-computed params today), so only accept the
-        # override keys each specific nx layout function actually supports.
-        allowed = GEOMETRIC_OVERRIDE_KEYS[layout_name]
-        params.update({k: v for k, v in sanitized_overrides.items() if k in allowed})
+    # `weight` is no longer whatever the caller passed — it is what
+    # resolve_weight decided, which is also the attribute name now present on the
+    # graph. Both the nx call and the cache key have to see the resolved value,
+    # or a weighted run would happily reuse an unweighted cached layout.
+    if weight_attribute:
+        sanitized_overrides["weight"] = weight_attribute
     else:
-        # spring / forceatlas2 / kamada_kawai: the tool layer only ever builds
-        # an `overrides` dict containing keys relevant to the layout it calls,
-        # so a direct merge on top of the auto-computed params is sufficient.
-        params.update(sanitized_overrides)
+        sanitized_overrides.pop("weight", None)
+
+    init_from = _resolve_warm_start(spec, network_id, sanitized_overrides, db)
+
+    positions = sanitized_overrides.get("pos")
+    if positions is not None:
+        unknown = set(positions) - set(G)
+        if unknown:
+            raise ValueError(f"pos contains unknown node IDs: {sorted(unknown)}")
+
+        if any(
+            len(point) != 2 or not all(math.isfinite(v) for v in point)
+            for point in positions.values()
+        ):
+            raise ValueError("pos must contain finite x/y coordinate pairs")
+    fixed = sanitized_overrides.get("fixed")
+    if fixed and (positions is None or any(node not in positions for node in fixed)):
+        raise ValueError("Every fixed node needs an initial position")
+
+    # Layouts that key off a node attribute translate it into what networkx
+    # expects here (see each layout's `prepare` in logic/layouts/structural.py).
+    if spec.prepare:
+        spec.prepare(G, network_id, sanitized_overrides, db)
+
+    # Preparation consumes app-level options. Everything remaining must reach
+    # NetworkX: accepting an ignored option would falsely report success.
+    rejected = set(sanitized_overrides) - spec.params
+    if rejected:
+        raise ValueError(
+            f"Unsupported parameters for layout '{layout_name}': "
+            f"{sorted(rejected)}. Supported computation parameters: "
+            f"{sorted(spec.params)}."
+        )
+    params.update(sanitized_overrides)
 
     # --- Cache check ---
-    from .utils.cache import compute_graph_state_hash
     from .attributes import get_cached_attribute, is_cache_valid
+    from .utils.cache import compute_graph_state_hash
 
-    current_hash = compute_graph_state_hash(network_id, db)
-    effective_params = {"layout_name": layout_name, **params}
+    dependencies = tuple(
+        (scope, name)
+        for scope, name in (
+            ("Edge", weight_attribute),
+            ("Node", raw_overrides.get("subset_attribute")),
+            ("Node", raw_overrides.get("partition_attribute")),
+        )
+        if name
+    )
+    current_hash = compute_graph_state_hash(network_id, db, dependencies)
+    # Several parameters can hold one entry per node (`pos`, `nodes`, `node_mass`,
+    # `node_size`, `dist`, `fixed`). Storing them verbatim would bloat
+    # computation_params and make every cache comparison walk the whole graph, so
+    # they are reduced to a digest — which still changes when their contents
+    # change, keeping cache invalidation correct.
+    cache_params = {
+        k: (_digest_param(v) if k in BULKY_PARAM_KEYS else v) for k, v in params.items()
+    }
+    if init_from:
+        cache_params["init_from_layout"] = init_from
+    effective_params = {"layout_name": layout_name, **cache_params}
+    if normalized_by is not None:
+        # Part of the cache key only: a layout stored before weights were
+        # normalized must not be reused as if it had been.
+        effective_params["weight_normalization"] = "median"
+
+    # A note only describes a default that was actually used.
+    tuning_notes = [
+        note
+        for note in tuning_notes
+        if not any(f"`{key}`" in note for key in sanitized_overrides)
+    ]
+    result = {
+        "layout_name": layout_name,
+        "weight": weight_attribute,
+        "weight_note": weight_note,
+        "tuning_notes": tuning_notes,
+        "parameters": cache_params,
+        "attributes": [f"{layout_name}_x", f"{layout_name}_y"],
+    }
 
     if not force:
         cached_x = get_cached_attribute(
@@ -165,46 +334,23 @@ def calculate_layout(
                 f"Layout cache HIT for network {network_id}, layout='{layout_name}' "
                 f"(graph_state_hash={current_hash[:12]}...). Skipping recomputation."
             )
-            return
+            return {**result, "cached": True}
 
     logger.info(
-        f"Layout cache MISS for network {network_id}, layout='{layout_name}'. Recomputing."
+        f"Layout cache MISS for network {network_id}, "
+        f"layout='{layout_name}'. Recomputing."
     )
 
-    pos = None
-
-    if layout_name == "spring" or layout_name == "fruchterman_reingold":
-        pos = nx.spring_layout(G, **params)
-
-    elif layout_name == "forceatlas2":
-        # Use native NetworkX implementation
-        # Note: Checked availability in NetworkX 3.6+
-        pos = nx.forceatlas2_layout(G, **params)
-
-    elif layout_name == "circular" or layout_name == "circle":
-        pos = nx.circular_layout(G, **params)
-
-    elif layout_name == "kamada_kawai":
-        pos = nx.kamada_kawai_layout(G, **params)
-
-    elif layout_name == "shell":
-        pos = nx.shell_layout(G, **params)
-
-    elif layout_name == "spectral":
-        pos = nx.spectral_layout(G)
-
-    elif layout_name == "spiral":
-        pos = nx.spiral_layout(G, **params)
-
-    elif layout_name == "random":
-        pos = nx.random_layout(G, seed=42, **params)
-
-    else:
-        raise ValueError(f"Unknown layout algorithm: {layout_name}")
+    pos = spec.compute(G, params)
+    if any(
+        len(point) != 2 or not all(math.isfinite(float(v)) for v in point)
+        for point in pos.values()
+    ):
+        raise ValueError("Layout produced non-finite coordinates; no result was saved")
 
     # Save to DB - Bulk Update Strategy
     # We save two attributes: {layout_name}_x and {layout_name}_y
-    
+
     # Prepare data maps
     data_map_x = {}
     data_map_y = {}
@@ -218,14 +364,10 @@ def calculate_layout(
     from .attributes import bulk_save_node_attributes, update_attribute_cache_metadata
 
     # Save X
-    bulk_save_node_attributes(
-        network_id, f"{layout_name}_x", "float", data_map_x, db
-    )
+    bulk_save_node_attributes(network_id, f"{layout_name}_x", "float", data_map_x, db)
 
     # Save Y
-    bulk_save_node_attributes(
-        network_id, f"{layout_name}_y", "float", data_map_y, db
-    )
+    bulk_save_node_attributes(network_id, f"{layout_name}_y", "float", data_map_y, db)
 
     # Stamp cache metadata on both x/y attributes so future calls can detect a cache hit
     derived_from = f"layout:{layout_name}"
@@ -263,3 +405,16 @@ def calculate_layout(
         db.rollback()
         logger.warning(f"Failed to update last_layout_name: {e}")
         # non-critical, proceed
+
+    return {**result, "cached": False}
+
+
+__all__ = [
+    "LAYOUT_PARAM_KEYS",
+    "build_layout_graph",
+    "calculate_layout",
+    "determine_layout_params",
+    "format_layout_result",
+    "layout_names",
+    "load_layout_positions",
+]

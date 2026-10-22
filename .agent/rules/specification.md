@@ -2,9 +2,8 @@
 trigger: always_on
 ---
 
-Implement the code based on @specification.
-However, prioritize code quality and development principles over strict adherence to the specifications.
+The authoritative project guide is @AGENTS.md — read it before making changes.
 
-If you deviate from the specifications for better quality:
-1. Propose the changes to the user.
-2. Update @specification to reflect the actual implementation.
+Code is the source of truth for what the system does; @specification records why.
+When a design decision changes, update the relevant specification document.
+Do not copy facts the code already declares into the specification.

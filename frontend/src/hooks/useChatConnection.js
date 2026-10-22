@@ -7,19 +7,26 @@ export const useChatConnection = (id, isAuthenticated) => {
     // Define Event Handlers (Memoized to prevent hook re-renders)
     const eventHandlers = useMemo(() => ({
         render_update: (data) => {
-            console.log("Render Update:", data);
             useNetworkStore.getState().setNetworkData(data);
-            
+
             // Fix for lost network ID context: Sync ID if backend provides it
             if (data.network_id) {
                 useNetworkStore.getState().setNetworkId(data.network_id);
             }
-
-            useChatStore.getState().setIsLoading(false);
-            useChatStore.getState().setThinkingMessage(null);
+            // Deliberately does NOT end the turn. A visualization tool renders
+            // mid-turn and the agent keeps working afterwards; treating this as
+            // terminal made the status indicator flicker off and back on.
+        },
+        // Backend pipeline steps ("Importing GraphML data"). These are our own
+        // labels — thinking_stream below is the model's reasoning, and mixing
+        // the two is what made non-thinking show up under "Thinking".
+        progress: (data) => {
+            useChatStore.getState().setProgress({
+                label: data.label,
+                status: data.status || 'running',
+            });
         },
         thinking_stream: (data) => {
-            console.log("RX thinking_stream:", data);
             const content = data.content || data;
             if (content) {
                 useChatStore.getState().appendThinkingMessage(content);
@@ -27,7 +34,6 @@ export const useChatConnection = (id, isAuthenticated) => {
             useChatStore.getState().setIsLoading(true);
         },
         tool_execution: (data) => {
-            console.log("Tool execution:", data);
             if (data.status === 'started') {
                 useChatStore.getState().setRunningTool({ name: data.tool, status: 'running' });
                 useChatStore.getState().setIsLoading(true);
@@ -36,28 +42,31 @@ export const useChatConnection = (id, isAuthenticated) => {
                 useChatStore.getState().setThinkingMessage(null);
             } else if (data.status === 'completed') {
                 useChatStore.getState().setRunningTool(null);
-                
-                // Add to the streaming message logs so the marker can find it
-                // We construct a partial object since we don't have full args/result here yet in this event
-                // But the marker just needs existence usually, or we show what we have.
-                // Actually the "started" event had args. We might have missed capturing them for this log.
-                // For now, let's just log the name and status.
+
+                // Placeholder for the inline marker already in the transcript.
+                // The full record (arguments, timings) arrives with
+                // message_complete and replaces this.
                 useChatStore.getState().addToolExecutionToStreamingMessage({
                     tool_name: data.tool,
                     status: 'completed',
-                    // arguments? context? We don't have them in 'completed' event from backend currently.
-                    // But for the UI "View details" it might be enough to show "Completed".
                 });
-
             } else if (data.status === 'failed') {
-                console.error(`Tool ${data.tool} failed:`, data.error);
+                // A tool-domain failure is part of the agent's recoverable
+                // protocol, not a browser/application error. It remains visible
+                // inline while the model can correct the call.
+                console.warn(`Tool ${data.tool} failed:`, data.error);
                 useChatStore.getState().setRunningTool(null);
-                useChatStore.getState().setIsLoading(false);
-                
+
                 useChatStore.getState().addToolExecutionToStreamingMessage({
                     tool_name: data.tool,
                     status: 'failed',
                     error: data.error
+                });
+            } else if (data.status === 'deferred') {
+                useChatStore.getState().setRunningTool(null);
+                useChatStore.getState().addToolExecutionToStreamingMessage({
+                    tool_name: data.tool,
+                    status: 'deferred',
                 });
             }
         },
@@ -69,23 +78,35 @@ export const useChatConnection = (id, isAuthenticated) => {
         },
         message_complete: (data) => {
             useChatStore.getState().finalizeStreamingMessage(data.id, data.content, data.tool_executions);
-            // Turn is fully done: fold the final currentTurnUsage into the lifetime chatUsage total.
-            useChatStore.getState().commitTurnUsage();
+            // The backend stores the turn's usage before this event: reload it.
+            useChatStore.getState().refreshUsage();
         },
-        // usage_update: { input_tokens, output_tokens, cached_input_tokens, estimated_cost_usd, provider, model }
-        // Fired potentially multiple times per turn (once per ReAct-loop iteration), each carrying
-        // the running total for the turn so far. commitTurnUsage() (above) folds it into the lifetime
-        // total once the turn is fully complete.
+        // usage_update: { input_tokens, output_tokens, cached_input_tokens, cache_write_tokens,
+        // reasoning_tokens, estimated_cost_usd, provider, model }
+        // Fired once per ReAct-loop iteration, each carrying the running total for the
+        // turn so far. refreshUsage() replaces it with the stored total once the turn ends.
         usage_update: (data) => {
             useChatStore.getState().setCurrentTurnUsage(data);
+        },
+        // The backend named the chat for us (from the uploaded filename, or from
+        // the first exchange). Never fires for a chat the user renamed by hand.
+        chat_renamed: (data) => {
+            if (data && data.name) {
+                useChatStore.getState().setChatName(data.name);
+            }
+            // A generated title spent tokens that are now stored.
+            useChatStore.getState().refreshUsage();
         },
         system_message: (data) => {
             console.log("System:", data);
         },
-        error: (data) => {
+        // Not named `error`: EventSource also routes a server event of that
+        // name to onerror, which would show a lost connection that never clears.
+        agent_error: (data) => {
             console.error("Backend reported error:", data);
-            useChatStore.getState().setThinkingMessage(null);
-            useChatStore.getState().setIsLoading(false);
+            useChatStore.getState().endTurn();
+            // Tokens spent before the failure are stored too.
+            useChatStore.getState().refreshUsage();
         }
     }), []);
 

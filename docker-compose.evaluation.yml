@@ -1,0 +1,107 @@
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "2"
+
+services:
+  evaluation-db:
+    image: postgres:15
+    logging: *default-logging
+    environment:
+      POSTGRES_USER: evaluation
+      POSTGRES_PASSWORD: evaluation
+      POSTGRES_DB: graphvis_evaluation
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evaluation -d graphvis_evaluation"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  evaluation-networkx:
+    build:
+      context: .
+      dockerfile: networkx-api/Dockerfile
+    logging: *default-logging
+    ports:
+      - "127.0.0.1:18001:8001"
+    environment:
+      POSTGRES_HOST: evaluation-db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: evaluation
+      POSTGRES_PASSWORD: evaluation
+      POSTGRES_DB: graphvis_evaluation
+      LOG_LEVEL: INFO
+      PYTHONDONTWRITEBYTECODE: "1"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--timeout-keep-alive", "60"]
+    depends_on:
+      evaluation-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - ./networkx-api:/app:ro
+      - ./common:/app/common:ro
+
+  evaluation-backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    logging: *default-logging
+    ports:
+      - "127.0.0.1:18000:8000"
+    environment:
+      POSTGRES_HOST: evaluation-db
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: evaluation
+      POSTGRES_PASSWORD: evaluation
+      POSTGRES_DB: graphvis_evaluation
+      NETWORKX_API_URL: http://evaluation-networkx:8001
+      LLM_PROVIDER: lmstudio
+      LM_STUDIO_BASE_URL: http://host.docker.internal:1234/v1
+      LM_STUDIO_MODEL: google/gemma-4-e4b
+      LM_STUDIO_API_KEY: ${LM_STUDIO_API_KEY:-}
+      SECRET_KEY: ${EVALUATION_SECRET_KEY:-evaluation-only-secret-key-change-me}
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 1440
+      KEEP_ALIVE_TIMEOUT: 900
+      COOKIE_SECURE: "false"
+      LOG_LEVEL: INFO
+      PYTHONDONTWRITEBYTECODE: "1"
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --timeout-keep-alive 900"]
+    depends_on:
+      evaluation-db:
+        condition: service_healthy
+      evaluation-networkx:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./backend:/app:ro
+      - ./common:/app/common:ro
+
+  evaluation-frontend:
+    build: ./frontend
+    logging: *default-logging
+    ports:
+      - "127.0.0.1:15173:5173"
+    environment:
+      VITE_API_URL: http://evaluation-backend:8000
+      VITE_NX_API_URL: http://evaluation-networkx:8001
+    command: ["npm", "run", "dev", "--", "--host"]
+    depends_on:
+      evaluation-backend:
+        condition: service_healthy
+    volumes:
+      - ./frontend:/app:ro
+      - /app/node_modules

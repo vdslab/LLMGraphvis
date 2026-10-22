@@ -24,6 +24,13 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
+    # Bumped on password change; tokens carrying an older value are rejected,
+    # which signs the user out everywhere else.
+    token_version = Column(Integer, nullable=False, default=0, server_default="0")
+    # The provider/model a chat uses when it has not pinned its own. Null falls
+    # back to the LLM_PROVIDER / *_MODEL environment defaults.
+    default_provider = Column(String, nullable=True)
+    default_model = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -42,6 +49,7 @@ class Network(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
     description = Column(Text, nullable=True)
+    is_directed = Column(Boolean, nullable=False, default=False, server_default="false")
 
     # Visual State Tracking
     last_layout_name = Column(String, nullable=True)
@@ -50,6 +58,7 @@ class Network(Base):
     last_edge_width_config = Column(JSON, nullable=True)
     last_edge_color_config = Column(JSON, nullable=True)
     last_node_label_config = Column(JSON, nullable=True)
+    last_highlight_config = Column(JSON, nullable=True)
 
 
     parent_network_id = Column(Integer, ForeignKey("networks.id"), nullable=True, index=True)
@@ -82,6 +91,11 @@ class Chat(Base):
     visualization_state = Column(JSON, nullable=True)
     provider = Column(String, nullable=True)
     model = Column(String, nullable=True)
+    # True once the user has renamed the chat themselves. Auto-naming (upload
+    # filename, then the LLM-generated title) never touches a chat with this set.
+    name_is_custom = Column(
+        Boolean, nullable=False, server_default=sqlalchemy.text("false"), default=False
+    )
 
     user = relationship("User", back_populates="chats")
     network = relationship("Network", back_populates="chat")
@@ -117,6 +131,8 @@ class ToolExecution(Base):
     thought = Column(Text, nullable=True)
     status = Column(String, nullable=False)
     error = Column(Text, nullable=True)
+    call_id = Column(String, nullable=True)
+    thought_signature = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     started_at = Column(DateTime(timezone=True), nullable=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
@@ -187,6 +203,22 @@ class NodeAttribute(Base):
     computation_params = Column(JSON, nullable=True)
     graph_state_hash = Column(String, nullable=True)
     computed_at = Column(DateTime(timezone=True), nullable=True)
+
+    # What the attribute means, beyond which value table holds it. See
+    # networkx-api/app/logic/attribute_semantics.py for the vocabularies.
+    role = Column(
+        String,
+        nullable=False,
+        default="data",
+        server_default="data",
+        comment="data | metric | community | coordinate",
+    )
+    # Exact for derived attributes, inferred from the values for imported ones.
+    measurement = Column(
+        String,
+        nullable=True,
+        comment="categorical | discrete | quantitative | identifier | text",
+    )
 
     network = relationship("Network", back_populates="node_attributes")
     values = relationship("NodeAttributeValue", back_populates="attribute", cascade="all, delete-orphan")
@@ -268,6 +300,22 @@ class EdgeAttribute(Base):
     graph_state_hash = Column(String, nullable=True)
     computed_at = Column(DateTime(timezone=True), nullable=True)
 
+    # What the attribute means, beyond which value table holds it. See
+    # networkx-api/app/logic/attribute_semantics.py for the vocabularies.
+    role = Column(
+        String,
+        nullable=False,
+        default="data",
+        server_default="data",
+        comment="data | metric | community | coordinate",
+    )
+    # Exact for derived attributes, inferred from the values for imported ones.
+    measurement = Column(
+        String,
+        nullable=True,
+        comment="categorical | discrete | quantitative | identifier | text",
+    )
+
     network = relationship("Network", back_populates="edge_attributes")
     values = relationship("EdgeAttributeValue", back_populates="attribute", cascade="all, delete-orphan")
 
@@ -327,17 +375,78 @@ class EdgeFloatAttributeValue(Base):
 
 
 class LlmUsage(Base):
+    """Tokens and estimated cost of one LLM task: an agent turn or a chat title.
+
+    Counts follow `UsageData`'s normalized meaning (ADR 0025): input includes
+    cache reads/writes, output includes reasoning. `calls` holds the same
+    counts per generate() call, in order. `message_id` is null when the turn
+    produced no stored message; `chat_id`/`user_id` keep such rows attributable.
+    """
+
     __tablename__ = "llm_usages"
 
     id = Column(Integer, primary_key=True, index=True)
-    message_id = Column(Integer, ForeignKey("chat_messages.id"), nullable=False, unique=True)
-    provider = Column(String, nullable=False)          # "google" | "anthropic"
-    model = Column(String, nullable=False)               # e.g. "gemini-2.5-flash", "claude-opus-4-8"
+    message_id = Column(Integer, ForeignKey("chat_messages.id"), nullable=True, unique=True)
+    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="SET NULL"), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    purpose = Column(String, nullable=False, default="agent_turn", server_default="agent_turn")
+    provider = Column(String, nullable=False)  # "google" | "anthropic" | "openai" | "lmstudio"
+    model = Column(String, nullable=False)               # e.g. "gemini-3.8-flash", "claude-opus-4-8"
     input_tokens = Column(Integer, nullable=False, default=0)
     output_tokens = Column(Integer, nullable=False, default=0)
     cached_input_tokens = Column(Integer, nullable=False, default=0)
+    cache_write_tokens = Column(Integer, nullable=False, default=0, server_default="0")
+    reasoning_tokens = Column(Integer, nullable=False, default=0, server_default="0")
     iteration_count = Column(Integer, nullable=False, default=1)
+    calls = Column(JSON, nullable=True)
     estimated_cost_usd = Column(Float, nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     message = relationship("ChatMessage", back_populates="usage")
+
+
+class AnalysisInput(Base):
+    """One conversational input request with a durable submission state."""
+
+    __tablename__ = "analysis_inputs"
+    id = Column(String(36), primary_key=True)
+    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False, index=True)
+    network_id = Column(Integer, ForeignKey("networks.id", ondelete="CASCADE"), nullable=False)
+    specification = Column(JSON, nullable=False)
+    status = Column(String, nullable=False, default="pending")
+    answer = Column(JSON, nullable=True)
+    # Tool names exposed to the model when it asked. Answering resumes the same
+    # task in a new turn, so the turn's progressive-disclosure state is restored
+    # from here rather than re-earned with another skill_load. See ADR 0014.
+    activated_tools = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class ParameterTuning(Base):
+    """A re-runnable tool pipeline whose parameters are adjusted by words or a panel.
+
+    The agent (`apply_parameter_tuning`) and the panel (`POST .../apply`) update
+    the same row, so each sees what the other changed. See ADR 0016.
+    """
+
+    __tablename__ = "parameter_tunings"
+    id = Column(String(36), primary_key=True)
+    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False, index=True)
+    network_id = Column(Integer, ForeignKey("networks.id", ondelete="CASCADE"), nullable=False)
+    # question and fields (with the schema description copied in).
+    specification = Column(JSON, nullable=False)
+    # [{tool, arguments}] in execution order: the effective arguments that ran.
+    steps = Column(JSON, nullable=False)
+    # field id ("tool.argument") -> value currently drawn on the canvas.
+    values = Column(JSON, nullable=False)
+    initial_values = Column(JSON, nullable=False)
+    suggested_values = Column(JSON, nullable=False)
+    history = Column(JSON, nullable=False, default=list)
+    last_result = Column(JSON, nullable=True)
+    status = Column(String, nullable=False, default="active")
+    activated_tools = Column(JSON, nullable=True)
+    last_applied_at = Column(DateTime(timezone=True), nullable=True)
+    # The last time the agent was told about panel changes (TURN_START).
+    reported_at = Column(DateTime(timezone=True), nullable=True)
+    confirmed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

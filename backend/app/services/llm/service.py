@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from common import models
 from app.core.logging import get_logger
 
-from . import engine, events, history, local_tools, mcp_client, context
+from . import context, emitters, engine, events, history
 from .providers.types import UsageData
 
 logger = get_logger(__name__)
@@ -23,11 +23,16 @@ def _format_exception_message(e: BaseException) -> str:
 
 
 async def process_chat(
-    chat_id: int, user_message: str, db: Session
+    chat_id: int,
+    user_message: str,
+    db: Session,
+    *,
+    resumed_from_input: bool = False,
 ) -> Tuple[str, List[Any], UsageData, str, str]:
     """Process a chat message using the configured LLM provider with function calling."""
     logger.info(f"Processing chat_id={chat_id}, message='{user_message[:50]}...'")
     queue = await events.get_event_queue(chat_id)
+    agent = None
 
     try:
         # 1. Setup Context
@@ -51,16 +56,13 @@ async def process_chat(
         except Exception as e:
             logger.warning(f"Failed to build context summary: {e}")
 
-        # Notify thinking start
-        await queue.put(
-            {
-                "event": "thinking_stream",
-                "data": json.dumps({"content": "Analyzing your request..."}),
-            }
-        )
+        # Tell the UI the turn has started. This is our status line, not the
+        # model's reasoning, so it goes out as `progress` — see emitters.py.
+        await emitters.emit_progress(queue, "Analyzing your request")
 
-        # 2. Delegate to GraphVisAgent, honoring this chat's pinned provider/model (if any)
-        agent = engine.GraphVisAgent(db, provider_name=chat.provider, model_name=chat.model)
+        # 2. Delegate to GraphVisAgent, honoring the chat's pin, else the user's default
+        provider_name, model_name = engine.resolve_chat_model(chat)
+        agent = engine.GraphVisAgent(db, provider_name=provider_name, model_name=model_name)
 
         final_response_text, execution_log, total_usage = await agent.process_turn(
             history=chat_history,
@@ -68,13 +70,24 @@ async def process_chat(
             chat_id=chat_id,
             network_id=network_id,
             context_summary=context_summary,
+            user_text=user_message,
+            resumed_from_input=resumed_from_input,
         )
 
         return final_response_text, execution_log, total_usage, agent.provider_name, agent.provider.model_name
 
     except Exception as e:
         logger.exception(f"Error in process_chat: {e}")
-        await queue.put({"event": "error", "data": json.dumps(str(e))})
+        await queue.put({"event": "agent_error", "data": json.dumps(str(e))})
 
         error_msg = _format_exception_message(e)
+        # Tokens spent before the failure were still billed.
+        if agent is not None:
+            return (
+                f"I encountered an error: {error_msg}",
+                [],
+                agent.turn_usage,
+                agent.provider_name,
+                agent.provider.model_name,
+            )
         return f"I encountered an error: {error_msg}", [], UsageData(), "", ""

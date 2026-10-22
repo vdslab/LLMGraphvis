@@ -71,7 +71,7 @@ export const useNetworkRealtime = (url, { delay = 0, onMessage, onError, eventHa
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         setLastMessage(data);
         if (onMessageRef.current) onMessageRef.current(data);
-      } catch (err) {
+      } catch {
         console.warn('Failed to parse SSE message JSON', event.data);
       }
     };

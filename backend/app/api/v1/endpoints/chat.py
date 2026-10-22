@@ -1,4 +1,3 @@
-import json
 from typing import List
 
 from fastapi import (
@@ -21,8 +20,8 @@ from app.core import database
 from app.core.logging import get_logger
 from app.services import llm as llm_service
 from app.services.llm import mcp_client
-from app.services.llm.catalog import PROVIDER_CATALOG
-from app.services import chat_service
+from app.services.llm.catalog import get_available_provider_catalog
+from app.services import chat_service, network_service, sample_networks, usage_report
 
 logger = get_logger(__name__)
 
@@ -48,7 +47,15 @@ def list_llm_providers(
     current_user: models.User = Depends(get_current_user),
 ):
     """List the LLM providers/models a chat can be pinned to."""
-    return PROVIDER_CATALOG
+    return get_available_provider_catalog()
+
+
+@router.get("/samples", response_model=List[schemas.SampleNetworkOption])
+def list_sample_networks(
+    current_user: models.User = Depends(get_current_user),
+):
+    """List the bundled networks available for starting an analysis."""
+    return sample_networks.list_samples()
 
 
 @router.get("", response_model=List[schemas.Chat])
@@ -97,6 +104,7 @@ async def get_chat(
             "network_id": chat.network_id,
             "provider": chat.provider,
             "model": chat.model,
+            "name_is_custom": chat.name_is_custom,
             "created_at": chat.created_at,
             "updated_at": chat.updated_at,
             "network": vis_data,
@@ -112,6 +120,7 @@ async def get_chat(
             "network_id": chat.network_id,
             "provider": chat.provider,
             "model": chat.model,
+            "name_is_custom": chat.name_is_custom,
             "created_at": chat.created_at,
             "updated_at": chat.updated_at,
             "network": None,
@@ -141,24 +150,39 @@ def get_messages(
     return messages
 
 
+@router.get("/{chat_id}/usage", response_model=schemas.ChatUsageReport)
+def get_chat_usage(
+    chat_id: int,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Token usage and estimated cost of every LLM task in this chat, oldest first."""
+    verify_chat_ownership(chat_id, current_user.id, db)
+    return usage_report.chat_usage(db, chat_id)
+
+
 @router.get("/{chat_id}/export")
 async def export_network(
     chat_id: int,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """Export network as GraphML file"""
-    # Verify ownership
+    """Export the chat's active network (a subgraph, if one is selected) as GraphML."""
     chat = verify_chat_ownership(chat_id, current_user.id, db)
 
-    # Call NetworkXAPI to get GraphML
-    graphml_data = await mcp_client.execute_tool(
-        "export_network", {"network_id": chat.network_id}
-    )
+    try:
+        graphml_data = await network_service.export_graphml(chat.network_id)
+    except network_service.NetworkNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Network not found") from exc
+    except network_service.NetworkExportError as exc:
+        logger.error(f"GraphML export failed for chat {chat_id}: {exc}")
+        raise HTTPException(
+            status_code=502, detail="The network could not be exported."
+        ) from exc
 
     return Response(
         content=graphml_data,
-        media_type="application/xml",
+        media_type="application/graphml+xml",
         headers={
             "Content-Disposition": f"attachment; filename=network_{chat.network_id}.graphml"
         },
@@ -239,7 +263,36 @@ async def upload_network(
 
     # Start background task utilizing the Service Layer
     background_tasks.add_task(
-        chat_service.handle_upload_background, chat_id, chat.network_id, graphml_data
+        chat_service.handle_upload_background,
+        chat_id,
+        chat.network_id,
+        graphml_data,
+        file.filename,
+    )
+
+    return {"status": "accepted"}
+
+
+@router.post("/{chat_id}/samples/{sample_id}", status_code=202)
+async def load_sample_network(
+    chat_id: int,
+    sample_id: str,
+    background_tasks: BackgroundTasks,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Initialize a chat from one allowlisted bundled sample network."""
+    chat = verify_chat_ownership(chat_id, current_user.id, db)
+    sample = sample_networks.get_sample(sample_id)
+    if sample is None:
+        raise HTTPException(status_code=404, detail="Sample network not found")
+
+    background_tasks.add_task(
+        chat_service.handle_upload_background,
+        chat_id,
+        chat.network_id,
+        sample_networks.load_graphml(sample),
+        sample.upload_filename,
     )
 
     return {"status": "accepted"}
@@ -257,16 +310,58 @@ async def process_message(
     # Verify chat exists and user owns it
     verify_chat_ownership(chat_id, current_user.id, db)
 
-    # Save user message
-    db_message = models.ChatMessage(
-        chat_id=chat_id, role="user", content=request.message.content
-    )
+    from app.services.llm.inputs import accept_answer
+
+    chat = db.query(models.Chat).filter_by(id=chat_id).with_for_update().one()
+    request_id = request.input_request_id
+    content = request.message.content
+    if request.parameter_tuning_id is not None:
+        # Confirming a tuning panel resumes its task like an answer does (ADR 0016).
+        from app.services.llm.tuning import confirm
+
+        try:
+            content = confirm(chat, db, request.parameter_tuning_id, content)
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        if content is None:
+            db.commit()
+            return {"status": "already_accepted"}
+        resumed_from_input = True
+    else:
+        if request_id is None:
+            pending = db.query(models.AnalysisInput).filter_by(
+                chat_id=chat_id, network_id=chat.network_id, status="pending"
+            ).first()
+            if pending:
+                request_id = pending.id
+        if request_id is not None:
+            resumed_from_input = True
+            try:
+                content = accept_answer(
+                    chat, db, request_id, request.input_values, content
+                )
+            except LookupError as exc:
+                raise HTTPException(status_code=404, detail=str(exc)) from exc
+            except ValueError as exc:
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
+            if content is None:
+                db.commit()
+                return {"status": "already_accepted"}
+        elif request.input_values is not None:
+            raise HTTPException(status_code=409, detail="No active question")
+        else:
+            resumed_from_input = False
+
+    db_message = models.ChatMessage(chat_id=chat_id, role="user", content=content)
     db.add(db_message)
     db.commit()
-
-    # Start background task utilizing the Service Layer
     background_tasks.add_task(
-        chat_service.handle_process_background, chat_id, request.message.content
+        chat_service.handle_process_background,
+        chat_id,
+        content,
+        resumed_from_input,
     )
 
     return {"status": "accepted"}
@@ -300,7 +395,94 @@ def update_chat(
     update_data = chat_update.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(chat, field, value)
+
+    # A name the user typed is final: pin it so neither the upload-filename nor
+    # the LLM-generated title can overwrite it later.
+    if update_data.get("name"):
+        chat.name_is_custom = True
+
     db.commit()
     db.refresh(chat)
 
     return chat
+
+
+@router.get("/{chat_id}/inputs/{request_id}")
+def get_analysis_input(
+    chat_id: int,
+    request_id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    from app.services.llm.inputs import serialize_request
+
+    chat = verify_chat_ownership(chat_id, current_user.id, db)
+    request = db.query(models.AnalysisInput).filter_by(
+        id=request_id, chat_id=chat_id
+    ).first()
+    if request is None:
+        raise HTTPException(status_code=404, detail="Question not found")
+    return serialize_request(request, chat.network_id)
+
+
+@router.get("/{chat_id}/tunings/{tuning_id}")
+def get_parameter_tuning(
+    chat_id: int,
+    tuning_id: str,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    from app.services.llm.tuning import serialize_tuning
+
+    chat = verify_chat_ownership(chat_id, current_user.id, db)
+    row = db.query(models.ParameterTuning).filter_by(id=tuning_id, chat_id=chat_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Tuning panel not found")
+    return serialize_tuning(row, chat.network_id)
+
+
+@router.post("/{chat_id}/tunings/{tuning_id}/apply")
+async def apply_parameter_tuning(
+    chat_id: int,
+    tuning_id: str,
+    request: schemas.TuningApplyRequest,
+    current_user: models.User = Depends(get_current_user),
+    db: Session = Depends(database.get_db),
+):
+    """Re-run the panel's pipeline with new field values, without the agent (ADR 0016)."""
+    from app.services.llm import tuning
+
+    verify_chat_ownership(chat_id, current_user.id, db)
+    chat = db.query(models.Chat).filter_by(id=chat_id).with_for_update().one()
+    row = (
+        db.query(models.ParameterTuning)
+        .filter_by(id=tuning_id, chat_id=chat_id)
+        .with_for_update()
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Tuning panel not found")
+    try:
+        outcome = await tuning.apply(
+            db,
+            row,
+            request.values,
+            source="form",
+            active_network_id=chat.network_id,
+            queue=await llm_service.get_event_queue(chat_id),
+        )
+    except tuning.TuningInactive as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except tuning.TuningError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except tuning.TuningExecutionError as exc:
+        db.rollback()
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {
+        "tuning": tuning.serialize_tuning(row, chat.network_id),
+        "changes": outcome["changes"],
+        "steps": outcome["steps"],
+        "visualization": outcome["visualization"],
+    }

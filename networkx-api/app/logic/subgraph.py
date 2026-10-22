@@ -59,6 +59,8 @@ def create_subgraph_from_nodes(
     suffix: str = "Subgraph",
     preserve_layout: bool = False,
     description: str = None,
+    initialize_layout: bool = True,
+    reuse_existing: bool = True,
 ) -> Dict[str, Any]:
     """
     Creates a new network as a subgraph containing the specified nodes.
@@ -85,14 +87,10 @@ def create_subgraph_from_nodes(
     # 2. Determine Network Name & Check Existing
     target_name = _determine_subgraph_name(node_ids, suffix)
     existing_network = (
-        db.query(models.Network)
-        .filter(
-            models.Network.parent_network_id == source_network_id,
-            models.Network.name == target_name,
-        )
-        .first()
+        _find_same_subgraph(db, source_network_id, target_name, node_ids)
+        if reuse_existing
+        else None
     )
-
     if existing_network:
         logger.info(
             f"Returning existing subgraph: {existing_network.id} ({target_name})"
@@ -101,7 +99,10 @@ def create_subgraph_from_nodes(
 
     # 3. Create New Network
     new_network = models.Network(
-        name=target_name, parent_network_id=source_network_id, description=description
+        name=target_name,
+        parent_network_id=source_network_id,
+        description=description,
+        is_directed=source_network.is_directed,
     )
     
     # [FIX] Inherit visualization settings if preserving layout
@@ -156,16 +157,53 @@ def create_subgraph_from_nodes(
     )
 
     # 7. Calculate Initial Layout (only if NOT preserved)
-    if not preserve_layout:
+    if not preserve_layout and initialize_layout:
         logger.info("Calculating initial layout (forceatlas2)...")
         calculate_layout(new_network_id, "forceatlas2", db)
-    else:
+    elif preserve_layout:
         logger.info(f"Preserving existing layout (x, y copied) from {source_network.last_layout_name}.")
         # Verify if the specific layout attributes exist?
         # Ideally, AttributeCopier copied everything. 
         # If source_network.last_layout_name was 'forceatlas2', then 'forceatlas2_x' should have been copied.
         
     return {"new_network_id": new_network_id, "name": new_network.name}
+
+
+def _find_same_subgraph(
+    db: Session, source_network_id: int, name: str, node_ids: List[str]
+):
+    """An existing child of the source with this name AND exactly these nodes.
+
+    A name alone does not identify a subgraph: several creators use a fixed
+    name ("_community", "Filtered", "Largest Component"), and the ad-hoc name
+    truncates long ID lists. Matching on the name only handed back the first
+    community's subgraph when the second one was requested.
+    """
+    source_ids = {
+        row[0]
+        for row in db.query(models.Node.node_id).filter(
+            models.Node.network_id == source_network_id,
+            models.Node.node_id.in_(list(node_ids)),
+        )
+    }
+    candidates = (
+        db.query(models.Network)
+        .filter(
+            models.Network.parent_network_id == source_network_id,
+            models.Network.name == name,
+        )
+        .all()
+    )
+    for candidate in candidates:
+        existing_ids = {
+            row[0]
+            for row in db.query(models.Node.node_id).filter(
+                models.Node.network_id == candidate.id
+            )
+        }
+        if existing_ids == source_ids:
+            return candidate
+    return None
 
 
 # --- High Level Helpers ---

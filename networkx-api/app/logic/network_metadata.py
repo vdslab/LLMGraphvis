@@ -32,6 +32,7 @@ def get_network_metadata(db: Session, network_id: int) -> Dict[str, Any]:
         "id": network.id,
         "name": network.name,
         "description": network.description,
+        "is_directed": network.is_directed,
         "created_at": str(network.created_at),
         "visual_state": {
             "last_layout_name": network.last_layout_name,
@@ -46,6 +47,9 @@ def get_network_metadata(db: Session, network_id: int) -> Dict[str, Any]:
 
 def get_network_structure(db: Session, network_id: int) -> Dict[str, Any]:
     """Returns basic structural statistics of the network."""
+    network = db.get(models.Network, network_id)
+    if network is None:
+        raise ValueError(f"Network {network_id} not found")
     node_count = (
         db.query(models.Node).filter(models.Node.network_id == network_id).count()
     )
@@ -53,17 +57,26 @@ def get_network_structure(db: Session, network_id: int) -> Dict[str, Any]:
         db.query(models.Edge).filter(models.Edge.network_id == network_id).count()
     )
 
-    # Calculate density (approximate for undirected)
+    # Directed graphs have twice as many possible non-loop edges.
     density = 0
     if node_count > 1:
-        possible_edges = node_count * (node_count - 1) / 2
+        possible_edges = node_count * (node_count - 1)
+        if not network.is_directed:
+            possible_edges /= 2
         density = edge_count / possible_edges if possible_edges > 0 else 0
+
+    # Edge weights live on the edges table, not in the edge-attribute listing
+    # (see graph_builder.WEIGHT_COLUMN), so this is the only place a reader —
+    # including the agent's system-prompt context — can learn that the network
+    # is weighted at all.
+    from app.logic.utils.graph_builder import summarize_edge_weights
 
     return {
         "node_count": node_count,
         "edge_count": edge_count,
         "density": density,
-        "is_directed": False,
+        "is_directed": network.is_directed,
+        "edge_weights": summarize_edge_weights(db=db, network_id=network_id),
     }
 
 
@@ -109,6 +122,37 @@ def get_visualization_state(db: Session, network_id: int) -> Dict[str, Any]:
     }
 
 
+# Listing budget (ADR 0024): a free-text attribute such as a biography would
+# otherwise contribute ten paragraphs to every listing.
+LISTED_VALUE_CHARS = 40
+LISTED_TOP_VALUES = 5
+
+
+def _compact_listing(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Drop an empty description and clip example values; counts stay exact.
+
+    Provenance (`is_derived`, `derived_from`) is kept even when false/null:
+    it is how a reader tells a computed metric from imported data.
+    """
+    compact = []
+    for entry in entries:
+        item = dict(entry)
+        if item.get("description") is None:
+            item.pop("description", None)
+        stats = dict(item.get("stats") or {})
+        values = stats.get("top_values")
+        if isinstance(values, list):
+            stats["top_values"] = [
+                v if not isinstance(v, str) or len(v) <= LISTED_VALUE_CHARS
+                else v[:LISTED_VALUE_CHARS] + "…"
+                for v in values[:LISTED_TOP_VALUES]
+            ]
+        if stats:
+            item["stats"] = stats
+        compact.append(item)
+    return compact
+
+
 def list_node_attributes(db: Session, network_id: int) -> List[Dict[str, Any]]:
     """Lists available node attributes."""
     from app.logic import attributes
@@ -120,7 +164,7 @@ def list_node_attributes(db: Session, network_id: int) -> List[Dict[str, Any]]:
         models.NodeTextAttributeValue,
         db
     )
-    return stats
+    return _compact_listing(stats)
 
 
 def list_edge_attributes(db: Session, network_id: int) -> List[Dict[str, Any]]:
@@ -134,4 +178,4 @@ def list_edge_attributes(db: Session, network_id: int) -> List[Dict[str, Any]]:
         models.EdgeTextAttributeValue,
         db
     )
-    return stats
+    return _compact_listing(stats)

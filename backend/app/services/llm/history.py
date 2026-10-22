@@ -1,15 +1,27 @@
-from typing import List
+import base64
+import binascii
+from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
 from common import models
+
+from .observations import compact_past_observation, truncate_tool_result
 from .providers.types import (
     LLMFunctionCallPart,
     LLMFunctionResponsePart,
     LLMMessage,
     LLMTextPart,
 )
-from .engine import _truncate_tool_result
+
+
+def _decode_thought_signature(value: Optional[str]) -> Optional[bytes]:
+    if not value:
+        return None
+    try:
+        return base64.b64decode(value, validate=True)
+    except (ValueError, binascii.Error):
+        return None
 
 
 def build_history(chat_id: int, user_message: str, db: Session) -> List[LLMMessage]:
@@ -45,18 +57,22 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[LLMMessa
                     model_parts = []
                     tool_parts = []
                     for exc in step["tool_calls"]:
-                        # Synthetic call ID for Anthropic tool_use/tool_result pairing
-                        call_id = f"toolu_{exc.id}"
+                        call_id = getattr(exc, "call_id", None) or f"toolu_{exc.id}"
                         model_parts.append(LLMFunctionCallPart(
                             name=exc.tool_name,
                             args=exc.arguments,
                             call_id=call_id,
+                            thought_signature=_decode_thought_signature(
+                                getattr(exc, "thought_signature", None)
+                            ),
                         ))
                         result_data = exc.result
                         if exc.status == "failed":
                             result_data = {"error": exc.error}
                         else:
-                            result_data = _truncate_tool_result(result_data)
+                            result_data = compact_past_observation(
+                                truncate_tool_result(result_data)
+                            )
                         tool_parts.append(LLMFunctionResponsePart(
                             name=exc.tool_name,
                             response=result_data,
@@ -92,7 +108,9 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[LLMMessa
                         if tc.get("status") == "failed":
                             result_data = {"error": tc.get("error")}
                         else:
-                            result_data = _truncate_tool_result(result_data)
+                            result_data = compact_past_observation(
+                                truncate_tool_result(result_data)
+                            )
                         tool_parts.append(LLMFunctionResponsePart(
                             name=tc["name"],
                             response=result_data,

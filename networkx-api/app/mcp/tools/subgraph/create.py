@@ -18,7 +18,8 @@ def subgraph_list(
     Lists all subgraphs derived from the given parent network.
 
     Use this to discover previously created subgraphs before navigating to them
-    with `visualization_switch_network`.
+    with `visualization_switch_network` (to switch and render) or `network_select`
+    (to change analysis context without rendering).
 
     Returns:
         dict: {"subgraphs": [{"id": int, "name": str, "created_at": str}]}
@@ -41,9 +42,11 @@ def subgraph_create_from_nodes(
     Creates a new subgraph from an explicit list of node IDs.
 
     Use this ONLY when the user provides a specific list of node IDs (e.g., "create a subgraph
-    for nodes A, B, and C"). For attribute-based filtering, use `subgraph_create_by_filter` instead.
+    for nodes A, B, and C"). For attribute-based filtering, use `subgraph_extract_filter` (atomic)
+    or `subgraph_create_by_filter` (legacy) instead.
 
-    After creation, call `visualization_switch_network(new_network_id)` to display the result.
+    Legacy compound behavior: the backend automatically selects and renders the
+    result. Prefer subgraph_extract_nodes for extraction without these side effects.
 
     Returns:
         dict: {"new_network_id": int, "content": str}
@@ -90,7 +93,8 @@ def subgraph_create_by_filter(
     - "ranges": list of {"min": float, "max": float} numeric ranges (OR within condition)
     Multiple conditions are combined with AND.
 
-    After creation, call `visualization_switch_network(new_network_id)` to display.
+    Legacy compound behavior: the backend automatically selects and renders the
+    result. Prefer subgraph_extract_filter for extraction without these side effects.
 
     Returns:
         dict: {"new_network_id": int, "content": str}

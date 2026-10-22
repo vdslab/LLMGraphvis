@@ -86,3 +86,23 @@ def test_generate_visualization(client):
 def test_missing_network(client):
     response = client.get("/api/v1/networks/999999/metadata")
     assert response.status_code == 404
+
+
+def test_export_network_returns_graphml(client):
+    network_id = 9992
+    client.post(
+        "/api/v1/networks/initialize",
+        json={"network_id": network_id, "graphml_data": GRAPHML_CONTENT},
+    )
+
+    response = client.get(f"/api/v1/networks/{network_id}/export")
+
+    assert response.status_code == 200
+    graphml = response.json()["graphml"]
+    assert "<graphml" in graphml
+    assert 'id="n0"' in graphml and 'id="n1"' in graphml
+
+
+def test_export_missing_network_is_404(client):
+    response = client.get("/api/v1/networks/999999/export")
+    assert response.status_code == 404

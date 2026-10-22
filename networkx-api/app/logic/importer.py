@@ -1,11 +1,13 @@
 import datetime
 import itertools
+from collections import defaultdict
 
 from sqlalchemy.orm import Session
 
 from common import models
 from app.logic.parsing.graphml_parser import GraphMLParser
 
+from .attribute_semantics import MeasurementProfiler
 from .attributes import ensure_attributes
 
 
@@ -30,6 +32,12 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
     except ValueError as e:
         raise ValueError(f"Failed to parse GraphML: {e}")
 
+    if G.is_multigraph():
+        raise ValueError(
+            "Parallel edges are not supported by this application's simple-graph "
+            "storage. Aggregate them explicitly before importing; no data was saved."
+        )
+
     # Access metadata from parser result
     network_desc = parsed_data.network_message
     node_descs = parsed_data.node_messages
@@ -44,6 +52,10 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
 
     node_attr_types = {}
     edge_attr_types = {}
+    # Each attribute's values are profiled in the passes below, so its
+    # measurement is known without reading the values back.
+    node_profiles = defaultdict(MeasurementProfiler)
+    edge_profiles = defaultdict(MeasurementProfiler)
 
     # Pre-register description attribute as string if we found any
     if node_descs:
@@ -96,6 +108,7 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
             .filter(models.Network.id == final_network_id)
             .first()
         )
+        network_for_update.is_directed = G.is_directed()
         if network_desc and network_for_update:
             network_for_update.description = network_desc
 
@@ -129,6 +142,7 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
                 for key, val in data.items():
                     if key == "label":
                         continue
+                    node_profiles[key].add(val)
                     if key not in node_attr_types:
                         node_attr_types[key] = "float"
                     if node_attr_types[key] == "float":
@@ -179,6 +193,7 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
                     for key, val in data.items():
                         if key == "weight":
                             continue
+                        edge_profiles[key].add(val)
                         if key not in edge_attr_types:
                             edge_attr_types[key] = "float"
                         if edge_attr_types[key] == "float":
@@ -205,6 +220,7 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
             db,
             commit=False,
             descriptions=node_attr_descs,
+            measurements={k: p.result() for k, p in node_profiles.items()},
         )
         edge_attr_map = ensure_attributes(
             network_id,
@@ -213,6 +229,7 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
             db,
             commit=False,
             descriptions=edge_attr_descs,
+            measurements={k: p.result() for k, p in edge_profiles.items()},
         )
 
         # --- 3b. Bulk Insert Attribute Values ---

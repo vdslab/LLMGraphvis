@@ -9,12 +9,11 @@ def export_network_to_graphml(network_id: int, db: Session) -> str:
     """
     Reconstructs the network from the database and returns it as a GraphML string.
     """
-    G = nx.Graph()
-
     # 1. Fetch Network Info (for consistency check, though largely unused in simple GraphML)
     network = db.query(models.Network).filter(models.Network.id == network_id).first()
     if not network:
         raise ValueError(f"Network {network_id} not found")
+    G = nx.DiGraph() if network.is_directed else nx.Graph()
 
     # 2. Fetch Nodes & Attributes
     nodes = db.query(models.Node).filter(models.Node.network_id == network_id).all()

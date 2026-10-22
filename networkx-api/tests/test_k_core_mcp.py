@@ -18,7 +18,6 @@ def test_create_k_core_subgraph_success():
 
                 # Setup return values
                 mock_logic_create.return_value = {"new_network_id": 999, "name": "K-Core (k=2)"}
-                mock_build_vis.return_value = {"nodes": [], "edges": []}
 
                 # Execute
                 result = subgraph.subgraph_k_core(
@@ -35,12 +34,15 @@ def test_create_k_core_subgraph_success():
                     preserve_layout=True,
                 )
 
-                # Verify Vis Builder Call
-                mock_build_vis.assert_called_once_with(mock_db, 999)
+                # Extraction no longer renders: it reports `new_network_id` and the
+                # backend's on_new_network_id POST_TOOL hook does the rendering and
+                # the view switch. Previously this built a visualization that the
+                # engine then discarded, since it only reacts to `new_network_id`.
+                mock_build_vis.assert_not_called()
 
-                # Verify Result Structure
-                assert result["network_id"] == 999
-                assert result["network"] == {"nodes": [], "edges": []}
+                # Verify Result Structure — same shape as the subgraph_create_* tools.
+                assert result["new_network_id"] == 999
+                assert "network" not in result
                 assert "content" in result
                 assert "K-core subgraph created" in result["content"]
 

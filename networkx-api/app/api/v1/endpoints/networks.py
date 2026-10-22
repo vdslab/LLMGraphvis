@@ -42,6 +42,8 @@ def initialize_network(
 @router.get("/{network_id}/export")
 def export_network(network_id: int, db: Session = Depends(get_db)):
     """Exports the network to GraphML."""
+    if db.get(models.Network, network_id) is None:
+        raise HTTPException(status_code=404, detail=f"Network {network_id} not found")
     try:
         logger.info(f"Exporting network_id={network_id}")
         data = exporter.export_network_to_graphml(network_id, db)

@@ -4,8 +4,15 @@ from sqlalchemy.orm import Session
 
 from common import models
 from app.logic.common_utils import calculate_smart_edge_width, calculate_smart_node_size
-from app.logic.style_service import StyleService
+from app.logic.style_service import (
+    DEFAULT_EDGE_COLOR,
+    DEFAULT_NODE_GRADIENT,
+    StyleService,
+)
 from app.logic.attributes import fetch_attribute_values
+from app.logic.layout_quality import evaluate as evaluate_layout
+from app.logic.layout_quality import normalize_like_renderer
+from app.logic.view_state import Highlight, label_flags
 
 
 class VisualizationBuilder:
@@ -23,6 +30,7 @@ class VisualizationBuilder:
         focus_config: Optional[Dict] = None,
         custom_node_colors: Optional[List[Dict]] = None,
         node_label_config: Optional[Dict] = None,
+        highlight_config: Optional[Dict] = None,
     ):
         self.network_id = network_id
         self.db = db
@@ -36,6 +44,8 @@ class VisualizationBuilder:
         self.focus_config = focus_config
         self.custom_node_colors = custom_node_colors
         self.node_label_config = node_label_config
+        self.highlight_config = highlight_config
+        self.highlight = Highlight(None, directed=False)
 
         # State to be populated
         self.network = None
@@ -61,6 +71,7 @@ class VisualizationBuilder:
 
         self.layout_x_attr = ""
         self.layout_y_attr = ""
+        self.raw_positions: Dict[str, tuple] = {}
 
     def validate_and_prepare(self):
         # 0. Resolve Network
@@ -87,6 +98,12 @@ class VisualizationBuilder:
 
         if self.node_label_config is None and self.network.last_node_label_config:
             self.node_label_config = self.network.last_node_label_config
+
+        if self.highlight_config is None and self.network.last_highlight_config:
+            self.highlight_config = self.network.last_highlight_config
+        self.highlight = Highlight(
+            self.highlight_config, directed=bool(self.network.is_directed)
+        )
 
         # Resolve Layout Name from DB if not provided
         if self.layout_name is None:
@@ -115,6 +132,9 @@ class VisualizationBuilder:
         global_node_attrs = StyleService.collect_required_attributes(
             global_attrs_configs
         )
+        rank_by = (self.node_label_config or {}).get("rank_by")
+        if rank_by:
+            global_node_attrs.add(rank_by)
 
         # Layout attributes
         global_node_attrs.add(self.layout_x_attr)
@@ -203,12 +223,69 @@ class VisualizationBuilder:
     def build(self) -> Dict[str, List[Dict]]:
         vis_nodes = self._build_vis_nodes()
         vis_edges = self._build_vis_edges(vis_nodes)
+        label_style = self._apply_labels(vis_nodes, vis_edges)
 
         self._save_state()
 
         legend = self._build_summary()
+        if self.highlight.active:
+            legend["highlight"] = self.highlight.summary(vis_nodes, vis_edges)
 
-        return {"nodes": vis_nodes, "links": vis_edges, "legend": legend}
+        vis_data = {"nodes": vis_nodes, "links": vis_edges, "legend": legend}
+        if label_style:
+            vis_data["label_style"] = label_style
+        return vis_data
+
+    def _apply_labels(self, vis_nodes: List[Dict], vis_edges: List[Dict]) -> Dict:
+        """Set per-node `show_label` and return the canvas's label style."""
+        config = self.node_label_config or {}
+        rank_values = None
+        rank_by = config.get("rank_by")
+        if rank_by:
+            db_ids = {
+                node_id: db_id
+                for db_id, node_id in self.db.query(models.Node.id, models.Node.node_id)
+                .filter(models.Node.network_id == self.network_id)
+                .all()
+            }
+            rank_values = {}
+            for n in vis_nodes:
+                val = StyleService.get_val(
+                    db_ids.get(n["id"]),
+                    rank_by,
+                    self.global_node_attr_map,
+                    self.global_node_values,
+                )
+                try:
+                    rank_values[n["id"]] = float(val) if val is not None else None
+                except (TypeError, ValueError):
+                    raise ValueError(
+                        f"rank_by attribute '{rank_by}' must be numeric"
+                    ) from None
+        flags = label_flags(config, vis_nodes, vis_edges, rank_values)
+        if flags is not None:
+            for n in vis_nodes:
+                n["show_label"] = flags.get(n["id"], False)
+        style = {
+            key: config[key]
+            for key in ("font_size", "max_length")
+            if config.get(key) is not None
+        }
+        if flags is not None:
+            style["visibility"] = config.get("visibility") or "all"
+            style["labeled_count"] = sum(1 for v in flags.values() if v)
+        return style
+
+    def layout_quality(self, vis_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Readability metrics of what `build()` drew (see logic/layout_quality)."""
+        if not self.raw_positions:
+            return None
+        report = evaluate_layout(
+            self.raw_positions,
+            [(e["source"], e["target"]) for e in vis_data["links"]],
+            {n["id"]: n["size"] for n in vis_data["nodes"]},
+        )
+        return {"layout": self.layout_name, **report.as_dict()}
 
     def _build_summary(self) -> Dict[str, Any]:
         """Constructs a summary of the applied visual mappings."""
@@ -229,6 +306,7 @@ class VisualizationBuilder:
             if scale == "CATEGORICAL":
                 info["type"] = "categorical"
                 info["mapping"] = self.categorical_color_map
+                info["palette"] = nc.get("palette")
             elif scale == "RANKING":
                 info["type"] = "ranking"
                 # Ranking map is ID based, maybe too large to show. Show rules instead.
@@ -237,8 +315,9 @@ class VisualizationBuilder:
                 info["type"] = "linear"
                 info["min"] = self.node_color_stats[1]
                 info["max"] = self.node_color_stats[2]
-                info["gradient"] = nc.get("gradient")
-            
+                info["gradient"] = nc.get("gradient") or DEFAULT_NODE_GRADIENT
+                info.update(_mapping_summary(nc))
+
             summary["node_color"] = info
 
         # 2. Node Size
@@ -251,9 +330,36 @@ class VisualizationBuilder:
                 info["data_max"] = self.node_size_stats[2]
                 info["size_min"] = ns.get("min")
                 info["size_max"] = ns.get("max")
+                info.update(_mapping_summary(ns))
             summary["node_size"] = info
-            
-        # 3. Layout
+
+        # 3. Edges, when styled: the model reports them, the panel does not draw them.
+        if self.edge_color_config:
+            ec = self.edge_color_config
+            info = {"attribute": ec.get("attribute")}
+            if ec.get("attribute"):
+                info["type"] = (ec.get("scale_type") or "LINEAR").lower()
+                if self.edge_color_stats[0] and info["type"] == "linear":
+                    info["min"] = self.edge_color_stats[1]
+                    info["max"] = self.edge_color_stats[2]
+                    info.update(_mapping_summary(ec))
+            info["default_color"] = ec.get("default_color") or DEFAULT_EDGE_COLOR
+            if ec.get("opacity") is not None:
+                info["opacity"] = ec["opacity"]
+            summary["edge_color"] = info
+        if self.edge_width_config:
+            ew = self.edge_width_config
+            info = {"attribute": ew.get("attribute")}
+            if self.edge_width_stats[0]:
+                info["data_min"] = self.edge_width_stats[1]
+                info["data_max"] = self.edge_width_stats[2]
+                info.update(_mapping_summary(ew))
+            elif ew.get("default") is not None:
+                info["width"] = ew["default"]
+            summary["edge_width"] = info
+
+
+        # 4. Layout
         if self.layout_name:
             summary["layout"] = self.layout_name
 
@@ -354,6 +460,15 @@ class VisualizationBuilder:
                         elif not self.node_size_stats[0]:
                             size = smart_defaults["min"]
 
+            highlighted = False
+            if self.highlight.active:
+                highlighted = self.highlight.node(n.node_id)
+                if highlighted:
+                    if self.highlight.color:
+                        color = self.highlight.color
+                else:
+                    opacity = min(opacity, self.highlight.dim_opacity)
+
             # Layout
             x = StyleService.get_val(
                 n.id,
@@ -395,35 +510,17 @@ class VisualizationBuilder:
                     "size": size,
                     "color": color,
                     "opacity": opacity,
+                    **({"highlighted": True} if highlighted else {}),
                 }
             )
 
-        # --- Normalization [NEW] ---
-        # Normalize coordinates to a fixed logical range (e.g. [-1000, 1000])
-        # This ensures node sizes (typically 5-20) have a consistent relative scale to the layout.
-        if vis_nodes:
-            xs = [n["x"] for n in vis_nodes]
-            ys = [n["y"] for n in vis_nodes]
-            
-            min_x, max_x = min(xs), max(xs)
-            min_y, max_y = min(ys), max(ys)
-            
-            # Avoid divide by zero if all nodes are at same spot
-            range_x = (max_x - min_x) if (max_x - min_x) > 0 else 1.0
-            range_y = (max_y - min_y) if (max_y - min_y) > 0 else 1.0
-            
-            # Target range: -1000 to 1000 (Size = 2000)
-            TARGET_EXTENT = 1000.0
-            
-            for node in vis_nodes:
-                # Normalize to 0..1 then shift/scale to -1000..1000
-                nx = (node["x"] - min_x) / range_x
-                ny = (node["y"] - min_y) / range_y
-                
-                # Center around 0: (0..1) -> (-0.5 .. 0.5) -> * 2000 -> (-1000 .. 1000)
-                node["x"] = (nx - 0.5) * (2 * TARGET_EXTENT)
-                node["y"] = (ny - 0.5) * (2 * TARGET_EXTENT)
-        # ---------------------------
+        # Normalize coordinates to the fixed logical range the frontend fits and
+        # sizes nodes against. layout_quality uses the same transform to measure
+        # what is drawn, so this must stay the only copy of it.
+        self.raw_positions = {n["id"]: (n["x"], n["y"]) for n in vis_nodes}
+        normalized = normalize_like_renderer(self.raw_positions)
+        for node in vis_nodes:
+            node["x"], node["y"] = normalized[node["id"]]
 
         return vis_nodes
 
@@ -489,12 +586,22 @@ class VisualizationBuilder:
                 self.edge_values,
             )
             opacity = 1.0
+            base_opacity = (self.edge_color_config or {}).get("opacity")
 
             if self.focus_network_id and not is_focused:
                 if self.context_config:
                     opacity = self.context_config.get("opacity", 0.1)
                     if self.context_config.get("color"):
                         color = self.context_config["color"]
+
+            highlighted = False
+            if self.highlight.active:
+                highlighted = self.highlight.edge(source_node_id, target_node_id)
+                if highlighted:
+                    if self.highlight.color:
+                        color = self.highlight.color
+                else:
+                    opacity = min(opacity, self.highlight.dim_opacity)
 
             vis_edges.append(
                 {
@@ -503,6 +610,8 @@ class VisualizationBuilder:
                     "width": width,
                     "color": color,
                     "opacity": opacity,
+                    **({"base_opacity": base_opacity} if base_opacity is not None else {}),
+                    **({"highlighted": True} if highlighted else {}),
                 }
             )
 
@@ -522,6 +631,8 @@ class VisualizationBuilder:
                 self.network.last_edge_color_config = self.edge_color_config
             if self.node_label_config is not None:
                 self.network.last_node_label_config = self.node_label_config
+            if self.highlight_config is not None:
+                self.network.last_highlight_config = self.highlight_config
             self.db.commit()
 
     # --- Helpers ---
@@ -638,6 +749,17 @@ class VisualizationBuilder:
 
 
 
+def _mapping_summary(config: Dict[str, Any]) -> Dict[str, Any]:
+    """The transform and explicit range of a numeric mapping, when not the default."""
+    info: Dict[str, Any] = {}
+    if (config.get("transform") or "linear") != "linear":
+        info["transform"] = config["transform"]
+    for key in ("value_min", "value_max"):
+        if config.get(key) is not None:
+            info[key] = config[key]
+    return info
+
+
 def get_current_visualization(db: Session, network_id: int) -> Dict[str, Any]:
     """
     Retrieves the current visualization state (configs) without re-generating it.
@@ -652,9 +774,62 @@ def get_current_visualization(db: Session, network_id: int) -> Dict[str, Any]:
         "node_color": network.last_node_color_config,
         "edge_width": network.last_edge_width_config,
         "edge_color": network.last_edge_color_config,
-        "node_label": network.last_node_label_config
+        "node_label": network.last_node_label_config,
+        "highlight": network.last_highlight_config,
     }
 
+
+
+# Style channels that can be reset, mapped to the column holding their config.
+RESETTABLE_STYLE_TARGETS = {
+    "node_color": "last_node_color_config",
+    "node_size": "last_node_size_config",
+    "node_label": "last_node_label_config",
+    "edge_color": "last_edge_color_config",
+    "edge_width": "last_edge_width_config",
+    "highlight": "last_highlight_config",
+}
+# Names a model reaches for when it means the zoom, which is not a style channel.
+VIEW_TARGET_GUESSES = frozenset({"viewport", "zoom", "view", "camera", "pan"})
+
+
+def reset_style(db: Session, network_id: int, targets: List[str]) -> List[str]:
+    """Clear the stored configuration for the named style channels.
+
+    Needed because the preserve-state mechanism is one-way: `_save_state` only
+    writes a config when it is not None and `validate_and_prepare` reloads any
+    config the caller omitted, so there is no argument to any `visualization_set_*`
+    tool that returns a channel to its default. The column has to be NULLed.
+
+    Returns the channels that were actually cleared (i.e. had a config set).
+    """
+    network = db.query(models.Network).filter(models.Network.id == network_id).first()
+    if not network:
+        raise ValueError(f"Network {network_id} not found.")
+
+    unknown = [t for t in targets if t not in RESETTABLE_STYLE_TARGETS]
+    if unknown:
+        message = (
+            f"Unknown style target(s): {', '.join(unknown)}. "
+            f"Valid targets: {', '.join(sorted(RESETTABLE_STYLE_TARGETS))}."
+        )
+        if any(t in VIEW_TARGET_GUESSES for t in unknown):
+            message += (
+                " The zoom is not a style: call "
+                "visualization_set_viewport(target='all') to show the whole network."
+            )
+        raise ValueError(message)
+
+    cleared = []
+    for target in targets:
+        column = RESETTABLE_STYLE_TARGETS[target]
+        if getattr(network, column) is not None:
+            setattr(network, column, None)
+            cleared.append(target)
+
+    if cleared:
+        db.commit()
+    return cleared
 
 
 def build_visualization(
@@ -669,9 +844,14 @@ def build_visualization(
     focus_config: Optional[dict] = None,
     node_label_config: Optional[Any] = None,
     custom_node_colors: Optional[list] = None,
+    with_quality: bool = False,
+    highlight_config: Optional[dict] = None,
 ) -> Dict[str, Any]:
     """
     Helper function to instantiate and run VisualizationBuilder.
+
+    `with_quality` adds `layout_quality` (see logic/layout_quality) for the
+    agent and the canvas's layout information panel.
     """
     # Convert Pydantic models to dicts if needed
     nc_conf = node_color_config.model_dump() if hasattr(node_color_config, "model_dump") else node_color_config
@@ -691,9 +871,43 @@ def build_visualization(
         context_config=context_config,
         focus_config=focus_config,
         node_label_config=nl_conf,
-        custom_node_colors=custom_node_colors
+        custom_node_colors=custom_node_colors,
+        highlight_config=highlight_config,
     )
     builder.validate_and_prepare()
     builder.fetch_data()
     builder.calculate_statistics()
-    return builder.build()
+    vis_data = builder.build()
+    if with_quality:
+        quality = builder.layout_quality(vis_data)
+        if quality is not None:
+            vis_data["layout_quality"] = quality
+    return vis_data
+
+
+def display_node_sizes(db: Session, network_id: int) -> Dict[str, float]:
+    """Each node's size (an area) as the saved style draws it, keyed by node_id.
+
+    Needs no layout, unlike `build_visualization`, so layouts can use it before
+    their first run: `size_aware` repulsion and quality scoring both have to
+    know how large the nodes will be drawn. Focus/context overrides are ignored;
+    they belong to a view, not to the network.
+    """
+    network = db.query(models.Network).filter(models.Network.id == network_id).first()
+    config = network.last_node_size_config if network else None
+    nodes = (
+        db.query(models.Node.id, models.Node.node_id)
+        .filter(models.Node.network_id == network_id)
+        .all()
+    )
+    smart_defaults = calculate_smart_node_size(len(nodes))
+    builder = VisualizationBuilder(network_id, db)
+    attrs = StyleService.collect_required_attributes([config])
+    attr_map, values = builder._fetch_node_data(network_id, attrs)
+    stats = StyleService.calculate_stats(config, attr_map, values)
+    return {
+        node_id: StyleService.resolve_node_size(
+            db_id, config, stats, attr_map, values, smart_defaults
+        )
+        for db_id, node_id in nodes
+    }

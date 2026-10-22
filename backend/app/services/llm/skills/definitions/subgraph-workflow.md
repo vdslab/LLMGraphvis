@@ -1,0 +1,63 @@
+---
+name: subgraph-workflow
+description: Extract a network, select the analysis context, lay it out, and render as separate decisions. Load before extracting or switching networks.
+triggers: [subgraph, 部分グラフ, サブグラフ, filter, フィルタ, 絞り, 抽出, extract, 切り出, only, のみ, だけ, component, 連結成分, ego, 近傍, neighbor, k-core, コア, 戻, back, parent, 親]
+related_tools: [subgraph_extract_filter, subgraph_extract_nodes, subgraph_create_from_nodes, subgraph_ego_network, subgraph_k_core, subgraph_community, subgraph_largest_component, subgraph_high_degree_nodes, network_select, subgraph_list, visualization_switch_network, analysis_connected_components, visualization_generate, layout_forceatlas2, layout_spring, layout_profile, ask_user, switch_to_parent_network, switch_to_main_network]
+---
+
+## Extract only to change the scope of analysis
+
+"Focus on", "show", "zoom in on" or "look at" a set of nodes is a view
+request: use `visualization_highlight` / `visualization_set_viewport`
+(`view-navigation`). The whole network stays on screen and in scope. Extract
+when the user wants later analysis or layout to run on the subset alone.
+
+## Separate selection, extraction, and viewing
+
+Use `subgraph_extract_filter` for attribute conditions. Conditions use
+`attribute_name`, with AND across conditions and OR among categories/ranges.
+Use `subgraph_extract_nodes` when the user named IDs or analysis returned a small
+set of IDs. Do not enumerate thousands of IDs to simulate an attribute filter.
+For communities, filter the exact saved community attribute and value.
+
+These tools return `created_network_id` and leave the active network and canvas
+unchanged. They create a fresh induced subgraph, copy source attributes, and
+exclude derived metrics and coordinates. They do not inherit visual styles.
+
+If the user asked only to create or compare a subset, analysis can use the
+returned ID explicitly while staying on the current graph. If the user asked
+to view it, use this sequence:
+
+1. Extract with the appropriate atomic tool.
+2. `network_select(network_id=created_network_id)` changes subsequent analysis.
+3. Calculate a layout on that network (`layout_profile` picks one when the user named none; see `layout`).
+4. Recompute any metrics needed for encoding; use the returned attribute names.
+5. `visualization_generate` draws the result.
+
+Report the resulting scope. Do not imply that centrality computed on the parent
+is a property of the subgraph. If a filtering request is ambiguous, ask one
+concrete question with `ask_user` and wait; do not extract before the answer.
+
+## Preserve an existing spatial arrangement
+
+For an explicit request to keep parent positions, the legacy
+`subgraph_create_from_nodes(..., preserve_layout=True)` remains available.
+Unlike the atomic tools, legacy `subgraph_create_*`, `subgraph_ego_network`,
+`subgraph_k_core`, `subgraph_community`, and other older extraction tools
+**automatically switch and render** through a backend hook. Do not repeat the
+switch. When `preserve_layout=False`, they also compute an initial layout.
+Use these only when that compound behavior matches the user's request.
+Derived metrics are excluded even when positions are retained, so recompute
+before interpreting or mapping them.
+
+## Return to an earlier network
+
+Use `subgraph_list` to discover saved children.
+- To **switch and view** an existing subgraph immediately, call
+  `visualization_switch_network(network_id=...)`, which updates the active context
+  and re-renders the saved view in one step.
+- Alternatively, `network_select` updates only the analysis context without
+  drawing; follow it with `visualization_generate` to display it.
+- `switch_to_parent_network` and `switch_to_main_network` are local shortcuts
+  that traverse up the hierarchy and also render. Explain the scope change
+  without exposing implementation details.

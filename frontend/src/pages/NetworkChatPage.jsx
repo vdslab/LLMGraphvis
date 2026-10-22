@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useChatStore } from '../stores/chatStore';
 import { useNetworkStore } from '../stores/networkStore';
@@ -9,7 +9,9 @@ import LegendPanel from '../components/LegendPanel';
 import ChatInterface from '../components/ChatInterface';
 import NodeDetailsPanel from '../components/NodeDetailsPanel';
 import ChatList from '../components/ChatList';
+import NetworkDataChooser from '../components/NetworkDataChooser';
 import * as api from '../services/api';
+import { Menu, Tag, X, AlertTriangle, Download } from 'lucide-react';
 
 const NetworkChatPage = () => {
   const { id } = useParams();
@@ -19,11 +21,19 @@ const NetworkChatPage = () => {
     setChatId,
     fetchMessages,
     uploadNetwork,
-    createChat
+    createChat,
+    isLoading,
+    sampleNetworks,
+    sampleNetworksStatus,
+    sampleNetworksError,
+    fetchSampleNetworks,
+    loadSampleNetwork,
+    exportNetworkAsGraphML,
   } = useChatStore();
-  const { nodes, links, networkId } = useNetworkStore();
+  const { nodes, links, labelStyle, viewport } = useNetworkStore();
   const fileInputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [loadingSampleId, setLoadingSampleId] = useState(null);
   
   // Sidebar Logic
   const [showChatList, setShowChatList] = useState(false);
@@ -79,6 +89,18 @@ const NetworkChatPage = () => {
       loadData();
     }
   }, [id, fetchMessages, isAuthenticated, navigate, setChatId]);
+
+  useEffect(() => {
+    if (id && id !== 'new' && isAuthenticated) {
+      fetchSampleNetworks().catch((error) => {
+        console.error('Failed to load sample network catalog:', error);
+      });
+    }
+  }, [id, isAuthenticated, fetchSampleNetworks]);
+
+  useEffect(() => {
+    if (!isLoading) setLoadingSampleId(null);
+  }, [isLoading]);
 
   // --- Real-time Connection Logic (Refactored) ---
   const { sseError } = useChatConnection(id, isAuthenticated);
@@ -141,7 +163,7 @@ const NetworkChatPage = () => {
     } catch (e) {
         console.error("Error in node click handler:", e);
     }
-  }, []); // networkId is accessed via getState(), so we don't need it in dependency. Stable callback.
+  }, [id]);
 
   const handleCloseNodeDetails = useCallback(() => {
       setNodeDetailsPanelOpen(false);
@@ -192,6 +214,16 @@ const NetworkChatPage = () => {
     }
   };
 
+  const handleSampleSelect = async (sampleId) => {
+    setLoadingSampleId(sampleId);
+    try {
+      await loadSampleNetwork(id, sampleId);
+    } catch (error) {
+      console.error('Sample network load failed:', error);
+      setLoadingSampleId(null);
+    }
+  };
+
   // --- Resize Logic ---
   const [sidebarWidth, setSidebarWidth] = useState(window.innerWidth / 4);
   const [isResizing, setIsResizing] = useState(false);
@@ -235,92 +267,191 @@ const NetworkChatPage = () => {
   }, [isResizing, resize, stopResizing]);
 
   const [showLabels, setShowLabels] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+      await exportNetworkAsGraphML(parseInt(id));
+    } catch (error) {
+      // The api-error event has already shown the reason.
+      console.error('GraphML export failed:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   if (!isAuthenticated) return null;
 
   return (
     <div style={{ display: 'flex', height: '100%', flexDirection: 'column' }}>
-      {/* Error notification */}
+      {/* M3 Error notification */}
       {sseError && (
-        <div style={{
-          padding: '10px',
-          backgroundColor: '#f44336',
-          color: 'white',
-          textAlign: 'center',
-          width: '100%'
-        }}>
-          {sseError}
+        <div
+          style={{
+            padding: '8px 16px',
+            backgroundColor: 'var(--md-sys-color-error-container)',
+            color: 'var(--md-sys-color-on-error-container)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            fontSize: '0.8125rem',
+            fontWeight: 600,
+            borderBottom: '1px solid rgba(186, 26, 26, 0.2)',
+          }}
+        >
+          <AlertTriangle size={15} />
+          <span>{sseError}</span>
         </div>
       )}
-      
+
       {/* Main content */}
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        
-        {/* Left Side: Navigation Sidebar (Collapsible) */}
+        {/* Left Side: Navigation Sidebar Drawer */}
         {showChatList && (
-            <div style={{ 
-                width: '250px', 
-                borderRight: '1px solid var(--border-color)',
+          <div
+            className="fade-in"
+            style={{
+              width: '280px',
+              borderRight: '1px solid var(--md-sys-color-outline-subtle)',
+              backgroundColor: 'var(--md-sys-color-surface-container-low)',
+              display: 'flex',
+              flexDirection: 'column',
+              zIndex: 20,
+            }}
+          >
+            <div
+              style={{
+                padding: '0.75rem 1rem',
                 display: 'flex',
-                flexDirection: 'column'
-            }}>
-                <div style={{ padding: '0.5rem', textAlign: 'right', borderBottom: '1px solid #eee' }}>
-                    <button onClick={() => setShowChatList(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>×</button>
-                </div>
-                <ChatList currentChatId={parseInt(id)} onClose={() => {}} />
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '1px solid var(--md-sys-color-outline-subtle)',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: '0.875rem',
+                  fontWeight: 700,
+                  fontFamily: 'var(--font-family-brand)',
+                  color: 'var(--md-sys-color-on-surface)',
+                }}
+              >
+                Workspaces
+              </span>
+              <button
+                onClick={() => setShowChatList(false)}
+                className="btn btn-ghost"
+                style={{
+                  width: '28px',
+                  height: '28px',
+                  padding: 0,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                aria-label="Close chat list"
+              >
+                <X size={16} />
+              </button>
             </div>
+            <ChatList currentChatId={parseInt(id)} onClose={() => setShowChatList(false)} />
+          </div>
         )}
 
         {/* Center: Graph */}
-        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-          
-           {/* Sidebar Toggle Button (if closed) */}
-           {!showChatList && (
-            <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 6 }}>
-               <button 
+        <div
+          data-testid="network-graph-panel"
+          style={{ flex: 1, position: 'relative', overflow: 'hidden' }}
+        >
+          {/* M3 Expressive Floating Action Bar */}
+          <div
+            style={{
+              position: 'absolute',
+              top: 14,
+              left: 14,
+              zIndex: 10,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 6px',
+              backgroundColor: 'rgba(255, 255, 255, 0.92)',
+              backdropFilter: 'blur(16px)',
+              borderRadius: 'var(--md-sys-shape-full)',
+              border: '1px solid var(--md-sys-color-outline-subtle)',
+              boxShadow: 'var(--md-sys-elevation-2)',
+            }}
+          >
+            {!showChatList && (
+              <button
                 onClick={() => setShowChatList(true)}
-                className="btn"
-                style={{ 
-                    backgroundColor: 'rgba(255, 255, 255, 0.9)', 
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-                    padding: '8px 12px',
-                    borderRadius: '5px'
+                className="btn btn-ghost"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.8125rem',
+                  borderRadius: 'var(--md-sys-shape-full)',
+                  gap: '6px',
+                  color: 'var(--md-sys-color-on-surface)',
                 }}
-               >
-                   ☰ Chats
-               </button>
-            </div>
-           )}
+              >
+                <Menu size={15} />
+                <span>Chats</span>
+              </button>
+            )}
 
-          {/* Graph Controls */}
-          {nodes.length > 0 && (
-            <div style={{ 
-              position: 'absolute', 
-              top: 10, 
-              left: !showChatList ? 100 : 10, 
-              zIndex: 5,
-              backgroundColor: 'rgba(255, 255, 255, 0.8)',
-              padding: '8px',
-              borderRadius: '5px',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-            }}>
-              <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '14px' }}>
-                <input
-                  type="checkbox"
-                  checked={showLabels}
-                  onChange={(e) => setShowLabels(e.target.checked)}
-                  style={{ marginRight: '8px' }}
-                />
-                Show Labels
-              </label>
-            </div>
-          )}
+            {nodes.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowLabels(!showLabels)}
+                className={showLabels ? 'btn btn-secondary' : 'btn btn-ghost'}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.8125rem',
+                  borderRadius: 'var(--md-sys-shape-full)',
+                  gap: '6px',
+                  backgroundColor: showLabels
+                    ? 'var(--md-sys-color-primary-container)'
+                    : 'transparent',
+                  color: showLabels
+                    ? 'var(--md-sys-color-on-primary-container)'
+                    : 'var(--md-sys-color-on-surface-variant)',
+                  border: 'none',
+                }}
+              >
+                <Tag size={14} />
+                <span>Labels</span>
+              </button>
+            )}
+
+            {nodes.length > 0 && (
+              <button
+                type="button"
+                onClick={handleExport}
+                disabled={isExporting}
+                className="btn btn-ghost"
+                title="Download the displayed network as GraphML"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.8125rem',
+                  borderRadius: 'var(--md-sys-shape-full)',
+                  gap: '6px',
+                  color: 'var(--md-sys-color-on-surface-variant)',
+                  border: 'none',
+                }}
+              >
+                <Download size={14} />
+                <span>{isExporting ? 'Exporting…' : 'Export'}</span>
+              </button>
+            )}
+          </div>
 
           {nodeDetailsPanelOpen && selectedNode && (
-            <NodeDetailsPanel 
-                selectedNode={selectedNode} 
-                onClose={handleCloseNodeDetails}
-                onAskAboutNode={handleAskAboutNode}
+            <NodeDetailsPanel
+              selectedNode={selectedNode}
+              onClose={handleCloseNodeDetails}
+              onAskAboutNode={handleAskAboutNode}
             />
           )}
 
@@ -328,62 +459,81 @@ const NetworkChatPage = () => {
             nodes={nodes}
             links={links}
             showLabels={showLabels}
+            labelStyle={labelStyle}
+            viewport={viewport}
             onNodeClick={handleNodeClick}
             onBackgroundClick={handleBackgroundClick}
           />
           {nodes.length > 0 && <LegendPanel />}
           {nodes.length === 0 && (
-            <div style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              textAlign: 'center'
-            }}>
-              <h3>No network data</h3>
-              <p>Upload a GraphML file to get started</p>
-              <input
-                type="file"
-                accept=".graphml,.xml"
-                onChange={handleFileUpload}
-                style={{ display: 'none' }}
-                ref={fileInputRef}
+            <div
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+              }}
+            >
+              <NetworkDataChooser
+                samples={sampleNetworks}
+                catalogStatus={sampleNetworksStatus}
+                catalogError={sampleNetworksError}
+                busy={isUploading || isLoading}
+                loadingSampleId={loadingSampleId}
+                onUpload={handleFileUpload}
+                onSelectSample={handleSampleSelect}
+                fileInputRef={fileInputRef}
               />
-              <button
-                onClick={() => fileInputRef.current.click()}
-                disabled={isUploading}
-                style={{
-                  padding: '10px 20px',
-                  fontSize: '16px',
-                  cursor: 'pointer',
-                  backgroundColor: '#4CAF50',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '5px'
-                }}
-              >
-                {isUploading ? 'Uploading...' : 'Upload GraphML'}
-              </button>
             </div>
           )}
         </div>
-        
-        {/* Resize Handle */}
+
+        {/* M3 Expressive Resize Handle with Grab Indicator */}
         <div
           onMouseDown={startResizing}
           style={{
-            width: '5px',
+            width: '8px',
             cursor: 'col-resize',
-            backgroundColor: isResizing ? 'var(--primary-color)' : 'var(--border-color)',
-            transition: 'background-color 0.2s',
-            zIndex: 10
+            backgroundColor: isResizing
+              ? 'var(--md-sys-color-primary)'
+              : 'var(--md-sys-color-surface-container)',
+            transition: 'all 0.2s',
+            zIndex: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderLeft: '1px solid var(--md-sys-color-outline-subtle)',
+            borderRight: '1px solid var(--md-sys-color-outline-subtle)',
           }}
-        />
+          title="Drag to resize chat panel"
+        >
+          <div
+            style={{
+              width: '2px',
+              height: '32px',
+              borderRadius: '999px',
+              backgroundColor: isResizing
+                ? '#ffffff'
+                : 'var(--md-sys-color-outline)',
+            }}
+          />
+        </div>
 
         {/* Right Side: Chat Interface */}
-        <div style={{ width: sidebarWidth, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderLeft: '1px solid var(--border-color)' }}>
-          <ChatInterface 
-            contextNode={contextNode} 
+        <div
+          style={{
+            width: sidebarWidth,
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            backgroundColor: 'var(--md-sys-color-surface-container-lowest)',
+          }}
+        >
+          <ChatInterface
+            contextNode={contextNode}
             onMessageSent={handleMessageSent}
             onCancelContext={() => setContextNode(null)}
           />

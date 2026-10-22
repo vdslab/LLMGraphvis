@@ -83,6 +83,7 @@ def test_generate_visualization_data_returns_legend(db, network, node_list):
     assert nc_legend["attribute"] == "community"
     assert nc_legend["type"] == "categorical"
     assert "mapping" in nc_legend
+    assert nc_legend["palette"] == "tableau10"
     
     mapping = nc_legend["mapping"]
     assert "Group A" in mapping

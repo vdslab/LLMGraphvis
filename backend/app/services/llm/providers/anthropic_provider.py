@@ -1,10 +1,12 @@
 import json
 import os
-from typing import AsyncIterator, List, Optional
+from typing import Any, AsyncIterator, List, Optional
 
 from app.core.logging import get_logger
 
+from ..observations import serialize_observation
 from .base import LLMProvider
+from .defaults import DEFAULT_CLAUDE_MODEL
 from .types import (
     FunctionCallData,
     LLMFunctionCallPart,
@@ -51,7 +53,6 @@ def _lowercase_schema_types(schema) -> dict:
     return result
 
 
-DEFAULT_CLAUDE_MODEL = "claude-opus-4-8"
 DEFAULT_ANTHROPIC_VERTEX_REGION = "us-east5"
 DEFAULT_MAX_TOKENS = 16000
 
@@ -118,9 +119,7 @@ class AnthropicProvider(LLMProvider):
                 content = []
                 for part in msg.parts:
                     if isinstance(part, LLMFunctionResponsePart):
-                        resp = part.response
-                        if not isinstance(resp, str):
-                            resp = json.dumps(resp)
+                        resp = serialize_observation(part.response)
                         content.append({
                             "type": "tool_result",
                             "tool_use_id": part.call_id or f"call_{part.name}",
@@ -177,6 +176,20 @@ class AnthropicProvider(LLMProvider):
     ):
         messages = self._to_anthropic_messages(history)
         anthropic_tools = self._to_anthropic_tools(tools)
+        if anthropic_tools:
+            anthropic_tools[-1]["cache_control"] = {"type": "ephemeral"}
+
+        system_payload: Any = (
+            [
+                {
+                    "type": "text",
+                    "text": system_instruction,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ]
+            if system_instruction
+            else ""
+        )
 
         # Accumulate partial tool-call inputs, keyed by content block index
         pending_tools: dict = {}
@@ -186,12 +199,13 @@ class AnthropicProvider(LLMProvider):
         # so we simply overwrite usage_output rather than summing deltas.
         usage_input = 0
         usage_cached = 0
+        usage_cache_write = 0
         usage_output = 0
 
         async with self.client.messages.stream(
             model=self.model_name,
             max_tokens=self.max_tokens,
-            system=system_instruction,
+            system=system_payload,
             messages=messages,
             tools=anthropic_tools,
             thinking={"type": "adaptive"},
@@ -234,8 +248,17 @@ class AnthropicProvider(LLMProvider):
                 elif etype == "message_start":
                     u = getattr(event.message, "usage", None)
                     if u is not None:
-                        usage_input = getattr(u, "input_tokens", 0) or 0
+                        # Anthropic's input_tokens counts only the uncached
+                        # part; cache reads and writes are reported beside it.
                         usage_cached = getattr(u, "cache_read_input_tokens", 0) or 0
+                        usage_cache_write = (
+                            getattr(u, "cache_creation_input_tokens", 0) or 0
+                        )
+                        usage_input = (
+                            (getattr(u, "input_tokens", 0) or 0)
+                            + usage_cached
+                            + usage_cache_write
+                        )
 
                 elif etype == "message_delta":
                     u = getattr(event, "usage", None)
@@ -251,4 +274,5 @@ class AnthropicProvider(LLMProvider):
                         input_tokens=usage_input,
                         output_tokens=usage_output,
                         cached_input_tokens=usage_cached,
+                        cache_write_tokens=usage_cache_write,
                     ))

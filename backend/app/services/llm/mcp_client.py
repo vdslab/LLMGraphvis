@@ -1,5 +1,6 @@
 import json
 import os
+import time
 
 from mcp import ClientSession
 from mcp.client.sse import sse_client
@@ -14,8 +15,32 @@ NETWORKX_API_URL = os.getenv("NETWORKX_API_URL") or "http://networkx-api:8001"
 SSE_ENDPOINT = f"{NETWORKX_API_URL}/mcp/sse"
 
 
-# Cache for tools
+# Discovered tool definitions, cached to avoid a list_tools() round trip per turn.
 _tools_cache = None
+_tools_cache_at = 0.0
+
+# Seconds before the cache is re-fetched. Without an expiry this was a
+# process-lifetime cache with no invalidation, so adding or renaming a tool on
+# networkx-api required restarting the backend to see it — painful during
+# development and a silent source of "tool not found" in production after a
+# one-sided deploy. 0 disables expiry.
+TOOLS_CACHE_TTL_SECONDS = float(os.getenv("MCP_TOOLS_CACHE_TTL") or 300)
+
+
+def invalidate_tools_cache() -> None:
+    """Force the next get_tools() to re-discover from the MCP server."""
+    global _tools_cache, _tools_cache_at
+    _tools_cache = None
+    _tools_cache_at = 0.0
+    logger.info("MCP tool cache invalidated")
+
+
+def _tools_cache_is_fresh() -> bool:
+    if _tools_cache is None:
+        return False
+    if TOOLS_CACHE_TTL_SECONDS <= 0:
+        return True
+    return (time.monotonic() - _tools_cache_at) < TOOLS_CACHE_TTL_SECONDS
 
 
 def _truncate_args_for_log(arguments: dict) -> dict:
@@ -31,8 +56,8 @@ async def get_tools() -> list[ToolDefinition]:
     Connects to the NetworkXAPI MCP Server, discovers tools,
     and returns them as provider-agnostic ToolDefinition objects.
     """
-    global _tools_cache
-    if _tools_cache is not None:
+    global _tools_cache, _tools_cache_at
+    if _tools_cache_is_fresh():
         return _tools_cache
 
     async with session_scope() as session:
@@ -69,35 +94,11 @@ async def get_tools() -> list[ToolDefinition]:
                         "properties": {},
                     },
                 ),
-                ToolDefinition(
-                    name="list_prompts",
-                    description="Lists all available prompts on the MCP server.",
-                    parameters={
-                        "type": "object",
-                        "properties": {},
-                    },
-                ),
-                ToolDefinition(
-                    name="get_prompt",
-                    description="Gets a prompt from the MCP server by name, with optional arguments.",
-                    parameters={
-                        "type": "object",
-                        "properties": {
-                            "name": {
-                                "type": "string",
-                                "description": "The name of the prompt to retrieve.",
-                            },
-                            "arguments": {
-                                "type": "object",
-                                "description": "Arguments for the prompt template.",
-                            },
-                        },
-                        "required": ["name"],
-                    },
-                ),
             ])
 
             _tools_cache = tool_list
+            _tools_cache_at = time.monotonic()
+            logger.info(f"Discovered {len(tool_list)} MCP tools")
             return tool_list
 
 
@@ -183,6 +184,13 @@ def _sanitize_schema(schema: dict) -> dict:
         prefix_items = new_schema.pop("prefixItems")
         if "items" not in new_schema and prefix_items:
             new_schema["items"] = prefix_items[0]
+
+    # Same story for exclusive bounds: Pydantic renders `gt=0` as
+    # "exclusiveMinimum", which Gemini's Schema type also rejects with
+    # extra_forbidden. The bound is enforced server-side when the arguments are
+    # validated, so dropping it from the advertised schema loses nothing.
+    for bound in ("exclusiveMinimum", "exclusiveMaximum"):
+        new_schema.pop(bound, None)
 
     for key, value in new_schema.items():
         if isinstance(value, dict):
@@ -276,20 +284,6 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
             resources = [{"uri": r.uri, "name": r.name, "description": r.description, "mimeType": r.mimeType} for r in result.resources]
             return {"resources": resources}
 
-        if tool_name == "list_prompts":
-            result = await session.list_prompts()
-            # Convert Prompt objects to dicts
-            prompts = [{"name": p.name, "description": p.description, "arguments": [a.model_dump() for a in p.arguments] if p.arguments else []} for p in result.prompts]
-            return {"prompts": prompts}
-
-        if tool_name == "get_prompt":
-            name = arguments.get("name")
-            args = arguments.get("arguments", {})
-            result = await session.get_prompt(name, args)
-            # PromptResult has messages
-            messages = [{"role": m.role, "content": m.content.text} for m in result.messages]
-            return {"messages": messages}
-
         result = await session.call_tool(tool_name, arguments)
 
         if result.isError:
@@ -320,7 +314,7 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
         raise _unwrap_exception(e) from e
 
 
-async def get_resource(uri: str, session: ClientSession = None) -> dict:
+async def get_resource(uri: str, session: ClientSession = None) -> dict | list:
     """
     Directly reads a resource from the MCP server.
     Useful for internal context validation.
@@ -335,22 +329,27 @@ async def get_resource(uri: str, session: ClientSession = None) -> dict:
         _log_exception_details(e, f"reading resource {uri}")
         return {}
 
-async def _read_resource_internal(session: ClientSession, uri: str) -> dict:
+async def _read_resource_internal(session: ClientSession, uri: str) -> dict | list:
     result = await session.read_resource(uri)
     content_item = result.contents[0]
-    
-    mime = getattr(content_item, "mimeType", None) or "text/plain"
-    
-    if "application/json" in mime:
-         try:
-            return json.loads(content_item.text)
-         except Exception:
-            # Fallback
-            return {}
-            
-    # If not JSON, we might return empty or handle differently.
-    # For internal context usage, we expect dictionaries.
-    return {}
+
+    text = getattr(content_item, "text", None)
+    if not text:
+        return {}
+
+    # Parse by content, not by declared mime type. FastMCP labels a resource
+    # text/plain unless the server passes mime_type explicitly, and trusting the
+    # label meant a JSON body was silently discarded — the network context and
+    # the post-upload overview then reported "no attributes" for every graph.
+    try:
+        return json.loads(text)
+    except ValueError:
+        mime = getattr(content_item, "mimeType", None) or "text/plain"
+        logger.warning(
+            f"Resource {uri} returned unparseable content (mimeType={mime}); "
+            "expected a JSON object"
+        )
+        return {}
 
 
 def _log_exception_details(e: BaseException, context: str):

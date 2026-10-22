@@ -1,5 +1,5 @@
 from common import models
-from app.logic import network_metadata
+from app.logic import attributes, network_metadata
 
 
 def test_get_network_metadata(db):
@@ -116,3 +116,34 @@ def test_get_visualization_state(db):
     # Check Size Config
     node_size = state["node_size"]
     assert node_size["attribute"] == "degree"
+
+
+def test_list_node_attributes_reports_provenance(db):
+    """A reader cannot tell a computed metric from imported data by name alone."""
+    network = models.Network(name="ProvenanceNet")
+    db.add(network)
+    db.commit()
+
+    attributes.get_or_create_attribute(
+        network.id, "club", models.NodeAttribute, db, is_derived=False
+    )
+    attributes.get_or_create_attribute(
+        network.id,
+        "louvain_community",
+        models.NodeAttribute,
+        db,
+        is_derived=True,
+        derived_from="louvain",
+    )
+
+    listed = {
+        attr["name"]: attr
+        for attr in network_metadata.list_node_attributes(db, network.id)
+    }
+
+    assert listed["club"]["is_derived"] is False
+    assert listed["club"]["derived_from"] is None
+    assert listed["louvain_community"]["is_derived"] is True
+    assert listed["louvain_community"]["derived_from"] == "louvain"
+    # The core label column is part of the imported graph, not a computation.
+    assert listed["label"]["is_derived"] is False
