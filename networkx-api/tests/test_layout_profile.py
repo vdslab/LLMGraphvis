@@ -70,6 +70,36 @@ class TestTuning:
         params, notes = get_spec("forceatlas2").tuned(G, profile_graph(G))
         assert params["gravity"] == 1.0 and notes == []
 
+    def test_forceatlas2_iterations_follow_the_size_rule_on_small_graphs(self):
+        from app.logic.layouts.force_directed import fa2_iterations
+
+        assert fa2_iterations(34) == (200, False)
+        assert fa2_iterations(500) == (500, False)
+
+    def test_forceatlas2_iterations_shrink_to_the_budget_on_large_graphs(self):
+        """2000 iterations on 3393 nodes took about twenty minutes (ADR 0033)."""
+        from app.logic.layouts.force_directed import (
+            _FA2_ITERATION_BUDGET,
+            _FA2_MIN_ITER,
+            fa2_budget_floor_nodes,
+            fa2_iterations,
+        )
+
+        iters, budgeted = fa2_iterations(1500)
+        assert budgeted and iters < 1500
+        assert iters * 1500 * 1500 <= _FA2_ITERATION_BUDGET
+        assert fa2_iterations(20_000) == (_FA2_MIN_ITER, True)
+
+        floor = fa2_budget_floor_nodes()
+        assert (floor - 1) ** 2 * _FA2_MIN_ITER <= _FA2_ITERATION_BUDGET
+        assert floor**2 * _FA2_MIN_ITER > _FA2_ITERATION_BUDGET
+
+    def test_budgeted_iterations_are_explained(self):
+        G = nx.barabasi_albert_graph(1500, 2, seed=0)
+        params, notes = get_spec("forceatlas2").tuned(G, profile_graph(G))
+        assert params["max_iter"] < 1500
+        assert any("`max_iter`" in n for n in notes)
+
     def test_fragmented_graph_switches_spring_to_energy(self):
         params, notes = get_spec("spring").tuned(_fragmented(), profile_graph(_fragmented()))
         assert params["method"] == "energy" and params["gravity"] > 1

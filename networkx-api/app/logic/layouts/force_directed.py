@@ -21,6 +21,12 @@ RENDERED_RADII = "node_size_in_rendered_units"
 # ForceAtlas2 at gravity 1 left 92% of nodes overlapping in a clump while
 # repulsion flung the small parts outwards; gravity 10 brought it to 16%.
 _FA2_FRAGMENTED_GRAVITY = (2.0, 10.0)   # clamp for 2 * log2(components)
+# N^2 x iterations allowed by default; at the measured 50-80 ns per N^2 per
+# iteration, about half a minute. Quality gained little beyond it (ADR 0033).
+_FA2_ITERATION_BUDGET = 500_000_000
+# Floor, so a very large graph still settles instead of staying near its
+# random start; past the size where it binds the budget no longer holds.
+_FA2_MIN_ITER = 50
 # Spring's 'energy' method is the one whose gravity holds components together;
 # on the same graph it took overlap from 92% to 0% at gravity 3.
 _SPRING_FRAGMENTED_GRAVITY = 3.0
@@ -70,28 +76,51 @@ def tune_spring(G, profile):
     return params, notes
 
 
-def tune_forceatlas2(G, profile):
-    """Iteration count, repulsion and gravity from the graph's profile.
+def fa2_iterations(n):
+    """Default ForceAtlas2 iteration count for `n` nodes, and whether the budget cut it.
 
     Each iteration computes dense pairwise repulsion (O(N^2), no Barnes-Hut
-    approximation), so the iteration count directly dominates upload latency on
-    large graphs. The floor/cap stay well above networkx's own default of 100 for
-    layout quality, but far below the 1000-5000 range that made large uploads
-    extremely slow.
+    approximation), so the total cost is about N^2 x iterations. Below the size
+    where `_FA2_ITERATION_BUDGET` binds, the size rule stands; above it the
+    count shrinks so the first layout of a large upload takes tens of seconds,
+    not tens of minutes (ADR 0033).
     """
+    by_size = max(200, min(2000, n))
+    by_budget = max(_FA2_MIN_ITER, _FA2_ITERATION_BUDGET // max(n * n, 1))
+    return min(by_size, by_budget), by_budget < by_size
+
+
+def fa2_budget_floor_nodes():
+    """Smallest node count at which even `_FA2_MIN_ITER` iterations exceed the budget.
+
+    From here on a default ForceAtlas2 run costs more than the budget allows,
+    which is what makes a network "large" (ADR 0034).
+    """
+    return math.isqrt(_FA2_ITERATION_BUDGET // _FA2_MIN_ITER) + 1
+
+
+def tune_forceatlas2(G, profile):
+    """Iteration count, repulsion and gravity from the graph's profile."""
     n = profile.nodes
     # Average degree stands in for local clumping: the tighter the graph pulls
     # itself, the more repulsion it needs to stay readable. With weights the
     # pull is the weighted degree (weights arrive median-normalized).
     pull = profile.avg_strength if profile.weighted else profile.avg_degree
+    max_iter, budgeted = fa2_iterations(n)
     params = {
-        "max_iter": max(200, min(2000, n)),
+        "max_iter": max_iter,
         "scaling_ratio": max(2.0, min(10.0, pull * 0.5)),
         "gravity": 1.0,
         "jitter_tolerance": 1.0,
         "seed": 42,
     }
     notes = []
+    if budgeted:
+        notes.append(
+            f"`max_iter` {max_iter}, fewer than usual: each iteration compares "
+            f"every pair of the {n} nodes, and on graphs this size more "
+            "iterations add minutes without improving the drawing."
+        )
     if profile.weighted and abs(profile.avg_strength - profile.avg_degree) > 0.5:
         notes.append(
             f"`scaling_ratio` {params['scaling_ratio']:.3g} from the weighted degree "

@@ -57,7 +57,7 @@ print(sorted(t.name for t in asyncio.run(mcp.list_tools())))"
 
 | ツール | 種別 | 備考 |
 |:---|:---|:---|
-| `layout_forceatlas2` | 力学系 | **既定**。反復ごとに密な斥力計算（O(N^2)、Barnes-Hut 近似なし）のため `max_iter` が実行時間を支配する |
+| `layout_forceatlas2` | 力学系 | **既定**。反復ごとに密な斥力計算（O(N^2)、Barnes-Hut 近似なし）のため `max_iter` が実行時間を支配する。既定の反復回数は「N² × 反復回数」の予算で上限を決める。大きいグラフでは反復を増やしても描画が良くならないため（ADR 0033） |
 | `layout_spring` | 力学系 | Fruchterman-Reingold。ノード間隔がより均等 |
 | `layout_arf` | 力学系 | 引力・斥力を個別制御。ForceAtlas2 で重なりが残る場合の第二候補 |
 | `layout_kamada_kawai` | 数理 | 大域構造に優れるが密な N×N 距離行列を構築するため時間・メモリともに O(N^2)。閾値超はフックが拒否する |
