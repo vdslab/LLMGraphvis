@@ -39,9 +39,10 @@ fixable = ["ALL"]
 unfixable = []
 
 [tool.ruff.lint.per-file-ignores]
-# Tool docstrings and Field descriptions are prompt surface; long lines there
-# are deliberate (AGENTS.md).
-"networkx-api/app/mcp/tools/**" = ["E501"]
+# Tool docstrings and Field descriptions are prompt surface, sent verbatim
+# (indentation included): long lines are deliberate (AGENTS.md), and a
+# docstring "fix" would change what the model reads.
+"networkx-api/app/mcp/tools/**" = ["E501", "D"]
 # Packages re-export their modules; MCP tool packages import for registration.
 "__init__.py" = ["F401", "F403"]
 
