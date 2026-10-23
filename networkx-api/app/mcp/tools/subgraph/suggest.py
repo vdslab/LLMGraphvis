@@ -28,7 +28,10 @@ def subgraph_suggest_reduction(
     of the other k levels), the most connected nodes
     (`subgraph_high_degree_nodes`), and, for categorical attributes with only a
     few values, the size of each group (`subgraph_extract_filter`; replace
-    `<value>` with the chosen values). A candidate is omitted when it does not
+    `<value>` with the chosen values), and, for a dense network, edge
+    backbones that keep every node but only its k strongest edges
+    (`subgraph_edge_backbone`, with the edges and connected parts each k
+    leaves; the remedy for a hairball). A candidate is omitted when it does not
     apply, e.g. the network is already connected.
 
     `large` says whether the network is above the size at which the default

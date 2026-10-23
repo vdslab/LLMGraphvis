@@ -338,9 +338,7 @@ class ResilientSession:
                 raise
             # The write side was already closed: the request never left.
             never_sent = isinstance(e, anyio.ClosedResourceError)
-            logger.warning(
-                f"MCP connection lost during {label} ({e!r}); reconnecting"
-            )
+            logger.warning(f"MCP connection lost during {label} ({e!r}); reconnecting")
             await self._close()
             await self._connect()
             if never_sent:

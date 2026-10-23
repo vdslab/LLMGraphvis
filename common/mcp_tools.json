@@ -391,6 +391,13 @@
   "node_ids",
   "preserve_layout"
  ],
+ "subgraph_edge_backbone": [
+  "description",
+  "k",
+  "method",
+  "min_weight",
+  "network_id"
+ ],
  "subgraph_ego_network": [
   "center_node_id",
   "network_id",

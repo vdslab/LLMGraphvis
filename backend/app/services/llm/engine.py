@@ -110,6 +110,7 @@ def _is_preparation_step(step_log: Dict[str, Any]) -> bool:
         for call in calls
     )
 
+
 # Register the builtin hooks once per process. Behaviour that used to be
 # hardcoded in this module (auto-rendering, network switching, network_id
 # injection, the stalled-intent nudge, the forced summary) now lives in
@@ -594,7 +595,9 @@ class GraphVisAgent:
         history.append(
             LLMMessage(role="user", parts=[LLMTextPart(text=BUDGET_EXHAUSTED_PROMPT)])
         )
-        tools = self._tools_for_generation(tool_catalog, turn_state, iteration=iteration)
+        tools = self._tools_for_generation(
+            tool_catalog, turn_state, iteration=iteration
+        )
         try:
             text, thought, dropped_calls, usage = await self._consume_stream(
                 self.provider.generate(history, tools, self.system_instruction), queue

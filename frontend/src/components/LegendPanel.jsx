@@ -52,6 +52,7 @@ const highEnd = (mapping, value) =>
   `${mapping.value_max != null ? '≥ ' : ''}${formatValue(value)}`;
 
 const issueLabels = {
+  dense_edges: 'Too many edges to show groups',
   node_overlap: 'Some nodes overlap',
   outliers_compress_core: 'Outlying nodes squeeze the center',
   clumped: 'Nodes cluster in a small area',

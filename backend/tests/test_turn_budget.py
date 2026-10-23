@@ -71,7 +71,13 @@ async def test_exhausted_budget_ends_with_a_closing_report(db, chat):
             return_value={"content": "ok"},
         ):
             text, _, _ = await agent._execute_tool_loop(
-                _stream(work[0]), [], [], AsyncMock(), chat.id, chat.network_id, None,
+                _stream(work[0]),
+                [],
+                [],
+                AsyncMock(),
+                chat.id,
+                chat.network_id,
+                None,
                 {"network_id": chat.network_id, **engine.hooks.new_turn_state(2)},
             )
     assert "PageRank を計算しました" in text

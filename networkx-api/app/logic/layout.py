@@ -10,7 +10,6 @@ import json
 import math
 
 import numpy as np
-
 from sqlalchemy.orm import Session
 
 from app.core.logging import get_logger
@@ -148,7 +147,9 @@ def _resolve_warm_start(spec, network_id: int, overrides: dict, db: Session):
         )
     # networkx copies each seed (`pos[node].copy()` in forceatlas2_layout), so
     # the stored (x, y) tuples must become arrays.
-    overrides["pos"] = {node: np.array(xy, dtype=float) for node, xy in start_pos.items()}
+    overrides["pos"] = {
+        node: np.array(xy, dtype=float) for node, xy in start_pos.items()
+    }
     return init_from
 
 

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Set
 
 import networkx as nx
 from sqlalchemy.orm import Session
@@ -62,6 +62,7 @@ def create_subgraph_from_nodes(
     description: str = None,
     initialize_layout: bool = True,
     reuse_existing: bool = True,
+    edge_pks: Optional[Set[int]] = None,
 ) -> Dict[str, Any]:
     """Creates a new network as a subgraph containing the specified nodes.
 
@@ -82,6 +83,8 @@ def create_subgraph_from_nodes(
             new network when the layout is not preserved.
         reuse_existing: Return an existing subgraph of the same name and nodes
             instead of creating a duplicate.
+        edge_pks: Copy only these source edges (an edge backbone, ADR 0040)
+            instead of every edge between the kept nodes.
 
     Returns:
         {"new_network_id": ..., "name": ...} of the created or reused network.
@@ -140,7 +143,7 @@ def create_subgraph_from_nodes(
     logger.debug(f"Copied {len(node_map)} nodes")
 
     # 5. Copy Edges (Induced Subgraph)
-    edge_map = _copy_edges(db, source_network_id, new_network_id, node_map)
+    edge_map = _copy_edges(db, source_network_id, new_network_id, node_map, edge_pks)
     logger.debug(f"Copied {len(edge_map)} edges")
 
     # 6. Copy Attributes Schema & Values
@@ -279,9 +282,15 @@ def _copy_nodes(
 
 
 def _copy_edges(
-    db: Session, source_network_id: int, new_network_id: int, node_map: Dict[int, int]
+    db: Session,
+    source_network_id: int,
+    new_network_id: int,
+    node_map: Dict[int, int],
+    edge_pks: Optional[Set[int]] = None,
 ) -> Dict[int, int]:
     """Copies edges where both source and target are in node_map.
+
+    With `edge_pks`, only those of them.
 
     Returns:
         Map of old_pk -> new_pk.
@@ -295,6 +304,8 @@ def _copy_edges(
         )
         .all()
     )
+    if edge_pks is not None:
+        source_edges = [edge for edge in source_edges if edge.id in edge_pks]
 
     edge_map = {}  # old_pk -> new_pk
     new_edges_data = []

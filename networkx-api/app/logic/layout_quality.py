@@ -48,6 +48,9 @@ THRESHOLDS = {
     "uneven_edge_lengths": 1.0,  # edge_length_cv above this
     "distorted_aspect": 3.0,  # aspect above this
     "clumped": 0.15,  # occupancy below this
+    # Mean degree from which the edges cover the drawing whatever the layout
+    # (a hairball); only thinning the edges helps (ADR 0040).
+    "dense_edges": 6.0,
 }
 
 # Weights of the penalty `score` sums; lower is better. Overlap dominates
@@ -191,6 +194,11 @@ def diagnose(report: QualityReport) -> List[str]:
     """Name the problems a reader would notice, most damaging first."""
     t = THRESHOLDS
     issues = []
+    if (
+        report.node_count
+        and 2 * report.edge_count / report.node_count >= t["dense_edges"]
+    ):
+        issues.append("dense_edges")
     if report.node_overlap > t["node_overlap"]:
         issues.append("node_overlap")
     if (

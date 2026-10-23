@@ -54,7 +54,9 @@ async def test_a_call_on_a_closed_stream_reconnects_and_retries_once():
     scope, opened = _scopes(dead, fresh)
     with patch.object(mcp_client, "session_scope", scope):
         async with mcp_client.ResilientSession() as session:
-            result = await mcp_client.execute_tool("layout_profile", {}, session=session)
+            result = await mcp_client.execute_tool(
+                "layout_profile", {}, session=session
+            )
     assert result == {"done": True}
     assert opened == [dead, fresh]
     assert fresh.calls == 1
@@ -62,7 +64,9 @@ async def test_a_call_on_a_closed_stream_reconnects_and_retries_once():
 
 @pytest.mark.asyncio
 async def test_a_call_cut_off_mid_run_is_reported_not_rerun_and_the_next_call_works():
-    cut = _Session(McpError(ErrorData(code=CONNECTION_CLOSED, message="Connection closed")))
+    cut = _Session(
+        McpError(ErrorData(code=CONNECTION_CLOSED, message="Connection closed"))
+    )
     fresh = _Session()
     scope, _ = _scopes(cut, fresh)
     with patch.object(mcp_client, "session_scope", scope):

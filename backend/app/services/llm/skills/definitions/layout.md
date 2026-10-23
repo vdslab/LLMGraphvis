@@ -2,7 +2,7 @@
 name: layout
 description: Placing nodes — choosing a layout algorithm, reading how readable the drawn layout is (`layout_quality`), and improving it. Load this whenever node positions are the subject, then load the skill for the algorithm in use.
 triggers: [layout, レイアウト, おまかせ, お任せ, 自分で調整, このままでよい, auto-tune, tune it for me, 配置, spread, 広げ, 離し, 密, tight, 詰ま, 重な, overlap, 見づら, 見にく, 読みにく, ごちゃ, clutter, 綺麗, きれい, 整え, position, 座標, force, ばね, spring, forceatlas, circular, 円, 円形, kamada, spectral, spiral, tree, 木, 階層, seed, 再現, weight, 重み, quality, 品質]
-related_tools: [layout_profile, layout_suggest_parameters, visualization_generate, visualization_get_state, layout_forceatlas2, layout_spring, layout_arf, layout_kamada_kawai, layout_spectral, layout_circular, layout_shell, layout_spiral, layout_random, layout_bipartite, layout_multipartite, layout_planar, layout_bfs, offer_parameter_tuning, apply_parameter_tuning]
+related_tools: [subgraph_edge_backbone, layout_profile, layout_suggest_parameters, visualization_generate, visualization_get_state, layout_forceatlas2, layout_spring, layout_arf, layout_kamada_kawai, layout_spectral, layout_circular, layout_shell, layout_spiral, layout_random, layout_bipartite, layout_multipartite, layout_planar, layout_bfs, offer_parameter_tuning, apply_parameter_tuning]
 ---
 
 ## Two-Step Invariant
@@ -24,12 +24,14 @@ When the user has not named one, call `layout_profile` and take the first `recom
 ## Reading `layout_quality`
 
 Every `visualization_generate` reports how the drawing reads, without an image:
-- `issues` names what a viewer would notice: `node_overlap`, `outliers_compress_core` (a few far-away nodes squeeze everything else together), `clumped`, `uneven_edge_lengths`, `distorted_aspect`.
+- `issues` names what a viewer would notice: `dense_edges` (so many edges that they hide any grouping; see below), `node_overlap`, `outliers_compress_core` (a few far-away nodes squeeze everything else together), `clumped`, `uneven_edge_lengths`, `distorted_aspect`.
 - `score` compares layouts **of the same network** only (lower is better). Crossings count toward it but are never an issue on their own: dense graphs cross a lot under any layout.
 
 Tell the user about an issue in plain words ("many nodes overlap"), not as metric names, and only when it affects what they are trying to see.
 
 ## Improving a Layout
+
+**`dense_edges` first.** When it is among the issues, no parameter or algorithm untangles the drawing: load `edge-backbone` and offer thinning the edges instead of tuning. Do not ask the three-option tuning question below for such a network.
 
 1. Know the algorithm in use (`visualization_get_state` if unknown) and load its skill: `layout-forceatlas2`, `layout-spring`, `layout-arf`, `layout-kamada-kawai`, or `layout-partitioned` (bipartite, multipartite, shell, bfs). Other algorithms have no parameters that change readability.
 2. **A vague complaint** ("hard to read", "cluttered", 見づらい, 重なってる): call `layout_suggest_parameters`. Apply the best candidate by calling `layout_<algorithm>` with its `arguments` exactly, then `visualization_generate`.

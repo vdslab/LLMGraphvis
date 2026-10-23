@@ -171,12 +171,12 @@ def test_offer_uses_effective_arguments_schema_description_and_suggestion(db, ch
     assert "apply_parameter_tuning" in state["enabled_tool_names"]
 
 
-def test_offer_requires_a_localized_explanation_in_a_non_english_conversation(
-    db, chat
-):
+def test_offer_requires_a_localized_explanation_in_a_non_english_conversation(db, chat):
     result, _ = _offer(db, chat, form=_form(explanation=None))
     assert "explanation" in result["error"]
-    english = {**_form(explanation=None, rationale=None, low_label=None, high_label=None)}
+    english = {
+        **_form(explanation=None, rationale=None, low_label=None, high_label=None)
+    }
     english["question"] = "Community granularity"
     panel = _offer(db, chat, form=english)[0]["parameter_tuning"]
     assert panel["fields"][0]["description"] == "Below 1 favors larger communities."

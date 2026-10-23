@@ -2,7 +2,7 @@
 name: network-reduction
 description: When the network is large (marked "large network" in the context), offer measured ways to shrink it and let the user choose; never shrink on your own. Load on a large network's first analysis turn, before a costly computation on it, or when the user says it is too big or cluttered.
 triggers: [reduce the network, reduction, too large, too big, too many nodes, cluttered, hairball, simplify, 削減, 間引, 縮小, 大きすぎ, 多すぎ, ノードが多, 重い, ごちゃごちゃ, 見づらい, 簡略]
-related_tools: [subgraph_suggest_reduction, subgraph_largest_component, subgraph_k_core, subgraph_high_degree_nodes, subgraph_extract_filter, network_select, visualization_highlight, visualization_set_viewport, ask_user, switch_to_parent_network, switch_to_main_network]
+related_tools: [subgraph_suggest_reduction, subgraph_edge_backbone, subgraph_largest_component, subgraph_k_core, subgraph_high_degree_nodes, subgraph_extract_filter, network_select, visualization_highlight, visualization_set_viewport, ask_user, switch_to_parent_network, switch_to_main_network]
 ---
 
 ## What "large" means here
@@ -12,6 +12,10 @@ had to be cut short to finish in reasonable time. At that size the drawing is
 dense, and costly analyses (betweenness, Kamada-Kawai, layout searches) take
 minutes. The size is a property of the data, not a problem the user asked you
 to fix.
+
+When the network is dense rather than big (`layout_quality` reports
+`dense_edges`), dropping nodes does not help: the `edge_backbone` candidates
+keep every node and thin the edges; follow `edge-backbone`.
 
 ## Offer, do not decide
 

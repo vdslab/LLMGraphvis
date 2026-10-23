@@ -19,6 +19,7 @@ from app.logic.attribute_semantics import (
     ROLE_DATA,
 )
 from app.logic.attributes import load_node_attribute_values
+from app.logic.backbone import suggest_backbones
 from app.logic.layouts.force_directed import fa2_budget_floor_nodes
 from app.logic.utils.graph_builder import build_graph_from_db
 from common import models
@@ -64,6 +65,8 @@ def suggest_reductions(
 
     attribute_candidates, attributes_omitted = _attribute_groups(G, network_id, db)
     candidates.extend(attribute_candidates)
+    # Dense networks: thin the edges instead of dropping nodes (ADR 0040).
+    candidates.extend(suggest_backbones(network_id, db))
 
     return {
         "network_id": network_id,
