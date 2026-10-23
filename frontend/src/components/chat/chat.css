@@ -316,6 +316,39 @@
   color: var(--md-sys-color-on-surface-variant);
 }
 
+/* --- Failed turn ---------------------------------------------------------- */
+
+.msg-error {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-error) 30%, transparent);
+  border-left: 3px solid var(--md-sys-color-error);
+  border-radius: var(--md-sys-shape-md);
+  background: color-mix(in srgb, var(--md-sys-color-error-container) 45%, var(--md-sys-color-surface-container-lowest));
+}
+
+.msg-error__title {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--md-sys-color-error);
+  overflow-wrap: anywhere;
+}
+
+.msg-error__summary {
+  color: var(--md-sys-color-on-surface);
+  overflow-wrap: anywhere;
+}
+
+.msg-error__summary .markdown-content > :last-child {
+  margin-bottom: 0;
+}
+
 /* --- Tool calls ----------------------------------------------------------- */
 
 .toolcall {

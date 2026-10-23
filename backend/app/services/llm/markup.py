@@ -11,6 +11,9 @@ Directives produced here:
                    collapsed checklist labelled "Steps".
 - `:::collapsible` a section the user can fold away. Used for the upload
                    overview, which is long and read once.
+- `:::error`       a turn that failed. The title names the failure, the first
+                   paragraph says what happened, and an optional fenced block
+                   holds the raw error, folded away by the renderer.
 
 `:::thought` is only produced through `thought_block`, which the engine uses
 around model reasoning. It is the one block the "Thinking" heading may describe.
@@ -20,6 +23,7 @@ import re
 
 STEPS_DIRECTIVE = "steps"
 COLLAPSIBLE_DIRECTIVE = "collapsible"
+ERROR_DIRECTIVE = "error"
 
 _UNSUPPORTED_VISUALIZATION_TAG = re.compile(
     r"(?:<|&lt;)\s*visualization[_-]output\b[\s\S]*?(?:/?>|/?&gt;)",
@@ -46,6 +50,18 @@ def _container_directive(name: str, body: str, attributes: str = "") -> str:
 def thought_block(body: str) -> str:
     """Wrap model reasoning in the one directive rendered as Thinking."""
     return _container_directive("thought", body)
+
+
+def error_block(title: str, summary: str, detail: str = "") -> str:
+    """Wrap a failed turn's error in the directive rendered as an error card."""
+    # A quoted directive attribute cannot hold a double quote or a newline.
+    safe_title = " ".join(title.replace('"', "'").split())
+    body = summary.strip()
+    if detail and detail.strip() != body:
+        backtick_runs = [len(m.group(0)) for m in re.finditer(r"`+", detail)]
+        fence = "`" * max(3, max(backtick_runs, default=0) + 1)
+        body += f"\n\n{fence}text\n{detail.strip()}\n{fence}"
+    return _container_directive(ERROR_DIRECTIVE, body, f'{{title="{safe_title}"}}')
 
 
 def tool_execution_marker(index: int) -> str:

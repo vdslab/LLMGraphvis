@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Brain, ListChecks, Clock, AlertCircle, RotateCw } from 'lucide-react';
+import { Brain, ListChecks, Clock, AlertCircle, AlertTriangle, RotateCw } from 'lucide-react';
 import { parseMessageContent } from '../../utils/parseMessageContent';
 import Disclosure from './Disclosure';
 import ToolCall from './ToolCall';
@@ -49,6 +49,26 @@ const StepsBlock = ({ block }) => (
       ))}
     </ol>
   </Disclosure>
+);
+
+// A failed turn: what happened up front, the raw error folded away.
+const ErrorBlock = ({ block }) => (
+  <div className="msg-error" role="alert">
+    <div className="msg-error__title">
+      <AlertTriangle size={14} aria-hidden />
+      <span>{block.title}</span>
+    </div>
+    {block.summary && (
+      <div className="msg-error__summary">
+        <Markdown>{block.summary}</Markdown>
+      </div>
+    )}
+    {block.detail && (
+      <Disclosure label="Details" tone="section">
+        <pre className="thought__text">{block.detail}</pre>
+      </Disclosure>
+    )}
+  </div>
 );
 
 const isRetriedAskUserFailure = (execution, allExecutions, currentIndex) => {
@@ -123,6 +143,8 @@ const ChatMessage = ({ message, onRetry, detachedInteractionKey = null }) => {
             return <ThoughtBlock key={idx} block={block} />;
           case 'steps':
             return <StepsBlock key={idx} block={block} />;
+          case 'error':
+            return <ErrorBlock key={idx} block={block} />;
           case 'collapsible':
             return (
               <Disclosure

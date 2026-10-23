@@ -134,4 +134,30 @@ async def test_process_chat_failure_emits_agent_error(db):
     event = queue.get_nowait()
     assert event["event"] == "agent_error"
     assert "Chat not found" in json.loads(event["data"])
-    assert text.startswith("I encountered an error")
+    assert text.startswith(':::error{title="ValueError"}')
+    assert "Chat not found" in text
+
+
+def test_error_reply_separates_provider_message_from_raw_detail():
+    """A provider error becomes a card: readable message up front, the
+    response repr kept as folded detail rather than as the reply itself."""
+    from app.services.llm import service
+
+    class ClientError(Exception):
+        def __init__(self):
+            self.code = 404
+            self.status = "NOT_FOUND"
+            self.message = "Publisher model gemini-x was not found."
+            super().__init__("404 NOT_FOUND. {'error': {'code': 404}}")
+
+    reply = service._error_reply(ClientError())
+    assert reply.startswith(':::error{title="ClientError 404 NOT_FOUND"}\n')
+    assert "Publisher model gemini-x was not found." in reply
+    assert "```text\n404 NOT_FOUND. {'error': {'code': 404}}\n```" in reply
+
+
+def test_error_block_keeps_quotes_out_of_the_title_attribute():
+    from app.services.llm import markup
+
+    block = markup.error_block('Bad "name"\nhere', "summary")
+    assert block.splitlines()[0] == ":::error{title=\"Bad 'name' here\"}"

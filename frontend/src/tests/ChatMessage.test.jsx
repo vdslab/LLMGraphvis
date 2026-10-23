@@ -74,4 +74,16 @@ describe('ChatMessage', () => {
     render(<ChatMessage message={message} />);
     expect(screen.getByText('Graph is disconnected')).toBeInTheDocument();
   });
+
+  it('shows a failed turn as an error card with the raw error folded away', () => {
+    render(<ChatMessage message={{
+      role: 'model',
+      content: ':::error{title="ClientError 404 NOT_FOUND"}\nModel was not found.\n\n```text\nraw repr\n```\n:::',
+    }} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent('ClientError 404 NOT_FOUND');
+    expect(screen.getByText('Model was not found.')).toBeInTheDocument();
+    expect(screen.queryByText('raw repr')).not.toBeInTheDocument();
+    expect(screen.getByText('Details')).toBeInTheDocument();
+  });
 });

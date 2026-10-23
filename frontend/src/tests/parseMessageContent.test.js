@@ -164,4 +164,28 @@ describe('parseMessageContent', () => {
     expect(parseMessageContent('')).toEqual([]);
     expect(parseMessageContent(null)).toEqual([]);
   });
+
+  it('reads an error directive as summary plus folded detail', () => {
+    expect(parseMessageContent(
+      ':::error{title="ClientError 404 NOT_FOUND"}\nModel was not found.\n\n```text\n404 {\'code\': 404}\n```\n:::',
+    )).toEqual([{
+      type: 'error',
+      title: 'ClientError 404 NOT_FOUND',
+      summary: 'Model was not found.',
+      detail: "404 {'code': 404}",
+    }]);
+  });
+
+  it('shows an old error reply as an error card', () => {
+    const [block] = parseMessageContent(
+      "I encountered an error: ClientError: 404 NOT_FOUND. {'error': {'code': 404, "
+        + "'message': 'Publisher model x was not found.', 'status': 'NOT_FOUND'}}",
+    );
+    expect(block).toMatchObject({
+      type: 'error',
+      title: 'ClientError',
+      summary: 'Publisher model x was not found.',
+    });
+    expect(block.detail).toContain('404 NOT_FOUND');
+  });
 });

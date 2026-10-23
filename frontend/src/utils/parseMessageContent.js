@@ -12,6 +12,7 @@ import { visit } from 'unist-util-visit';
  *   :::thought ... :::
  *   :::steps ... :::
  *   :::collapsible{title="…" open="true"} ... :::
+ *   :::error{title="…"} summary, then an optional fenced raw error :::
  *   ::tool-execution{index="N"}
  */
 
@@ -57,6 +58,37 @@ const stepsBlock = (body, complete = true) => ({
   complete,
 });
 
+const errorBlock = (source, node) => {
+  const code = node.children?.find((child) => child.type === 'code');
+  const prose = (node.children || []).filter((child) => child !== code);
+  const summary = prose.length
+    ? source.slice(prose[0].position.start.offset, prose.at(-1).position.end.offset).trim()
+    : '';
+  return {
+    type: 'error',
+    title: node.attributes?.title || 'Error',
+    summary,
+    detail: code?.value || '',
+  };
+};
+
+// Replies stored before the `:::error` directive: "I encountered an error:
+// ClientError: 404 NOT_FOUND. {'error': {..., 'message': '…'}}".
+const LEGACY_ERROR_PREFIX = /^I encountered an error:\s*/;
+
+const legacyErrorBlock = (content) => {
+  const raw = content.replace(LEGACY_ERROR_PREFIX, '').trim();
+  const typed = /^([A-Za-z_][\w.]*(?:Error|Exception)):\s*([\s\S]*)$/.exec(raw);
+  const detail = typed ? typed[2] : raw;
+  const providerMessage = /['"]message['"]:\s*(['"])([\s\S]*?)\1\s*[,}]/.exec(detail);
+  return {
+    type: 'error',
+    title: typed ? typed[1] : 'Error',
+    summary: providerMessage ? providerMessage[2] : detail,
+    detail: providerMessage ? detail : '',
+  };
+};
+
 const collectDirectiveRanges = (source) => {
   let tree;
   try {
@@ -91,6 +123,8 @@ const collectDirectiveRanges = (source) => {
             complete: true,
           },
         });
+      } else if (node.name === 'error') {
+        ranges.push({ start, end, block: errorBlock(source, node) });
       }
     }
 
@@ -165,6 +199,7 @@ const collectLegacyRanges = (source) => {
  */
 export function parseMessageContent(content) {
   if (!content) return [];
+  if (LEGACY_ERROR_PREFIX.test(content)) return [legacyErrorBlock(content)];
   const source = normalizeLegacyTags(content);
   const candidates = [
     ...collectDirectiveRanges(source),

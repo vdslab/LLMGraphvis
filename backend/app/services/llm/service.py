@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.logging import get_logger
 from common import models
 
-from . import context, emitters, engine, events, history
+from . import context, emitters, engine, events, history, markup
 from .providers.types import UsageData
 
 logger = get_logger(__name__)
@@ -20,6 +20,27 @@ def _format_exception_message(e: BaseException) -> str:
     except NameError:
         pass
     return f"{type(e).__name__}: {str(e)}"
+
+
+def _error_reply(e: BaseException) -> str:
+    """The stored reply for a failed turn: an error card, not a raw repr.
+
+    Provider SDK errors carry a readable `message` and an HTTP code and status
+    next to a repr of the whole response body; the card shows the former and
+    keeps the latter as folded detail.
+    """
+    if hasattr(e, "exceptions"):  # an exception group: list its members
+        return markup.error_block("Error", _format_exception_message(e))
+    code = getattr(e, "code", None) or getattr(e, "status_code", None)
+    status = getattr(e, "status", None)
+    title = " ".join(
+        str(part)
+        for part in (type(e).__name__, code, status)
+        if isinstance(part, (int, str)) and part
+    )
+    message = getattr(e, "message", None)
+    summary = message if isinstance(message, str) and message.strip() else str(e)
+    return markup.error_block(title, summary or type(e).__name__, str(e))
 
 
 async def process_chat(
@@ -92,14 +113,14 @@ async def process_chat(
         logger.exception(f"Error in process_chat: {e}")
         await queue.put({"event": "agent_error", "data": json.dumps(str(e))})
 
-        error_msg = _format_exception_message(e)
+        error_reply = _error_reply(e)
         # Tokens spent before the failure were still billed.
         if agent is not None:
             return (
-                f"I encountered an error: {error_msg}",
+                error_reply,
                 [],
                 agent.turn_usage,
                 agent.provider_name,
                 agent.provider.model_name,
             )
-        return f"I encountered an error: {error_msg}", [], UsageData(), "", ""
+        return error_reply, [], UsageData(), "", ""
