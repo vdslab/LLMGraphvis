@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from common import models
 from app.core.logging import get_logger
@@ -61,7 +62,11 @@ async def import_graphml(
     except UnicodeDecodeError:
         raise HTTPException(status_code=422, detail="GraphML must be UTF-8 text.")
     try:
-        final_network_id = importer.parse_and_save_graphml(network_id, graphml, db)
+        # The route is async only to read the raw body; parsing and saving are
+        # blocking and would stall every other request, MCP included.
+        final_network_id = await run_in_threadpool(
+            importer.parse_and_save_graphml, network_id, graphml, db
+        )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception as e:
