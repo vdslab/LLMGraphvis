@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.database import get_db
 from app.logic import subgraph
 from app.schemas.subgraph import (
     ComponentContainingNodeRequest,
@@ -12,8 +13,6 @@ from app.schemas.subgraph import (
 from common import models
 
 router = APIRouter()
-
-from app.core.database import get_db
 
 
 @router.get("/{network_id}/subgraphs")

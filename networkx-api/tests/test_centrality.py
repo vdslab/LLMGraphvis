@@ -21,7 +21,6 @@ def setup_simple_network(db):
     node_map = {n.node_id: n.id for n in nodes}
 
     # Edges (Star graph center at n0)
-    edges = []
     for i in range(1, 5):
         e = models.Edge(
             network_id=1,

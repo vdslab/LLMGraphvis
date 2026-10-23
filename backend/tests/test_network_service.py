@@ -1,5 +1,3 @@
-import pytest
-
 from app.services.network_service import NetworkService
 from common import models
 

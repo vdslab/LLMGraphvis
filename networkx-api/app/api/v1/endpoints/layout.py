@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.database import get_db
 from app.logic import layout
 from app.schemas.layout import LayoutRequest
 
 router = APIRouter()
-
-from app.core.database import get_db
 
 
 @router.post("/{network_id}/layout")

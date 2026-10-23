@@ -4,7 +4,6 @@ import pytest
 
 from app.services import chat_service
 from app.services.llm.providers.types import UsageData
-from common import models
 
 
 @pytest.mark.asyncio

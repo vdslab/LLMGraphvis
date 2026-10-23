@@ -8,10 +8,10 @@ from common import models
 
 from .layout import calculate_layout
 from .utils.attribute_copier import AttributeCopier
+from .utils.graph_builder import build_graph_from_db
 from .utils.node_utils import resolve_node_id
 
 logger = get_logger(__name__)
-from .utils.graph_builder import build_graph_from_db
 
 
 def _get_derived_attribute_names(source_network_id: int, db: Session) -> List[str]:

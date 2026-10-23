@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.database import get_db
 from app.core.logging import get_logger
 from app.logic import visualizer
 from app.schemas.visualization import VisualizationRequest
@@ -8,8 +9,6 @@ from common import models
 
 router = APIRouter()
 logger = get_logger(__name__)
-
-from app.core.database import get_db
 
 
 @router.get("/{network_id}/visualization")

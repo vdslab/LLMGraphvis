@@ -1,5 +1,4 @@
 import logging
-import traceback
 from typing import Annotated
 
 from pydantic import Field

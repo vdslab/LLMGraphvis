@@ -722,10 +722,10 @@ class VisualizationBuilder:
                 .filter(models.Node.network_id == net_id)
                 .all()
             )
-            for nid, l in labels:
+            for nid, label in labels:
                 if nid not in core_values:
                     core_values[nid] = {}
-                core_values[nid][LABEL_ID] = l
+                core_values[nid][LABEL_ID] = label
 
         # ------------------------------------
 

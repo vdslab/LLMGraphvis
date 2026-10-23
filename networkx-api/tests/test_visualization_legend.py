@@ -1,7 +1,6 @@
 import pytest
 
 from app.logic import layout
-from app.logic.visualization_builder import VisualizationBuilder
 from app.logic.visualizer import generate_visualization_data
 from common import models
 
@@ -48,15 +47,7 @@ def test_generate_visualization_data_returns_legend(db, network, node_list):
             db.commit()
             db.refresh(attr_def)
 
-        # Add value
-        val = models.NodeTextAttributeValue(
-            node_attribute_value_id=None, text_value=comm_val
-        )
-        # Note: In the actual schema, NodeTextAttributeValue links to NodeAttributeValue which links to Node/Attribute.
-        # Let's use the proper relationship structure or helpers if available.
-        # But for valid test setup, let's rely on standard object creation if possible or just mock.
-
-        # Simpler approach: Insert directly
+        # NodeTextAttributeValue hangs off a NodeAttributeValue row.
         nav = models.NodeAttributeValue(node_id=node.id, attribute_id=attr_def.id)
         db.add(nav)
         db.commit()

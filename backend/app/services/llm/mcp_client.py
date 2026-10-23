@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import time
+from contextlib import asynccontextmanager
 
 from mcp import ClientSession
 from mcp.client.sse import sse_client
@@ -230,9 +231,6 @@ def _sanitize_schema(schema: dict) -> dict:
     return new_schema
 
 
-from contextlib import asynccontextmanager
-
-
 @asynccontextmanager
 async def session_scope():
     """
@@ -353,7 +351,7 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
             if isinstance(parsed_result, list):
                 return {"result": parsed_result}
             return parsed_result
-        except:
+        except json.JSONDecodeError:
             return {"content": output_text}
 
     except Exception as e:

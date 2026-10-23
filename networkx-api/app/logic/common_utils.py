@@ -84,11 +84,11 @@ def interpolate_color(
     # Normalize back to 0..1
     h = h % 1.0
 
-    l = l1 + (l2 - l1) * ratio
+    lightness = l1 + (l2 - l1) * ratio
     s = s1 + (s2 - s1) * ratio
 
     # Back to RGB
-    r_float, g_float, b_float = colorsys.hls_to_rgb(h, l, s)
+    r_float, g_float, b_float = colorsys.hls_to_rgb(h, lightness, s)
 
     r = round(r_float * 255)
     g = round(g_float * 255)

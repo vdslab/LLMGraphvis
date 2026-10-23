@@ -1,5 +1,3 @@
-import pytest
-
 from app.logic.layout import calculate_layout
 from common import models
 

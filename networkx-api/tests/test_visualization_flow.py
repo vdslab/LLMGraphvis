@@ -1,11 +1,8 @@
-import json
 from unittest import mock
 
-import networkx as nx
 import pytest
 
 from app.core import database
-from app.logic import layout
 from app.mcp import tools
 from common import models
 
@@ -86,7 +83,7 @@ def setup_network(db):
     # Verify stats are visible immediately
     from app.logic import attributes
 
-    stats = attributes.get_attribute_stats(
+    attributes.get_attribute_stats(
         net.id,
         models.NodeAttribute,
         models.NodeAttributeValue,

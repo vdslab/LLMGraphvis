@@ -1,3 +1,4 @@
+import contextlib
 import os
 
 from dotenv import load_dotenv
@@ -16,9 +17,6 @@ SQLALCHEMY_DATABASE_URL = f"postgresql+psycopg2://{POSTGRES_USER}:{POSTGRES_PASS
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True, pool_recycle=3600)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-import contextlib
 
 
 def get_db():

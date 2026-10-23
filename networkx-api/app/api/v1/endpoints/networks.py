@@ -2,14 +2,16 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
+from app.core.database import get_db
 from app.core.logging import get_logger
-from app.logic import attributes, exporter, importer, search
+from app.logic import attributes, exporter, filter, importer, search
+from app.schemas.filter import SubgraphFilterRequest
+from app.schemas.network import NetworkMetadataResponse, UpdateNetworkMetadataRequest
 from common import models
 
 router = APIRouter()
 logger = get_logger(__name__)
 
-from app.core.database import get_db
 
 MAX_GRAPHML_SIZE = 50 * 1024 * 1024  # 50MB, matches the backend upload cap
 
@@ -163,9 +165,6 @@ def get_node_details(network_id: int, node_id: str, db: Session = Depends(get_db
         raise HTTPException(status_code=500, detail=str(e))
 
 
-from app.schemas.network import NetworkMetadataResponse, UpdateNetworkMetadataRequest
-
-
 @router.get("/{network_id}/metadata", response_model=NetworkMetadataResponse)
 def get_network_metadata(network_id: int, db: Session = Depends(get_db)):
     """Get network metadata."""
@@ -222,10 +221,6 @@ def update_network_metadata(
         last_node_size_config=network.last_node_size_config,
         last_node_color_config=network.last_node_color_config,
     )
-
-
-from app.logic import filter
-from app.schemas.filter import SubgraphFilterRequest
 
 
 @router.post("/{network_id}/subgraphs/filter")

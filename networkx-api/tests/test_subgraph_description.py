@@ -75,7 +75,6 @@ def setup_dummy_network(db: Session) -> int:
     db.refresh(attr)
 
     # Values: Node 0=10, 1=20, 2=30, 3=40, 4=50
-    vals = []
     for i in range(5):
         node = (
             db.query(models.Node)

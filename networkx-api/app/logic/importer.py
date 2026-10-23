@@ -45,11 +45,6 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
     node_attr_descs = parsed_data.node_attr_descriptions
     edge_attr_descs = parsed_data.edge_attr_descriptions
 
-    # Use iterators directly to save memory
-    # Note: G.number_of_nodes() is O(1) for NetworkX graphs
-    total_nodes = G.number_of_nodes()
-    total_edges = G.number_of_edges()
-
     node_attr_types = {}
     edge_attr_types = {}
     # Each attribute's values are profiled in the passes below, so its

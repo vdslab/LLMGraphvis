@@ -1,6 +1,6 @@
 # Mock Data
 GRAPHML_CONTENT = """<?xml version="1.0" encoding="UTF-8"?>
-<graphml xmlns="http://graphml.graphdrawing.org/xmlns"  
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns
      http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
@@ -71,7 +71,7 @@ def test_generate_visualization(client):
     assert len(data["links"]) == 1
 
     # Verify strict layout update
-    node_0 = next(n for n in data["nodes"] if n["id"] == "n0")
+    assert any(n["id"] == "n0" for n in data["nodes"])
     # Circle layout usually puts nodes on unit circle, but coordinates vary.
     # Just checking we got a response is good enough for integration.
 
