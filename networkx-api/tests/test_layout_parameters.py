@@ -433,6 +433,16 @@ class TestWarmStart:
         assert captured["pos"] is not None
         assert set(captured["pos"]) == set(seed_positions)
 
+    def test_forceatlas2_accepts_a_warm_start(self, db):
+        # forceatlas2_layout calls .copy() on every seed position; stored
+        # positions came back as tuples and failed (chat 277).
+        setup_graph(db)
+        calculate_layout(1, "circular", db)
+        calculate_layout(
+            1, "forceatlas2", db, overrides={"init_from_layout": "circular"}
+        )
+        assert load_layout_positions(1, "forceatlas2", db)
+
     def test_missing_source_layout_is_a_clear_error(self, db):
         setup_graph(db)
         with pytest.raises(ValueError, match="No stored 'circular' layout"):

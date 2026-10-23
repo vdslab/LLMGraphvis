@@ -2,10 +2,13 @@ import asyncio
 import json
 import os
 import time
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 
+import anyio
 from mcp import ClientSession
 from mcp.client.sse import sse_client
+from mcp.shared.exceptions import McpError
+from mcp.types import CONNECTION_CLOSED
 
 from app.core.logging import get_logger
 
@@ -257,6 +260,94 @@ async def session_scope():
         raise _unwrap_exception(e) from e
 
 
+class ToolConnectionLost(RuntimeError):
+    """The connection to networkx-api dropped while a tool was running."""
+
+    def __init__(self, tool_name: str):
+        super().__init__(
+            f"The connection to the graph service dropped while {tool_name} was "
+            "running (the service restarted or was overloaded), so it returned no "
+            "result. The connection has been re-opened: calling the tool again "
+            "is safe."
+        )
+
+
+def _is_connection_error(e: BaseException) -> bool:
+    if isinstance(
+        e,
+        (
+            anyio.ClosedResourceError,
+            anyio.BrokenResourceError,
+            anyio.EndOfStream,
+            ConnectionError,
+        ),
+    ):
+        return True
+    return isinstance(e, McpError) and e.error.code == CONNECTION_CLOSED
+
+
+class ResilientSession:
+    """A turn-long MCP session that re-opens itself after the connection drops.
+
+    A dropped SSE stream (networkx-api restarting, or a stalled event loop)
+    used to leave the turn holding a dead session: every later call failed in
+    a millisecond with an empty message (chat 277). Now the next call opens a
+    fresh connection. A call that never reached the server is retried once; a
+    call cut off mid-run is reported as `ToolConnectionLost`, never re-run
+    blindly, since it may have been minutes of work.
+    """
+
+    def __init__(self):
+        self._stack: AsyncExitStack | None = None
+        self.session: ClientSession | None = None
+
+    async def __aenter__(self):
+        await self._connect()
+        return self
+
+    async def __aexit__(self, *exc_info):
+        await self._close()
+        return False
+
+    async def _connect(self):
+        stack = AsyncExitStack()
+        try:
+            self.session = await stack.enter_async_context(session_scope())
+        except BaseException:
+            await stack.aclose()
+            raise
+        self._stack = stack
+
+    async def _close(self):
+        stack, self._stack, self.session = self._stack, None, None
+        if stack is None:
+            return
+        try:
+            await stack.aclose()
+        except Exception as e:  # A broken stream often fails on the way out too.
+            logger.warning(f"Closing a dropped MCP session raised: {e!r}")
+
+    async def run(self, label: str, operation):
+        """`await operation(session)`, reconnecting around a dropped connection."""
+        if self.session is None:
+            await self._connect()
+        try:
+            return await operation(self.session)
+        except Exception as e:
+            if not _is_connection_error(e):
+                raise
+            # The write side was already closed: the request never left.
+            never_sent = isinstance(e, anyio.ClosedResourceError)
+            logger.warning(
+                f"MCP connection lost during {label} ({e!r}); reconnecting"
+            )
+            await self._close()
+            await self._connect()
+            if never_sent:
+                return await operation(self.session)
+            raise ToolConnectionLost(label) from e
+
+
 def _unwrap_exception(e: BaseException) -> BaseException:
     """Unwraps an ExceptionGroup if it contains only a single exception."""
     try:
@@ -281,6 +372,11 @@ async def execute_tool(tool_name: str, arguments: dict, session: ClientSession =
 
     try:
         async with asyncio.timeout(CALL_TIMEOUT_SECONDS):
+            if isinstance(session, ResilientSession):
+                return await session.run(
+                    tool_name,
+                    lambda live: _execute_internal(live, tool_name, arguments),
+                )
             if session:
                 return await _execute_internal(session, tool_name, arguments)
 
@@ -372,6 +468,10 @@ async def get_resource(uri: str, session: ClientSession = None) -> dict | list:
     Useful for internal context validation.
     """
     try:
+        if isinstance(session, ResilientSession):
+            return await session.run(
+                uri, lambda live: _read_resource_internal(live, uri)
+            )
         if session:
             return await _read_resource_internal(session, uri)
 

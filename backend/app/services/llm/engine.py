@@ -306,7 +306,7 @@ class GraphVisAgent:
 
         # 3. Enter Tool Execution Loop within Session Scope
         try:
-            async with mcp_client.session_scope() as session:
+            async with mcp_client.ResilientSession() as session:
                 final_text, execution_log, total_usage = await self._execute_tool_loop(
                     initial_stream=initial_stream,
                     history=history,
@@ -994,7 +994,7 @@ async def execute_tool_loop(
     tool_catalog.initialize_turn(turn_state)
     initial_tools = agent._tools_for_generation(tool_catalog, turn_state, iteration=0)
 
-    async with mcp_client.session_scope() as session:
+    async with mcp_client.ResilientSession() as session:
         return await agent._execute_tool_loop(
             initial_stream=agent.provider.generate(
                 history, initial_tools, agent.system_instruction

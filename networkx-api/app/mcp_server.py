@@ -5,7 +5,7 @@ not MCP prompts (ADR 0027).
 """
 
 from app.core.logging import get_logger
-from app.core.mcp import mcp  # noqa: F401  (re-exported for app.main)
+from app.core.mcp import mcp, offload_sync_tools  # noqa: F401  (mcp re-exported)
 
 # Imported for their side effect: the decorators register tools and resources
 # on `mcp`, in import order.
@@ -13,4 +13,8 @@ import app.mcp.tools  # noqa: F401
 import app.mcp.resources  # noqa: F401
 
 logger = get_logger(__name__)
-logger.info("MCP Server initialized and tools registered.")
+offloaded = offload_sync_tools(mcp)
+logger.info(
+    "MCP Server initialized and tools registered (%s run in worker threads).",
+    offloaded,
+)
