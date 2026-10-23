@@ -15,6 +15,7 @@ import {
   loadSampleNetwork as loadSampleNetworkAPI,
   getApiErrorMessage,
 } from '../services/api';
+import { isUnsent, latestInteraction } from '../utils/chatInteraction';
 
 export const EMPTY_USAGE_TOTALS = {
   input_tokens: 0,
@@ -176,9 +177,7 @@ export const useChatStore = create((set, get) => ({
     if (get().isLoading && !turnFinished) return;
 
     // Messages the backend has not seen yet stay on screen.
-    const unsent = get().messages.filter(
-      (message) => message.status === 'queued' || message.status === 'failed',
-    );
+    const unsent = get().messages.filter(isUnsent);
     set({ messages: [...stored, ...unsent] });
     if (get().isLoading) get().endTurn();
     get().refreshUsage();
@@ -318,6 +317,19 @@ export const useChatStore = create((set, get) => ({
       get().setMessageStatus(localId, 'sent');
       return true;
     } catch (error) {
+      const freeTextAnswer = message.inputResponse?.input_request_id
+        && !message.inputResponse.input_values;
+      if (freeTextAnswer && error?.response?.status === 409) {
+        // The question closed before this reply reached it; the text still
+        // stands as a message of its own.
+        set((state) => ({
+          messages: state.messages.map((m) =>
+            m.localId === localId ? { ...m, inputResponse: null } : m
+          ),
+          isLoading: false,
+        }));
+        return get().dispatchMessage(localId);
+      }
       console.error("Failed to send message:", error);
       get().setMessageStatus(localId, 'failed');
       set({ isLoading: false, thinkingMessage: null, progressSteps: [] });
@@ -353,11 +365,54 @@ export const useChatStore = create((set, get) => ({
     return await get().dispatchMessage(localId);
   },
 
+  /**
+   * Send the next queued message, unless the turn that just ended asked the
+   * user something. A message queued before that question or panel arrived
+   * was written without seeing it, so it is held until the user says whether
+   * it is an answer or a new request (ADR 0039). Released messages go out.
+   */
   dispatchQueued: () => {
     if (get().isLoading) return;
+    const queued = get().messages.filter((message) => message.status === 'queued');
+    if (!queued.length) return;
+    if (latestInteraction(get().messages)) {
+      set((state) => ({
+        messages: state.messages.map((message) =>
+          message.status === 'queued' && !message.released
+            ? { ...message, status: 'held' }
+            : message
+        ),
+      }));
+    }
     const next = get().messages.find((message) => message.status === 'queued');
     if (next) get().dispatchMessage(next.localId);
   },
+
+  /**
+   * Send a held message, as an answer to the open question or as a new
+   * request. It moves to the end of the conversation, where it is sent.
+   */
+  releaseHeld: (localId, { asAnswer = false } = {}) => {
+    const interaction = latestInteraction(get().messages);
+    const inputResponse = asAnswer && interaction?.kind === 'choice'
+      ? { input_request_id: interaction.data.id }
+      : null;
+    set((state) => {
+      const message = state.messages.find((m) => m.localId === localId);
+      if (!message) return {};
+      return {
+        messages: [
+          ...state.messages.filter((m) => m.localId !== localId),
+          { ...message, inputResponse, released: true, status: 'queued' },
+        ],
+      };
+    });
+    get().dispatchQueued();
+  },
+
+  discardHeld: (localId) => set((state) => ({
+    messages: state.messages.filter((message) => message.localId !== localId),
+  })),
 
   retryMessage: async (message) => {
     if (get().isLoading) {

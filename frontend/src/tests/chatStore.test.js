@@ -60,6 +60,75 @@ describe('chatStore sending', () => {
     expect(state().messages[1].status).toBe('sent');
   });
 
+  describe('when the turn ends with a question (ADR 0039)', () => {
+    const question = {
+      id: 7,
+      role: 'assistant',
+      content: '::tool-execution{index="0"}',
+      tool_executions: [{
+        tool_name: 'ask_user',
+        result: { input_request: { id: 'q1', question: 'どれにしますか？', fields: [] } },
+      }],
+    };
+
+    const endWithQuestion = async () => {
+      await state().sendMessage('first');
+      await state().sendMessage('written during the turn');
+      useChatStore.setState((s) => ({ messages: [...s.messages, question] }));
+      state().endTurn();
+      await flush();
+    };
+
+    it('holds a message queued before the question arrived', async () => {
+      await endWithQuestion();
+
+      expect(api.processMessage).toHaveBeenCalledTimes(1);
+      expect(state().messages[1].status).toBe('held');
+    });
+
+    it('sends a held message as a new request, after the question', async () => {
+      await endWithQuestion();
+      const held = state().messages[1];
+
+      state().releaseHeld(held.localId);
+      await flush();
+
+      expect(api.processMessage).toHaveBeenLastCalledWith(1, 'written during the turn');
+      expect(state().messages.at(-1)).toMatchObject({ localId: held.localId, status: 'sent' });
+    });
+
+    it('sends a held message as an answer when asked to', async () => {
+      await endWithQuestion();
+
+      state().releaseHeld(state().messages[1].localId, { asAnswer: true });
+      await flush();
+
+      expect(api.processMessage).toHaveBeenLastCalledWith(
+        1, 'written during the turn', { input_request_id: 'q1' },
+      );
+    });
+
+    it('discards a held message', async () => {
+      await endWithQuestion();
+
+      state().discardHeld(state().messages[1].localId);
+
+      expect(state().messages.map((m) => m.content)).not.toContain('written during the turn');
+    });
+  });
+
+  it('sends a free-text answer as a plain message once the question has closed', async () => {
+    api.processMessage
+      .mockRejectedValueOnce({ response: { status: 409 } })
+      .mockResolvedValueOnce({ status: 202 });
+
+    await state().sendMessage('late answer', { input_request_id: 'q1' });
+    await flush();
+
+    expect(api.processMessage).toHaveBeenLastCalledWith(1, 'late answer');
+    expect(state().messages[0].status).toBe('sent');
+  });
+
   it('sends only one queued message per turn', async () => {
     await state().sendMessage('first');
     await state().sendMessage('second');

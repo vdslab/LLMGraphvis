@@ -283,14 +283,34 @@ def test_network_change_expires_question(db, chat):
 
 
 @pytest.mark.asyncio
-async def test_plain_text_reply_resolves_pending_question(db, chat):
+async def test_free_text_naming_the_question_answers_it(db, chat):
     request = present_question(chat.id, db, FORM, {})["input_request"]
     user = db.get(models.User, chat.user_id)
-    payload = schemas.ChatProcessRequest(message={"content": "まず経路だけ調べて"})
-    process_message(chat.id, payload, BackgroundTasks(), user, db)
+    payload = schemas.ChatProcessRequest(
+        message={"content": "まず経路だけ調べて"}, input_request_id=request["id"]
+    )
+    tasks = BackgroundTasks()
+    process_message(chat.id, payload, tasks, user, db)
     assert db.get(models.AnalysisInput, request["id"]).answer == {
         "free_text": "まず経路だけ調べて"
     }
+    assert tasks.tasks[0].args[2] is True  # resumed_from_input
+
+
+@pytest.mark.asyncio
+async def test_plain_message_is_a_new_request_and_retires_the_question(db, chat):
+    # The message may have been written before the question arrived (ADR 0039).
+    request = present_question(chat.id, db, FORM, {})["input_request"]
+    user = db.get(models.User, chat.user_id)
+    payload = schemas.ChatProcessRequest(message={"content": "中心性で再計算したい"})
+    tasks = BackgroundTasks()
+    process_message(chat.id, payload, tasks, user, db)
+    stored = db.get(models.AnalysisInput, request["id"])
+    assert stored.status == "superseded"
+    assert stored.answer is None
+    assert tasks.tasks[0].args[2] is False
+    with pytest.raises(ValueError, match="no longer active"):
+        accept_answer(chat, db, request["id"], None, "yes")
 
 
 @pytest.mark.asyncio

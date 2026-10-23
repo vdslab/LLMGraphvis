@@ -9,7 +9,7 @@ import TurnStatus from './chat/TurnStatus';
 import Composer from './chat/Composer';
 import InputRequest from './chat/InputRequest';
 import ParameterTuning from './chat/ParameterTuning';
-import { interactionKey, latestInteraction } from '../utils/chatInteraction';
+import { interactionKey, latestInteraction, looksJapanese } from '../utils/chatInteraction';
 import './chat/chat.css';
 
 // How far from the bottom still counts as "following the conversation".
@@ -21,6 +21,8 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
     messages,
     sendMessage,
     retryMessage,
+    releaseHeld,
+    discardHeld,
     isLoading,
     thinkingMessage,
     progressSteps,
@@ -39,7 +41,10 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
   const seenInteraction = useRef(null);
   const interaction = latestInteraction(messages);
   const currentInteractionKey = interactionKey(interaction);
-  const japaneseInteraction = /[\u3040-\u30ff\u4e00-\u9fff]/.test(interaction?.data.question ?? '');
+  const japaneseInteraction = looksJapanese(interaction?.data.question);
+  // Typing while a question is on screen answers it (ADR 0039); a message
+  // written during the turn was not, and is held instead.
+  const answering = interaction?.kind === 'choice' && !isLoading;
   const interactionLabel = interaction?.kind === 'choice'
     ? (japaneseInteraction ? '選択' : 'Choice')
     : (japaneseInteraction ? '調整' : 'Adjust');
@@ -90,7 +95,7 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
     setInput('');
     setActiveView('conversation');
     onMessageSent?.();
-    sendMessage(content);
+    sendMessage(content, answering ? { input_request_id: interaction.data.id } : null);
   };
 
   const handleFileUpload = async (event) => {
@@ -156,6 +161,9 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
 
           {messages.map((message) => (
             <ChatMessage key={message.id} message={message} onRetry={retryMessage}
+              onRelease={(held, options) => releaseHeld(held.localId, options)}
+              onDiscard={(held) => discardHeld(held.localId)}
+              canAnswer={interaction?.kind === 'choice'}
               detachedInteractionKey={currentInteractionKey} />
           ))}
 
@@ -202,6 +210,8 @@ const ChatInterface = ({ contextNode, onMessageSent, onCancelContext }) => {
         onCancelContext={onCancelContext}
         queuedCount={queuedCount}
         busy={isLoading}
+        answering={answering}
+        japanese={looksJapanese(interaction?.data.question)}
       />}
     </div>
   );

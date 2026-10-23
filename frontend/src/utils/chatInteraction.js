@@ -12,8 +12,13 @@ export const interactionForExecution = (execution) => {
 export const interactionKey = (interaction) => interaction
   ? `${interaction.kind}:${interaction.data.id}` : null;
 
+// Messages the backend has not received. They are not part of the stored
+// conversation, so they must not hide the question the last reply ended with.
+const UNSENT = new Set(['queued', 'held', 'failed']);
+export const isUnsent = (message) => UNSENT.has(message?.status);
+
 export const latestInteraction = (messages) => {
-  const latest = messages.at(-1);
+  const latest = messages.findLast((message) => !isUnsent(message));
   if (latest?.role !== 'assistant') return null;
   const executions = latest.tool_executions ?? [];
   for (let i = executions.length - 1; i >= 0; i -= 1) {
@@ -22,3 +27,5 @@ export const latestInteraction = (messages) => {
   }
   return null;
 };
+
+export const looksJapanese = (text) => /[぀-ヿ一-鿿]/.test(text ?? '');

@@ -184,8 +184,10 @@
 
 .msg__footnote {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem 0.5rem;
   font-size: 0.6875rem;
   color: var(--md-sys-color-outline);
 }
@@ -198,6 +200,12 @@
 
 .msg__state--error {
   color: var(--md-sys-color-error);
+}
+
+.msg__state--held {
+  flex-basis: 100%;
+  justify-content: flex-end;
+  color: var(--md-sys-color-on-warning-container);
 }
 
 .msg__retry {

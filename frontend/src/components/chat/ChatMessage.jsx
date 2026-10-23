@@ -4,7 +4,7 @@ import { parseMessageContent } from '../../utils/parseMessageContent';
 import Disclosure from './Disclosure';
 import ToolCall from './ToolCall';
 import Markdown from './Markdown';
-import { interactionForExecution, interactionKey } from '../../utils/chatInteraction';
+import { interactionForExecution, interactionKey, looksJapanese } from '../../utils/chatInteraction';
 
 /**
  * Tool calls this message made but did not place inline.
@@ -83,7 +83,29 @@ const isRetriedAskUserFailure = (execution, allExecutions, currentIndex) => {
   );
 };
 
-const ChatMessage = ({ message, onRetry, detachedInteractionKey = null }) => {
+const HELD_TEXT = {
+  en: {
+    held: 'Held: a question arrived before this was sent',
+    asRequest: 'Send as new request',
+    asAnswer: 'Send as answer',
+    discard: 'Discard',
+  },
+  ja: {
+    held: '保留中：送信前に質問が届きました',
+    asRequest: '新しい依頼として送る',
+    asAnswer: '回答として送る',
+    discard: '取り消す',
+  },
+};
+
+const ChatMessage = ({
+  message,
+  onRetry,
+  onRelease,
+  onDiscard,
+  canAnswer = false,
+  detachedInteractionKey = null,
+}) => {
   const blocks = useMemo(
     () => parseMessageContent(message.content),
     [message.content],
@@ -113,6 +135,30 @@ const ChatMessage = ({ message, onRetry, detachedInteractionKey = null }) => {
               <Clock size={11} aria-hidden /> Queued
             </span>
           )}
+          {message.status === 'held' && (() => {
+            const text = HELD_TEXT[looksJapanese(message.content) ? 'ja' : 'en'];
+            return (
+              <>
+                <span className="msg__state msg__state--held">
+                  <Clock size={11} aria-hidden /> {text.held}
+                </span>
+                <button type="button" className="msg__retry"
+                  onClick={() => onRelease?.(message, { asAnswer: false })}>
+                  {text.asRequest}
+                </button>
+                {canAnswer && (
+                  <button type="button" className="msg__retry"
+                    onClick={() => onRelease?.(message, { asAnswer: true })}>
+                    {text.asAnswer}
+                  </button>
+                )}
+                <button type="button" className="msg__retry"
+                  onClick={() => onDiscard?.(message)}>
+                  {text.discard}
+                </button>
+              </>
+            );
+          })()}
           {message.status === 'sending' && (
             <span className="msg__state">Sending…</span>
           )}

@@ -4,6 +4,12 @@ import { ArrowUp, Paperclip, X } from 'lucide-react';
 
 const MAX_HEIGHT = 160;
 
+const placeholderFor = ({ busy, answering, japanese }) => {
+  if (busy) return 'Add another message…';
+  if (answering) return japanese ? '質問への回答を入力…' : 'Answer the question…';
+  return 'Ask about this network…';
+};
+
 /**
  * The message box.
  *
@@ -11,7 +17,8 @@ const MAX_HEIGHT = 160;
  * answers 202 immediately, and a chat is a queue rather than a lock, so making
  * the user wait for the previous answer before they may even type was a
  * restriction the system never needed. Anything sent mid-turn is held by the
- * store and dispatched when the turn ends — see `chatStore.sendMessage`.
+ * store and dispatched when the turn ends — see `chatStore.sendMessage` —
+ * unless that turn ended with a question, which holds it (ADR 0039).
  */
 const Composer = ({
   value,
@@ -22,6 +29,8 @@ const Composer = ({
   onCancelContext,
   queuedCount,
   busy,
+  answering = false,
+  japanese = false,
 }) => {
   const textareaRef = useRef(null);
 
@@ -81,7 +90,7 @@ const Composer = ({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={busy ? 'Add another message…' : 'Ask about this network…'}
+          placeholder={placeholderFor({ busy, answering, japanese })}
           rows={1}
         />
         <button

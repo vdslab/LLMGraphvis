@@ -75,7 +75,7 @@ describe('ChatInterface', () => {
         fireEvent.change(input, { target: { value: 'Hello' } });
         fireEvent.keyDown(input, { key: 'Enter', shiftKey: false, code: 'Enter' });
 
-        expect(mockSendMessage).toHaveBeenCalledWith('Hello');
+        expect(mockSendMessage).toHaveBeenCalledWith('Hello', null);
         await waitFor(() => {
             expect(input.value).toBe('');
         });
@@ -103,7 +103,7 @@ describe('ChatInterface', () => {
         fireEvent.change(input, { target: { value: 'and colour by community' } });
         fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
 
-        expect(mockSendMessage).toHaveBeenCalledWith('and colour by community');
+        expect(mockSendMessage).toHaveBeenCalledWith('and colour by community', null);
     });
 
     it('says how many messages are waiting for the current turn', () => {
@@ -193,8 +193,15 @@ describe('ChatInterface', () => {
 
         fireEvent.click(screen.getByRole('tab', { name: 'Chat' }));
         expect(screen.getByText('Choose how to continue.')).toBeInTheDocument();
-        expect(screen.getByPlaceholderText(PLACEHOLDER)).toBeInTheDocument();
         expect(screen.queryByText('Choice form question-1')).not.toBeInTheDocument();
+
+        // Typing with the question on screen answers it, by its id (ADR 0039).
+        const input = screen.getByPlaceholderText('Answer the question…');
+        fireEvent.change(input, { target: { value: 'something else' } });
+        fireEvent.keyDown(input, { key: 'Enter', shiftKey: false, code: 'Enter' });
+        expect(mockSendMessage).toHaveBeenCalledWith(
+            'something else', { input_request_id: 'question-1' },
+        );
     });
 
     it('opens a new tuning panel in the same chat area', () => {

@@ -354,16 +354,13 @@ def process_message(
             return {"status": "already_accepted"}
         resumed_from_input = True
     else:
-        if request_id is None:
-            pending = (
-                db.query(models.AnalysisInput)
-                .filter_by(
-                    chat_id=chat_id, network_id=chat.network_id, status="pending"
-                )
-                .first()
-            )
-            if pending:
-                request_id = pending.id
+        if request_id is None and request.input_values is None:
+            # A message that does not name the question is a new request, not an
+            # answer: it may have been written before the question arrived. The
+            # open question is retired so it cannot be answered later (ADR 0039).
+            db.query(models.AnalysisInput).filter_by(
+                chat_id=chat_id, status="pending"
+            ).update({"status": "superseded"})
         if request_id is not None:
             resumed_from_input = True
             try:
