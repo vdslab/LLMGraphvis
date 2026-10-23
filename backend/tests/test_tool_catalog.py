@@ -280,4 +280,4 @@ async def test_activation_payloads_report_everything_callable(monkeypatch):
     second = await local_tools.tool_search("analysis_alpha", 5, 0, state)
     assert second["activated_tools"] == []
     assert "analysis_alpha" in second["active_tools"]
-    assert "this same response" in second["activation_note"]
+    assert "rest of this turn" in second["activation_note"]

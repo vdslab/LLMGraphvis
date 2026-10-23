@@ -311,12 +311,18 @@ async def test_execute_tools_and_update_history(mock_agent, mock_queue):
 
 
 @pytest.mark.asyncio
-async def test_same_batch_search_does_not_retroactively_expose_tool(
+async def test_same_batch_call_to_an_unshown_tool_runs_when_it_fits_its_schema(
     mock_agent, mock_queue
 ):
+    """A well-formed call to a real tool is not sent back for a search round."""
+    schema = {
+        "type": "object",
+        "properties": {"network_id": {"type": "integer"}},
+        "required": ["network_id"],
+    }
     catalog = ToolCatalog(
         [
-            ToolDefinition("analysis_pagerank", "Calculate PageRank.", {}),
+            ToolDefinition("analysis_pagerank", "Calculate PageRank.", schema),
             *local_tools.get_local_tools(),
         ]
     )
@@ -332,16 +338,19 @@ async def test_same_batch_search_does_not_retroactively_expose_tool(
     ]
 
     with patch(
-        "app.services.llm.mcp_client.execute_tool", new_callable=AsyncMock
+        "app.services.llm.mcp_client.execute_tool",
+        new_callable=AsyncMock,
+        return_value={"content": "ok"},
     ) as remote:
         result = await mock_agent._execute_tools_and_update_history(
             calls, "", "", [], mock_queue, 1, state, None
         )
 
-    remote.assert_not_called()
+    # normalize_network_id fills network_id before the schema check.
+    remote.assert_called_once()
     assert [call["status"] for call in result["tool_calls"]] == [
         "completed",
-        "deferred",
+        "completed",
     ]
 
 

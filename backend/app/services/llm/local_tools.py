@@ -90,8 +90,8 @@ async def switch_to_parent_network(chat_id: int, db: Session) -> dict:
 # overlapping skill returns an empty list while those tools are in fact usable —
 # `active_tools` is the key to read for "what can I call now".
 ACTIVATION_NOTE = (
-    "Activated tools are callable in later responses of this turn and after "
-    "ask_user answers, but not in this same response."
+    "Activated tools stay callable for the rest of this turn and after ask_user "
+    "answers."
 )
 NO_MATCH_NOTE = (
     "No tool matched this query, which does not mean the capability is missing: "

@@ -29,9 +29,30 @@ from .normalize import _attribute_arg, resolve_attribute
 logger = get_logger(__name__)
 
 
+def _schema_problem(schema: Dict[str, Any], args: Dict[str, Any]) -> Optional[str]:
+    """The first way `args` breaks the tool's JSON schema, or None if it fits."""
+    import jsonschema
+
+    try:
+        validator = jsonschema.Draft202012Validator(schema or {})
+        error = next(iter(validator.iter_errors(args or {})), None)
+    except jsonschema.SchemaError:
+        return "its schema could not be checked"
+    if error is None:
+        return None
+    where = ".".join(str(part) for part in error.absolute_path)
+    return f"{where}: {error.message}" if where else error.message
+
+
 @hook(HookEvent.PRE_TOOL, tools="*", priority=40, name="guard_tool_is_exposed")
 def guard_tool_is_exposed(ctx: HookContext) -> Optional[ToolCallDecision]:
-    """Defer stale or invented calls that were absent from this model request."""
+    """Check calls to tools that were absent from this model request.
+
+    A well-formed call to a real tool runs, and the tool stays exposed: making
+    the model search for a tool it already called correctly cost a round each
+    time, and such deferrals were a fifth of all tool calls. A call that does
+    not fit the tool's schema is deferred, since the model never saw it.
+    """
     presented = ctx.turn_state.get("presented_tool_names")
     if presented is None or ctx.tool_name in presented:
         return None
@@ -39,13 +60,17 @@ def guard_tool_is_exposed(ctx: HookContext) -> Optional[ToolCallDecision]:
     if catalog is None or not catalog.names:
         return None
     if ctx.tool_name in catalog.names:
+        problem = _schema_problem(catalog.get(ctx.tool_name).parameters, ctx.args)
+        if problem is None:
+            catalog.activate([ctx.tool_name], ctx.turn_state)
+            return None
         return ToolCallDecision.defer(
             f"'{ctx.tool_name}' exists but was not exposed in the current model "
-            "request. Load a skill that relates to it or call tool_search with "
-            "its exact name, then call it in a later response. A skill or search "
-            "call in this same response does not expose it retroactively. Once "
-            "exposed it stays callable for the rest of this turn, including "
-            "after an ask_user answer."
+            f"request, and this call does not match its parameters ({problem}). "
+            "Load a skill that relates to it or call tool_search with its exact "
+            "name to see them, then call it in a later response. Once exposed it "
+            "stays callable for the rest of this turn, including after an "
+            "ask_user answer."
         )
     return ToolCallDecision.defer(
         f"'{ctx.tool_name}' is not in the live tool catalogue. Use tool_search "

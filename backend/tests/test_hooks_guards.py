@@ -674,14 +674,19 @@ class TestCandidateListing:
         assert guards._format_candidates(["spring_x", "spring_y"]) == "(none)"
 
 
-def test_unexposed_known_tool_is_deferred():
+def _unexposed_call(args):
     from app.services.llm.hooks.builtin.guards import guard_tool_is_exposed
     from app.services.llm.hooks.types import HookContext, HookEvent
 
+    schema = {
+        "type": "object",
+        "properties": {"network_id": {"type": "integer"}, "alpha": {"type": "number"}},
+        "required": ["network_id"],
+    }
     catalog = ToolCatalog(
         [
             ToolDefinition("skill_load", "", {}),
-            ToolDefinition("analysis_pagerank", "", {}),
+            ToolDefinition("analysis_pagerank", "", schema),
         ]
     )
     state = {}
@@ -693,10 +698,22 @@ def test_unexposed_known_tool_is_deferred():
         network_id=1,
         turn_state=state,
         tool_name="analysis_pagerank",
+        args=args,
     )
-    decision = guard_tool_is_exposed(ctx)
+    return guard_tool_is_exposed(ctx), state
+
+
+def test_unexposed_known_tool_with_a_valid_call_runs_and_stays_exposed():
+    decision, state = _unexposed_call({"network_id": 1, "alpha": 0.85})
+    assert decision is None
+    assert "analysis_pagerank" in state["enabled_tool_names"]
+
+
+def test_unexposed_known_tool_with_an_invalid_call_is_deferred():
+    decision, state = _unexposed_call({"alpha": "high"})
     assert decision.action == "defer"
-    assert "same response" in decision.reason
+    assert "does not match its parameters" in decision.reason
+    assert "analysis_pagerank" not in state["enabled_tool_names"]
 
 
 # --------------------------------------------------------------------------
