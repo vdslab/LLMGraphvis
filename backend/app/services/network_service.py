@@ -46,6 +46,78 @@ async def export_graphml(network_id: int) -> str:
         raise NetworkExportError("networkx-api export returned no GraphML")
     return graphml
 
+
+# --- Upload pipeline -----------------------------------------------------------
+# Initialising an uploaded file is a user action too, so it goes over REST like
+# export (ADR 0035). MCP capped the request at 4 MiB, below the 50MB upload cap.
+
+# Parsing and saving a file near the upload cap.
+IMPORT_TIMEOUT_SECONDS = 300.0
+# The first layout of a large network (ADR 0033 keeps it to tens of seconds).
+LAYOUT_TIMEOUT_SECONDS = 600.0
+VISUALIZATION_TIMEOUT_SECONDS = 120.0
+
+
+class NetworkPipelineError(RuntimeError):
+    """A step of initialising an uploaded network failed on networkx-api."""
+
+
+async def _call(method: str, path: str, timeout: float, **kwargs) -> dict:
+    try:
+        async with _networkx_client() as client:
+            response = await client.request(method, path, timeout=timeout, **kwargs)
+    except httpx.TimeoutException as exc:
+        raise NetworkPipelineError(
+            f"networkx-api did not answer {path} within {timeout:g} seconds"
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise NetworkPipelineError(f"networkx-api unreachable: {exc}") from exc
+
+    if response.status_code != 200:
+        try:
+            detail = response.json().get("detail")
+        except ValueError:
+            detail = None
+        raise NetworkPipelineError(
+            f"networkx-api {path} failed ({response.status_code}): "
+            f"{str(detail or response.text)[:500]}"
+        )
+    return response.json()
+
+
+async def import_graphml(network_id: int, graphml: str) -> int:
+    """Save `graphml` and return the network id it was saved under."""
+    result = await _call(
+        "POST",
+        f"/api/v1/networks/{network_id}/import",
+        IMPORT_TIMEOUT_SECONDS,
+        content=graphml.encode("utf-8"),
+        headers={"Content-Type": "application/xml; charset=utf-8"},
+    )
+    final_id = result.get("network_id")
+    if not isinstance(final_id, int):
+        raise NetworkPipelineError("networkx-api import returned no network_id")
+    return final_id
+
+
+async def calculate_layout(network_id: int, layout_name: str) -> None:
+    """Compute and store a layout with its auto-tuned defaults."""
+    await _call(
+        "POST",
+        f"/api/v1/networks/{network_id}/layout",
+        LAYOUT_TIMEOUT_SECONDS,
+        json={"layout_name": layout_name},
+    )
+
+
+async def build_visualization(network_id: int) -> dict:
+    """The network as drawn, the same object `visualization_generate` returns."""
+    return await _call(
+        "GET",
+        f"/api/v1/networks/{network_id}/visualization",
+        VISUALIZATION_TIMEOUT_SECONDS,
+    )
+
 # Upper bound on the parent chain walked to find a root. Subgraphs of subgraphs
 # are legitimate, so this is a cycle/corruption stop, not a design limit.
 MAX_NETWORK_DEPTH = 100

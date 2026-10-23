@@ -51,8 +51,8 @@ sequenceDiagram
     %% Step 3: Backend accepts the request and starts background task
     B-->>F: 202 Accepted
     note right of B: FastAPIのBackgroundTasksを使い、<br/>後続の重い処理をバックグラウンドで実行
-    B->>N: GraphMLのインポート、レイアウト、描画を順次要求
-    note right of B: 両入力で同じ初期化処理を使用
+    B->>N: REST で import → layout → visualization を順次要求
+    note right of B: 両入力で同じ初期化処理を使用。<br/>ユーザーの操作なので MCP ではなく REST（ADR 0035）
 
     %% Step 4: Frontend waits for SSE event
     F->>B: GET /chat/{chat_id}/stream

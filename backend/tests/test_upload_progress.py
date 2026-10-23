@@ -28,16 +28,21 @@ async def _run_upload(
     exec_side_effect=None,
 ):
     with patch(
-        "app.services.llm.mcp_client.execute_tool", new_callable=AsyncMock
-    ) as mock_exec, patch(
+        "app.services.network_service.import_graphml", new_callable=AsyncMock
+    ) as mock_import, patch(
+        "app.services.network_service.calculate_layout", new_callable=AsyncMock
+    ), patch(
+        "app.services.network_service.build_visualization", new_callable=AsyncMock
+    ) as mock_vis, patch(
         "app.services.llm.get_event_queue", new_callable=AsyncMock
     ) as mock_get_queue, patch(
         "app.services.llm.context.build_data_overview", new_callable=AsyncMock
     ) as mock_overview, patch(
         "app.core.database.SessionLocal"
     ) as mock_session_cls:
-        mock_exec.return_value = {"network_id": 100, "nodes": [], "links": []}
-        mock_exec.side_effect = exec_side_effect
+        mock_import.return_value = 100
+        mock_import.side_effect = exec_side_effect
+        mock_vis.return_value = {"network_id": 100, "nodes": [], "links": []}
         mock_overview.return_value = overview
         mock_queue = AsyncMock()
         mock_get_queue.return_value = mock_queue
@@ -140,15 +145,17 @@ async def test_upload_leaves_a_real_network_name_alone():
 async def test_a_failed_step_is_saved_with_its_name_and_error():
     """A failed upload used to stop the spinner and leave nothing behind, so
     the user could not tell a stall from a broken file."""
-    from app.services.llm.mcp_client import ToolTimeoutError
+    from app.services.network_service import NetworkPipelineError
 
     events, content, _ = await _run_upload(
-        exec_side_effect=ToolTimeoutError("network_import_graphml", 600)
+        exec_side_effect=NetworkPipelineError(
+            "networkx-api /api/v1/networks/100/import failed (422): bad XML"
+        )
     )
 
     assert ":::steps" in content
     assert 'failed during "Importing GraphML data"' in content
-    assert "did not respond within 600 seconds" in content
+    assert "failed (422): bad XML" in content
     # `message` is terminal on the frontend: it ends the turn.
     assert events[-1]["event"] == "message"
     assert not [e for e in events if e["event"] == "render_update"]

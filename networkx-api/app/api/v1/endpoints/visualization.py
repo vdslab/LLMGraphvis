@@ -12,6 +12,27 @@ logger = get_logger(__name__)
 from app.core.database import get_db
 
 
+@router.get("/{network_id}/visualization")
+def build_visualization(network_id: int, db: Session = Depends(get_db)):
+    """The network as drawn, built exactly as `visualization_generate` builds it.
+
+    Used by the upload pipeline (ADR 0035). The POST route below predates the
+    builder and assembles the data differently.
+    """
+    from app.logic import visualization_builder
+
+    if db.get(models.Network, network_id) is None:
+        raise HTTPException(status_code=404, detail=f"Network {network_id} not found")
+    try:
+        vis_data = visualization_builder.build_visualization(
+            db, network_id, with_quality=True
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    vis_data["network_id"] = network_id
+    return vis_data
+
+
 @router.post("/{network_id}/visualization")
 def generate_visualization(
     network_id: int, request: VisualizationRequest, db: Session = Depends(get_db)

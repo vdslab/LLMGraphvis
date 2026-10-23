@@ -305,6 +305,8 @@ networkx 既定の 50 に下げる。120〜500 ノードの木 5 種すべてで
 
 **根拠**: REST 側はフロントエンドからの直接操作とデバッグに必要であり、MCP 側はエージェントに必要である。ロジックを重複させると、片方だけが修正された状態が生まれ、「チャットでは正しいのに直接叩くと違う」という再現困難な差異になる。
 
+アップロード時の初期化は REST の入口だけを使う（`POST …/import`、`POST …/layout`、`GET …/visualization`）。`POST …/import` は GraphML を JSON に包まずに XML の本文として受け取り、上限は受付と同じ 50MB である。`GET …/visualization` は `visualization_generate` と同じ `build_visualization(with_quality=True)` を返す（[ADR 0035](../4_Decisions/0035-upload-over-rest.md)）。
+
 **エンドポイントの一覧とシグネチャは `/docs`（OpenAPI）と `app/api/` を参照すること。**
 
 ## 3.7. 内部構造の設計判断

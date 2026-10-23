@@ -7,10 +7,10 @@ from common import models
 from app.core import database
 from app.core.logging import get_logger
 from app.services import llm as llm_service
+from app.services import network_service
 from app.services.llm import context as llm_context
 from app.services.llm import emitters
 from app.services.llm import markup
-from app.services.llm import mcp_client
 from app.services.llm import titles
 from app.services.llm import usage as llm_usage
 from app.services.llm.providers.types import UsageData
@@ -174,49 +174,23 @@ async def handle_upload_background(
         steps.append(label)
         await emitters.emit_progress(queue, label, status="running")
 
+    # Every step below is a REST call, not an MCP tool: uploading is the user's
+    # action, and MCP capped the request below the upload size (ADR 0035).
     try:
-        # Step 1: Import
         await step("Importing GraphML data")
-
-        import_result = await mcp_client.execute_tool(
-            "network_import_graphml",
-            {"network_id": network_id, "graphml_data": graphml_data},
+        final_network_id = await network_service.import_graphml(
+            network_id, graphml_data
         )
-        
-        if "error" in import_result:
-            raise ValueError(f"Import failed: {import_result['error']}")
-            
-        final_network_id = import_result.get("network_id")
-        if final_network_id is None:
-             raise ValueError("Import tool did not return a valid network_id")
 
         # Before the overview is built, so it reports the file's name and not
         # the placeholder the network was created with.
         _name_network_after_file(final_network_id, filename)
 
-        # Step 2: Layout
         await step("Calculating ForceAtlas2 layout")
+        await network_service.calculate_layout(final_network_id, "forceatlas2")
 
-        layout_result = await mcp_client.execute_tool(
-            "layout_forceatlas2",
-            {"network_id": final_network_id}
-        )
-        
-        # layout tool returns string message or "Error: ..."
-        if isinstance(layout_result, str) and layout_result.startswith("Error"):
-             raise ValueError(layout_result)
-
-        # Step 3: Visualization
         await step("Generating initial visualization")
-
-        vis_data = await mcp_client.execute_tool(
-            "visualization_generate",
-            {"network_id": final_network_id}
-        )
-        
-        # Check if vis_data is an error dict (though tool raises/returns dict usually)
-        if isinstance(vis_data, dict) and "error" in vis_data:
-             raise ValueError(f"Visualization failed: {vis_data['error']}")
+        vis_data = await network_service.build_visualization(final_network_id)
 
         # Step 4: Inspect the uploaded data (fixed step, not an LLM tool call).
         # Reads the network's structure/attributes directly so the user can see

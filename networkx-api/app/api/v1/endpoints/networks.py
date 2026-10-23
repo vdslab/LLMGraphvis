@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from common import models
@@ -37,6 +37,38 @@ def initialize_network(
     except Exception as e:
         logger.error(f"Failed to initialize network: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{network_id}/import")
+async def import_graphml(
+    network_id: int, request: Request, db: Session = Depends(get_db)
+):
+    """Parse a GraphML document sent as the raw request body and save it.
+
+    The upload pipeline's import step (ADR 0035). The body is the XML itself,
+    not JSON, so a large file is neither escaped nor held twice. Returns the
+    network id the data was saved under, which differs from `network_id` when
+    that one already holds data.
+    """
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > MAX_GRAPHML_SIZE:
+        raise HTTPException(status_code=413, detail="GraphML data too large.")
+    body = await request.body()
+    if len(body) > MAX_GRAPHML_SIZE:
+        raise HTTPException(status_code=413, detail="GraphML data too large.")
+    try:
+        graphml = body.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=422, detail="GraphML must be UTF-8 text.")
+    try:
+        final_network_id = importer.parse_and_save_graphml(network_id, graphml, db)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to import network {network_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    logger.info(f"Imported GraphML into network_id={final_network_id}")
+    return {"network_id": final_network_id}
 
 
 @router.get("/{network_id}/export")

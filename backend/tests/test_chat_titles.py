@@ -221,15 +221,20 @@ async def test_upload_names_chat_after_the_file(
     chat_id, network_id = 1, 100
 
     with patch(
-        "app.services.llm.mcp_client.execute_tool", new_callable=AsyncMock
-    ) as mock_exec, patch(
+        "app.services.network_service.import_graphml", new_callable=AsyncMock
+    ) as mock_import, patch(
+        "app.services.network_service.calculate_layout", new_callable=AsyncMock
+    ), patch(
+        "app.services.network_service.build_visualization", new_callable=AsyncMock
+    ) as mock_vis, patch(
         "app.services.llm.get_event_queue", new_callable=AsyncMock
     ) as mock_get_queue, patch(
         "app.services.llm.context.build_data_overview", new_callable=AsyncMock
     ) as mock_overview, patch(
         "app.core.database.SessionLocal"
     ) as mock_session_cls:
-        mock_exec.return_value = {"network_id": network_id, "nodes": [], "links": []}
+        mock_import.return_value = network_id
+        mock_vis.return_value = {"network_id": network_id, "nodes": [], "links": []}
         mock_overview.return_value = ("", "")
         mock_queue = AsyncMock()
         mock_get_queue.return_value = mock_queue
