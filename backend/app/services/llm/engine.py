@@ -84,8 +84,31 @@ def _order_tool_calls(function_calls: List[FunctionCallData]) -> List[FunctionCa
     return ordered
 
 
-# Max ReAct loop iterations per turn (each iteration = one LLM generate() call).
+# Max working rounds per turn. A round that only loads skills or searches for
+# tools, or whose every call was deferred, prepares work rather than doing it
+# and does not count: in chat 280 seven of ten rounds went to preparation and
+# the turn ended mid-task. HARD_ITERATION_FACTOR bounds the total anyway.
 AGENT_MAX_ITERATIONS = int(os.getenv("AGENT_MAX_ITERATIONS") or 10)
+HARD_ITERATION_FACTOR = 2
+PREPARATION_TOOLS = frozenset({"skill_load", "tool_search"})
+
+# Sent when the budget runs out, so the turn still ends with a report instead
+# of a row of tool cards and no words (chat 280).
+BUDGET_EXHAUSTED_PROMPT = (
+    "[System] This turn's tool budget is used up; tool calls are no longer "
+    "executed. Without calling any tool, write the closing reply to the user in "
+    "their language: what was done, what the results show, and what is left "
+    "undone, with the next step the user can ask for."
+)
+
+
+def _is_preparation_step(step_log: Dict[str, Any]) -> bool:
+    """A round of discovery or deferred calls only, which did no work."""
+    calls = step_log.get("tool_calls") or []
+    return bool(calls) and all(
+        call.get("name") in PREPARATION_TOOLS or call.get("status") == "deferred"
+        for call in calls
+    )
 
 # Register the builtin hooks once per process. Behaviour that used to be
 # hardcoded in this module (auto-rendering, network switching, network_id
@@ -368,7 +391,9 @@ class GraphVisAgent:
         total_usage = self.turn_usage = TurnUsage()
         provider_name = self.provider_name
 
-        while iteration < max_iterations:
+        work_rounds = 0
+        hard_cap = max_iterations * HARD_ITERATION_FACTOR
+        while work_rounds < max_iterations and iteration < hard_cap:
             iteration += 1
             turn_state["iteration"] = iteration
 
@@ -422,6 +447,7 @@ class GraphVisAgent:
                 continuation = await hooks.registry.run_no_tool_calls(no_call_ctx)
 
                 if continuation:
+                    work_rounds += 1
                     turn_state["continuation"] = None
                     turn_state["continuations_granted"] = (
                         turn_state.get("continuations_granted", 0) + 1
@@ -478,6 +504,9 @@ class GraphVisAgent:
                 session,
             )
             execution_log.append(step_log)
+            if not _is_preparation_step(step_log):
+                work_rounds += 1
+            turn_state["work_rounds"] = work_rounds
 
             # Step D: Inject Tool Markers into Transcript and Emit
             if step_log.get("tool_calls"):
@@ -511,6 +540,9 @@ class GraphVisAgent:
                     total_usage,
                 )
 
+            if work_rounds >= max_iterations or iteration >= hard_cap:
+                break
+
             # Step F: Next Generation
             logger.info(f"--- LLM API Request (Iteration {iteration}) ---")
             self._log_history(history, iteration)
@@ -521,7 +553,12 @@ class GraphVisAgent:
                 history, tools, self.system_instruction
             )
 
-        if not full_transcript.strip():
+        # Step G: Budget exhausted with the last round's results still unread.
+        closing = await self._closing_report(
+            history, tool_catalog, turn_state, queue, total_usage, iteration
+        )
+        full_transcript += closing
+        if not markup.visible_text(full_transcript).strip():
             return (
                 "I have completed the requested actions, but the process reached its "
                 "step limit before generating a final report.",
@@ -530,6 +567,59 @@ class GraphVisAgent:
             )
 
         return markup.sanitize_model_output(full_transcript), execution_log, total_usage
+
+    async def _closing_report(
+        self,
+        history: List[LLMMessage],
+        tool_catalog: ToolCatalog,
+        turn_state: Dict[str, Any],
+        queue: Any,
+        total_usage: TurnUsage,
+        iteration: int,
+    ) -> str:
+        """One last generation that reports instead of acting.
+
+        The tools stay declared (a history of tool calls with no tools declared
+        is rejected by some providers); any call the model still makes is
+        dropped, never executed.
+        """
+        logger.warning(
+            "Tool budget exhausted after %s iterations; requesting a closing report",
+            iteration,
+        )
+        self.trace.emit("budget_exhausted", iteration=iteration)
+        history.append(
+            LLMMessage(role="model", parts=[LLMTextPart(text="I will report now.")])
+        )
+        history.append(
+            LLMMessage(role="user", parts=[LLMTextPart(text=BUDGET_EXHAUSTED_PROMPT)])
+        )
+        tools = self._tools_for_generation(tool_catalog, turn_state, iteration=iteration)
+        try:
+            text, thought, dropped_calls, usage = await self._consume_stream(
+                self.provider.generate(history, tools, self.system_instruction), queue
+            )
+        except Exception:
+            logger.exception("Closing report generation failed")
+            return ""
+        if not usage.is_empty:
+            total_usage.add_call(usage)
+            await self._emit_usage_update(
+                queue, total_usage, self.provider_name, self.provider.model_name
+            )
+        if dropped_calls:
+            logger.info(
+                "Dropped %s tool call(s) from the closing report: %s",
+                len(dropped_calls),
+                [call.name for call in dropped_calls],
+            )
+        text = markup.sanitize_model_text(text)
+        closing = ""
+        if thought:
+            closing += f"{markup.thought_block(thought)}\n\n"
+        if text:
+            closing += f"\n\n{text}"
+        return closing
 
     async def _execute_tools_and_update_history(
         self,

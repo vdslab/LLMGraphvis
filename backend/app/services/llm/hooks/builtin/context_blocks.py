@@ -76,7 +76,8 @@ def inject_iteration_budget(ctx: HookContext) -> None:
     ctx.add_context(
         f"# Budget\n"
         f"You have at most {budget} tool-calling rounds in this turn (tool calls made "
-        f"together in one response count as one round). Plan accordingly: batch "
+        f"together in one response count as one round; a round that only calls "
+        f"skill_load or tool_search does not count). Plan accordingly: batch "
         f"independent calls into a single response, and if the task genuinely "
         f"needs more than that, do the most informative part first and tell the "
         f"user what remains."
