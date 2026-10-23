@@ -25,16 +25,19 @@ def search_nodes(
     Args:
         network_id: The ID of the network to search in.
         query: The search string.
-        attribute_name: Optional. If provided, search only within this attribute's values.
+        attribute_name: Optional. If provided, search only within this attribute's
+            values.
                         If None, search against node_id and label.
         limit: Max number of results to return.
         db: Database session.
 
     Returns:
-        List of dicts containing node info (id, node_id, label, and matched attribute if applicable).
+        List of dicts containing node info (id, node_id, label, and matched attribute if
+        applicable).
     """
     logger.info(
-        f"Searching nodes in network {network_id} (query='{query}', attr='{attribute_name}', limit={limit})"
+        f"Searching nodes in network {network_id} (query='{query}', "
+        f"attr='{attribute_name}', limit={limit})"
     )
 
     results = []
@@ -63,7 +66,8 @@ def _search_by_attribute(
     Returns:
         List of matching nodes.
     """
-    # Join: Node -> NodeAttributeValue -> NodeAttribute (filter name) -> NodeTextAttributeValue (filter value)
+    # Join: Node -> NodeAttributeValue -> NodeAttribute (filter name) ->
+    # NodeTextAttributeValue (filter value)
     query_results = (
         db.query(models.Node, models.NodeTextAttributeValue.text_value)
         .join(
@@ -172,7 +176,8 @@ def get_node_details(
         "attributes": {},
     }
 
-    # 1. Fetch all possible attributes for this network to ensure we show the full schema
+    # 1. Fetch all possible attributes for this network to ensure we show the full
+    # schema
     all_attrs = (
         db.query(models.NodeAttribute)
         .filter(models.NodeAttribute.network_id == network_id)

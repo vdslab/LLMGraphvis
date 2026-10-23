@@ -85,7 +85,10 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
                 # COLLISION: Network exists and has data.
                 # Create a NEW network instead of overwriting.
                 new_network = models.Network(
-                    name=f"{network.name} (Uploaded {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')})"
+                    name=(
+                        f"{network.name} (Uploaded "
+                        f"{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')})"
+                    )
                 )
                 db.add(new_network)
                 db.flush()
@@ -93,7 +96,8 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
 
                 # Note: We do NOT delete the old data. We just switch to a new ID.
             else:
-                # Network exists but is empty (e.g. created by Backend chat initialization).
+                # Network exists but is empty (e.g. created by Backend chat
+                # initialization).
                 # No content update needed for Network table anymore.
                 pass
 
@@ -133,7 +137,8 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
                     }
                 )
 
-                # Track attribute type inference during the first pass to avoid extra scans
+                # Track attribute type inference during the first pass to avoid extra
+                # scans
                 for key, val in data.items():
                     if key == "label":
                         continue
@@ -150,7 +155,8 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
                     .values(nodes_data)
                     .returning(models.Node.node_id, models.Node.id)
                 )
-                # No on_conflict needed as we are inserting into a fresh (or verified empty) network ID space
+                # No on_conflict needed as we are inserting into a fresh (or verified
+                # empty) network ID space
                 result = db.execute(stmt)
                 for row in result:
                     node_map[row.node_id] = row.id

@@ -10,7 +10,7 @@ logger = get_logger(__name__)
 async def _fetch_network_resources(
     network_id: int,
 ) -> Tuple[Any, Any, Any, Any]:
-    """Fetch the network's metadata, structure and node/edge attributes in one session."""
+    """Fetch metadata, structure and node/edge attributes in one MCP session."""
     async with mcp_client.session_scope() as session:
         metadata = await mcp_client.get_resource(
             f"network://{network_id}/metadata", session=session
@@ -163,7 +163,7 @@ def _weight_line(structure: Any) -> Optional[str]:
 
 
 def _format_attr_stats(dtype: Optional[str], stats: Optional[Dict[str, Any]]) -> str:
-    """Render an attribute's value range (floats) or top values (strings) as a suffix."""
+    """Render a value range (floats) or top values (strings) as a suffix."""
     if not stats:
         return ""
     if dtype == "float" and "min" in stats and "max" in stats:

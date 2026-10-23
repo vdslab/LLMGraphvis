@@ -19,7 +19,10 @@ logger = get_logger(__name__)
 # Create FastAPI app with Swagger UI configuration
 app = FastAPI(
     title="GraphVisAgent Backend",
-    description="API with authentication support for both browser clients (cookies) and API clients (Bearer tokens).",
+    description=(
+        "API with authentication support for both browser clients (cookies) and API "
+        "clients (Bearer tokens)."
+    ),
     version="1.0.0",
     swagger_ui_parameters={
         "persistAuthorization": True,  # Remember authorization between refreshes

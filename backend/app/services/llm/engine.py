@@ -219,12 +219,14 @@ class GraphVisAgent:
         resumed_from_input: bool = False,
         network_large: bool = False,
     ) -> Tuple[str, List[Dict[str, Any]], UsageData]:
-        """Orchestrates a single turn of the agent (User Input -> [Thoughts/Actions] -> Final Response).
+        """Run one agent turn: user input -> [thoughts/actions] -> final response.
 
         Returns:
             final_text: The string response to the user.
-            execution_log: A list of steps containing tool calls and results for persistence.
-            total_usage: Token usage accumulated across every provider.generate() call this turn.
+            execution_log: A list of steps containing tool calls and results for
+                persistence.
+            total_usage: Token usage accumulated across every provider.generate() call
+                this turn.
         """
         logger.info(
             f"Starting agent turn for Chat ID: {chat_id}, Network ID: {network_id}"
@@ -342,7 +344,7 @@ class GraphVisAgent:
         session: Any,
         turn_state: Optional[Dict[str, Any]] = None,
     ) -> Tuple[str, List[Dict[str, Any]], UsageData]:
-        """Manages the ReAct loop: Consumption -> Execution -> Observation -> Next Generation."""
+        """Run the ReAct loop: consume -> execute -> observe -> generate again."""
         current_stream = initial_stream
         max_iterations = AGENT_MAX_ITERATIONS
         iteration = 0
@@ -424,7 +426,8 @@ class GraphVisAgent:
                         turn_state.get("continuations_granted", 0) + 1
                     )
                     logger.info(
-                        f"Continuation requested by {continuation.get('requested_by')}; regenerating"
+                        "Continuation requested by "
+                        f"{continuation.get('requested_by')}; regenerating"
                     )
                     self.trace.emit(
                         "continuation",
@@ -519,7 +522,8 @@ class GraphVisAgent:
 
         if not full_transcript.strip():
             return (
-                "I have completed the requested actions, but the process reached its step limit before generating a final report.",
+                "I have completed the requested actions, but the process reached its "
+                "step limit before generating a final report.",
                 execution_log,
                 total_usage,
             )
@@ -948,7 +952,8 @@ class GraphVisAgent:
         full dump is DEBUG-only; INFO gets just the size summary.
         """
         logger.info(
-            f"Context sent to LLM (iteration {iteration}): {len(history)} history messages"
+            f"Context sent to LLM (iteration {iteration}): {len(history)} history "
+            "messages"
         )
         if not logger.isEnabledFor(logging.DEBUG):
             return

@@ -22,7 +22,8 @@ def _get_derived_attribute_names(source_network_id: int, db: Session) -> List[st
 
     These are topology-dependent values that become stale once copied into a subgraph
     (a different induced graph), so they are excluded by default when copying attributes
-    into a new subgraph network. This replaces a previously-hardcoded attribute-name list
+    into a new subgraph network. This replaces a previously-hardcoded attribute-name
+    list
     that had drifted out of sync with the real attribute names actually produced by the
     layout/centrality/community logic (e.g. "degree_centrality", "louvain_community").
 
@@ -86,7 +87,8 @@ def create_subgraph_from_nodes(
         {"new_network_id": ..., "name": ...} of the created or reused network.
     """
     logger.info(
-        f"Creating subgraph from network {source_network_id} with {len(node_ids)} nodes (suffix='{suffix}', preserve_layout={preserve_layout})"
+        f"Creating subgraph from network {source_network_id} with {len(node_ids)} "
+        f"nodes (suffix='{suffix}', preserve_layout={preserve_layout})"
     )
 
     # 1. Get Source Network
@@ -175,11 +177,13 @@ def create_subgraph_from_nodes(
         calculate_layout(new_network_id, "forceatlas2", db)
     elif preserve_layout:
         logger.info(
-            f"Preserving existing layout (x, y copied) from {source_network.last_layout_name}."
+            "Preserving existing layout (x, y copied) from "
+            f"{source_network.last_layout_name}."
         )
         # Verify if the specific layout attributes exist?
         # Ideally, AttributeCopier copied everything.
-        # If source_network.last_layout_name was 'forceatlas2', then 'forceatlas2_x' should have been copied.
+        # If source_network.last_layout_name was 'forceatlas2', then 'forceatlas2_x'
+        # should have been copied.
 
     return {"new_network_id": new_network_id, "name": new_network.name}
 
@@ -277,7 +281,11 @@ def _copy_nodes(
 def _copy_edges(
     db: Session, source_network_id: int, new_network_id: int, node_map: Dict[int, int]
 ) -> Dict[int, int]:
-    """Copies edges where both source and target are in node_map. Returns map of old_pk -> new_pk."""
+    """Copies edges where both source and target are in node_map.
+
+    Returns:
+        Map of old_pk -> new_pk.
+    """
     source_edges = (
         db.query(models.Edge)
         .filter(

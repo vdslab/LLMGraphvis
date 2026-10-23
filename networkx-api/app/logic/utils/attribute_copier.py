@@ -33,7 +33,8 @@ class AttributeCopier:
         """
         excluded_attributes = excluded_attributes or []
         logger.info(
-            f"Copying attributes from {source_network_id} to {new_network_id} (excluding: {excluded_attributes})"
+            f"Copying attributes from {source_network_id} to {new_network_id} "
+            f"(excluding: {excluded_attributes})"
         )
 
         # Copy Node Attribute Definitions
@@ -77,7 +78,7 @@ class AttributeCopier:
         model_class,
         excluded_attributes: List[str],
     ) -> Dict[int, int]:
-        """Copies attribute definitions for a given model (NodeAttribute or EdgeAttribute).
+        """Copies attribute definitions of NodeAttribute or EdgeAttribute.
 
         Returns map of old_attr_id -> new_attr_id.
         """
@@ -178,7 +179,8 @@ class AttributeCopier:
 
                 # 2. Fetch back to get IDs
                 # We filter by the new parent IDs we just inserted.
-                # Note: this might fetch values inserted in previous chunks if IDs overlap,
+                # Note: this might fetch values inserted in previous chunks if IDs
+                # overlap,
                 # but id_map keeps 1:1, so new_pks are unique to this chunk's source.
                 new_pks_inserted = list(set([d[parent_col] for d in new_vals_data]))
 
@@ -205,8 +207,10 @@ class AttributeCopier:
 
                 # Fetch float/text values for the old attribute values in this chunk
                 if old_val_ids:
-                    # We also need to chunk this if old_val_ids is too large (e.g. > parameters limit)
-                    # With chunk_size=500 and say 20 attributes -> 10,000 IDs. usually fine.
+                    # We also need to chunk this if old_val_ids is too large (e.g. >
+                    # parameters limit)
+                    # With chunk_size=500 and say 20 attributes -> 10,000 IDs. usually
+                    # fine.
                     # But to be safe, we can process these in sub-chunks if needed.
                     # For 500 nodes, 10k params is okay for Postgres (limit ~32k).
                     # If SQLite (limit 999), this will fail.

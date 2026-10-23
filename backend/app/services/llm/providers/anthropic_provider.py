@@ -37,7 +37,8 @@ def _lowercase_schema_types(schema) -> dict:
         if key == "type" and isinstance(value, str):
             if value != value.lower():
                 logger.debug(
-                    f"_lowercase_schema_types: found non-lowercase type value {value!r} "
+                    "_lowercase_schema_types: found non-lowercase type value "
+                    f"{value!r} "
                     "— this function may not be dead code after all"
                 )
             result[key] = value.lower()
@@ -78,7 +79,8 @@ class AnthropicProvider(LLMProvider):
 
         project_id = os.getenv("VERTEX_PROJECT_ID")
         if project_id:
-            # Anthropic on Vertex AI — uses Google Cloud ADC, no ANTHROPIC_API_KEY needed.
+            # Anthropic on Vertex AI — uses Google Cloud ADC, no ANTHROPIC_API_KEY
+            # needed.
             # Vertex regions for Claude differ from Google's own services.
             region = (
                 os.getenv("ANTHROPIC_VERTEX_REGION")
@@ -86,7 +88,8 @@ class AnthropicProvider(LLMProvider):
                 or DEFAULT_ANTHROPIC_VERTEX_REGION
             )
             logger.info(
-                f"Using Anthropic on Vertex AI (Project: {project_id}, Region: {region})"
+                f"Using Anthropic on Vertex AI (Project: {project_id}, Region: "
+                f"{region})"
             )
             return anthropic.AsyncAnthropicVertex(
                 project_id=project_id, region=region, max_retries=5

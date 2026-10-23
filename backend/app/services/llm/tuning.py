@@ -84,7 +84,9 @@ class TuningField(BaseModel):
     tool: str = Field(
         min_length=1,
         max_length=80,
-        description="Pipeline tool whose argument this row adjusts; must be listed in `tools`.",
+        description=(
+            "Pipeline tool whose argument this row adjusts; must be listed in `tools`."
+        ),
     )
     argument: str = Field(
         pattern=r"^[A-Za-z_][A-Za-z0-9_]{0,63}$",
@@ -120,7 +122,8 @@ class TuningField(BaseModel):
         default=None,
         description="Your recommended value for this data. The panel starts here; it "
         "is shown as a guide and NOT applied. Required when the tool ran with an "
-        "automatic default (pass the reported effective value if you have no better one).",
+        "automatic default (pass the reported effective value if you have no better "
+        "one).",
     )
     rationale: str | None = Field(
         default=None,
@@ -474,7 +477,8 @@ def _build(form: TuningForm, turn_state: dict, network_id: int, earlier=()):
                 bounds = (spec["step"], field.minimum, field.maximum)
                 if any(v is not None and not float(v).is_integer() for v in bounds):
                     raise TuningError(
-                        f"{field.id} is an integer: minimum, maximum and step must be whole"
+                        f"{field.id} is an integer: minimum, maximum and step must be "
+                        "whole"
                     )
 
         recommended = field.suggested
@@ -747,7 +751,11 @@ async def apply_from_agent(
 
 
 def confirm(chat, db, tuning_id, content: str):
-    """Called under the chat row lock. Returns the user message text, or None on retry."""
+    """Confirm a tuning panel. Called under the chat row lock.
+
+    Returns:
+        The user message text, or None on retry.
+    """
     row = (
         db.query(models.ParameterTuning)
         .filter_by(id=tuning_id, chat_id=chat.id)
@@ -861,7 +869,8 @@ def context_block(db, row) -> str:
         lines.append("Recent changes, oldest first:")
         for entry in history[-5:]:
             changed = ", ".join(
-                f"{c['param']} {_format_value(c['before'])} → {_format_value(c['after'])}"
+                f"{c['param']} {_format_value(c['before'])} → "
+                f"{_format_value(c['after'])}"
                 for c in entry["changes"]
             )
             lines.append(f"- {entry['source']}: {changed}")

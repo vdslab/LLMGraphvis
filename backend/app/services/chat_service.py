@@ -136,7 +136,10 @@ async def _handle_background_error(chat_id: int, e: Exception, message: str) -> 
         # Use a fresh session for error logging
         db_error = database.SessionLocal()
         try:
-            error_content = f"I encountered an internal error while processing your request: {str(e)}"
+            error_content = (
+                "I encountered an internal error while processing your request: "
+                f"{str(e)}"
+            )
             db_err_msg = models.ChatMessage(
                 chat_id=chat_id, role="model", content=error_content
             )
@@ -218,7 +221,8 @@ async def handle_upload_background(
                 # Update network_id if collision occurred
                 if final_network_id != network_id:
                     logger.info(
-                        f"Network ID updated from {network_id} to {final_network_id} due to collision/re-upload."
+                        f"Network ID updated from {network_id} to {final_network_id} "
+                        "due to collision/re-upload."
                     )
                     chat.network_id = final_network_id
 
@@ -354,12 +358,14 @@ async def handle_process_background(
     Orchestrates the Agent interaction and persists messages.
     """
     logger.info(
-        f"Background process started for chat_id={chat_id}, message='{user_message[:50]}...'"
+        f"Background process started for chat_id={chat_id}, "
+        f"message='{user_message[:50]}...'"
     )
     db = database.SessionLocal()
     try:
         # Process chat and get response
-        # process_turn now returns (final_text, execution_log, total_usage, provider_name, model_name)
+        # process_turn now returns (final_text, execution_log, total_usage,
+        # provider_name, model_name)
         (
             final_response_text,
             execution_log,

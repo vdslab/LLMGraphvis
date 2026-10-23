@@ -13,7 +13,8 @@ from .providers.types import ToolDefinition
 
 logger = get_logger(__name__)
 
-# NetworkX API Configuration (networkx-api serves on port 8001; see networkx-api/Dockerfile)
+# NetworkX API Configuration (networkx-api serves on port 8001; see
+# networkx-api/Dockerfile)
 NETWORKX_API_URL = os.getenv("NETWORKX_API_URL") or "http://networkx-api:8001"
 SSE_ENDPOINT = f"{NETWORKX_API_URL}/mcp/sse"
 
@@ -202,7 +203,8 @@ def _sanitize_schema(schema: dict) -> dict:
     new_schema = schema.copy()
     if "title" in new_schema:
         del new_schema["title"]
-    # Double check for residual $defs if they weren't caught before (though _resolve handles them)
+    # Double check for residual $defs if they weren't caught before (though _resolve
+    # handles them)
     if "$defs" in new_schema:
         del new_schema["$defs"]
 
@@ -273,7 +275,8 @@ async def execute_tool(tool_name: str, arguments: dict, session: ClientSession =
     Otherwise, it creates a transient session (old behavior).
     """
     logger.info(
-        f"Executing tool: {tool_name} with arguments: {_truncate_args_for_log(arguments)}"
+        f"Executing tool: {tool_name} with arguments: "
+        f"{_truncate_args_for_log(arguments)}"
     )
 
     try:

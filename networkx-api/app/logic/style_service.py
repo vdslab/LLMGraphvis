@@ -58,7 +58,7 @@ def _position(value: float, stats: Tuple) -> float:
 
 
 class StyleService:
-    """Service to handle all styling logic for determining node/edge size, color, and opacity."""
+    """Styling logic: node/edge size, color, and opacity."""
 
     @staticmethod
     def _category_key(value: str) -> str:
@@ -357,7 +357,7 @@ class StyleService:
         custom_color_map: Dict[str, str],
         default_color: str = "#5384ED",
     ) -> str:
-        """Resolve node color based on various strategies (custom, linear, categorical, ranking)."""
+        """Resolve a node color: custom, linear, categorical or ranking."""
         # 1. Custom specific color
         if node_id_str in custom_color_map:
             return custom_color_map[node_id_str]

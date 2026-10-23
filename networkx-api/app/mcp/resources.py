@@ -40,7 +40,7 @@ def get_network_metadata(network_id: int) -> ResourceResult:
 
 @mcp.resource("network://{network_id}/attributes/nodes", mime_type=JSON_MIME)
 def get_node_attributes_resource(network_id: int) -> ResourceResult:
-    """Lists available node attributes with metadata (type, min/max, distinct values)."""
+    """Lists node attributes with metadata (type, min/max, distinct values)."""
     db = database.SessionLocal()
     try:
         return network_metadata.list_node_attributes(db, network_id)

@@ -21,7 +21,8 @@ from .providers.types import UsageData
 # USD per 1,000,000 tokens.
 MODEL_PRICING = {
     # Anthropic — current defaults used by this codebase (see anthropic_provider.py
-    # CLAUDE_MODEL default) plus adjacent tiers, per platform.claude.com/docs/en/pricing.
+    # CLAUDE_MODEL default) plus adjacent tiers, per
+    # platform.claude.com/docs/en/pricing.
     # cache_write is the 5-minute cache TTL rate: 1.25x input.
     "claude-opus-4-8": {
         "input": 5.00,

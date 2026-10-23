@@ -170,17 +170,9 @@ def calculate_smart_edge_width(num_edges: int) -> dict:
     if num_edges <= 0:
         return {"default": 2.0, "min": 0.5, "max": 10.0}
 
-    # Heuristic: Dense graphs need thinner edges
-    # Formula: base = 150 / sqrt(E)
-    # Target:
-    #   E=50   -> ~21?? No wait, 150/7 = 21. Maybe too thick?
-    #   Let's check the plan: Target ~5-8 units for low density.
-    #   150 / sqrt(50) = 21... The plan said 150 but maybe meant a bit less or I should clamp stricter?
-    #   Plan said "Target ~5-8 units".
-    #   If E=50, sqrt(50)=7. 150/7 = 21. That is very thick.
-    #   Maybe 50 / sqrt(E) was better? 50/7 = 7.
-    #   Wait, the plan approved was 150. But 21px edge on 2000px canvas is 1%. That's okay.
-    #   Let's stick to the plan but maybe lower the clamp if it gets too crazy.
+    # Dense graphs need thinner edges: base = 150 / sqrt(E), clamped to
+    # [0.2, 10]. E=50 gives about 21 before the clamp, still only 1% of the
+    # 2000-unit canvas.
     import math
 
     base_width = 150 / math.sqrt(num_edges)

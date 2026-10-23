@@ -25,7 +25,8 @@ logger = get_logger(__name__)
 def clear_network_data(network_id: int, db: Session) -> None:
     """Clears all graph data (nodes, edges, attribute values) for a network.
 
-    Does NOT delete the Network record itself or Attribute Definitions (to preserve schema if reused).
+    Does NOT delete the Network record itself or Attribute Definitions (to preserve
+    schema if reused).
 
     Args:
         network_id: The ID of the network to clear.
@@ -183,7 +184,8 @@ def ensure_attributes(
     Args:
         network_id: The ID of the network.
         attr_types: Dict mapping attribute name to data_type ("float", "string", etc.).
-        model_class: The SQLAlchemy model class for the attribute (NodeAttribute or EdgeAttribute).
+        model_class: The SQLAlchemy model class for the attribute (NodeAttribute or
+            EdgeAttribute).
         db: Database session.
         commit: Whether to commit the transaction.
         descriptions: Optional Dict mapping attribute name to description text.
@@ -443,9 +445,11 @@ def delete_attribute_values(
     """Delete all attribute values for a specific attribute in a network.
 
     Args:
-        network_id: The ID of the network (unused currently but kept for potential future scoping).
+        network_id: The ID of the network (unused currently but kept for potential
+            future scoping).
         attribute_id: The ID of the attribute definition.
-        model_val_class: The model class for values (NodeAttributeValue or EdgeAttributeValue).
+        model_val_class: The model class for values (NodeAttributeValue or
+            EdgeAttributeValue).
         db: Database session.
         commit: Whether to commit the transaction (default: True).
     """
@@ -598,7 +602,8 @@ def get_attribute_stats(
     Args:
         network_id: The ID of the network.
         model_attr: Attribute definition model (NodeAttribute/EdgeAttribute).
-        model_val: Attribute value linking model (NodeAttributeValue/EdgeAttributeValue).
+        model_val: Attribute value linking model
+            (NodeAttributeValue/EdgeAttributeValue).
         model_float: Float value model.
         model_text: Text value model.
         db: Database session.
@@ -671,9 +676,11 @@ def get_attribute_stats(
                     "top_values": [v[0] for v in top_values],
                 }
         except Exception as e:
-            # Fallback if calculation fails, just return name/type to avoid blocking response
+            # Fallback if calculation fails, just return name/type to avoid blocking
+            # response
             logger.error(
-                f"Error calculating stats for {attr.attribute_name} in network {network_id}: {e}"
+                f"Error calculating stats for {attr.attribute_name} in network "
+                f"{network_id}: {e}"
             )
             pass
 
@@ -817,7 +824,8 @@ def get_specific_attribute_stats(
             }
     except Exception as e:
         logger.error(
-            f"Error calculating stats for {attr.attribute_name} in network {network_id}: {e}"
+            f"Error calculating stats for {attr.attribute_name} in network "
+            f"{network_id}: {e}"
         )
         pass
 
@@ -836,12 +844,15 @@ def fetch_attribute_values(
     Args:
         db: Database session.
         model_val: The attribute value model (NodeAttributeValue or EdgeAttributeValue).
-        model_float: The float value model (NodeFloatAttributeValue or EdgeFloatAttributeValue).
-        model_text: The text value model (NodeTextAttributeValue or EdgeTextAttributeValue).
+        model_float: The float value model (NodeFloatAttributeValue or
+            EdgeFloatAttributeValue).
+        model_text: The text value model (NodeTextAttributeValue or
+            EdgeTextAttributeValue).
         attr_ids: List of attribute IDs to fetch values for.
 
     Returns:
-        A dictionary mapping entity_id (node_id or edge_id) to a dictionary of {attribute_id: value}.
+        A dictionary mapping entity_id (node_id or edge_id) to a dictionary of
+        {attribute_id: value}.
         Example: {1: {10: 0.5, 11: "label"}}
     """
     if not attr_ids:

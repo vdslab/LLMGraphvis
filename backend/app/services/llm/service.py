@@ -29,7 +29,7 @@ async def process_chat(
     *,
     resumed_from_input: bool = False,
 ) -> Tuple[str, List[Any], UsageData, str, str]:
-    """Process a chat message using the configured LLM provider with function calling."""
+    """Process a chat message with the configured LLM provider and its tools."""
     logger.info(f"Processing chat_id={chat_id}, message='{user_message[:50]}...'")
     queue = await events.get_event_queue(chat_id)
     agent = None

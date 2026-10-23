@@ -67,15 +67,21 @@ class NodeColorConfig(NumericMapping):
     )
     color_map: Optional[Dict[str, str]] = Field(
         None,
-        description="Dictionary mapping attribute values to hex colors for CATEGORICAL scale.",
+        description=(
+            "Dictionary mapping attribute values to hex colors for CATEGORICAL scale."
+        ),
     )
     palette: Optional[CategoricalPaletteName] = Field(
         None,
-        description="Named categorical palette used to fill values absent from color_map.",
+        description=(
+            "Named categorical palette used to fill values absent from color_map."
+        ),
     )
     ranking_rules: Optional[List[Dict[str, Any]]] = Field(
         None,
-        description="List of rules for RANKING scale (e.g. {'top': 10, 'color': '#FF0000'}).",
+        description=(
+            "List of rules for RANKING scale (e.g. {'top': 10, 'color': '#FF0000'})."
+        ),
     )
     default_color: Optional[str] = Field(
         None, description="Fallback color if attribute is missing or no rule matches."
@@ -92,15 +98,26 @@ class NodeSizeConfig(NumericMapping):
     )
     min: Optional[float] = Field(
         None,
-        description="Min node radius. Prefer leaving as None to allow adaptive sizing (recommended). Example range: 10-200.",
+        description=(
+            "Min node size (area-proportional; rendered radius = "
+            "sqrt(size * 10 / π)). Prefer leaving as None to allow adaptive "
+            "sizing (recommended). Example range: 10-200."
+        ),
     )
     max: Optional[float] = Field(
         None,
-        description="Max node radius. Prefer leaving as None to allow adaptive sizing (recommended). Example range: 20-400.",
+        description=(
+            "Max node size (area-proportional; rendered radius = "
+            "sqrt(size * 10 / π)). Prefer leaving as None to allow adaptive "
+            "sizing (recommended). Example range: 20-400."
+        ),
     )
     default: Optional[float] = Field(
         None,
-        description="Default radius if attribute is missing. Defaults to adaptive value.",
+        description=(
+            "Default size (area-proportional) if attribute is missing. Defaults "
+            "to adaptive value."
+        ),
     )
     scaling_factor: float = Field(
         1.0, description="Multiplier for node sizes (default 1.0)."

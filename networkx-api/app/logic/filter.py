@@ -25,7 +25,8 @@ def create_subgraph_by_filter(
     Within a condition, ranges and categories are combined with OR logic.
     """
     logger.info(
-        f"Filtering nodes in network {network_id} with {len(conditions)} conditions (preserve_layout={preserve_layout})"
+        f"Filtering nodes in network {network_id} with {len(conditions)} conditions "
+        f"(preserve_layout={preserve_layout})"
     )
 
     # Start with all node IDs in the network
@@ -105,7 +106,8 @@ def _get_nodes_matching_condition(
 
     if not attr_record:
         logger.warning(
-            f"Attribute '{attr_name}' not found in network {network_id}. Treating as no match."
+            f"Attribute '{attr_name}' not found in network {network_id}. Treating as "
+            "no match."
         )
         return set()
 
@@ -161,7 +163,8 @@ def _get_nodes_matching_condition(
                 )
 
     if not filters:
-        # If no specific ranges or categories provided, maybe just presence of attribute?
+        # If no specific ranges or categories provided, maybe just presence of
+        # attribute?
         # For now, if no criteria, return all nodes having this attribute.
         pass
     else:

@@ -6,7 +6,8 @@ from common import models
 
 def export_network_to_graphml(network_id: int, db: Session) -> str:
     """Reconstructs the network from the database and returns it as a GraphML string."""
-    # 1. Fetch Network Info (for consistency check, though largely unused in simple GraphML)
+    # 1. Fetch Network Info (for consistency check, though largely unused in simple
+    # GraphML)
     network = db.query(models.Network).filter(models.Network.id == network_id).first()
     if not network:
         raise ValueError(f"Network {network_id} not found")
@@ -36,7 +37,8 @@ def export_network_to_graphml(network_id: int, db: Session) -> str:
 
     if node_attr_defs:
         # Fetch Values
-        # Join NodeAttributeValue with Node to filter by network? Or just filter by attribute IDs which are network-specific.
+        # Join NodeAttributeValue with Node to filter by network? Or just filter by
+        # attribute IDs which are network-specific.
         attr_ids = [a.id for a in node_attr_defs]
 
         # We need to join with proper value tables

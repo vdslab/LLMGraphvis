@@ -201,7 +201,8 @@ class VisualizationBuilder:
                 self.focus_node_values,
             )
 
-        # Smart Inference: If Node Color stats (linear) failed but attribute exists, assume CATEGORICAL
+        # Smart Inference: If Node Color stats (linear) failed but attribute exists,
+        # assume CATEGORICAL
         if self.node_color_config and self.node_color_config.get("attribute"):
             if (
                 not self.node_color_stats[0]
@@ -297,7 +298,8 @@ class VisualizationBuilder:
 
             # Refine scale based on stats similar to resolve logic
             if not self.node_color_stats[0] and scale == "LINEAR":
-                # If stats failed, it might be effectively nothing or categorical fallback
+                # If stats failed, it might be effectively nothing or categorical
+                # fallback
                 pass
 
             info = {"attribute": attr}
@@ -652,7 +654,8 @@ class VisualizationBuilder:
 
         if missing_attrs:
             raise ValueError(
-                f"Missing required attributes for visualization: {', '.join(missing_attrs)}. Please calculate them first."
+                "Missing required attributes for visualization: "
+                f"{', '.join(missing_attrs)}. Please calculate them first."
             )
 
     def _fetch_node_data(self, net_id, attrs):
@@ -733,9 +736,8 @@ class VisualizationBuilder:
             val_model,
             float_val_model,
             text_val_model,
-            list(
-                attr_map.values()
-            ),  # This will include negative IDs but they won't match DB queries, which is fine
+            # Includes negative IDs, which match no DB rows; that is fine.
+            list(attr_map.values()),
         )
 
         # Merge core values

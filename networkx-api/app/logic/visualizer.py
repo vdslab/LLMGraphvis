@@ -86,7 +86,8 @@ def _validate_node_color_config(config: Optional[Dict]):
     if "scale_type" in config:
         if config["scale_type"] not in ["LINEAR", "CATEGORICAL", "RANKING"]:
             raise ValueError(
-                f"Invalid scale_type: {config['scale_type']}. Must be LINEAR, CATEGORICAL, or RANKING."
+                f"Invalid scale_type: {config['scale_type']}. Must be LINEAR, "
+                "CATEGORICAL, or RANKING."
             )
 
 

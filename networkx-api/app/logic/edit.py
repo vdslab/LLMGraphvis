@@ -37,11 +37,14 @@ def update_node_label(
     db.refresh(node)
 
     logger.info(
-        f"Updated node label: Network={network_id}, Node={node_id}, '{old_label}' -> '{new_label}'"
+        f"Updated node label: Network={network_id}, Node={node_id}, '{old_label}' -> "
+        f"'{new_label}'"
     )
 
     return {
         "status": "success",
-        "message": f"Updated label for node '{node_id}' from '{old_label}' to '{new_label}'",
+        "message": (
+            f"Updated label for node '{node_id}' from '{old_label}' to '{new_label}'"
+        ),
         "node": {"id": node.node_id, "label": node.label},
     }

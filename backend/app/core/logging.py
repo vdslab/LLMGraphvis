@@ -26,7 +26,8 @@ def get_logger(name: str) -> logging.Logger:
 
         logger.addHandler(handler)
 
-        # Prevent propagation to root logger to avoid duplicate logs if uvicorn also logs
+        # Prevent propagation to root logger to avoid duplicate logs if uvicorn also
+        # logs
         logger.propagate = False
 
     return logger

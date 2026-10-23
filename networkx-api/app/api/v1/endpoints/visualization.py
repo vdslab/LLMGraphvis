@@ -39,7 +39,8 @@ def generate_visualization(
     """Generates visualization data."""
     try:
         logger.info(
-            f"Generating visualization for network_id={network_id}, layout={request.layout_name}"
+            f"Generating visualization for network_id={network_id}, "
+            f"layout={request.layout_name}"
         )
         return visualizer.generate_visualization_data(
             network_id,

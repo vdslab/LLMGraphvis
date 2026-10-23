@@ -184,7 +184,9 @@ async def export_network(
         content=graphml_data,
         media_type="application/graphml+xml",
         headers={
-            "Content-Disposition": f"attachment; filename=network_{chat.network_id}.graphml"
+            "Content-Disposition": (
+                f"attachment; filename=network_{chat.network_id}.graphml"
+            )
         },
     )
 
@@ -241,7 +243,10 @@ async def upload_network(
         if total_size > MAX_UPLOAD_SIZE:
             raise HTTPException(
                 status_code=413,
-                detail=f"File too large. Maximum size is {MAX_UPLOAD_SIZE // (1024 * 1024)}MB.",
+                detail=(
+                    "File too large. Maximum size is "
+                    f"{MAX_UPLOAD_SIZE // (1024 * 1024)}MB."
+                ),
             )
         chunks.append(chunk)
     content = b"".join(chunks)
@@ -252,7 +257,10 @@ async def upload_network(
     except UnicodeDecodeError:
         raise HTTPException(
             status_code=400,
-            detail="Invalid file encoding. Please upload a valid UTF-8 encoded GraphML file.",
+            detail=(
+                "Invalid file encoding. Please upload a valid UTF-8 encoded GraphML "
+                "file."
+            ),
         )
 
     if "<graphml" not in graphml_data[:4096]:
@@ -457,7 +465,7 @@ async def apply_parameter_tuning(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """Re-run the panel's pipeline with new field values, without the agent (ADR 0016)."""
+    """Re-run the panel's pipeline with new values, without the agent (ADR 0016)."""
     from app.services.llm import tuning
 
     verify_chat_ownership(chat_id, current_user.id, db)
