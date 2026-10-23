@@ -1,9 +1,15 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkBreaks from 'remark-breaks';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
 import remarkColorPreview from '../../utils/remarkColorPreview';
 
-const PLUGINS = [remarkGfm, remarkBreaks, remarkColorPreview];
+const PLUGINS = [remarkGfm, remarkBreaks, remarkMath, remarkColorPreview];
+// `throwOnError: false` shows a malformed formula as red source instead of
+// failing the whole message.
+const REHYPE_PLUGINS = [[rehypeKatex, { throwOnError: false }]];
 
 /**
  * Renders a hex colour as a swatch followed by its code.
@@ -40,7 +46,11 @@ const COMPONENTS = {
 
 const Markdown = ({ children }) => (
   <div className="markdown-content">
-    <ReactMarkdown remarkPlugins={PLUGINS} components={COMPONENTS}>
+    <ReactMarkdown
+      remarkPlugins={PLUGINS}
+      rehypePlugins={REHYPE_PLUGINS}
+      components={COMPONENTS}
+    >
       {children}
     </ReactMarkdown>
   </div>

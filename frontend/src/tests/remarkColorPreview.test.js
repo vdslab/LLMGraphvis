@@ -67,4 +67,15 @@ describe('remarkColorPreview', () => {
   it('ignores headings and non-colour hashes', () => {
     expect(swatches('# Heading\n\nsee #community and #12345')).toEqual([]);
   });
+
+  it('turns a model-drawn HTML swatch into one swatch', () => {
+    expect(swatches(
+      '| 学科 | 色 |\n|---|---|\n| 史学科 | <span style="display:inline-block;background-color:#9467bd;"></span> `#9467bd` |',
+    )).toEqual(['#9467bd']);
+    expect(swatches('<span style="background-color: #ff7f0e"></span>')).toEqual(['#ff7f0e']);
+  });
+
+  it('leaves other HTML alone', () => {
+    expect(swatches('<span style="color:red">x</span> and <b>#1f77b4</b>')).toEqual(['#1f77b4']);
+  });
 });

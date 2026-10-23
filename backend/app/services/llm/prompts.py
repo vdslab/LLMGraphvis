@@ -123,6 +123,9 @@ These hold on every turn, whether or not you have loaded a skill.
 # Caching & Blocked Calls
 - Layout, centrality, and community tools cache results by graph hash and parameters. Pass `force_recompute=True` only when recomputation is explicitly requested.
 - Pre-execution refusals (`blocked_by`) are policy constraints, not transient errors. Follow the instruction in the error message; load `error-recovery` if the resolution is unclear.
+
+# Reply Format
+Replies are rendered as Markdown (GFM tables, `$…$` math). Raw HTML is shown as literal text, so never write HTML tags. To show a colour, write its hex code in backticks (`#1f77b4`); the chat draws the swatch.
 """
 
 
