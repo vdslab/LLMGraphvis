@@ -11,6 +11,7 @@ from .attribute_semantics import (
     IDENTIFIER,
     QUANTITATIVE,
     ROLE_DATA,
+    describe_derived,
     infer_measurement,
     measurement_for_role,
     role_for_source,
@@ -343,7 +344,7 @@ def update_attribute_cache_metadata(
     is_derived: bool = True,
     derived_from: Optional[str] = None,
 ) -> None:
-    """Stamp cache metadata, role and measurement onto an attribute row.
+    """Stamp cache metadata, role, measurement and description onto a row.
 
     Call after (re)computation, and AFTER bulk_save_node_attributes or
     bulk_save_edge_attributes, since that is what creates or refreshes the
@@ -359,6 +360,9 @@ def update_attribute_cache_metadata(
     # The computation knows what its values mean; nothing needs inferring.
     attr.role = role_for_source(derived_from) if is_derived else ROLE_DATA
     attr.measurement = measurement_for_role(attr.role) or attr.measurement
+    if is_derived:
+        # Replaces an imported description too: the values are now computed.
+        attr.description = describe_derived(derived_from, computation_params)
 
     from datetime import datetime, timezone
 
@@ -531,6 +535,25 @@ def _stored_measurement(
         return None
 
 
+def _stored_description(attr: models.Base, db: Session) -> Optional[str]:
+    """The attribute's description, writing one for a computed row without it.
+
+    Rows computed before descriptions existed (ADR 0036) get theirs on first
+    read, the way measurements were filled in.
+    """
+    if attr.description or not attr.is_derived:
+        return attr.description
+    description = describe_derived(attr.derived_from, attr.computation_params)
+    if description:
+        try:
+            attr.description = description
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Could not describe {attr.attribute_name}: {e}")
+    return description
+
+
 def _describe_attribute(
     attr: models.Base,
     model_val: Type[models.Base],
@@ -542,7 +565,7 @@ def _describe_attribute(
     data = {
         "name": attr.attribute_name,
         "data_type": attr.data_type,
-        "description": attr.description,
+        "description": _stored_description(attr, db),
         "role": attr.role or ROLE_DATA,
         "measurement": _stored_measurement(
             attr, model_val, model_float, model_text, db

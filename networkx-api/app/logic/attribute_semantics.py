@@ -135,6 +135,140 @@ def infer_measurement(values: Iterable[Any]) -> Optional[str]:
     return profiler.result()
 
 
+# --- Descriptions of computed values (ADR 0036) -------------------------------
+
+# derived_from -> how to read its values. The tool docstrings say the same, but
+# a tool definition is often not loaded in the turn that later uses the values;
+# the attribute listing is. Parameters themselves are listed beside it, so only
+# what they change about the reading is added below.
+_DERIVED_DESCRIPTIONS = {
+    "centrality:degree": (
+        "Share of the other nodes each node is linked to (0-1); higher means "
+        "more direct contacts."
+    ),
+    "centrality:in_degree": (
+        "Share of the other nodes that link to each node (0-1); higher means "
+        "more incoming edges."
+    ),
+    "centrality:out_degree": (
+        "Share of the other nodes each node links to (0-1); higher means more "
+        "outgoing edges."
+    ),
+    "centrality:betweenness": (
+        "Share of shortest paths between other nodes that pass through each "
+        "node; higher means more of a bridge between parts of the network."
+    ),
+    "centrality:closeness": (
+        "Inverse of the average shortest-path distance from each node to the "
+        "nodes it can reach; higher means closer to everyone else."
+    ),
+    "centrality:eigenvector": (
+        "High when a node is linked to other high-scoring nodes; values only "
+        "compare within this network."
+    ),
+    "centrality:pagerank": (
+        "Share of time a random walk spends at each node (values sum to 1); "
+        "higher means more, and better-linked, edges lead to it."
+    ),
+    "centrality:clustering": (
+        "Share of each node's neighbour pairs that are themselves linked (0-1), "
+        "ignoring weights; higher means a tighter local group."
+    ),
+    "community:louvain": (
+        "Community label from Louvain modularity optimisation. Labels are "
+        "arbitrary names: nodes with the same label are in one community, and "
+        "the numbers have no order or size."
+    ),
+    "community:greedy_modularity": (
+        "Community label from greedy modularity merging. Labels are arbitrary "
+        "names: nodes with the same label are in one community, and the numbers "
+        "have no order or size."
+    ),
+    "community:label_propagation": (
+        "Community label from label propagation, ignoring weights. Labels are "
+        "arbitrary names: nodes with the same label are in one community, and "
+        "the numbers have no order or size."
+    ),
+}
+
+# Readings that replace the default when the run did not normalize.
+_UNNORMALIZED_DESCRIPTIONS = {
+    "centrality:degree": "Number of edges at each node (not normalized).",
+    "centrality:in_degree": "Number of incoming edges at each node (not normalized).",
+    "centrality:out_degree": "Number of outgoing edges at each node (not normalized).",
+    "centrality:betweenness": (
+        "Number of shortest paths between other nodes that pass through each "
+        "node (not normalized); higher means more of a bridge."
+    ),
+}
+
+# How a computation reads an edge weight. Only the sources listed here take one.
+_DISTANCE = "distance"
+_STRENGTH = "strength"
+_WEIGHT_READING = {
+    "centrality:betweenness": _DISTANCE,
+    "centrality:closeness": _DISTANCE,
+    "centrality:eigenvector": _STRENGTH,
+    "centrality:pagerank": _STRENGTH,
+    "community:louvain": _STRENGTH,
+    "community:greedy_modularity": _STRENGTH,
+}
+
+
+def _weight_clause(source: str, params: Dict[str, Any]) -> Optional[str]:
+    reading = _WEIGHT_READING.get(source)
+    # Rows computed before the weight was recorded say nothing either way.
+    if reading is None or "weight" not in params:
+        return None
+    weight = params.get("weight")
+    if not weight:
+        return "Edges were treated as unweighted."
+    if reading == _DISTANCE:
+        return (
+            f"Edge attribute '{weight}' was read as a distance: a heavier edge "
+            f"is a longer, weaker link."
+        )
+    return (
+        f"Edge attribute '{weight}' was read as tie strength: a heavier edge "
+        f"counts more."
+    )
+
+
+def describe_derived(
+    derived_from: Optional[str], params: Optional[Dict[str, Any]]
+) -> Optional[str]:
+    """How to read the values a computation wrote, or None for an unknown source.
+
+    Built from the provenance string and the parameters the run used, so a
+    rerun with other parameters gets a matching description. An unknown source
+    gets None rather than a guess.
+    """
+    if not derived_from:
+        return None
+    params = params or {}
+    if derived_from.startswith("layout:"):
+        layout = derived_from.split(":", 1)[1]
+        return (
+            f"Position from the {layout} layout. Only distances between nodes in "
+            f"this layout mean anything; it is not a property of the node."
+        )
+    text = _DERIVED_DESCRIPTIONS.get(derived_from)
+    if text is None:
+        return None
+    if params.get("normalized") is False:
+        text = _UNNORMALIZED_DESCRIPTIONS.get(derived_from, text)
+    clauses = [text]
+    weight = _weight_clause(derived_from, params)
+    if weight:
+        clauses.append(weight)
+    if derived_from == "centrality:betweenness" and params.get("k"):
+        clauses.append(
+            f"Estimated from {params['k']} sampled nodes, so small differences "
+            f"are noise."
+        )
+    return " ".join(clauses)
+
+
 # --- Encoding fit ------------------------------------------------------------
 
 _NUMERIC_SCALES = {"LINEAR", "RANKING"}

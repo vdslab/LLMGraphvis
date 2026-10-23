@@ -420,3 +420,29 @@ async def test_overview_tells_the_user_a_large_network_can_be_narrowed():
         _title, body = await context.build_data_overview(1)
 
     assert "Large network" in body and "reduce the network" in body
+
+
+@pytest.mark.asyncio
+async def test_context_summary_labels_computed_descriptions_apart():
+    """Imported text is dataset content; a computed attribute's is ours."""
+    nodes = [
+        {
+            "name": "club",
+            "data_type": "string",
+            "is_derived": False,
+            "description": "Club the member joined",
+        },
+        {
+            "name": "pagerank",
+            "data_type": "float",
+            "is_derived": True,
+            "derived_from": "centrality:pagerank",
+            "description": "Share of time a random walk spends at each node.",
+        },
+    ]
+    with _patch_resources(nodes=nodes):
+        summary = await context.build_context_summary(1)
+
+    assert "  Description: Club the member joined" in summary
+    assert "  Meaning: Share of time a random walk spends at each node." in summary
+    assert "`Meaning:` line is written by this system" in summary

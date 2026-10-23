@@ -241,3 +241,114 @@ def test_style_tool_is_silent_when_scale_fits(bound):
     )
     assert "encoding_note" not in tools.visualization_set_node_size(bound, "score")
     assert "encoding_note" not in tools.visualization_set_edge_width(bound, "weight")
+
+
+# --- Descriptions of computed values (ADR 0036) -------------------------------
+
+
+@pytest.mark.parametrize(
+    "centrality_type", ["degree", "betweenness", "closeness", "eigenvector", "pagerank"]
+)
+def test_computed_centrality_is_described(db, centrality_type):
+    from app.logic.centrality import calculate_centrality
+
+    setup_clique_network(db)
+    calculate_centrality(1, centrality_type, db)
+    name = (
+        "pagerank" if centrality_type == "pagerank" else f"{centrality_type}_centrality"
+    )
+
+    assert _attr(db, 1, name).description == sem.describe_derived(
+        f"centrality:{centrality_type}", _attr(db, 1, name).computation_params
+    )
+    assert _attr(db, 1, name).description
+
+
+@pytest.mark.parametrize(
+    "algorithm", ["louvain", "greedy_modularity", "label_propagation"]
+)
+def test_computed_community_is_described(db, algorithm):
+    setup_clique_network(db)
+    name = calculate_community(1, algorithm, db)
+
+    assert "no order" in _attr(db, 1, name).description
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "centrality:in_degree",
+        "centrality:out_degree",
+        "centrality:clustering",
+        "layout:forceatlas2",
+    ],
+)
+def test_every_other_source_has_a_description(source):
+    """Sources the end-to-end tests above cannot reach on an undirected clique."""
+    assert sem.describe_derived(source, {})
+
+
+def test_unknown_source_gets_no_description():
+    assert sem.describe_derived("centrality:made_up", {}) is None
+    assert sem.describe_derived(None, {}) is None
+
+
+@pytest.mark.parametrize(
+    "source, reading",
+    [
+        ("centrality:betweenness", "a distance"),
+        ("centrality:closeness", "a distance"),
+        ("centrality:pagerank", "tie strength"),
+        ("community:louvain", "tie strength"),
+    ],
+)
+def test_description_says_how_the_weight_was_read(source, reading):
+    weighted = sem.describe_derived(source, {"weight": "weight"})
+    assert f"'weight' was read as {reading}" in weighted
+    assert "unweighted" in sem.describe_derived(source, {"weight": None})
+    # An old row that never recorded the weight cannot say either.
+    assert "weight" not in sem.describe_derived(source, {}).lower()
+
+
+def test_description_follows_normalization_and_sampling():
+    assert "Number of edges" in sem.describe_derived(
+        "centrality:degree", {"normalized": False}
+    )
+    assert "0-1" in sem.describe_derived("centrality:degree", {"normalized": True})
+    sampled = sem.describe_derived("centrality:betweenness", {"k": 10})
+    assert "10 sampled nodes" in sampled
+
+
+def test_rerun_rewrites_the_description(db):
+    from app.logic.centrality import calculate_centrality
+
+    setup_clique_network(db)
+    calculate_centrality(1, "degree", db)
+    calculate_centrality(1, "degree", db, normalized=False)
+
+    assert "Number of edges" in _attr(db, 1, "degree_centrality").description
+
+
+def test_listing_describes_rows_computed_before_descriptions(db):
+    setup_clique_network(db)
+    name = calculate_community(1, "louvain", db)
+    row = _attr(db, 1, name)
+    row.description = None
+    db.commit()
+
+    listed = {a["name"]: a for a in network_metadata.list_node_attributes(db, 1)}
+    assert "no order" in listed[name]["description"]
+    db.refresh(row)
+    assert "no order" in row.description
+
+
+def test_imported_description_is_left_alone(db):
+    network_id = _import(db)
+    club = _attr(db, network_id, "club")
+    club.description = "Karate club the member joined"
+    db.commit()
+
+    listed = {
+        a["name"]: a for a in network_metadata.list_node_attributes(db, network_id)
+    }
+    assert listed["club"]["description"] == "Karate club the member joined"
