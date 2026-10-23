@@ -203,8 +203,8 @@ cd frontend      && npm test && npm run lint
 Schema changes need an Alembic revision in `backend/alembic/versions/` and
 `python -m common.schema_doc` (from `backend/`) to regenerate the ER diagram
 `common/schema.md`; a test fails otherwise (ADR 0031). Lint: root
-`pyproject.toml` (ruff, line-length 88; long `Field` descriptions in
-`mcp/tools/` are the E501 exception). There is **no CI**.
+`pyproject.toml` (ruff check and format; its per-file exceptions say why).
+There is **no CI**.
 
 ## Known rough edges
 
