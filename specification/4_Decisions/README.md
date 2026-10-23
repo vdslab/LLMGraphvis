@@ -39,3 +39,4 @@
 | [0030](./0030-attribute-role-and-measurement.md) | 属性に役割と尺度を持たせ、エンコーディングをそこから選ぶ | 採用 |
 | [0031](./0031-generated-schema-diagram.md) | 列レベルの ER 図はモデルから生成し、仕様書には意図の図だけを描く | 採用 |
 | [0032](./0032-agent-turn-trace.md) | エージェントのターンを構造化トレースとして記録する | 採用 |
+| [0036](./0036-derived-attribute-descriptions.md) | 計算した属性に、値の読み方を説明文として保存する | 採用 |
