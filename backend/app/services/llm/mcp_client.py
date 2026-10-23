@@ -78,9 +78,11 @@ def _truncate_args_for_log(arguments: dict) -> dict:
 
 
 async def get_tools() -> list[ToolDefinition]:
-    """
-    Connects to the NetworkXAPI MCP Server, discovers tools,
-    and returns them as provider-agnostic ToolDefinition objects.
+    """Discover the NetworkXAPI MCP server's tools.
+
+    Returns:
+        The tools as provider-agnostic `ToolDefinition` objects, served from a
+        cache while it is fresh.
     """
     global _tools_cache, _tools_cache_at
     if _tools_cache_is_fresh():
@@ -146,8 +148,8 @@ def _mcp_to_tool_definition(mcp_tool) -> ToolDefinition:
 
 
 def _resolve_schema_refs(schema: dict, root: dict) -> dict:
-    """
-    Recursively resolves $ref in JSON schema by looking up definitions in root.
+    """Recursively resolves $ref in JSON schema by looking up definitions in root.
+
     Removes $defs/definitions from the final output.
     """
     if not isinstance(schema, dict):
@@ -233,9 +235,9 @@ def _sanitize_schema(schema: dict) -> dict:
 
 @asynccontextmanager
 async def session_scope():
-    """
-    Context manager that yields a connected ClientSession.
-    Usage:
+    """Context manager that yields a connected ClientSession.
+
+    Example:
         async with session_scope() as session:
              await session.call_tool(...)
     """
@@ -254,9 +256,7 @@ async def session_scope():
 
 
 def _unwrap_exception(e: BaseException) -> BaseException:
-    """
-    Unwraps an ExceptionGroup if it contains only a single exception.
-    """
+    """Unwraps an ExceptionGroup if it contains only a single exception."""
     try:
         if isinstance(e, BaseExceptionGroup):
             if len(e.exceptions) == 1:
@@ -267,8 +267,8 @@ def _unwrap_exception(e: BaseException) -> BaseException:
 
 
 async def execute_tool(tool_name: str, arguments: dict, session: ClientSession = None):
-    """
-    Executes a tool on the NetworkXAPI MCP Server.
+    """Executes a tool on the NetworkXAPI MCP Server.
+
     If 'session' is provided, it uses the existing session.
     Otherwise, it creates a transient session (old behavior).
     """
@@ -364,8 +364,8 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
 
 
 async def get_resource(uri: str, session: ClientSession = None) -> dict | list:
-    """
-    Directly reads a resource from the MCP server.
+    """Directly reads a resource from the MCP server.
+
     Useful for internal context validation.
     """
     try:
@@ -403,9 +403,7 @@ async def _read_resource_internal(session: ClientSession, uri: str) -> dict | li
 
 
 def _log_exception_details(e: BaseException, context: str):
-    """
-    Helper to log exception details, unwrapping ExceptionGroup if present.
-    """
+    """Helper to log exception details, unwrapping ExceptionGroup if present."""
     # Python 3.11+ ExceptionGroup / BaseExceptionGroup handling
     is_group = False
     try:

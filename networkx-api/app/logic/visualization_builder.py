@@ -772,9 +772,7 @@ def _mapping_summary(config: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def get_current_visualization(db: Session, network_id: int) -> Dict[str, Any]:
-    """
-    Retrieves the current visualization state (configs) without re-generating it.
-    """
+    """Retrieves the current visualization state (configs) without re-generating it."""
     network = db.query(models.Network).filter(models.Network.id == network_id).first()
     if not network:
         return {}
@@ -857,8 +855,7 @@ def build_visualization(
     with_quality: bool = False,
     highlight_config: Optional[dict] = None,
 ) -> Dict[str, Any]:
-    """
-    Helper function to instantiate and run VisualizationBuilder.
+    """Helper function to instantiate and run VisualizationBuilder.
 
     `with_quality` adds `layout_quality` (see logic/layout_quality) for the
     agent and the canvas's layout information panel.

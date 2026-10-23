@@ -6,9 +6,7 @@ from app.mcp.tools import subgraph
 
 
 def test_create_k_core_subgraph_success():
-    """
-    Test that the subgraph_k_core tool calls logic correctly.
-    """
+    """Test that the subgraph_k_core tool calls logic correctly."""
     # get_db_context() calls SessionLocal() at runtime, so patching SessionLocal
     # works even though the tool module imported get_db_context directly.
     with patch("app.core.database.SessionLocal") as mock_session_cls:
@@ -54,8 +52,7 @@ def test_create_k_core_subgraph_success():
 
 
 def test_create_k_core_subgraph_error():
-    """
-    Test error handling when logic raises (e.g. empty k-core).
+    """Test error handling when logic raises (e.g. empty k-core).
     handle_tool_errors wraps any exception in a RuntimeError with the
     original message preserved.
     """

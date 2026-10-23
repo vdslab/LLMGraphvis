@@ -125,9 +125,7 @@ MAX_NETWORK_DEPTH = 100
 
 
 class NetworkService:
-    """
-    Service class for handling network-related business logic.
-    """
+    """Service class for handling network-related business logic."""
 
     @staticmethod
     def root_network_id(network_id: int, db: Session) -> Optional[int]:
@@ -151,8 +149,7 @@ class NetworkService:
 
     @staticmethod
     def verify_network_access(network_id: int, user_id: int, db: Session) -> bool:
-        """
-        Verify if a user has access to a specific network.
+        """Verify if a user has access to a specific network.
 
         A user owns every network in the subgraph tree of each of their chats.
         Ownership is decided by the tree's root rather than by the network a

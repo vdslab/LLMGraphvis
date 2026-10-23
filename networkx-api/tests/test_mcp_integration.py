@@ -28,9 +28,7 @@ def mock_builder():
 
 
 def test_initialize_network_structure(mock_importer, mock_layout, mock_builder):
-    """
-    Test that the network_initialize tool calls all logic components correctly.
-    """
+    """Test that the network_initialize tool calls all logic components correctly."""
     mock_importer.return_value = 101  # Final network ID
 
     with patch("app.core.database.SessionLocal") as mock_session_cls:
@@ -52,9 +50,7 @@ def test_initialize_network_structure(mock_importer, mock_layout, mock_builder):
 
 
 def test_resources_execution():
-    """
-    Test that resources open/close DB and call logic.
-    """
+    """Test that resources open/close DB and call logic."""
     with patch("app.core.database.SessionLocal") as mock_session_cls:
         mock_db = MagicMock()
         mock_session_cls.return_value = mock_db
@@ -116,7 +112,8 @@ def test_resources_return_data_not_errors(db):
 
 def test_resources_declare_json_mime_type():
     """The backend parses resource bodies as JSON; FastMCP defaults templates to
-    text/plain unless mime_type is passed explicitly."""
+    text/plain unless mime_type is passed explicitly.
+    """
     templates = mcp._resource_manager._templates.values()
     network_templates = [
         t for t in templates if str(t.uri_template).startswith("network://")

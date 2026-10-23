@@ -32,7 +32,8 @@ line-length = 88
 # pydocstyle under the Google convention. Missing docstrings (D1xx) are not
 # enforced: much existing code predates the convention.
 select = ["E", "F", "I", "W", "D2", "D3", "D4"]
-ignore = []
+# A docstring may open with a lower-case identifier (`nx`, `column`).
+ignore = ["D403"]
 
 # Allow autofix for all enabled rules (when `--fix` is provided).
 fixable = ["ALL"]
@@ -48,6 +49,17 @@ unfixable = []
 # Import order is registration order, which is the order list_tools returns.
 "networkx-api/app/mcp/tools/**/__init__.py" = ["I001"]
 "networkx-api/app/mcp_server.py" = ["I001"]
+# Docstring format is enforced on application code only, not on tests,
+# migrations or ad-hoc scripts.
+"**/tests/**" = ["D"]
+"backend/alembic/**" = ["D"]
+"networkx-api/scripts/**" = ["D"]
+"**/verify_*.py" = ["D"]
+"**/repro*.py" = ["D"]
+"backend/experiment_thinking.py" = ["D"]
+"backend/inspect_sdk.py" = ["D"]
+"networkx-api/list_networks.py" = ["D"]
+"networkx-api/test_schema.py" = ["D"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

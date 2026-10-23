@@ -41,9 +41,7 @@ def _issue_token(response: Response, user: models.User) -> Dict[str, str]:
 def register(
     user: schemas.UserCreate, response: Response, db: Session = Depends(database.get_db)
 ):
-    """
-    Register a new user with username and password.
-    """
+    """Register a new user with username and password."""
     db_user = (
         db.query(models.User).filter(models.User.username == user.username).first()
     )
@@ -65,8 +63,8 @@ def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(database.get_db),
 ):
-    """
-    OAuth2 compatible token login, get an access token for future requests.
+    """OAuth2 compatible token login, get an access token for future requests.
+
     This endpoint is used by the Swagger UI for authentication.
     """
     user = (
@@ -112,8 +110,7 @@ async def get_current_user(
     bearer_payload: Optional[Dict[str, Any]] = Depends(auth.get_token_payload),
     access_token: Optional[str] = Cookie(None),
 ):
-    """
-    Get the current authenticated user.
+    """Get the current authenticated user.
 
     This uses the Bearer token first (for API/Swagger clients) but also supports
     cookie-based auth for browser clients. A token whose `ver` no longer matches
@@ -136,8 +133,8 @@ async def get_current_user(
 
 @router.get("/users/me", response_model=schemas.User)
 def read_users_me(current_user: models.User = Depends(get_current_user)):
-    """
-    Get details of the currently authenticated user.
+    """Get details of the currently authenticated user.
+
     Used to test authentication in Swagger UI.
     """
     return current_user
@@ -150,8 +147,7 @@ def change_password(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """
-    Change the current user's password.
+    """Change the current user's password.
 
     Signs the user out of every other session (their tokens carry the old
     `token_version`) and returns a fresh token for this one.
@@ -173,8 +169,8 @@ def change_password(
 
 @router.post("/logout")
 def logout(response: Response):
-    """
-    Logout a user by removing the authentication cookie.
+    """Logout a user by removing the authentication cookie.
+
     Note: For API clients using Bearer tokens, the token remains valid until it
     expires or the password is changed.
     """

@@ -29,7 +29,7 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 
 
 def verify_chat_ownership(chat_id: int, user_id: int, db: Session) -> models.Chat:
-    """Verify user owns the chat and return it"""
+    """Verify user owns the chat and return it."""
     chat = (
         db.query(models.Chat)
         .filter(models.Chat.id == chat_id, models.Chat.user_id == user_id)
@@ -63,7 +63,7 @@ def list_chats(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """Get all chats for the current user"""
+    """Get all chats for the current user."""
     chats = (
         db.query(models.Chat)
         .filter(models.Chat.user_id == current_user.id)
@@ -79,7 +79,7 @@ async def get_chat(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """Get specific chat with network information"""
+    """Get specific chat with network information."""
     chat = verify_chat_ownership(chat_id, current_user.id, db)
 
     try:
@@ -133,7 +133,7 @@ def get_messages(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """Get all messages for a specific chat"""
+    """Get all messages for a specific chat."""
     from sqlalchemy.orm import joinedload
 
     # Verify ownership
@@ -392,7 +392,7 @@ def update_chat(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """Update a chat (e.g. rename, or pin its LLM provider/model)"""
+    """Update a chat (e.g. rename, or pin its LLM provider/model)."""
     logger.info(f"Updating chat {chat_id} with data: {chat_update}")
     chat = verify_chat_ownership(chat_id, current_user.id, db)
 

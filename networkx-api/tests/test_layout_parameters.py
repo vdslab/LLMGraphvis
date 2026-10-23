@@ -130,7 +130,8 @@ class TestLayoutParamKeys:
 
 class TestRegistry:
     """The registry is the single declaration of each layout; these check that
-    nothing that used to be a parallel list has drifted from it."""
+    nothing that used to be a parallel list has drifted from it.
+    """
 
     def test_every_layout_is_callable_and_declares_parameters(self):
         for name, spec in SPECS.items():
@@ -140,7 +141,8 @@ class TestRegistry:
 
     def test_weight_is_allowlisted_exactly_for_weight_aware_layouts(self):
         """A layout that takes a weight must be able to pass it to networkx, and
-        one that does not must not advertise it."""
+        one that does not must not advertise it.
+        """
         for name, spec in SPECS.items():
             assert spec.accepts_weight == ("weight" in spec.params), name
 
@@ -159,7 +161,8 @@ class TestRegistry:
 
     def test_mcp_tools_expose_weight_exactly_where_the_layout_takes_one(self):
         """The tool signature is prompt surface: offering `weight` on a layout
-        that ignores it, or hiding it on one that uses it, misleads the model."""
+        that ignores it, or hiding it on one that uses it, misleads the model.
+        """
         from app.mcp.tools import layout as layout_tools
 
         for name, spec in SPECS.items():
@@ -252,7 +255,8 @@ def weights_seen_by(layout_name, nx_name, db, overrides=None, network_id=1):
 class TestEdgeWeights:
     def test_weight_parameter_builds_a_weighted_graph(self, db):
         """Without this the graph carried no weight attribute, so nx's default
-        weight='weight' silently degraded to unweighted."""
+        weight='weight' silently degraded to unweighted.
+        """
         setup_graph(db, weighted=True)
         seen = weights_seen_by("spring", "spring_layout", db, {"weight": "weight"})
         assert all("weight" in d for d in seen["edge_data"])
@@ -276,7 +280,8 @@ class TestEdgeWeights:
 
     def test_uniform_weights_are_left_alone(self, db):
         """Every edge weighing the same lays out identically either way, so the
-        slower weighted path buys nothing."""
+        slower weighted path buys nothing.
+        """
         setup_graph(db, weights=[2.0] * 5)
         seen = weights_seen_by("spring", "spring_layout", db)
         assert all(d == {} for d in seen["edge_data"])
@@ -302,7 +307,8 @@ class TestEdgeWeights:
 
     def test_opting_out_is_not_served_from_the_weighted_cache(self, db):
         """The resolved weight is part of the cache key, so the unweighted run
-        recomputes instead of returning the weighted coordinates."""
+        recomputes instead of returning the weighted coordinates.
+        """
         setup_graph(db, weighted=True)
         calculate_layout(1, "spring", db)
         weighted_pos = load_layout_positions(1, "spring", db)
@@ -311,7 +317,8 @@ class TestEdgeWeights:
 
     def test_kamada_kawai_is_not_weighted_by_default(self, db):
         """Its `weight` is a target distance, not a strength — enabling it
-        automatically would push strongly connected nodes apart."""
+        automatically would push strongly connected nodes apart.
+        """
         setup_graph(db, weighted=True)
         seen = weights_seen_by("kamada_kawai", "kamada_kawai_layout", db)
         assert seen["weight_kwarg"] is None
@@ -331,7 +338,8 @@ class TestEdgeWeights:
     def test_other_numeric_attributes_are_offered_never_chosen(self, db):
         """A second numeric edge attribute could be a distance, a year or an id.
         Only the imported weight has a known meaning, so the rest are named in
-        the message and left to the caller."""
+        the message and left to the caller.
+        """
         setup_graph(db, weighted=True)
         add_edge_attribute(db, 1, "cooccurrence", [9.0, 8.0, 7.0, 6.0, 5.0])
         seen = weights_seen_by("spring", "spring_layout", db)
@@ -341,7 +349,8 @@ class TestEdgeWeights:
 
     def test_candidates_are_offered_when_there_is_no_usable_weight(self, db):
         """Uniform imported weights, but the file carries a numeric attribute:
-        the layout stays unweighted and says what could be used instead."""
+        the layout stays unweighted and says what could be used instead.
+        """
         setup_graph(db, weights=[1.0] * 5)
         add_edge_attribute(db, 1, "cost", [4.0, 3.0, 2.0, 1.0, 5.0])
         seen = weights_seen_by("spring", "spring_layout", db)
@@ -441,7 +450,8 @@ class TestWarmStart:
 
     def test_pos_is_digested_not_stored_verbatim(self, db):
         """A coordinate dict per node would bloat computation_params, but dropping
-        it entirely would break invalidation — so it is reduced to a digest."""
+        it entirely would break invalidation — so it is reduced to a digest.
+        """
         setup_graph(db)
         calculate_layout(1, "circular", db)
         calculate_layout(1, "spring", db, overrides={"init_from_layout": "circular"})

@@ -2,8 +2,8 @@ import networkx as nx
 
 
 def resolve_node_id(G: nx.Graph, node_id_input: str) -> str:
-    """
-    Tries to resolve the node_id_input to a node in G.
+    """Tries to resolve the node_id_input to a node in G.
+
     Handles cases where LLM adds 'Node ' prefix or similar.
     """
     if node_id_input in G:

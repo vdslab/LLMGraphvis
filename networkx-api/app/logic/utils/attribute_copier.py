@@ -9,9 +9,7 @@ logger = get_logger(__name__)
 
 
 class AttributeCopier:
-    """
-    Helper class to copy node and edge attributes from one network to another.
-    """
+    """Helper class to copy node and edge attributes from one network to another."""
 
     def __init__(self, db: Session):
         self.db = db
@@ -24,8 +22,7 @@ class AttributeCopier:
         edge_map: Dict[int, int],
         excluded_attributes: List[str] = None,
     ):
-        """
-        Copies both node and edge attributes definitions and values.
+        """Copies both node and edge attributes definitions and values.
 
         Args:
             source_network_id: ID of source network
@@ -80,8 +77,8 @@ class AttributeCopier:
         model_class,
         excluded_attributes: List[str],
     ) -> Dict[int, int]:
-        """
-        Copies attribute definitions for a given model (NodeAttribute or EdgeAttribute).
+        """Copies attribute definitions for a given model (NodeAttribute or EdgeAttribute).
+
         Returns map of old_attr_id -> new_attr_id.
         """
         source_attrs = (

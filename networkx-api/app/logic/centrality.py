@@ -219,8 +219,7 @@ def calculate_centrality(
 def get_top_nodes(
     network_id: int, metric: str, k: int, order: str, db: Session
 ) -> List[Dict[str, Any]]:
-    """
-    Returns the top k nodes based on an already-computed numeric node attribute.
+    """Returns the top k nodes based on an already-computed numeric node attribute.
 
     `metric` is the exact saved attribute name (e.g. "degree_centrality",
     "pagerank", "clustering") as reported by the analysis tool that computed

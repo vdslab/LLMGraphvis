@@ -133,8 +133,7 @@ def search_nodes(
     limit: int = 10,
     db: Session = Depends(get_db),
 ):
-    """
-    Search for nodes in a network.
+    """Search for nodes in a network.
 
     - **q**: Search query string.
     - **attribute**: (Optional) Filter by specific attribute name.
@@ -150,9 +149,7 @@ def search_nodes(
 
 @router.get("/{network_id}/nodes/{node_id}")
 def get_node_details(network_id: int, node_id: str, db: Session = Depends(get_db)):
-    """
-    Get full details for a specific node.
-    """
+    """Get full details for a specific node."""
     try:
         details = search.get_node_details(network_id, node_id, db)
         if not details:
@@ -227,9 +224,7 @@ def update_network_metadata(
 def create_subgraph_by_filter_endpoint(
     network_id: int, request: SubgraphFilterRequest, db: Session = Depends(get_db)
 ):
-    """
-    Creates a subgraph by filtering nodes based on attributes.
-    """
+    """Creates a subgraph by filtering nodes based on attributes."""
     try:
         logger.info(f"Received filter request for network {network_id}")
         result = filter.create_subgraph_by_filter(

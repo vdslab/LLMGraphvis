@@ -8,9 +8,7 @@ from app.services.llm.providers.types import UsageData
 
 @pytest.mark.asyncio
 async def test_handle_process_background_success(db):
-    """
-    Test that process_background calls LLM service and saves messages.
-    """
+    """Test that process_background calls LLM service and saves messages."""
     # Setup
     chat_id = 1
     user_message = "Hello AI"
@@ -62,8 +60,7 @@ async def test_handle_process_background_success(db):
 
 @pytest.mark.asyncio
 async def test_handle_upload_background_success(db):
-    """
-    The upload runs import -> layout -> visualization over networkx-api's REST
+    """The upload runs import -> layout -> visualization over networkx-api's REST
     routes, never as MCP tools (ADR 0035), and updates the chat.
     """
     chat_id = 1
@@ -123,7 +120,8 @@ async def test_handle_upload_background_success(db):
 @pytest.mark.asyncio
 async def test_process_chat_failure_emits_agent_error(db):
     """A backend failure must not be sent as an SSE event named `error`:
-    EventSource routes that name to onerror, which shows a lost connection."""
+    EventSource routes that name to onerror, which shows a lost connection.
+    """
     import asyncio
     import json
 

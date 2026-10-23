@@ -5,8 +5,7 @@ from common import models
 
 
 def test_subgraph_fresh_view(db: Session):
-    """
-    Test 'Fresh View' (preserve_layout=False):
+    """Test 'Fresh View' (preserve_layout=False):
     - Should exclude 'x', 'y' from source.
     - Should exclude topological metrics (e.g. 'degree').
     - Should calculate new layout.
@@ -152,8 +151,7 @@ def test_subgraph_fresh_view(db: Session):
 
 
 def test_subgraph_cutout_view(db: Session):
-    """
-    Test 'Cutout View' (preserve_layout=True):
+    """Test 'Cutout View' (preserve_layout=True):
     - Should KEEP 'x', 'y' from source.
     - Should exclude topological metrics (e.g. 'degree').
     """

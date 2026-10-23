@@ -138,14 +138,17 @@ def resolve_chat_model(chat: Any) -> Tuple[Optional[str], Optional[str]]:
 def create_provider(
     provider_name: Optional[str] = None, model_name: Optional[str] = None
 ) -> LLMProvider:
-    """Build a provider the way the agent does, for callers outside the ReAct loop
-    (e.g. the one-shot title generation in titles.py)."""
+    """Build a provider the way the agent does.
+
+    For callers outside the ReAct loop, e.g. the one-shot title generation in
+    titles.py.
+    """
     return _create_provider(resolve_provider_name(provider_name), model_name)
 
 
 class GraphVisAgent:
-    """
-    Agent service for Graph Visualization (Single Agent Mode).
+    """Agent service for Graph Visualization (Single Agent Mode).
+
     Encapsulates the LLM interaction loop, tool execution, and state management.
     """
 
@@ -216,8 +219,8 @@ class GraphVisAgent:
         resumed_from_input: bool = False,
         network_large: bool = False,
     ) -> Tuple[str, List[Dict[str, Any]], UsageData]:
-        """
-        Orchestrates a single turn of the agent (User Input -> [Thoughts/Actions] -> Final Response).
+        """Orchestrates a single turn of the agent (User Input -> [Thoughts/Actions] -> Final Response).
+
         Returns:
             final_text: The string response to the user.
             execution_log: A list of steps containing tool calls and results for persistence.
@@ -535,7 +538,6 @@ class GraphVisAgent:
         session: Any,
     ) -> Dict[str, Any]:
         """Execute tools in dependency-safe order and return a step log."""
-
         # Visible prose produced so far in this turn, for PRE_TOOL hooks that
         # care whether the model has said anything to the user yet (see
         # `guard_question_needs_prose`). Thought blocks are excluded: they are
@@ -715,6 +717,7 @@ class GraphVisAgent:
         turn_state: Dict[str, Any],
     ) -> Tuple[Any, str, Optional[str], str, Any, Any]:
         """Run PRE_TOOL hooks, then the tool, emitting SSE events around it.
+
         Returns (result, status, error_msg, feature_name, started_at, completed_at).
         """
         from datetime import datetime, timezone

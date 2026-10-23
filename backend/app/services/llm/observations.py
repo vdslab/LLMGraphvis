@@ -120,10 +120,10 @@ def truncate_tool_result(result: Any, max_list_items: int = MAX_LIST_ITEMS) -> A
 
 
 def serialize_observation(result: Any) -> str:
-    """Text form of an observation for providers that take tool results as text.
+    r"""Text form of an observation for providers that take tool results as text.
 
     Non-ASCII stays literal: escaping turns each Japanese character into six
-    ASCII characters (`\\u30e2`), several times the tokens of the character
+    ASCII characters (`\u30e2`), several times the tokens of the character
     itself, and this app's data and users are largely Japanese.
     """
     if isinstance(result, str):

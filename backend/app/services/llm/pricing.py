@@ -1,5 +1,4 @@
-"""
-Estimated USD cost of LLM calls, from normalized token usage.
+"""Estimated USD cost of LLM calls, from normalized token usage.
 
 Every provider adapter reports `UsageData` with one meaning (see its docstring
 and ADR 0025): `input_tokens` includes cache reads and writes, `output_tokens`

@@ -98,8 +98,8 @@ def get_subgraphs(db: Session, network_id: int) -> List[Dict[str, Any]]:
 
 
 def get_visualization_state(db: Session, network_id: int) -> Dict[str, Any]:
-    """
-    Returns the current visualization state including color maps.
+    """Returns the current visualization state including color maps.
+
     This is crucial for understanding what the user sees (e.g. "Community 0 is Blue").
     """
     network = db.query(models.Network).filter(models.Network.id == network_id).first()

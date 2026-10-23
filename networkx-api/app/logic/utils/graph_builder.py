@@ -137,8 +137,8 @@ def _load_edge_attribute_weights(
 def build_graph_from_db(
     network_id: int, db: Session, weight_attribute: Optional[str] = None
 ) -> nx.Graph:
-    """
-    Reconstructs a NetworkX graph from the database for a given network_id.
+    """Reconstructs a NetworkX graph from the database for a given network_id.
+
     Optimized to fetch only necessary ID columns.
 
     Args:

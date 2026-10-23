@@ -93,7 +93,8 @@ async def test_pipeline_steps_are_progress_events_not_thinking():
 @pytest.mark.asyncio
 async def test_last_step_is_reported_finished():
     """Without a closing 'done', the UI would show the final step spinning
-    forever whenever the turn produces no further events."""
+    forever whenever the turn produces no further events.
+    """
     events, _, _ = await _run_upload()
 
     progress = [json.loads(e["data"]) for e in events if e["event"] == "progress"]
@@ -134,7 +135,8 @@ async def test_message_omits_the_collapsible_when_there_is_no_overview():
 async def test_upload_names_the_network_after_the_file():
     """A network is created as "<chat name> Network" before anything is in it,
     so leaving that name in place reports "New Chat Network" to the user and to
-    the agent as if it were the graph's own."""
+    the agent as if it were the graph's own.
+    """
     _, _, network = await _run_upload()
 
     assert network.name == "karate club"
@@ -150,7 +152,8 @@ async def test_upload_leaves_a_real_network_name_alone():
 @pytest.mark.asyncio
 async def test_a_failed_step_is_saved_with_its_name_and_error():
     """A failed upload used to stop the spinner and leave nothing behind, so
-    the user could not tell a stall from a broken file."""
+    the user could not tell a stall from a broken file.
+    """
     from app.services.network_service import NetworkPipelineError
 
     events, content, _ = await _run_upload(

@@ -2,9 +2,7 @@ import colorsys
 
 
 def normalize(value, min_val, max_val, target_min, target_max):
-    """
-    Normalize a value to a target range.
-    """
+    """Normalize a value to a target range."""
     if max_val == min_val:
         return target_min
     return target_min + ((value - min_val) / (max_val - min_val)) * (
@@ -15,9 +13,7 @@ def normalize(value, min_val, max_val, target_min, target_max):
 def interpolate_color(
     value: float, min_val: float, max_val: float, start_color: str, end_color: str
 ) -> str:
-    """
-    Interpolate between two colors (hex or names).
-    """
+    """Interpolate between two colors (hex or names)."""
     if max_val == min_val:
         return start_color
 
@@ -100,8 +96,8 @@ def interpolate_color(
 def interpolate_gradient(
     value: float, min_val: float, max_val: float, colors: list[str]
 ) -> str:
-    """
-    Interpolate color from a list of colors (gradient stops).
+    """Interpolate color from a list of colors (gradient stops).
+
     Distributes stops evenly across the range [min_val, max_val].
     """
     if not colors:
@@ -142,8 +138,8 @@ def interpolate_gradient(
 
 
 def calculate_smart_node_size(num_nodes: int) -> dict:
-    """
-    Calculate smart default node sizes based on graph size.
+    """Calculate smart default node sizes based on graph size.
+
     Returns a dict with 'default', 'min', 'max'.
     """
     if num_nodes <= 0:
@@ -167,8 +163,8 @@ def calculate_smart_node_size(num_nodes: int) -> dict:
 
 
 def calculate_smart_edge_width(num_edges: int) -> dict:
-    """
-    Calculate smart default edge widths based on graph size (number of edges).
+    """Calculate smart default edge widths based on graph size (number of edges).
+
     Returns a dict with 'default', 'min', 'max'.
     """
     if num_edges <= 0:

@@ -15,10 +15,10 @@ logger = get_logger(__name__)
 
 
 def _get_derived_attribute_names(source_network_id: int, db: Session) -> List[str]:
-    """
-    Returns the set of attribute names (node- and edge-side combined) on the SOURCE
-    network that are marked `is_derived=True` (layout coordinates, centrality scores,
-    community labels, etc.).
+    """Names of the SOURCE network's derived attributes, node and edge combined.
+
+    Derived means marked `is_derived=True`: layout coordinates, centrality
+    scores, community labels, etc.
 
     These are topology-dependent values that become stale once copied into a subgraph
     (a different induced graph), so they are excluded by default when copying attributes
@@ -62,15 +62,28 @@ def create_subgraph_from_nodes(
     initialize_layout: bool = True,
     reuse_existing: bool = True,
 ) -> Dict[str, Any]:
-    """
-    Creates a new network as a subgraph containing the specified nodes.
+    """Creates a new network as a subgraph containing the specified nodes.
+
+    Topological metrics (degree, centrality, etc.) are ALWAYS excluded from the
+    copied attributes, since they would be wrong for the subgraph.
 
     Args:
-        preserve_layout (bool):
-            If True, copies 'x' and 'y' attributes to keep node positions ("Cutout View").
-            If False, excludes 'x' and 'y', forcing a new layout calculation ("Fresh View").
+        source_network_id: The network the nodes are taken from.
+        node_ids: GraphML ids of the nodes to keep.
+        db: Database session.
+        suffix: Name of the new network. The default "Subgraph" instead names
+            it after the node ids.
+        preserve_layout: If True, copies 'x' and 'y' attributes to keep node
+            positions ("Cutout View"). If False, excludes them, forcing a new
+            layout calculation ("Fresh View").
+        description: Description stored on the new network.
+        initialize_layout: Whether to compute a ForceAtlas2 layout for the
+            new network when the layout is not preserved.
+        reuse_existing: Return an existing subgraph of the same name and nodes
+            instead of creating a duplicate.
 
-            NOTE: Topological metrics (degree, centrality, etc.) are ALWAYS excluded to ensure correctness.
+    Returns:
+        {"new_network_id": ..., "name": ...} of the created or reused network.
     """
     logger.info(
         f"Creating subgraph from network {source_network_id} with {len(node_ids)} nodes (suffix='{suffix}', preserve_layout={preserve_layout})"
@@ -225,9 +238,7 @@ def _determine_subgraph_name(node_ids: List[str], suffix: str) -> str:
 def _copy_nodes(
     db: Session, source_network_id: int, new_network_id: int, node_ids: List[str]
 ) -> Dict[int, int]:
-    """
-    Copies nodes from source to new network. Returns map of old_pk -> new_pk.
-    """
+    """Copies nodes from source to new network. Returns map of old_pk -> new_pk."""
     source_nodes = (
         db.query(models.Node)
         .filter(
@@ -266,9 +277,7 @@ def _copy_nodes(
 def _copy_edges(
     db: Session, source_network_id: int, new_network_id: int, node_map: Dict[int, int]
 ) -> Dict[int, int]:
-    """
-    Copies edges where both source and target are in node_map. Returns map of old_pk -> new_pk.
-    """
+    """Copies edges where both source and target are in node_map. Returns map of old_pk -> new_pk."""
     source_edges = (
         db.query(models.Edge)
         .filter(

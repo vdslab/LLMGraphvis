@@ -9,9 +9,11 @@ class LLMProvider(ABC):
 
     @property
     def supports_native_thinking(self) -> bool:
-        """Whether this provider/model surfaces reasoning via a native "thinking"
-        stream (StreamChunk.thought) rather than requiring the model to write
-        literal <thought> tags in its regular text output.
+        """Whether this provider/model streams its reasoning natively.
+
+        Native reasoning arrives as a "thinking" stream (StreamChunk.thought)
+        instead of literal <thought> tags the model writes in its regular text
+        output.
 
         The engine uses this to decide which system-prompt variant to send:
         providers with native thinking must NOT also be asked to hand-write

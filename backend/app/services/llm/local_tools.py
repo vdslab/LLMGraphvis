@@ -24,8 +24,8 @@ def _get_chat_and_network(chat_id: int, db: Session):
 
 
 async def switch_to_main_network(chat_id: int, db: Session) -> dict:
-    """
-    Switches the chat context back to the main (root) network.
+    """Switches the chat context back to the main (root) network.
+
     Use this when the user wants to go back to the original full graph.
     """
     try:
@@ -58,8 +58,8 @@ async def switch_to_main_network(chat_id: int, db: Session) -> dict:
 
 
 async def switch_to_parent_network(chat_id: int, db: Session) -> dict:
-    """
-    Switches the chat context to the parent network of the current subgraph.
+    """Switches the chat context to the parent network of the current subgraph.
+
     Use this when the user wants to go up one level in the hierarchy.
     """
     try:
@@ -103,8 +103,7 @@ NO_MATCH_NOTE = (
 
 
 async def skill_load(name: str, turn_state: dict) -> dict:
-    """
-    Loads the full text of a skill (a stored procedure for one kind of task).
+    """Loads the full text of a skill (a stored procedure for one kind of task).
 
     The system prompt lists only skill names and one-line descriptions; the
     procedures themselves are fetched through this tool so a turn only pays for

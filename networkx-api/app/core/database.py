@@ -29,9 +29,9 @@ def get_db():
 
 @contextlib.contextmanager
 def get_db_context():
-    """
-    Context manager for database sessions.
-    Usage:
+    """Context manager for database sessions.
+
+    Example:
         with get_db_context() as db:
             db.query(...)
     """

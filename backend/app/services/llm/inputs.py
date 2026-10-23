@@ -174,11 +174,11 @@ class InputForm(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def normalize_fields_input(cls, value):
-        """Recover from malformed model outputs for the fields parameter.
+        r"""Recover from malformed model outputs for the fields parameter.
 
         Models (notably Claude/Anthropic) occasionally emit tool calls where:
         1. `fields` is a JSON-encoded string, sometimes prefixed or wrapped by
-           internal XML tags such as `\\n<parameter name="fields">[{"id": ...}]`.
+           internal XML tags such as `\n<parameter name="fields">[{"id": ...}]`.
         2. `fields` is a single dict rather than a list of dicts.
         3. Field parameters (`id`, `label`, `kind`, `options`) are flattened
            into the top-level arguments dictionary rather than nested under `fields`.

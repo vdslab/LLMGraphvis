@@ -1,5 +1,7 @@
-"""Tuning panel exposure, the nudge to offer it (ADR 0016), and the question of
-how to tune a force layout just drawn (ADR 0018).
+"""Hooks for the parameter-tuning panel.
+
+Covers the panel's exposure, the nudge to offer it (ADR 0016), and the
+question of how to tune a force layout just drawn (ADR 0018).
 
 `offer_parameter_tuning` is useless before a pipeline exists, so it is not in
 the initial exposure set (ADR 0010). It appears the moment an analysis, layout

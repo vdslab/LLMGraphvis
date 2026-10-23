@@ -35,9 +35,7 @@ def setup_db_schema():
 
 @pytest.fixture(scope="function")
 async def async_client(db):
-    """
-    Async client for testing async endpoints.
-    """
+    """Async client for testing async endpoints."""
 
     def override_get_db():
         try:
@@ -58,8 +56,7 @@ async def async_client(db):
 
 @pytest.fixture(scope="function")
 def db(setup_db_schema):
-    """
-    Creates a fresh database session for a test.
+    """Creates a fresh database session for a test.
     Rolls back transaction after test to ensure isolation.
     """
     connection = engine.connect()

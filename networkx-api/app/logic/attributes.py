@@ -23,8 +23,8 @@ logger = get_logger(__name__)
 
 
 def clear_network_data(network_id: int, db: Session) -> None:
-    """
-    Clears all graph data (nodes, edges, attribute values) for a network.
+    """Clears all graph data (nodes, edges, attribute values) for a network.
+
     Does NOT delete the Network record itself or Attribute Definitions (to preserve schema if reused).
 
     Args:
@@ -103,8 +103,8 @@ def bulk_save_node_attributes(
     data_map: Dict[int, Any],  # db_node_id -> value
     db: Session,
 ):
-    """
-    Helper function to bulk save node attributes.
+    """Helper function to bulk save node attributes.
+
     Handles attribute creation, clearing old values, and bulk insertion.
 
     Args:
@@ -178,8 +178,7 @@ def ensure_attributes(
     descriptions: Optional[Dict[str, str]] = None,
     measurements: Optional[Dict[str, Optional[str]]] = None,
 ) -> Dict[str, int]:
-    """
-    Ensure attributes exist for the given keys and return a map of {name: id}.
+    """Ensure attributes exist for the given keys and return a map of {name: id}.
 
     Args:
         network_id: The ID of the network.
@@ -257,8 +256,7 @@ def get_or_create_attribute(
     is_derived: Optional[bool] = None,
     derived_from: Optional[str] = None,
 ) -> models.Base:
-    """
-    Get an existing attribute or create a new one if it doesn't exist.
+    """Get an existing attribute or create a new one if it doesn't exist.
 
     Args:
         network_id: The ID of the network.
@@ -300,8 +298,8 @@ def get_or_create_attribute(
 def get_cached_attribute(
     network_id: int, attr_name: str, model_class: Type[models.Base], db: Session
 ) -> Optional[models.Base]:
-    """
-    Returns the NodeAttribute/EdgeAttribute row if it exists, else None.
+    """Returns the NodeAttribute/EdgeAttribute row if it exists, else None.
+
     Used to check cache validity before an expensive computation.
     """
     return (
@@ -319,10 +317,10 @@ def is_cache_valid(
     current_hash: str,
     current_params: Optional[dict],
 ) -> bool:
-    """
-    True if the cached attribute's stored graph_state_hash and computation_params
-    match the current graph state / params, meaning the cached values are still valid
-    and recomputation can be skipped.
+    """Whether a cached attribute's values are still valid.
+
+    True if its stored graph_state_hash and computation_params match the current
+    graph state and params, so recomputation can be skipped.
     """
     if cached_attr is None:
         return False
@@ -343,10 +341,11 @@ def update_attribute_cache_metadata(
     is_derived: bool = True,
     derived_from: Optional[str] = None,
 ) -> None:
-    """
-    Stamps cache metadata, role and measurement onto an existing
-    NodeAttribute/EdgeAttribute row after (re)computation. Call AFTER bulk_save_node_attributes/bulk_save_edge_attributes,
-    since that is what creates/refreshes the attribute row in the first place.
+    """Stamp cache metadata, role and measurement onto an attribute row.
+
+    Call after (re)computation, and AFTER bulk_save_node_attributes or
+    bulk_save_edge_attributes, since that is what creates or refreshes the
+    NodeAttribute/EdgeAttribute row in the first place.
     """
     attr = get_cached_attribute(network_id, attr_name, model_class, db)
     if attr is None:
@@ -368,11 +367,10 @@ def update_attribute_cache_metadata(
 def load_node_attribute_values(
     network_id: int, attr_name: str, db: Session
 ) -> Dict[str, Any]:
-    """
-    Loads existing computed values for a NodeAttribute back into a {node_id_str: value}
-    dict, matching the shape that calculate_centrality currently returns, so a
-    cache-hit path can return identically-shaped data to a cache-miss (freshly
-    computed) path.
+    """Load a NodeAttribute's stored values as a {node_id_str: value} dict.
+
+    The shape matches what calculate_centrality returns, so a cache-hit path
+    can return identically-shaped data to a cache-miss (freshly computed) path.
 
     Handles both float and text attribute value types. Uses the same bulk-join
     query pattern as `fetch_attribute_values` to avoid an N+1 lazy-load per row.
@@ -442,8 +440,7 @@ def delete_attribute_values(
     db: Session,
     commit: bool = True,
 ) -> None:
-    """
-    Delete all attribute values for a specific attribute in a network.
+    """Delete all attribute values for a specific attribute in a network.
 
     Args:
         network_id: The ID of the network (unused currently but kept for potential future scoping).
@@ -596,8 +593,7 @@ def get_attribute_stats(
     model_text: Type[models.Base],
     db: Session,
 ) -> List[Dict[str, Any]]:
-    """
-    Fetch attributes with statistics to help LLM decide visualization types.
+    """Fetch attributes with statistics to help LLM decide visualization types.
 
     Args:
         network_id: The ID of the network.
@@ -754,9 +750,7 @@ def get_specific_attribute_stats(
     model_text: Type[models.Base],
     db: Session,
 ) -> Optional[Dict[str, Any]]:
-    """
-    Fetch statistics for a SINGLE specific attribute.
-    """
+    """Fetch statistics for a SINGLE specific attribute."""
     attr = (
         db.query(model_attr)
         .filter(
@@ -837,8 +831,7 @@ def fetch_attribute_values(
     model_text: Type[models.Base],
     attr_ids: List[int],
 ) -> Dict[int, Dict[int, Any]]:
-    """
-    Fetch values for specified attributes.
+    """Fetch values for specified attributes.
 
     Args:
         db: Database session.

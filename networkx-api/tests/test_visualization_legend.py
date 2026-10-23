@@ -26,8 +26,7 @@ def node_list(db, network):
 
 
 def test_generate_visualization_data_returns_legend(db, network, node_list):
-    """
-    Verifies that the visualization data generation includes a 'legend' field
+    """Verifies that the visualization data generation includes a 'legend' field
     with correct details about applied visual mappings.
     """
     # 1. Setup Data: Assign a 'community' attribute to nodes

@@ -19,9 +19,7 @@ async def get_subgraphs(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """
-    Get all subgraphs for a given network.
-    """
+    """Get all subgraphs for a given network."""
     if not NetworkService.verify_network_access(network_id, current_user.id, db):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -38,9 +36,7 @@ async def create_ego_network(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """
-    Create an ego network subgraph.
-    """
+    """Create an ego network subgraph."""
     if not NetworkService.verify_network_access(network_id, current_user.id, db):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -62,9 +58,7 @@ async def create_subgraph_from_nodes(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """
-    Create a subgraph from a specific list of nodes.
-    """
+    """Create a subgraph from a specific list of nodes."""
     if not NetworkService.verify_network_access(network_id, current_user.id, db):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -82,9 +76,7 @@ async def create_path_subgraph(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """
-    Create a subgraph consisting of the shortest path between two nodes.
-    """
+    """Create a subgraph consisting of the shortest path between two nodes."""
     if not NetworkService.verify_network_access(network_id, current_user.id, db):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -106,9 +98,7 @@ async def create_k_core_subgraph(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """
-    Create a k-core subgraph.
-    """
+    """Create a k-core subgraph."""
     if not NetworkService.verify_network_access(network_id, current_user.id, db):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -124,9 +114,7 @@ async def create_largest_component_subgraph(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """
-    Create a subgraph for the largest connected component.
-    """
+    """Create a subgraph for the largest connected component."""
     if not NetworkService.verify_network_access(network_id, current_user.id, db):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -143,9 +131,7 @@ async def create_component_containing_node(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """
-    Create a subgraph for the connected component containing a specific node.
-    """
+    """Create a subgraph for the connected component containing a specific node."""
     if not NetworkService.verify_network_access(network_id, current_user.id, db):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -164,9 +150,7 @@ async def get_top_nodes(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """
-    Get the top K nodes based on a specific centrality metric.
-    """
+    """Get the top K nodes based on a specific centrality metric."""
     if not NetworkService.verify_network_access(network_id, current_user.id, db):
         raise HTTPException(status_code=403, detail="Access denied")
 
@@ -183,9 +167,7 @@ async def get_node_details(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """
-    Get details for a specific node, including all attributes.
-    """
+    """Get details for a specific node, including all attributes."""
     if not NetworkService.verify_network_access(network_id, current_user.id, db):
         raise HTTPException(status_code=403, detail="Access denied")
 

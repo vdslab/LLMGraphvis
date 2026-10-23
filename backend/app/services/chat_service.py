@@ -159,8 +159,8 @@ async def handle_upload_background(
     graphml_data: str,
     filename: Optional[str] = None,
 ) -> None:
-    """
-    Background task to handle network upload and initialization.
+    """Background task to handle network upload and initialization.
+
     Executes the initialization steps granularly to provide progress updates.
     """
     logger.info(
@@ -349,8 +349,8 @@ async def _report_upload_failure(
 async def handle_process_background(
     chat_id: int, user_message: str, resumed_from_input: bool = False
 ) -> None:
-    """
-    Background task to process chat message with LLM.
+    """Background task to process chat message with LLM.
+
     Orchestrates the Agent interaction and persists messages.
     """
     logger.info(

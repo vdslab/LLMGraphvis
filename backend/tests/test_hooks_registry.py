@@ -326,7 +326,8 @@ class TestOtherEvents:
 class TestBuiltinsLoadOnce:
     """Note: `app.services.llm.hooks.registry` is the HookRegistry *instance*
     exported by the package __init__, which shadows the same-named submodule —
-    so these go through the package-level names."""
+    so these go through the package-level names.
+    """
 
     def test_load_builtin_hooks_is_idempotent(self):
         from app.services.llm.hooks import load_builtin_hooks

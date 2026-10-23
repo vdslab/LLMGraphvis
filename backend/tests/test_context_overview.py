@@ -79,7 +79,8 @@ async def test_overview_title_carries_the_size_without_a_name():
 @pytest.mark.asyncio
 async def test_overview_details_attribute_types_and_ranges():
     """The body is collapsed by default, so it can afford the detail that the
-    old always-visible overview had to leave out."""
+    old always-visible overview had to leave out.
+    """
     with _patch_resources():
         _, body = await context.build_data_overview(1)
 
@@ -99,7 +100,8 @@ async def test_overview_reports_density_and_average_degree():
 @pytest.mark.asyncio
 async def test_overview_states_what_the_upload_already_did():
     """Otherwise the user cannot tell which of what they see came from their
-    file and which the pipeline chose for them."""
+    file and which the pipeline chose for them.
+    """
     with _patch_resources():
         _, body = await context.build_data_overview(1)
 
@@ -133,7 +135,8 @@ async def test_overview_caps_the_attribute_name_list():
 @pytest.mark.asyncio
 async def test_overview_hides_generated_layout_coordinates():
     """The upload pipeline lays out the graph before this runs; those coordinates
-    are not attributes of the file the user uploaded."""
+    are not attributes of the file the user uploaded.
+    """
     with _patch_resources():
         _, body = await context.build_data_overview(1)
 
@@ -229,7 +232,8 @@ async def test_overview_is_omitted_when_nothing_can_be_read():
 @pytest.mark.asyncio
 async def test_context_summary_names_layouts_instead_of_listing_coordinates():
     """The agent needs to know which layouts exist, but a coordinate is not an
-    attribute to encode."""
+    attribute to encode.
+    """
     with _patch_resources():
         summary = await context.build_context_summary(1)
 
@@ -241,7 +245,8 @@ async def test_context_summary_names_layouts_instead_of_listing_coordinates():
 @pytest.mark.asyncio
 async def test_coordinates_do_not_crowd_out_imported_attributes():
     """Coordinates once counted toward the listing cap, so a few layouts pushed
-    the dataset's own attributes behind '... and N more'."""
+    the dataset's own attributes behind '... and N more'.
+    """
     layouts = [f"layout{i}" for i in range(10)]
     coordinates = [
         {
@@ -268,7 +273,8 @@ async def test_coordinates_do_not_crowd_out_imported_attributes():
 @pytest.mark.asyncio
 async def test_context_summary_shows_measurement_and_parameters():
     """The measurement decides the encoding, and the parameters say what a
-    computed value is a result of."""
+    computed value is a result of.
+    """
     nodes = [
         {
             "name": "group",
@@ -302,7 +308,8 @@ async def test_context_summary_shows_measurement_and_parameters():
 @pytest.mark.asyncio
 async def test_context_summary_reports_edge_weights():
     """Weights are invisible in the attribute listing, so without this line the
-    agent has no way to know the uploaded file was weighted."""
+    agent has no way to know the uploaded file was weighted.
+    """
     with _patch_resources(structure={**STRUCTURE, "edge_weights": WEIGHTS}):
         summary = await context.build_context_summary(1)
 
@@ -313,7 +320,8 @@ async def test_context_summary_reports_edge_weights():
 @pytest.mark.asyncio
 async def test_context_summary_stays_silent_about_uniform_weights():
     """All-equal weights change no layout, so mentioning them only invites the
-    agent to pass a parameter that does nothing."""
+    agent to pass a parameter that does nothing.
+    """
     uniform = {**WEIGHTS, "is_uniform": True, "is_informative": False}
     with _patch_resources(structure={**STRUCTURE, "edge_weights": uniform}):
         summary = await context.build_context_summary(1)
@@ -324,7 +332,8 @@ async def test_context_summary_stays_silent_about_uniform_weights():
 @pytest.mark.asyncio
 async def test_context_summary_names_alternative_weight_attributes():
     """A graph can carry several numeric edge attributes; only the imported
-    weight is used unasked, so the agent needs to know what else it may pick."""
+    weight is used unasked, so the agent needs to know what else it may pick.
+    """
     weights = {**WEIGHTS, "alternatives": ["cooccurrence", "cost"]}
     with _patch_resources(structure={**STRUCTURE, "edge_weights": weights}):
         summary = await context.build_context_summary(1)
@@ -361,7 +370,8 @@ class _FakeSession:
 @pytest.mark.parametrize("mime", ["application/json", "text/plain", None])
 async def test_resource_json_is_parsed_regardless_of_declared_mime(mime):
     """FastMCP labels a resource text/plain unless the server sets mime_type;
-    the body must still be read."""
+    the body must still be read.
+    """
     session = _FakeSession(json.dumps(STRUCTURE), mime)
 
     result = await mcp_client.get_resource("network://1/structure", session=session)

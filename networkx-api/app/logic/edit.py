@@ -11,8 +11,7 @@ logger = get_logger(__name__)
 def update_node_label(
     network_id: int, node_id: str, new_label: str, db: Session
 ) -> Dict[str, Any]:
-    """
-    Updates the label of a specific node in a network.
+    """Updates the label of a specific node in a network.
 
     Args:
         network_id: The ID of the network.

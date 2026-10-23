@@ -20,8 +20,7 @@ def search_nodes(
     limit: int = 10,
     db: Session = None,
 ) -> List[NodeSearchResult]:
-    """
-    Search for nodes in a network.
+    """Search for nodes in a network.
 
     Args:
         network_id: The ID of the network to search in.
@@ -52,8 +51,7 @@ def search_nodes(
 def _search_by_attribute(
     db: Session, network_id: int, query: str, attribute_name: str, limit: int
 ) -> List[NodeSearchResult]:
-    """
-    Find matches in Text Attributes with the given name.
+    """Find matches in Text Attributes with the given name.
 
     Args:
         db: Database session.
@@ -106,8 +104,7 @@ def _search_by_attribute(
 def _search_default(
     db: Session, network_id: int, query: str, limit: int
 ) -> List[NodeSearchResult]:
-    """
-    Simple OR search on node_id and label.
+    """Simple OR search on node_id and label.
 
     Args:
         db: Database session.
@@ -149,8 +146,7 @@ def _search_default(
 def get_node_details(
     network_id: int, node_id: str, db: Session
 ) -> Optional[NodeDetails]:
-    """
-    Returns full details for a specific node, including all attributes.
+    """Returns full details for a specific node, including all attributes.
 
     Args:
         network_id: The ID of the network.

@@ -113,7 +113,7 @@ class Network(BaseModel):
 
 
 class ChatWithNetwork(Chat):
-    """Chat with network information"""
+    """Chat with network information."""
 
     network: Optional[Any] = None  # Allow both Dict and Network model
 

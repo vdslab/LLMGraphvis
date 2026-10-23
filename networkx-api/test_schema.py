@@ -11,9 +11,7 @@ mcp = FastMCP("TestServer")
 def test_tool(
     arg1: Annotated[int, Field(description="Description for arg1")], arg2: str
 ) -> str:
-    """
-    Test tool docstring.
-    """
+    """Test tool docstring."""
     return "ok"
 
 

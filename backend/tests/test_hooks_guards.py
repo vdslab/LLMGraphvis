@@ -634,7 +634,8 @@ class TestIntentHooks:
 
 class TestCandidateListing:
     """The deny message is the model's only view of what it can use, so the
-    list has to surface real attributes rather than internal storage."""
+    list has to surface real attributes rather than internal storage.
+    """
 
     def test_layout_coordinate_pairs_are_hidden(self):
         c = ctx(
@@ -663,7 +664,8 @@ class TestCandidateListing:
 
     def test_a_paired_user_attribute_is_the_accepted_cost(self):
         """Genuine x/y pairs are indistinguishable from layout output; hiding
-        them is the deliberate tradeoff."""
+        them is the deliberate tradeoff.
+        """
         assert guards._without_layout_coordinates(["pos_x", "pos_y", "club"]) == [
             "club"
         ]

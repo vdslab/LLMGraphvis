@@ -93,6 +93,7 @@ def search(
             from these. Defaults to `base_params`.
         budget: Maximum number of layout runs, baseline included.
         time_cap: Stop starting new runs after this many seconds.
+        clock: Source of the time `time_cap` is measured with.
     """
     tuned_params = tuned_params or base_params
     budget = budget or evaluation_budget(G.number_of_nodes())

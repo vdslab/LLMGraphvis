@@ -72,7 +72,8 @@ def test_import_reports_a_broken_file_as_unprocessable(client, db):
 
 def test_visualization_route_builds_what_the_mcp_tool_builds(client, db):
     """`visualization_generate` is `build_visualization(with_quality=True)`;
-    the tool opens its own session, so the builder is compared directly."""
+    the tool opens its own session, so the builder is compared directly.
+    """
     network_id = _network(db)
     imported = client.post(
         f"/api/v1/networks/{network_id}/import",

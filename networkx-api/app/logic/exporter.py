@@ -5,9 +5,7 @@ from common import models
 
 
 def export_network_to_graphml(network_id: int, db: Session) -> str:
-    """
-    Reconstructs the network from the database and returns it as a GraphML string.
-    """
+    """Reconstructs the network from the database and returns it as a GraphML string."""
     # 1. Fetch Network Info (for consistency check, though largely unused in simple GraphML)
     network = db.query(models.Network).filter(models.Network.id == network_id).first()
     if not network:

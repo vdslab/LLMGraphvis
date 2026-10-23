@@ -58,9 +58,7 @@ def _position(value: float, stats: Tuple) -> float:
 
 
 class StyleService:
-    """
-    Service to handle all styling logic for determining node/edge size, color, and opacity.
-    """
+    """Service to handle all styling logic for determining node/edge size, color, and opacity."""
 
     @staticmethod
     def _category_key(value: str) -> str:
@@ -182,9 +180,7 @@ class StyleService:
         global_node_attr_map: Dict[str, int],
         global_node_values: Dict[int, Dict[int, Any]],
     ) -> Dict[int, str]:
-        """
-        Pre-calculate a map of node_id -> color for RANKING scale type.
-        """
+        """Pre-calculate a map of node_id -> color for RANKING scale type."""
         ranking_color_map = {}
         if node_color_config and node_color_config.get("scale_type") == "RANKING":
             attr_name = node_color_config.get("attribute")
@@ -222,8 +218,8 @@ class StyleService:
         global_node_attr_map: Dict[str, int],
         global_node_values: Dict[int, Dict[int, Any]],
     ) -> Dict[str, str]:
-        """
-        Pre-calculate a map of value_str -> color for CATEGORICAL scale type.
+        """Pre-calculate a map of value_str -> color for CATEGORICAL scale type.
+
         Assigns a named palette up to its capacity, then falls back to Gray.
         """
         categorical_color_map = {}

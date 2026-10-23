@@ -41,7 +41,7 @@ class Broadcaster:
             self._subscribers.remove(queue)
 
     async def put(self, event: dict):
-        """Broadcast event to all subscribers"""
+        """Broadcast event to all subscribers."""
         self.last_activity = time.monotonic()
         if not self._subscribers:
             self._pending.append(event)
@@ -64,8 +64,8 @@ def _prune_idle_broadcasters():
 
 
 async def get_event_queue(chat_id: int) -> Broadcaster:
-    """
-    Returns a Broadcaster object.
+    """Returns a Broadcaster object.
+
     Maintains compatibility with code calling queue.put()
     because Broadcaster has a put() method.
     """
@@ -76,7 +76,7 @@ async def get_event_queue(chat_id: int) -> Broadcaster:
 
 
 async def event_generator(chat_id: int, request: Request) -> AsyncGenerator[dict, None]:
-    """Generate SSE events for a chat"""
+    """Generate SSE events for a chat."""
     broadcaster = await get_event_queue(chat_id)
     queue = await broadcaster.subscribe()
 

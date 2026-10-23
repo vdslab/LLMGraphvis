@@ -10,8 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 def execute_with_db(func):
-    """
-    Decorator to inject a database session into the function.
+    """Decorator to inject a database session into the function.
+
     The session is automatically closed after execution.
     """
 
@@ -30,8 +30,8 @@ def execute_with_db(func):
 
 
 def handle_tool_errors(func):
-    """
-    Decorator to handle errors in MCP tools.
+    """Decorator to handle errors in MCP tools.
+
     Catches validation errors and other exceptions, returning a clear error message.
     """
 

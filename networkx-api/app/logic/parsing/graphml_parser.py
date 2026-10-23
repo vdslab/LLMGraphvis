@@ -21,8 +21,9 @@ class ParsedGraphData:
 
 
 class GraphMLParser:
-    """
-    Handles parsing of GraphML content to extract:
+    """Parses GraphML content.
+
+    Extracts:
     1. NetworkX Graph object
     2. Description metadata (<desc> tags) for network, nodes, edges, and keys.
     """
@@ -30,9 +31,7 @@ class GraphMLParser:
     NS_MAP = {"g": "http://graphml.graphdrawing.org/xmlns"}
 
     def parse(self, content: str) -> ParsedGraphData:
-        """
-        Parses raw GraphML string content.
-        """
+        """Parses raw GraphML string content."""
         if isinstance(content, str):
             content_bytes = content.encode("utf-8")
         else:

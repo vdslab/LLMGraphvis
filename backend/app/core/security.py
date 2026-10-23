@@ -52,8 +52,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 
 def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
-    """
-    Decode and validate the JWT access token.
+    """Decode and validate the JWT access token.
 
     Args:
         token: JWT token to decode
@@ -71,8 +70,7 @@ def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
 async def get_token_payload(
     token: Optional[str] = Depends(oauth2_scheme),
 ) -> Optional[Dict[str, Any]]:
-    """
-    Dependency returning the claims of a Bearer token.
+    """Dependency returning the claims of a Bearer token.
 
     Returns None when no token was sent, so the caller can fall back to the
     cookie. Raises 401 when a token was sent but is invalid or has no subject.

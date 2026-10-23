@@ -218,7 +218,8 @@ async def test_upload_names_chat_after_the_file(
     initial_name, name_is_custom, expected_name, expect_event
 ):
     """The uploaded filename becomes the chat's provisional name — unless the
-    user has already named the chat themselves."""
+    user has already named the chat themselves.
+    """
     chat_id, network_id = 1, 100
 
     with (

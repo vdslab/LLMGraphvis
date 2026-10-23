@@ -31,8 +31,7 @@ def setup_db_schema():
 
 @pytest.fixture(scope="function")
 def db(setup_db_schema):
-    """
-    Creates a fresh database session for a test.
+    """Creates a fresh database session for a test.
     Rolls back transaction after test to ensure isolation.
     """
     connection = engine.connect()
@@ -48,9 +47,7 @@ def db(setup_db_schema):
 
 @pytest.fixture(scope="function")
 def client(db):
-    """
-    FastAPI TestClient with overridden get_db dependency.
-    """
+    """FastAPI TestClient with overridden get_db dependency."""
 
     def override_get_db():
         try:

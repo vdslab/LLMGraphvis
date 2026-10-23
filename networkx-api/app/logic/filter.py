@@ -19,8 +19,8 @@ def create_subgraph_by_filter(
     preserve_layout: bool = False,
     description: str = None,
 ):
-    """
-    Creates a subgraph based on a list of attribute conditions.
+    """Creates a subgraph based on a list of attribute conditions.
+
     Conditions are combined with AND logic.
     Within a condition, ranges and categories are combined with OR logic.
     """
@@ -90,9 +90,7 @@ def _generate_filter_description(conditions: List[AttributeCondition]) -> str:
 def _get_nodes_matching_condition(
     network_id: int, condition: AttributeCondition, db: Session
 ) -> Set[str]:
-    """
-    Finds node IDs that match a single attribute condition.
-    """
+    """Finds node IDs that match a single attribute condition."""
     attr_name = condition.attribute_name
 
     # 1. Find the Attribute ID
@@ -176,8 +174,8 @@ def _get_nodes_matching_condition(
 def get_nodes_by_filter(
     network_id: int, conditions: List[AttributeCondition], db: Session
 ) -> List[dict]:
-    """
-    Returns a list of node details (id, label) that match the conditions.
+    """Returns a list of node details (id, label) that match the conditions.
+
     Does NOT create a subgraph, just lists them.
     """
     # Start with all node IDs in the network
