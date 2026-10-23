@@ -1,19 +1,16 @@
-import logging
+"""The MCP server: the singleton `mcp` with every tool and resource registered.
 
-import app.mcp.resources
+`app.main` mounts `mcp` from here. Procedures ("prompts") are backend skills,
+not MCP prompts (ADR 0027).
+"""
 
-# 2. Import sub-modules to register Tools and Resources.
-# Procedures ("prompts") are backend skills, not MCP prompts (ADR 0027).
-# These imports are "side-effects" (they decorate functions on the 'mcp' object)
-import app.mcp.tools
-
-# Setup logging
 from app.core.logging import get_logger
+from app.core.mcp import mcp  # noqa: F401  (re-exported for app.main)
 
-# 1. Import the singleton MCP instance
-from app.core.mcp import mcp
+# Imported for their side effect: the decorators register tools and resources
+# on `mcp`, in import order.
+import app.mcp.tools  # noqa: F401
+import app.mcp.resources  # noqa: F401
 
 logger = get_logger(__name__)
 logger.info("MCP Server initialized and tools registered.")
-
-# The 'mcp' object is now populated and ready to run by the FastMCP entrypoint (uvicorn/cli)

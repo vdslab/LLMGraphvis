@@ -45,6 +45,9 @@ unfixable = []
 "networkx-api/app/mcp/tools/**" = ["E501", "D"]
 # Packages re-export their modules; MCP tool packages import for registration.
 "__init__.py" = ["F401", "F403"]
+# Import order is registration order, which is the order list_tools returns.
+"networkx-api/app/mcp/tools/**/__init__.py" = ["I001"]
+"networkx-api/app/mcp_server.py" = ["I001"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
