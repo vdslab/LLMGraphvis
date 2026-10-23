@@ -5,7 +5,8 @@ import api, { getApiErrorMessage } from '../../services/api';
 import { useChatStore } from '../../stores/chatStore';
 import { useNetworkStore } from '../../stores/networkStore';
 
-/** Chrome only: parameter names, tools and descriptions are shown verbatim. */
+/** Chrome only: parameter and tool names are shown verbatim; each row's description is
+ * written by the agent in the conversation language, the tool's own one kept as a tooltip. */
 const STRINGS = {
   en: {
     apply: 'Apply',
@@ -220,7 +221,11 @@ export default function ParameterTuning({ tuning }) {
                 )}
               </div>
               {field.description && (
-                <p className="parameter-tuning__description">{field.description}</p>
+                <p className="parameter-tuning__description"
+                  title={field.tool_description && field.tool_description !== field.description
+                    ? field.tool_description : undefined}>
+                  {field.description}
+                </p>
               )}
 
               {field.kind === 'select' ? (

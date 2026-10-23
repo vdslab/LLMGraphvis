@@ -28,6 +28,7 @@ Offer `offer_parameter_tuning` in the same turn when the result depends strongly
 - **Fields**: 1–4, most influential first. Pair parameters that act together (ForceAtlas2 `scaling_ratio` + `gravity`; `min_size` + `max_size`).
 - **Ranges** should cover what is worth exploring on this data, not the whole mathematical domain, and must include the current value.
 - **low_label / high_label**: what each end does to the view, in the conversation language.
+- **explanation**: one sentence on what the parameter does to the view, in the conversation language. It replaces the tool's English description on the panel, so write it whenever the conversation is not in English.
 - **Suggested value**: choose one from `[Current Network Context]` (node count, density, weights) and the result you just saw, with a one-sentence `rationale`. It is shown, not applied. If you are confident it is better, run the tool with it before offering the panel instead. Omit it when you have no data-grounded reason, unless the tool ran with an automatic default (then pass the effective value it reported).
 - **In your text**: say what the fields change, and that the user can simply tell you how to adjust it.
 

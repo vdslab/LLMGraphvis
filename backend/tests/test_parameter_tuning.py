@@ -129,6 +129,7 @@ def _form(**field_overrides):
         "rationale": "密度が高いので少し細かめが見やすい",
         "low_label": "大きなまとまり",
         "high_label": "細かく分ける",
+        "explanation": "1 より小さいと大きなまとまり、大きいと細かい分割になります。",
     }
     field.update(field_overrides)
     return {
@@ -163,10 +164,22 @@ def test_offer_uses_effective_arguments_schema_description_and_suggestion(db, ch
     }
     field = panel["fields"][0]
     assert field["id"] == f"{LOUVAIN}.resolution"
-    assert field["description"] == "Below 1 favors larger communities."
+    assert field["description"].startswith("1 より小さいと")
+    assert field["tool_description"] == "Below 1 favors larger communities."
     assert panel["values"] == {f"{LOUVAIN}.resolution": 1.0}
     assert panel["suggested_values"] == {f"{LOUVAIN}.resolution": 1.5}
     assert "apply_parameter_tuning" in state["enabled_tool_names"]
+
+
+def test_offer_requires_a_localized_explanation_in_a_non_english_conversation(
+    db, chat
+):
+    result, _ = _offer(db, chat, form=_form(explanation=None))
+    assert "explanation" in result["error"]
+    english = {**_form(explanation=None, rationale=None, low_label=None, high_label=None)}
+    english["question"] = "Community granularity"
+    panel = _offer(db, chat, form=english)[0]["parameter_tuning"]
+    assert panel["fields"][0]["description"] == "Below 1 favors larger communities."
 
 
 def test_offer_never_executes_the_suggestion(db, chat):
@@ -231,6 +244,7 @@ def test_automatic_default_needs_a_suggestion(db, chat):
                 "kind": "slider",
                 "minimum": 1,
                 "maximum": 50,
+                "explanation": "ノード同士の反発の強さです。",
             },
         ],
     }
@@ -306,6 +320,7 @@ async def test_agent_changes_several_parameters_including_non_fields_at_once(db,
             "argument": "palette",
             "kind": "select",
             "options": ["tableau10", "set2"],
+            "explanation": "色の組み合わせです。",
         }
     )
     state = _turn(
@@ -358,6 +373,7 @@ async def test_partial_change_keeps_other_values(db, chat):
             "minimum": 1,
             "maximum": 10,
             "suggested": 3,
+            "explanation": "階層をいくつまで統合するかです。",
         }
     )
     panel = _offer(db, chat, form=form)[0]["parameter_tuning"]

@@ -85,6 +85,15 @@ def _load_json_string(value):
     return value
 
 
+_NON_LATIN = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]")
+
+
+def _non_english(form, field) -> bool:
+    """Whether the panel's own wording shows a CJK conversation."""
+    texts = [form.question, field.rationale, field.low_label, field.high_label]
+    return any(text and _NON_LATIN.search(text) for text in texts)
+
+
 class TuningField(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tool: str = Field(
@@ -136,6 +145,13 @@ class TuningField(BaseModel):
         max_length=200,
         description="One sentence, in the conversation language, on why `suggested` "
         "fits this data.",
+    )
+    explanation: str | None = Field(
+        default=None,
+        max_length=200,
+        description="One sentence, in the conversation language, on what this "
+        "parameter does to the view. Shown as the row's description in place of the "
+        "tool's English one; required unless the conversation is in English.",
     )
     low_label: str | None = Field(
         default=None,
@@ -455,9 +471,16 @@ def _build(form: TuningForm, turn_state: dict, network_id: int, earlier=()):
         types = _schema_types(prop)
         integer = "integer" in types and "number" not in types
         spec = field.model_dump()
+        tool_description = prop.get("description") or ""
+        if not field.explanation and _non_english(form, field):
+            raise TuningError(
+                f"{field.id}: write `explanation` in the conversation language; the "
+                "tool's own description is English and would reach the user as is."
+            )
         spec.update(
             id=field.id,
-            description=prop.get("description") or "",
+            description=field.explanation or tool_description,
+            tool_description=tool_description,
             integer=integer,
         )
         if field.kind == "select":
