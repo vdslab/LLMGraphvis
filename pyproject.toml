@@ -1,12 +1,4 @@
 [tool.ruff]
-# Enable pycodestyle (`E`) and Pyflakes (`F`) codes by default.
-select = ["E", "F", "I", "W"]
-ignore = []
-
-# Allow autofix for all enabled rules (when `--fix` is provided).
-fixable = ["A", "B", "C", "D", "E", "F", "G", "I", "N", "Q", "S", "T", "W", "ANN", "ARG", "BLE", "COM", "DJ", "DTZ", "EM", "ERA", "EXE", "FBT", "ICN", "INP", "ISC", "NPY", "PD", "PGH", "PIE", "PL", "PT", "PTH", "PYI", "RET", "RSE", "RUF", "SIM", "SLF", "TCH", "TID", "TRY", "UP", "YTT"]
-unfixable = []
-
 # Exclude a variety of commonly ignored directories.
 exclude = [
     ".bzr",
@@ -32,10 +24,35 @@ exclude = [
     "venv",
 ]
 
-# Same as Black.
+# Same as Black. Google's guide says 80, but the codebase was written to 88.
 line-length = 88
 
-[tool.ruff.mccabe]
+[tool.ruff.lint]
+# pycodestyle (E, W), Pyflakes (F), isort (I), and the formatting half of
+# pydocstyle under the Google convention. Missing docstrings (D1xx) are not
+# enforced: much existing code predates the convention.
+select = ["E", "F", "I", "W", "D2", "D3", "D4"]
+ignore = []
+
+# Allow autofix for all enabled rules (when `--fix` is provided).
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+# Tool docstrings and Field descriptions are prompt surface; long lines there
+# are deliberate (AGENTS.md).
+"networkx-api/app/mcp/tools/**" = ["E501"]
+# Packages re-export their modules; MCP tool packages import for registration.
+"__init__.py" = ["F401", "F403"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+# Both services name their package `app`; `common` is shared between them.
+known-first-party = ["app", "common"]
+
+[tool.ruff.lint.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
 max-complexity = 10
 
