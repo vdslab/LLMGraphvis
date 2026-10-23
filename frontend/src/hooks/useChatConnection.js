@@ -117,6 +117,11 @@ export const useChatConnection = (id, isAuthenticated) => {
 
     const { isConnected, error: sseError } = useNetworkRealtime(sseUrl, {
         eventHandlers,
+        onResync: () => {
+            useChatStore.getState().resyncMessages().catch((e) => {
+                console.warn('Failed to resync messages:', e);
+            });
+        },
         onError: (e) => console.log("SSE Connect Error (Hook):", e)
     });
 

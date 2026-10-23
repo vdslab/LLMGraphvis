@@ -231,3 +231,42 @@ describe('chatStore finalizing a turn', () => {
     expect(state().messages.filter((m) => m.id === 42)).toHaveLength(1);
   });
 });
+
+describe('chatStore resync', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.getChatUsage.mockResolvedValue({ data: {} });
+    useChatStore.setState({
+      chatId: 1,
+      isLoading: true,
+      streamingMessageId: null,
+      messages: [
+        { id: 'local-1', localId: 'local-1', role: 'user', content: 'q', status: 'sent' },
+        { id: 'local-2', localId: 'local-2', role: 'user', content: 'next', status: 'queued' },
+      ],
+    });
+  });
+
+  it('ends a turn whose reply was stored while the stream was down', async () => {
+    api.getChatMessages.mockResolvedValue({ data: [
+      { id: 10, role: 'user', content: 'q' },
+      { id: 11, role: 'model', content: 'answer' },
+    ] });
+    api.processMessage.mockResolvedValue({ status: 202 });
+
+    await state().resyncMessages();
+
+    expect(state().messages.map((m) => m.content)).toEqual(['q', 'answer', 'next']);
+    // endTurn dispatched the queued message.
+    expect(api.processMessage).toHaveBeenCalledWith(1, 'next');
+  });
+
+  it('leaves a turn that is still running alone', async () => {
+    api.getChatMessages.mockResolvedValue({ data: [{ id: 10, role: 'user', content: 'q' }] });
+
+    await state().resyncMessages();
+
+    expect(state().isLoading).toBe(true);
+    expect(state().messages.map((m) => m.id)).toEqual(['local-1', 'local-2']);
+  });
+});

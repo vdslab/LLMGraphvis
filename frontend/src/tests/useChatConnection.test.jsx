@@ -20,8 +20,11 @@ class FakeEventSource {
     (this.listeners[type] || []).forEach((fn) => fn(event));
     if (type === 'error' && this.onerror) this.onerror(event);
   }
-  close() {}
+  close() {
+    this.readyState = 2;
+  }
 }
+FakeEventSource.CLOSED = 2;
 
 describe('useChatConnection', () => {
   beforeEach(() => {
@@ -48,5 +51,30 @@ describe('useChatConnection', () => {
     expect(refreshUsage).toHaveBeenCalled();
     expect(result.current.isConnected).toBe(true);
     expect(result.current.sseError).toBeNull();
+  });
+
+  it('resyncs messages when the stream reopens after a loss', () => {
+    const resyncMessages = vi.fn().mockResolvedValue();
+    useChatStore.setState({ resyncMessages });
+
+    renderHook(() => useChatConnection('1', true));
+    const es = FakeEventSource.last;
+    act(() => es.onopen());
+    expect(resyncMessages).not.toHaveBeenCalled();
+
+    act(() => es.onerror({}));
+    act(() => es.onopen());
+    expect(resyncMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it('reopens a closed stream when the tab comes back into view', () => {
+    useChatStore.setState({ resyncMessages: vi.fn().mockResolvedValue() });
+    renderHook(() => useChatConnection('1', true));
+    const first = FakeEventSource.last;
+    first.close();
+
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+
+    expect(FakeEventSource.last).not.toBe(first);
   });
 });

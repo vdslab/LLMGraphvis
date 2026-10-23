@@ -100,7 +100,8 @@ Two backend → frontend contracts, specified in `specification/2_Technical_Deta
 **SSE events**: emitted from `llm/emitters.py`, consumed in
 `frontend/src/hooks/useChatConnection.js`. `thinking_stream` is *model reasoning*
 only; pipeline status goes through `emit_progress`. Only a terminal event
-(`message`, `message_complete`, `error`) calls `chatStore.endTurn()`.
+(`message`, `message_complete`, `error`) calls `chatStore.endTurn()`, or a
+resync after a lost stream that finds the reply already stored (ADR 0037).
 
 **In-band markup** survives into the stored message: `llm/markup.py` lists the
 tags, `frontend/src/utils/parseMessageContent.js` parses them. `<thought>` is

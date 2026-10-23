@@ -154,6 +154,36 @@ export const useChatStore = create((set, get) => ({
     return res.data;
   },
 
+  /**
+   * Catch up with what the backend stored while the stream was down.
+   *
+   * Events sent while the connection was lost (a sleeping laptop, a network
+   * switch, a stream that died unnoticed in a background tab) are gone, so
+   * the stored messages are the only record of them. A turn whose reply is
+   * already stored has ended even though its terminal event never arrived;
+   * one still running is left alone, since its remaining events and the full
+   * reply in message_complete will still come over the new connection.
+   */
+  resyncMessages: async () => {
+    const id = get().chatId;
+    if (!id) return;
+
+    const res = await getChatMessages(id);
+    if (get().chatId !== id) return;
+
+    const stored = res.data || [];
+    const turnFinished = stored.length > 0 && stored.at(-1).role !== 'user';
+    if (get().isLoading && !turnFinished) return;
+
+    // Messages the backend has not seen yet stay on screen.
+    const unsent = get().messages.filter(
+      (message) => message.status === 'queued' || message.status === 'failed',
+    );
+    set({ messages: [...stored, ...unsent] });
+    if (get().isLoading) get().endTurn();
+    get().refreshUsage();
+  },
+
   // Load what the backend stored for this chat: every turn and chat title,
   // including turns that ended in an error. Replaces the live turn total.
   fetchChatUsage: async (chatId = null) => {

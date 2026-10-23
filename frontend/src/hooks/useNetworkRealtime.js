@@ -13,25 +13,32 @@ const MAX_CONSECUTIVE_FAILURES = 10;
  * @param {Function} [options.onMessage] - Callback for 'message' events.
  * @param {Function} [options.onError] - Callback for 'error' events.
  * @param {Object} [options.eventHandlers] - Map of event type -> callback.
+ * @param {Function} [options.onResync] - Called when events may have been
+ *   missed: the stream reopened after a loss, or the tab came back into view.
  * @returns {Object} Connection state ({ isConnected, error, lastMessage }).
  */
-export const useNetworkRealtime = (url, { delay = 0, onMessage, onError, eventHandlers } = {}) => {
+export const useNetworkRealtime = (url, { delay = 0, onMessage, onError, eventHandlers, onResync } = {}) => {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState(null);
   const [lastMessage, setLastMessage] = useState(null);
   const eventSourceRef = useRef(null);
   const failureCountRef = useRef(0);
+  // Set when the stream drops; the next open has missed whatever was sent
+  // in between.
+  const lostRef = useRef(false);
 
   // Use refs for callbacks to avoid re-connecting when they change
   const onMessageRef = useRef(onMessage);
   const onErrorRef = useRef(onError);
   const eventHandlersRef = useRef(eventHandlers);
+  const onResyncRef = useRef(onResync);
 
   useEffect(() => {
     onMessageRef.current = onMessage;
     onErrorRef.current = onError;
     eventHandlersRef.current = eventHandlers;
-  }, [onMessage, onError, eventHandlers]);
+    onResyncRef.current = onResync;
+  }, [onMessage, onError, eventHandlers, onResync]);
 
   const connect = useCallback(() => {
     if (!url) return;
@@ -51,11 +58,16 @@ export const useNetworkRealtime = (url, { delay = 0, onMessage, onError, eventHa
       failureCountRef.current = 0;
       setIsConnected(true);
       setError(null);
+      if (lostRef.current) {
+        lostRef.current = false;
+        if (onResyncRef.current) onResyncRef.current();
+      }
     };
 
     es.onerror = (e) => {
       console.error('SSE Connection Error', e);
       setIsConnected(false);
+      lostRef.current = true;
       failureCountRef.current += 1;
       if (failureCountRef.current >= MAX_CONSECUTIVE_FAILURES) {
         es.close();
@@ -117,6 +129,31 @@ export const useNetworkRealtime = (url, { delay = 0, onMessage, onError, eventHa
       }
     };
   }, [connect, url, delay]);
+
+  // A background tab or a sleeping machine can outlast the retry budget, and
+  // a stream can die without the browser noticing. Coming back into view, or
+  // back online, reopens a closed stream and catches up an open one.
+  useEffect(() => {
+    if (!url) return undefined;
+
+    const revive = () => {
+      if (document.visibilityState !== 'visible') return;
+      const es = eventSourceRef.current;
+      if (!es || es.readyState === EventSource.CLOSED) {
+        lostRef.current = true;
+        connect();
+      } else if (onResyncRef.current) {
+        onResyncRef.current();
+      }
+    };
+
+    document.addEventListener('visibilitychange', revive);
+    window.addEventListener('online', revive);
+    return () => {
+      document.removeEventListener('visibilitychange', revive);
+      window.removeEventListener('online', revive);
+    };
+  }, [url, connect]);
 
   return { isConnected, error, lastMessage };
 };
