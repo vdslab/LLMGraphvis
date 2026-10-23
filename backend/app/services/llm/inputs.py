@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from app.core.database import for_update
 from common import models
 
 
@@ -379,7 +380,7 @@ def present_question(chat_id, db, arguments, turn_state):
         form = InputForm.model_validate(arguments)
     except ValidationError as error:
         return {"error": _readable_validation_error(error)}
-    chat = db.query(models.Chat).filter_by(id=chat_id).with_for_update().one()
+    chat = for_update(db, db.query(models.Chat).filter_by(id=chat_id)).one()
     db.query(models.AnalysisInput).filter_by(chat_id=chat_id, status="pending").update(
         {"status": "superseded"}
     )
@@ -456,12 +457,9 @@ def _naive(moment):
 
 def accept_answer(chat, db, request_id, values, content):
     """Called under the chat row lock; caller commits with the user message."""
-    request = (
-        db.query(models.AnalysisInput)
-        .filter_by(id=request_id, chat_id=chat.id)
-        .with_for_update()
-        .first()
-    )
+    request = for_update(
+        db, db.query(models.AnalysisInput).filter_by(id=request_id, chat_id=chat.id)
+    ).first()
     if request is None:
         raise LookupError("Question not found in this chat")
     answer = values if values is not None else {"free_text": content.strip()}

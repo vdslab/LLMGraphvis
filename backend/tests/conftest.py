@@ -61,7 +61,10 @@ def db(setup_db_schema):
     """
     connection = engine.connect()
     transaction = connection.begin()
-    session = TestingSessionLocal(bind=connection)
+    # A savepoint, so code under test that rolls back keeps the fixture data.
+    session = TestingSessionLocal(
+        bind=connection, join_transaction_mode="create_savepoint"
+    )
 
     yield session
 

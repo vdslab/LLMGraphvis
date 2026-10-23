@@ -320,8 +320,10 @@ async def load_sample_network(
     return {"status": "accepted"}
 
 
+# Plain `def`: FastAPI runs it in the threadpool, so waiting for the chat row
+# lock blocks a worker thread, never the event loop (ADR 0038).
 @router.post("/{chat_id}/process", status_code=202)
-async def process_message(
+def process_message(
     chat_id: int,
     request: schemas.ChatProcessRequest,
     background_tasks: BackgroundTasks,
@@ -334,7 +336,7 @@ async def process_message(
 
     from app.services.llm.inputs import accept_answer
 
-    chat = db.query(models.Chat).filter_by(id=chat_id).with_for_update().one()
+    chat = database.for_update(db, db.query(models.Chat).filter_by(id=chat_id)).one()
     request_id = request.input_request_id
     content = request.message.content
     if request.parameter_tuning_id is not None:
@@ -402,6 +404,9 @@ async def stream(
 ):
     # Verify chat exists and user owns it
     verify_chat_ownership(chat_id, current_user.id, db)
+    # The stream outlives this request; without this its session would sit
+    # idle in transaction, holding a pooled connection, until the tab closes.
+    db.close()
 
     # Return SSE response with event generator
     return EventSourceResponse(llm_service.event_generator(chat_id, request), ping=15)
@@ -479,26 +484,30 @@ async def apply_parameter_tuning(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(database.get_db),
 ):
-    """Re-run the panel's pipeline with new values, without the agent (ADR 0016)."""
+    """Re-run the panel's pipeline with new field values, without the agent (ADR 0016).
+
+    No row lock is taken here: `tuning.apply` locks and commits around the
+    pipeline itself, never across an await (ADR 0038).
+    """
     from app.services.llm import tuning
 
-    verify_chat_ownership(chat_id, current_user.id, db)
-    chat = db.query(models.Chat).filter_by(id=chat_id).with_for_update().one()
+    chat = verify_chat_ownership(chat_id, current_user.id, db)
     row = (
         db.query(models.ParameterTuning)
         .filter_by(id=tuning_id, chat_id=chat_id)
-        .with_for_update()
         .first()
     )
     if row is None:
         raise HTTPException(status_code=404, detail="Tuning panel not found")
+    network_id = chat.network_id
+    db.commit()  # end the read transaction before the first await
     try:
         outcome = await tuning.apply(
             db,
             row,
             request.values,
             source="form",
-            active_network_id=chat.network_id,
+            active_network_id=network_id,
             queue=await llm_service.get_event_queue(chat_id),
         )
     except tuning.TuningInactive as exc:
@@ -511,7 +520,7 @@ async def apply_parameter_tuning(
         db.rollback()
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return {
-        "tuning": tuning.serialize_tuning(row, chat.network_id),
+        "tuning": tuning.serialize_tuning(row, network_id),
         "changes": outcome["changes"],
         "steps": outcome["steps"],
         "visualization": outcome["visualization"],

@@ -481,9 +481,7 @@ async def test_confirm_resumes_with_the_panel_tools_and_is_idempotent(db, chat):
         message={"content": "この値で決定"}, parameter_tuning_id=panel["id"]
     )
     tasks = BackgroundTasks()
-    assert await process_message(chat.id, payload, tasks, user, db) == {
-        "status": "accepted"
-    }
+    assert process_message(chat.id, payload, tasks, user, db) == {"status": "accepted"}
     assert tasks.tasks[0].args[2] is True  # resumed_from_input
     message = db.query(models.ChatMessage).one().content
     assert message.startswith("この値で決定")
@@ -493,7 +491,7 @@ async def test_confirm_resumes_with_the_panel_tools_and_is_idempotent(db, chat):
     restored = inputs.restore_activation(db, chat.id, chat.network_id)
     assert LOUVAIN in restored
 
-    retry = await process_message(chat.id, payload, BackgroundTasks(), user, db)
+    retry = process_message(chat.id, payload, BackgroundTasks(), user, db)
     assert retry == {"status": "already_accepted"}
 
     with pytest.raises(tuning.TuningInactive):
@@ -504,6 +502,104 @@ async def test_confirm_resumes_with_the_panel_tools_and_is_idempotent(db, chat):
             source="form",
             active_network_id=chat.network_id,
         )
+
+
+# --- no transaction across an await (ADR 0038) -----------------------------------
+
+
+def test_process_message_runs_in_the_threadpool():
+    """A coroutine endpoint would wait for the chat row lock on the event loop."""
+    import inspect
+
+    assert not inspect.iscoroutinefunction(process_message)
+
+
+def _remote_checking(db, *results):
+    """Like `_remote`, but records whether `db` had a transaction open at each call."""
+    seen = []
+    queue = list(results)
+
+    async def execute(tool, arguments, session=None):
+        seen.append(db.in_transaction())
+        return queue.pop(0)
+
+    return patch("app.services.llm.mcp_client.execute_tool", side_effect=execute), seen
+
+
+@pytest.mark.asyncio
+async def test_form_endpoint_holds_no_transaction_while_tools_run(db, chat):
+    panel = _offer(db, chat)[0]["parameter_tuning"]
+    user = db.get(models.User, chat.user_id)
+    remote, seen = _remote_checking(db, {"content": "ok"}, PAYLOAD)
+    with remote, patch("app.services.llm.get_event_queue", new_callable=AsyncMock):
+        await apply_parameter_tuning(
+            chat.id,
+            panel["id"],
+            schemas.TuningApplyRequest(values={f"{LOUVAIN}.resolution": 1.8}),
+            user,
+            db,
+        )
+    assert seen == [False, False]
+
+
+@pytest.mark.asyncio
+async def test_agent_apply_holds_no_transaction_while_tools_run(db, chat):
+    _, state = _offer(db, chat)
+    db.query(models.Chat).all()  # the turn's session is mid-transaction
+    remote, seen = _remote_checking(db, {"content": "ok"}, PAYLOAD)
+    with remote:
+        result = await tuning.apply_from_agent(
+            chat.id,
+            db,
+            {"changes": [{"param": f"{LOUVAIN}.resolution", "value": 2}]},
+            state,
+        )
+    assert "error" not in result
+    assert seen == [False, False]
+
+
+@pytest.mark.asyncio
+async def test_panel_confirmed_mid_pipeline_is_not_overwritten(db, chat):
+    panel = _offer(db, chat)[0]["parameter_tuning"]
+    row = db.get(models.ParameterTuning, panel["id"])
+
+    async def execute(tool, arguments, session=None):
+        # The user confirms the panel while the layout is still running.
+        db.query(models.ParameterTuning).filter_by(id=panel["id"]).update(
+            {"status": "confirmed"}
+        )
+        db.commit()
+        return PAYLOAD
+
+    with patch("app.services.llm.mcp_client.execute_tool", side_effect=execute):
+        with pytest.raises(tuning.TuningInactive):
+            await tuning.apply(
+                db,
+                row,
+                {f"{LOUVAIN}.resolution": 2.0},
+                source="form",
+                active_network_id=chat.network_id,
+            )
+    db.expire_all()
+    assert db.get(models.ParameterTuning, panel["id"]).history == []
+
+
+def test_failed_offer_releases_the_chat_lock(db, chat):
+    result = tuning.present_tuning(
+        chat.id, db, _form(), _turn(chat, (COLOR, {"attribute": "x"}, "completed"))
+    )
+    assert "error" in result
+    assert not db.in_transaction()
+
+
+@pytest.mark.asyncio
+async def test_stream_does_not_keep_its_session_open(db, chat):
+    from app.api.v1.endpoints.chat import stream
+
+    user = db.get(models.User, chat.user_id)
+    with patch("app.services.llm.event_generator", return_value=iter(())):
+        await stream(chat.id, MagicMock(), user, db)
+    assert not db.in_transaction()
 
 
 # --- hooks and exposure ----------------------------------------------------------

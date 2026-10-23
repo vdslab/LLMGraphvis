@@ -253,12 +253,10 @@ async def test_answer_submission_is_idempotent_and_bound_to_chat(db, chat):
         input_values={"method": "経路", "iterations": 20},
     )
     tasks = BackgroundTasks()
-    assert await process_message(chat.id, payload, tasks, user, db) == {
-        "status": "accepted"
-    }
+    assert process_message(chat.id, payload, tasks, user, db) == {"status": "accepted"}
     assert len(tasks.tasks) == 1
     retry_tasks = BackgroundTasks()
-    assert await process_message(chat.id, payload, retry_tasks, user, db) == {
+    assert process_message(chat.id, payload, retry_tasks, user, db) == {
         "status": "already_accepted"
     }
     assert not retry_tasks.tasks
@@ -289,7 +287,7 @@ async def test_plain_text_reply_resolves_pending_question(db, chat):
     request = present_question(chat.id, db, FORM, {})["input_request"]
     user = db.get(models.User, chat.user_id)
     payload = schemas.ChatProcessRequest(message={"content": "まず経路だけ調べて"})
-    await process_message(chat.id, payload, BackgroundTasks(), user, db)
+    process_message(chat.id, payload, BackgroundTasks(), user, db)
     assert db.get(models.AnalysisInput, request["id"]).answer == {
         "free_text": "まず経路だけ調べて"
     }

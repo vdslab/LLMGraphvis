@@ -6,6 +6,7 @@ The agent (`apply_parameter_tuning`) and the panel (`POST .../apply`) both go
 through `apply()`, so they share one state. See ADR 0016.
 """
 
+import asyncio
 import copy
 import json
 import re
@@ -15,6 +16,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from app.core.database import for_update
 from common import models
 
 from . import emitters, mcp_client
@@ -38,6 +40,10 @@ UNTUNABLE_TOOLS = frozenset(
     }
 )
 MAX_HISTORY = 10
+
+# One pipeline run per panel at a time. An asyncio lock, not a row lock: a row
+# lock cannot be held across the tool awaits (ADR 0038). One worker process.
+_apply_locks: dict[str, asyncio.Lock] = {}
 
 
 def is_tunable_tool(name: str) -> bool:
@@ -517,12 +523,13 @@ def present_tuning(chat_id, db, arguments, turn_state) -> dict:
         form = TuningForm.model_validate(arguments)
     except ValidationError as error:
         return {"error": _readable(error)}
-    chat = db.query(models.Chat).filter_by(id=chat_id).with_for_update().one()
+    chat = for_update(db, db.query(models.Chat).filter_by(id=chat_id)).one()
     try:
         fields, steps, values, suggested = _build(
             form, turn_state, chat.network_id, _earlier_calls(db, chat_id, form.tools)
         )
     except TuningError as error:
+        db.commit()  # release the chat lock before the turn awaits again
         return {"error": str(error)}
 
     db.query(models.ParameterTuning).filter_by(chat_id=chat_id, status="active").update(
@@ -598,9 +605,58 @@ async def apply(
 
     Only the agent may change arguments that are not panel fields. Nothing is
     persisted unless every step succeeds.
+
+    Commits `db` before running the pipeline and again after recording it: the
+    panel row is locked only around those two short transactions, never while a
+    tool is awaited (ADR 0038).
     """
+    tuning_id = row.id
+    lock = _apply_locks.setdefault(tuning_id, asyncio.Lock())
+    async with lock:
+        try:
+            row = _lock_active(db, tuning_id, active_network_id)
+            plan = _plan(row, changes, source=source, schemas=schemas)
+        except Exception:
+            db.rollback()
+            raise
+        network_id = row.network_id
+        db.commit()  # releases the row lock before the first tool call
+        if not plan["changes"]:
+            return {**plan, "steps": [], "visualization": None}
+
+        results, visualization = await _run_pipeline(plan["steps"], network_id, session)
+
+        try:
+            row = _lock_active(db, tuning_id, active_network_id)
+            _record(db, row, plan, results, visualization, source)
+        except Exception:
+            db.rollback()
+            raise
+        db.commit()
+
+    if visualization is not None and queue is not None:
+        await emitters.emit_render_update(queue, visualization)
+    return {
+        "changes": plan["changes"],
+        "values": plan["values"],
+        "steps": results,
+        "visualization": visualization,
+    }
+
+
+def _lock_active(db, tuning_id, active_network_id):
+    row = (
+        for_update(db, db.query(models.ParameterTuning).filter_by(id=tuning_id))
+        .populate_existing()
+        .one()
+    )
     if row.status != "active" or row.network_id != active_network_id:
         raise TuningInactive("This tuning panel is no longer active")
+    return row
+
+
+def _plan(row, changes, *, source, schemas) -> dict:
+    """The new steps and values for `changes`; touches neither the row nor the db."""
     if not changes:
         raise TuningError("No changes given")
 
@@ -633,10 +689,11 @@ async def apply(
             by_tool[tool]["arguments"][argument] = value
         if before != value:
             diff.append({"param": param, "before": before, "after": value})
+    return {"changes": diff, "values": values, "steps": steps}
 
-    if not diff:
-        return {"changes": [], "values": values, "steps": [], "visualization": None}
 
+async def _run_pipeline(steps, network_id, session):
+    """Run every step; no db access, so no transaction is open while it awaits."""
     results, last = [], None
     for step in steps:
         try:
@@ -655,17 +712,18 @@ async def apply(
         try:
             generated = await mcp_client.execute_tool(
                 "visualization_generate",
-                {"network_id": row.network_id},
+                {"network_id": network_id},
                 session=session,
             )
         except Exception as exc:
             raise TuningExecutionError("visualization_generate", str(exc)) from exc
         visualization = generated if _is_payload(generated) else None
+    return results, visualization
 
+
+def _record(db, row, plan, results, visualization, source) -> None:
     now = datetime.now(timezone.utc)
     if visualization is not None:
-        if queue is not None:
-            await emitters.emit_render_update(queue, visualization)
         chat = db.get(models.Chat, row.chat_id)
         if chat is not None:
             chat.visualization_state = visualization
@@ -673,27 +731,20 @@ async def apply(
     history = list(row.history or [])
     history.append(
         {
-            "changes": diff,
+            "changes": plan["changes"],
             "source": source,
             "summary": results[-1]["message"] if results else "",
             "at": now.isoformat(),
         }
     )
     row.history = history[-MAX_HISTORY:]
-    row.steps = steps
-    row.values = values
+    row.steps = plan["steps"]
+    row.values = plan["values"]
     row.last_result = results
     row.last_applied_at = now
     if source == "agent":
         # The agent made (and reports) this change itself.
         row.reported_at = now
-    db.commit()
-    return {
-        "changes": diff,
-        "values": values,
-        "steps": results,
-        "visualization": visualization,
-    }
 
 
 async def apply_from_agent(
@@ -756,12 +807,9 @@ def confirm(chat, db, tuning_id, content: str):
     Returns:
         The user message text, or None on retry.
     """
-    row = (
-        db.query(models.ParameterTuning)
-        .filter_by(id=tuning_id, chat_id=chat.id)
-        .with_for_update()
-        .first()
-    )
+    row = for_update(
+        db, db.query(models.ParameterTuning).filter_by(id=tuning_id, chat_id=chat.id)
+    ).first()
     if row is None:
         raise LookupError("Tuning panel not found in this chat")
     if row.status == "confirmed":

@@ -5,6 +5,7 @@ import os
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.logging import get_logger
 
@@ -848,6 +849,10 @@ class GraphVisAgent:
             return result, "completed", None
         except Exception as e:
             logger.exception(f"Tool execution failed: {e}")
+            if isinstance(e, SQLAlchemyError):
+                # A failed statement (e.g. a row lock timeout) aborts the
+                # transaction; the turn's session is unusable until rolled back.
+                self.db.rollback()
             return {"error": str(e)}, "failed", str(e)
 
     async def _get_all_tools(self) -> List[ToolDefinition]:

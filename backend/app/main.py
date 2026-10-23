@@ -4,8 +4,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import OperationalError
 
 from app.api.v1.endpoints import auth, chat, networks, users
+from app.core.database import is_lock_timeout
 from app.core.logging import get_logger
 from app.middleware.logging import LoggingMiddleware
 
@@ -34,6 +36,16 @@ app = FastAPI(
 
 # Add logging middleware
 app.add_middleware(LoggingMiddleware)
+
+
+@app.exception_handler(OperationalError)
+async def lock_timeout_handler(request: Request, exc: OperationalError):
+    if is_lock_timeout(exc):
+        logger.warning(f"Row lock timeout on {request.method} {request.url.path}")
+        return JSONResponse(
+            status_code=409, content={"detail": "This chat is busy; try again."}
+        )
+    return await global_exception_handler(request, exc)
 
 
 @app.exception_handler(Exception)
