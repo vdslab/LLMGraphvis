@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from fastapi import (
     APIRouter,
@@ -40,6 +40,16 @@ def verify_chat_ownership(chat_id: int, user_id: int, db: Session) -> models.Cha
         raise HTTPException(status_code=404, detail="Chat not found or access denied")
 
     return chat
+
+
+def _network_has_nodes(db: Session, network_id: Optional[int]) -> bool:
+    """Whether any data has been imported into `network_id` yet."""
+    if network_id is None:
+        return False
+    return (
+        db.query(models.Node.id).filter(models.Node.network_id == network_id).first()
+        is not None
+    )
 
 
 @router.get("/providers", response_model=List[schemas.LlmProviderOption])
@@ -87,6 +97,10 @@ async def get_chat(
         if chat.visualization_state:
             logger.info(f"Returning saved visualization state for chat {chat_id}")
             vis_data = chat.visualization_state
+        elif not _network_has_nodes(db, chat.network_id):
+            # A new chat whose file is not uploaded yet: there is nothing to
+            # draw, and asking networkx-api only fails for want of a layout.
+            vis_data = None
         else:
             logger.info(
                 f"No saved visualization for chat {chat_id}, generating default."
