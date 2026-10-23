@@ -1,9 +1,9 @@
 import networkx as nx
 import pytest
-from app.logic import structure_metrics as metrics
-from app.logic.utils.graph_builder import build_graph_from_db
 from test_layout_parameters import setup_graph
 
+from app.logic import structure_metrics as metrics
+from app.logic.utils.graph_builder import build_graph_from_db
 from common import models
 
 
@@ -56,7 +56,9 @@ def test_limited_results_list_extremes_and_summarize_every_node(db):
 
     assert result["returned_count"] == 2
     assert result["omitted"] == len(full) - 2
-    assert list(result["core_numbers"].values()) == sorted(full.values(), reverse=True)[:2]
+    assert (
+        list(result["core_numbers"].values()) == sorted(full.values(), reverse=True)[:2]
+    )
     assert sum(result["summary"]["distribution"].values()) == len(full)
 
     triangles = metrics.triangle_counts(1, db, limit=1)

@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Union
 @dataclass
 class ToolDefinition:
     """Provider-agnostic tool definition."""
+
     name: str
     description: str
     parameters: Dict  # JSON Schema object
@@ -13,6 +14,7 @@ class ToolDefinition:
 @dataclass
 class FunctionCallData:
     """A function call emitted by the LLM during streaming."""
+
     name: str
     args: Dict[str, Any]
     call_id: Optional[str] = None
@@ -35,6 +37,7 @@ class UsageData:
     - reasoning_tokens: the part of output_tokens spent on reasoning, when the
       provider reports it separately (Anthropic does not; it stays 0).
     """
+
     input_tokens: int = 0
     output_tokens: int = 0
     cached_input_tokens: int = 0
@@ -65,6 +68,7 @@ class UsageData:
 @dataclass
 class TurnUsage(UsageData):
     """Usage summed over an agent turn, plus one entry per generate() call."""
+
     calls: List[Dict[str, int]] = field(default_factory=list)
 
     def add_call(self, usage: UsageData) -> None:
@@ -75,6 +79,7 @@ class TurnUsage(UsageData):
 @dataclass
 class StreamChunk:
     """A single normalized event from the LLM stream."""
+
     text: Optional[str] = None
     thought: Optional[str] = None
     function_calls: List[FunctionCallData] = field(default_factory=list)
@@ -82,6 +87,7 @@ class StreamChunk:
 
 
 # --- History message part types ---
+
 
 @dataclass
 class LLMTextPart:
@@ -100,7 +106,9 @@ class LLMFunctionCallPart:
 class LLMFunctionResponsePart:
     name: str
     response: Any
-    call_id: Optional[str] = None  # Must match the corresponding LLMFunctionCallPart.call_id
+    call_id: Optional[str] = (
+        None  # Must match the corresponding LLMFunctionCallPart.call_id
+    )
 
 
 LLMPart = Union[LLMTextPart, LLMFunctionCallPart, LLMFunctionResponsePart]
@@ -109,5 +117,6 @@ LLMPart = Union[LLMTextPart, LLMFunctionCallPart, LLMFunctionResponsePart]
 @dataclass
 class LLMMessage:
     """Provider-agnostic conversation history entry."""
+
     role: str  # "user" | "model" | "tool"
     parts: List[LLMPart]

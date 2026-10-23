@@ -62,16 +62,16 @@ def k_shortest_paths(
             "source": source,
             "target": target,
             "reachable": source == target,
-            "paths": [{"path": [source], "hops": 0, "length": 0}] if source == target else [],
+            "paths": [{"path": [source], "hops": 0, "length": 0}]
+            if source == target
+            else [],
             "is_directed": graph.is_directed(),
         }
     routes = []
     for path in itertools.islice(
         nx.shortest_simple_paths(graph, source, target, weight=weight), k
     ):
-        length = (
-            nx.path_weight(graph, path, weight) if weight else len(path) - 1
-        )
+        length = nx.path_weight(graph, path, weight) if weight else len(path) - 1
         routes.append({"path": path, "hops": len(path) - 1, "length": length})
     return {
         "source": source,
@@ -164,7 +164,11 @@ def _numeric_histogram(numbers: List[float], bins: int) -> List[Dict[str, Any]]:
     for v in numbers:
         counts[min(int((v - low) / step), bins - 1)] += 1
     return [
-        {"from": round(low + i * step, 6), "to": round(low + (i + 1) * step, 6), "count": c}
+        {
+            "from": round(low + i * step, 6),
+            "to": round(low + (i + 1) * step, 6),
+            "count": c,
+        }
         for i, c in enumerate(counts)
     ]
 
@@ -184,7 +188,9 @@ def attribute_distribution(
             f"Node attribute '{attribute}' has no values; check "
             "network_list_node_attributes or compute it first."
         )
-    node_count = db.query(models.Node).filter(models.Node.network_id == network_id).count()
+    node_count = (
+        db.query(models.Node).filter(models.Node.network_id == network_id).count()
+    )
     numeric = all(_is_number(v) for v in values.values())
     result: Dict[str, Any] = {
         "attribute": attribute,
@@ -258,7 +264,9 @@ def group_connectivity(
         "group_count": len(sizes),
         "edges_within": sum(within.values()),
         "edges_between": sum(between.values()),
-        "within_share": round(sum(within.values()) / edge_total, 6) if edge_total else None,
+        "within_share": round(sum(within.values()) / edge_total, 6)
+        if edge_total
+        else None,
         "groups": {
             g: {"nodes": sizes[g], "internal_edges": within.get(g, 0)}
             for g, _ in sizes.most_common(top)

@@ -24,7 +24,7 @@ class WeightRole(Enum):
     for explicitly.
     """
 
-    NONE = "none"          # the algorithm has no weight concept at all
+    NONE = "none"  # the algorithm has no weight concept at all
     STRENGTH = "strength"  # heavier = pulled closer together
     DISTANCE = "distance"  # heavier = placed further apart
 
@@ -93,10 +93,10 @@ class LayoutSpec:
     """Everything the orchestrator needs to know about one layout."""
 
     name: str
-    compute: Callable          # (G, params) -> {node: (x, y)}
-    params: FrozenSet[str]     # allowlist of kwargs that may reach networkx
+    compute: Callable  # (G, params) -> {node: (x, y)}
+    params: FrozenSet[str]  # allowlist of kwargs that may reach networkx
     weight_role: WeightRole = WeightRole.NONE
-    tune: Optional[Callable] = None     # (G, GraphProfile) -> Tuning
+    tune: Optional[Callable] = None  # (G, GraphProfile) -> Tuning
     prepare: Optional[Callable] = None  # (G, network_id, overrides, db) -> None
     aliases: Tuple[str, ...] = ()
     knobs: Tuple[Knob, ...] = ()
@@ -156,7 +156,9 @@ def register(
         )
         unknown = {k.param for k in spec.knobs} - spec.params
         if unknown:
-            raise ValueError(f"Layout '{name}' declares knobs it does not accept: {unknown}")
+            raise ValueError(
+                f"Layout '{name}' declares knobs it does not accept: {unknown}"
+            )
         SPECS[name] = spec
         for alias in spec.aliases:
             _ALIASES[alias] = name

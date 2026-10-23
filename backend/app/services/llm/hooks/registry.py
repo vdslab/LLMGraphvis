@@ -90,8 +90,7 @@ class HookRegistry:
         if tool_name is None:
             return list(regs)
         return [
-            r for r in regs
-            if r.tools == "*" or fnmatch.fnmatch(tool_name, r.tools)
+            r for r in regs if r.tools == "*" or fnmatch.fnmatch(tool_name, r.tools)
         ]
 
     async def _call(self, reg: Registration, ctx: HookContext) -> HookResult:
@@ -209,9 +208,7 @@ def load_builtin_hooks() -> HookRegistry:
     _builtins_loaded = True
     logger.info(
         "Builtin hooks loaded: "
-        + ", ".join(
-            f"{e.value}={len(registry.registered(e))}" for e in HookEvent
-        )
+        + ", ".join(f"{e.value}={len(registry.registered(e))}" for e in HookEvent)
     )
     return registry
 

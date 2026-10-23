@@ -5,8 +5,8 @@ import sys
 backend_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../backend"))
 sys.path.append(backend_path)
 
-from common.models import Base
 from app.core.database import engine
+from common.models import Base
 
 
 def reset_db():

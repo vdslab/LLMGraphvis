@@ -30,8 +30,7 @@ def prepare_bipartite(G, network_id, overrides, db):
     values = load_node_attribute_values(network_id, partition_attr, db)
     if not values:
         raise ValueError(
-            f"Node attribute '{partition_attr}' has no values on network "
-            f"{network_id}."
+            f"Node attribute '{partition_attr}' has no values on network {network_id}."
         )
 
     distinct = sorted({str(v) for v in values.values()})

@@ -8,6 +8,7 @@ import asyncio
 from unittest.mock import patch
 
 import pytest
+
 from app.services.llm import mcp_client
 
 
@@ -39,8 +40,9 @@ async def test_the_timeout_also_covers_opening_the_session():
         async def __aexit__(self, *exc):
             return False
 
-    with patch.object(mcp_client, "CALL_TIMEOUT_SECONDS", 0.05), patch.object(
-        mcp_client, "session_scope", lambda: _StalledScope()
+    with (
+        patch.object(mcp_client, "CALL_TIMEOUT_SECONDS", 0.05),
+        patch.object(mcp_client, "session_scope", lambda: _StalledScope()),
     ):
         with pytest.raises(mcp_client.ToolTimeoutError):
             await mcp_client.execute_tool("layout_forceatlas2", {"network_id": 1})

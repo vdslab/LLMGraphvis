@@ -112,14 +112,24 @@ class TestScore:
         good = nx.spring_layout(G, seed=1, iterations=200)
         bad = {node: (0.001 * i, 0.001 * i) for i, node in enumerate(G)}
         bad["Valjean"] = (100, 100)
-        assert lq.evaluate(good, G.edges, 50).score < lq.evaluate(bad, G.edges, 50).score
+        assert (
+            lq.evaluate(good, G.edges, 50).score < lq.evaluate(bad, G.edges, 50).score
+        )
 
     def test_compact_dict_shape(self):
         pos, edges = _square_with_diagonals()
         out = lq.evaluate(pos, edges, sizes=1).as_dict()
         assert set(out) == {
-            "node_overlap", "crossings", "crossings_per_edge", "crossings_sampled",
-            "edge_length_cv", "core_extent", "aspect", "occupancy", "score", "issues",
+            "node_overlap",
+            "crossings",
+            "crossings_per_edge",
+            "crossings_sampled",
+            "edge_length_cv",
+            "core_extent",
+            "aspect",
+            "occupancy",
+            "score",
+            "issues",
         }
 
 
@@ -135,9 +145,10 @@ class TestRenderedQuality:
     """Visible renders carry metrics; low-level builds may omit them."""
 
     def test_generate_reports_quality_after_a_layout(self, db):
+        from tests.test_layout_parameters import setup_graph
+
         from app.logic.layout import calculate_layout
         from app.logic.visualization_builder import build_visualization
-        from tests.test_layout_parameters import setup_graph
 
         setup_graph(db, n=8)
         calculate_layout(1, "spring", db)
@@ -150,9 +161,10 @@ class TestRenderedQuality:
         from contextlib import contextmanager
         from unittest.mock import patch
 
+        from tests.test_layout_parameters import setup_graph
+
         from app.logic.layout import calculate_layout
         from app.mcp.tools.visualization.style import visualization_set_node_labels
-        from tests.test_layout_parameters import setup_graph
 
         setup_graph(db, n=8)
         calculate_layout(1, "spring", db)

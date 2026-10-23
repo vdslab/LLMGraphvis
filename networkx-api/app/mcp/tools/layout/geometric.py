@@ -1,9 +1,11 @@
+import logging
 from typing import Annotated, List, Optional, Tuple
+
 from pydantic import Field
-from app.core.mcp import mcp
+
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
-import logging
+from app.core.mcp import mcp
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,9 @@ _CENTER_DESC = (
 def layout_circular(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     scale: Annotated[Optional[float], Field(description=_SCALE_DESC)] = None,
-    center: Annotated[Optional[Tuple[float, float]], Field(description=_CENTER_DESC)] = None,
+    center: Annotated[
+        Optional[Tuple[float, float]], Field(description=_CENTER_DESC)
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -54,21 +58,36 @@ def layout_circular(
     """
     with get_db_context() as db:
         from app.logic import layout
+
         overrides = {"scale": scale, "center": center}
         info = layout.calculate_layout(
             network_id, "circular", db, overrides=overrides, force=force_recompute
         )
-        return layout.format_layout_result(info, "Circular layout calculated. Call `visualization_generate` to render.")
+        return layout.format_layout_result(
+            info, "Circular layout calculated. Call `visualization_generate` to render."
+        )
 
 
 @mcp.tool()
 @handle_tool_errors
 def layout_shell(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    nlist: Annotated[Optional[List[List[str]]], Field(description="List of lists of node IDs, one inner list per concentric shell (innermost first). Node IDs must match the graph's node IDs. This is the parameter that makes the layout meaningful: use it to place a grouping (e.g. one shell per community, or core nodes inside and periphery outside). Defaults to a single shell containing all nodes, which is identical to a circular layout.")] = None,
-    rotate: Annotated[Optional[float], Field(description="Angle in radians by which each successive shell is rotated relative to the previous one. Reduces radial alignment of nodes across shells, which can make edges easier to follow.")] = None,
+    nlist: Annotated[
+        Optional[List[List[str]]],
+        Field(
+            description="List of lists of node IDs, one inner list per concentric shell (innermost first). Node IDs must match the graph's node IDs. This is the parameter that makes the layout meaningful: use it to place a grouping (e.g. one shell per community, or core nodes inside and periphery outside). Defaults to a single shell containing all nodes, which is identical to a circular layout."
+        ),
+    ] = None,
+    rotate: Annotated[
+        Optional[float],
+        Field(
+            description="Angle in radians by which each successive shell is rotated relative to the previous one. Reduces radial alignment of nodes across shells, which can make edges easier to follow."
+        ),
+    ] = None,
     scale: Annotated[Optional[float], Field(description=_SCALE_DESC)] = None,
-    center: Annotated[Optional[Tuple[float, float]], Field(description=_CENTER_DESC)] = None,
+    center: Annotated[
+        Optional[Tuple[float, float]], Field(description=_CENTER_DESC)
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -89,6 +108,7 @@ def layout_shell(
     """
     with get_db_context() as db:
         from app.logic import layout
+
         overrides = {
             "nlist": nlist,
             "rotate": rotate,
@@ -98,17 +118,31 @@ def layout_shell(
         info = layout.calculate_layout(
             network_id, "shell", db, overrides=overrides, force=force_recompute
         )
-        return layout.format_layout_result(info, "Shell layout calculated. Call `visualization_generate` to render.")
+        return layout.format_layout_result(
+            info, "Shell layout calculated. Call `visualization_generate` to render."
+        )
 
 
 @mcp.tool()
 @handle_tool_errors
 def layout_spiral(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    resolution: Annotated[Optional[float], Field(description="Compactness of the spiral: the angle between successive nodes. Lower values wind the spiral more tightly (more turns); higher values make it looser.")] = None,
-    equidistant: Annotated[Optional[bool], Field(description="If True, nodes are spaced at equal arc distance along the spiral instead of at equal angles, which keeps outer nodes from spreading further apart than inner ones.")] = None,
+    resolution: Annotated[
+        Optional[float],
+        Field(
+            description="Compactness of the spiral: the angle between successive nodes. Lower values wind the spiral more tightly (more turns); higher values make it looser."
+        ),
+    ] = None,
+    equidistant: Annotated[
+        Optional[bool],
+        Field(
+            description="If True, nodes are spaced at equal arc distance along the spiral instead of at equal angles, which keeps outer nodes from spreading further apart than inner ones."
+        ),
+    ] = None,
     scale: Annotated[Optional[float], Field(description=_SCALE_DESC)] = None,
-    center: Annotated[Optional[Tuple[float, float]], Field(description=_CENTER_DESC)] = None,
+    center: Annotated[
+        Optional[Tuple[float, float]], Field(description=_CENTER_DESC)
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -129,6 +163,7 @@ def layout_spiral(
     """
     with get_db_context() as db:
         from app.logic import layout
+
         overrides = {
             "resolution": resolution,
             "equidistant": equidistant,
@@ -138,15 +173,28 @@ def layout_spiral(
         info = layout.calculate_layout(
             network_id, "spiral", db, overrides=overrides, force=force_recompute
         )
-        return layout.format_layout_result(info, "Spiral layout calculated. Call `visualization_generate` to render.")
+        return layout.format_layout_result(
+            info, "Spiral layout calculated. Call `visualization_generate` to render."
+        )
 
 
 @mcp.tool()
 @handle_tool_errors
 def layout_random(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    seed: Annotated[Optional[int], Field(description="Random seed. Defaults to 42; null uses fresh randomness. Cached coordinates are reused unless force_recompute=True.")] = 42,
-    center: Annotated[Optional[Tuple[float, float]], Field(description=_CENTER_DESC + " NOTE: unlike the other geometric layouts, networkx's random_layout has no `scale` parameter, so none is offered here.")] = None,
+    seed: Annotated[
+        Optional[int],
+        Field(
+            description="Random seed. Defaults to 42; null uses fresh randomness. Cached coordinates are reused unless force_recompute=True."
+        ),
+    ] = 42,
+    center: Annotated[
+        Optional[Tuple[float, float]],
+        Field(
+            description=_CENTER_DESC
+            + " NOTE: unlike the other geometric layouts, networkx's random_layout has no `scale` parameter, so none is offered here."
+        ),
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -167,8 +215,11 @@ def layout_random(
     """
     with get_db_context() as db:
         from app.logic import layout
+
         overrides = {"seed": seed, "center": center}
         info = layout.calculate_layout(
             network_id, "random", db, overrides=overrides, force=force_recompute
         )
-        return layout.format_layout_result(info, "Random layout calculated. Call `visualization_generate` to render.")
+        return layout.format_layout_result(
+            info, "Random layout calculated. Call `visualization_generate` to render."
+        )

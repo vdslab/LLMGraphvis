@@ -1,9 +1,9 @@
 import networkx as nx
 import pytest
-from app.logic.importer import parse_and_save_graphml
-from app.logic.utils.graph_builder import build_graph_from_db
 from test_layout_parameters import setup_graph
 
+from app.logic.importer import parse_and_save_graphml
+from app.logic.utils.graph_builder import build_graph_from_db
 from common import models
 
 

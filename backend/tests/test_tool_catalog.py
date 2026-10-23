@@ -248,7 +248,12 @@ def test_restoring_a_renamed_tool_degrades_to_loading_it_again(monkeypatch):
 def test_turns_that_do_not_resume_start_from_the_discovery_set(monkeypatch):
     monkeypatch.delenv("TOOL_EXPOSURE_MODE", raising=False)
     catalog = ToolCatalog(
-        [tool("analysis_alpha"), tool("skill_load"), tool("tool_search"), tool("ask_user")]
+        [
+            tool("analysis_alpha"),
+            tool("skill_load"),
+            tool("tool_search"),
+            tool("ask_user"),
+        ]
     )
     state = {"enabled_tool_names": {"analysis_alpha"}}
     catalog.initialize_turn(state)

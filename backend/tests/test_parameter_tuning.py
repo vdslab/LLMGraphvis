@@ -36,7 +36,10 @@ TOOLS = [
                     "default": 1.0,
                     "description": "Below 1 favors larger communities.",
                 },
-                "seed": {"anyOf": [{"type": "integer"}, {"type": "null"}], "default": 42},
+                "seed": {
+                    "anyOf": [{"type": "integer"}, {"type": "null"}],
+                    "default": 42,
+                },
                 "max_level": {
                     "anyOf": [{"type": "integer", "minimum": 1}, {"type": "null"}],
                     "default": None,
@@ -96,7 +99,11 @@ def _turn(chat, *calls):
     catalog.initialize_turn(state)
     catalog.activate([name for name, _, _ in calls], state)
     state["executed_calls"] = [
-        {"name": name, "args": {"network_id": chat.network_id, **args}, "status": status}
+        {
+            "name": name,
+            "args": {"network_id": chat.network_id, **args},
+            "status": status,
+        }
         for name, args, status in calls
     ]
     return state
@@ -124,7 +131,11 @@ def _form(**field_overrides):
         "high_label": "細かく分ける",
     }
     field.update(field_overrides)
-    return {"question": "コミュニティの粒度", "tools": [LOUVAIN, COLOR], "fields": [field]}
+    return {
+        "question": "コミュニティの粒度",
+        "tools": [LOUVAIN, COLOR],
+        "fields": [field],
+    }
 
 
 def _offer(db, chat, form=None, state=None):
@@ -176,14 +187,27 @@ def test_offer_never_executes_the_suggestion(db, chat):
         (_form(suggested=1.55), "suggested"),
         ({**_form(), "tools": [LOUVAIN, COLOR, FA2]}, "has not run successfully"),
         (
-            {**_form(), "tools": ["subgraph_k_core"], "fields": [
-                {"tool": "subgraph_k_core", "argument": "k", "kind": "number"}
-            ]},
+            {
+                **_form(),
+                "tools": ["subgraph_k_core"],
+                "fields": [
+                    {"tool": "subgraph_k_core", "argument": "k", "kind": "number"}
+                ],
+            },
             "cannot be re-run",
         ),
         (_form(tool=COLOR, argument="attribute"), "not numeric"),
-        (_form(tool=LOUVAIN, argument="max_level", minimum=1, maximum=5, step=0.5,
-               suggested=None), "whole"),
+        (
+            _form(
+                tool=LOUVAIN,
+                argument="max_level",
+                minimum=1,
+                maximum=5,
+                step=0.5,
+                suggested=None,
+            ),
+            "whole",
+        ),
     ],
 )
 def test_offer_rejects_what_cannot_be_rerun_faithfully(db, chat, form, message):
@@ -201,8 +225,13 @@ def test_automatic_default_needs_a_suggestion(db, chat):
         "question": "広がり",
         "tools": [FA2],
         "fields": [
-            {"tool": FA2, "argument": "scaling_ratio", "kind": "slider",
-             "minimum": 1, "maximum": 50},
+            {
+                "tool": FA2,
+                "argument": "scaling_ratio",
+                "kind": "slider",
+                "minimum": 1,
+                "maximum": 50,
+            },
         ],
     }
     result = tuning.present_tuning(chat.id, db, form, state)
@@ -244,8 +273,12 @@ async def test_form_apply_reruns_pipeline_draws_and_records_history(db, chat):
 
     with _remote({"content": "Saved."}, {"message": "colored"}, PAYLOAD) as remote:
         outcome = await tuning.apply(
-            db, row, {f"{LOUVAIN}.resolution": 2.0},
-            source="form", active_network_id=chat.network_id, queue=queue,
+            db,
+            row,
+            {f"{LOUVAIN}.resolution": 2.0},
+            source="form",
+            active_network_id=chat.network_id,
+            queue=queue,
         )
 
     calls = [(c.args[0], c.args[1]) for c in remote.call_args_list]
@@ -268,31 +301,44 @@ async def test_form_apply_reruns_pipeline_draws_and_records_history(db, chat):
 async def test_agent_changes_several_parameters_including_non_fields_at_once(db, chat):
     form = _form()
     form["fields"].append(
-        {"tool": COLOR, "argument": "palette", "kind": "select",
-         "options": ["tableau10", "set2"]}
+        {
+            "tool": COLOR,
+            "argument": "palette",
+            "kind": "select",
+            "options": ["tableau10", "set2"],
+        }
     )
     state = _turn(
         chat,
         (LOUVAIN, {"resolution": 1.0}, "completed"),
-        (COLOR, {"attribute": "louvain_community", "palette": "tableau10"}, "completed"),
+        (
+            COLOR,
+            {"attribute": "louvain_community", "palette": "tableau10"},
+            "completed",
+        ),
     )
     panel = tuning.present_tuning(chat.id, db, form, state)["parameter_tuning"]
 
     with _remote({"content": "Saved."}, PAYLOAD) as remote:
         result = await tuning.apply_from_agent(
-            chat.id, db,
-            {"changes": [
-                {"param": f"{LOUVAIN}.resolution", "value": 0.6},
-                {"param": f"{LOUVAIN}.seed", "value": 7},
-                {"param": f"{COLOR}.palette", "value": "set2"},
-            ]},
+            chat.id,
+            db,
+            {
+                "changes": [
+                    {"param": f"{LOUVAIN}.resolution", "value": 0.6},
+                    {"param": f"{LOUVAIN}.seed", "value": 7},
+                    {"param": f"{COLOR}.palette", "value": "set2"},
+                ]
+            },
             state,
         )
 
     assert remote.await_count == 2  # one pipeline run, payload came from the last step
     assert remote.call_args_list[0].args[1]["seed"] == 7
     assert {c["param"] for c in result["changes"]} == {
-        f"{LOUVAIN}.resolution", f"{LOUVAIN}.seed", f"{COLOR}.palette",
+        f"{LOUVAIN}.resolution",
+        f"{LOUVAIN}.seed",
+        f"{COLOR}.palette",
     }
     db.expire_all()
     row = db.get(models.ParameterTuning, panel["id"])
@@ -305,15 +351,24 @@ async def test_agent_changes_several_parameters_including_non_fields_at_once(db,
 async def test_partial_change_keeps_other_values(db, chat):
     form = _form()
     form["fields"].append(
-        {"tool": LOUVAIN, "argument": "max_level", "kind": "number",
-         "minimum": 1, "maximum": 10, "suggested": 3}
+        {
+            "tool": LOUVAIN,
+            "argument": "max_level",
+            "kind": "number",
+            "minimum": 1,
+            "maximum": 10,
+            "suggested": 3,
+        }
     )
     panel = _offer(db, chat, form=form)[0]["parameter_tuning"]
     row = db.get(models.ParameterTuning, panel["id"])
     with _remote({"content": "ok"}, PAYLOAD):
         await tuning.apply(
-            db, row, {f"{LOUVAIN}.resolution": 0.5},
-            source="form", active_network_id=chat.network_id,
+            db,
+            row,
+            {f"{LOUVAIN}.resolution": 0.5},
+            source="form",
+            active_network_id=chat.network_id,
         )
     assert row.values[f"{LOUVAIN}.max_level"] == 3
     assert row.steps[0]["arguments"]["resolution"] == 0.5
@@ -358,8 +413,11 @@ async def test_failed_step_leaves_state_untouched(db, chat):
     with _remote({"content": "ok"}, {"error": "boom"}):
         with pytest.raises(tuning.TuningExecutionError, match="boom"):
             await tuning.apply(
-                db, row, {f"{LOUVAIN}.resolution": 2.0},
-                source="form", active_network_id=chat.network_id,
+                db,
+                row,
+                {f"{LOUVAIN}.resolution": 2.0},
+                source="form",
+                active_network_id=chat.network_id,
             )
     db.expire_all()
     row = db.get(models.ParameterTuning, panel["id"])
@@ -370,7 +428,9 @@ async def test_failed_step_leaves_state_untouched(db, chat):
 @pytest.mark.asyncio
 async def test_agent_without_active_panel_is_told_to_rerun_directly(db, chat):
     result = await tuning.apply_from_agent(
-        chat.id, db, {"changes": [{"param": f"{LOUVAIN}.resolution", "value": 2}]},
+        chat.id,
+        db,
+        {"changes": [{"param": f"{LOUVAIN}.resolution", "value": 2}]},
         _louvain_turn(chat),
     )
     assert "No active tuning panel" in result["error"]
@@ -383,13 +443,16 @@ async def test_agent_without_active_panel_is_told_to_rerun_directly(db, chat):
 async def test_form_endpoint_applies_and_rejects_non_fields(db, chat):
     panel = _offer(db, chat)[0]["parameter_tuning"]
     user = db.get(models.User, chat.user_id)
-    with _remote({"content": "ok"}, PAYLOAD), patch(
-        "app.services.llm.get_event_queue", new_callable=AsyncMock
+    with (
+        _remote({"content": "ok"}, PAYLOAD),
+        patch("app.services.llm.get_event_queue", new_callable=AsyncMock),
     ):
         response = await apply_parameter_tuning(
-            chat.id, panel["id"],
+            chat.id,
+            panel["id"],
             schemas.TuningApplyRequest(values={f"{LOUVAIN}.resolution": 1.8}),
-            user, db,
+            user,
+            db,
         )
     assert response["visualization"] == PAYLOAD
     assert response["tuning"]["values"] == {f"{LOUVAIN}.resolution": 1.8}
@@ -400,9 +463,11 @@ async def test_form_endpoint_applies_and_rejects_non_fields(db, chat):
     with patch("app.services.llm.get_event_queue", new_callable=AsyncMock):
         with pytest.raises(HTTPException) as error:
             await apply_parameter_tuning(
-                chat.id, panel["id"],
+                chat.id,
+                panel["id"],
                 schemas.TuningApplyRequest(values={f"{LOUVAIN}.seed": 1}),
-                user, db,
+                user,
+                db,
             )
     assert error.value.status_code == 422
 
@@ -416,7 +481,9 @@ async def test_confirm_resumes_with_the_panel_tools_and_is_idempotent(db, chat):
         message={"content": "この値で決定"}, parameter_tuning_id=panel["id"]
     )
     tasks = BackgroundTasks()
-    assert await process_message(chat.id, payload, tasks, user, db) == {"status": "accepted"}
+    assert await process_message(chat.id, payload, tasks, user, db) == {
+        "status": "accepted"
+    }
     assert tasks.tasks[0].args[2] is True  # resumed_from_input
     message = db.query(models.ChatMessage).one().content
     assert message.startswith("この値で決定")
@@ -431,9 +498,11 @@ async def test_confirm_resumes_with_the_panel_tools_and_is_idempotent(db, chat):
 
     with pytest.raises(tuning.TuningInactive):
         await tuning.apply(
-            db, db.get(models.ParameterTuning, panel["id"]),
+            db,
+            db.get(models.ParameterTuning, panel["id"]),
             {f"{LOUVAIN}.resolution": 2.0},
-            source="form", active_network_id=chat.network_id,
+            source="form",
+            active_network_id=chat.network_id,
         )
 
 
@@ -446,14 +515,20 @@ async def test_context_block_reports_values_and_unreported_panel_changes_once(db
     row = db.get(models.ParameterTuning, panel["id"])
     with _remote({"content": "ok"}, PAYLOAD):
         await tuning.apply(
-            db, row, {f"{LOUVAIN}.resolution": 2.0},
-            source="form", active_network_id=chat.network_id,
+            db,
+            row,
+            {f"{LOUVAIN}.resolution": 2.0},
+            source="form",
+            active_network_id=chat.network_id,
         )
 
     def turn_start():
         ctx = hooks.build_context(
             hooks.HookEvent.TURN_START,
-            chat_id=chat.id, network_id=chat.network_id, turn_state={}, db=db,
+            chat_id=chat.id,
+            network_id=chat.network_id,
+            turn_state={},
+            db=db,
         )
         inject_active_tuning(ctx)
         return "\n".join(ctx.context_additions)
@@ -467,11 +542,18 @@ async def test_context_block_reports_values_and_unreported_panel_changes_once(db
 
 
 def test_offer_is_exposed_only_after_a_tunable_tool(db, chat):
-    for tool, exposed in [("subgraph_k_core", False), ("skill_load", False), (LOUVAIN, True)]:
+    for tool, exposed in [
+        ("subgraph_k_core", False),
+        ("skill_load", False),
+        (LOUVAIN, True),
+    ]:
         state = _turn(chat)
         ctx = hooks.build_context(
             hooks.HookEvent.POST_TOOL,
-            chat_id=chat.id, network_id=chat.network_id, turn_state=state, tool_name=tool,
+            chat_id=chat.id,
+            network_id=chat.network_id,
+            turn_state=state,
+            tool_name=tool,
         )
         expose_tuning_offer(ctx)
         assert ("offer_parameter_tuning" in state["enabled_tool_names"]) is exposed
@@ -501,9 +583,14 @@ async def test_turn_with_active_panel_exposes_apply_tool(db, chat):
     async def no_session():
         yield None
 
-    with patch(
-        "app.services.llm.mcp_client.get_tools", new_callable=AsyncMock, return_value=TOOLS
-    ), patch("app.services.llm.mcp_client.session_scope", no_session):
+    with (
+        patch(
+            "app.services.llm.mcp_client.get_tools",
+            new_callable=AsyncMock,
+            return_value=TOOLS,
+        ),
+        patch("app.services.llm.mcp_client.session_scope", no_session),
+    ):
         await agent.process_turn([], AsyncMock(), chat.id, chat.network_id)
 
     assert "apply_parameter_tuning" in exposed[0]
@@ -513,10 +600,13 @@ async def test_turn_with_active_panel_exposes_apply_tool(db, chat):
 def test_summary_counts_categories_of_the_redrawn_color():
     payload = {
         **PAYLOAD,
-        "legend": {"node_color": {
-            "type": "categorical", "attribute": "louvain_community",
-            "mapping": {"0": "#4e79a7", "1": "#f28e2b", "2": "#e15759"},
-        }},
+        "legend": {
+            "node_color": {
+                "type": "categorical",
+                "attribute": "louvain_community",
+                "mapping": {"0": "#4e79a7", "1": "#f28e2b", "2": "#e15759"},
+            }
+        },
     }
     assert tuning._summarize(payload).endswith("louvain_community: 3 categories")
 
@@ -527,7 +617,11 @@ def test_summary_counts_categories_of_the_redrawn_color():
 def test_field_accepts_min_max_default_aliases(db, chat):
     form = _form()
     field = form["fields"][0]
-    field["min"], field["max"], field["default"] = field.pop("minimum"), field.pop("maximum"), field.pop("suggested")
+    field["min"], field["max"], field["default"] = (
+        field.pop("minimum"),
+        field.pop("maximum"),
+        field.pop("suggested"),
+    )
     panel = _offer(db, chat, form=form)[0]["parameter_tuning"]
     assert panel["fields"][0]["minimum"] == 0.2
     assert panel["suggested_values"] == {f"{LOUVAIN}.resolution": 1.5}
@@ -537,23 +631,30 @@ def test_offer_in_a_later_turn_uses_the_earlier_calls(db, chat):
     message = models.ChatMessage(chat_id=chat.id, role="model", content="done")
     db.add(message)
     db.flush()
-    db.add_all([
-        models.ToolExecution(
-            message_id=message.id, tool_name=LOUVAIN, status="completed",
-            arguments={"network_id": chat.network_id, "resolution": 0.8},
-        ),
-        models.ToolExecution(
-            message_id=message.id, tool_name=COLOR, status="completed",
-            arguments={"attribute": "louvain_community"},
-        ),
-    ])
+    db.add_all(
+        [
+            models.ToolExecution(
+                message_id=message.id,
+                tool_name=LOUVAIN,
+                status="completed",
+                arguments={"network_id": chat.network_id, "resolution": 0.8},
+            ),
+            models.ToolExecution(
+                message_id=message.id,
+                tool_name=COLOR,
+                status="completed",
+                arguments={"attribute": "louvain_community"},
+            ),
+        ]
+    )
     db.commit()
 
     panel = _offer(db, chat, state=_turn(chat))[0]["parameter_tuning"]
 
     assert panel["values"] == {f"{LOUVAIN}.resolution": 0.8}
     assert panel["steps"][1]["arguments"] == {
-        "attribute": "louvain_community", "network_id": chat.network_id,
+        "attribute": "louvain_community",
+        "network_id": chat.network_id,
     }
 
 
@@ -561,19 +662,28 @@ def test_offer_ignores_calls_made_on_another_network(db, chat):
     message = models.ChatMessage(chat_id=chat.id, role="model", content="done")
     db.add(message)
     db.flush()
-    db.add(models.ToolExecution(
-        message_id=message.id, tool_name=LOUVAIN, status="completed",
-        arguments={"network_id": chat.network_id + 999, "resolution": 0.8},
-    ))
+    db.add(
+        models.ToolExecution(
+            message_id=message.id,
+            tool_name=LOUVAIN,
+            status="completed",
+            arguments={"network_id": chat.network_id + 999, "resolution": 0.8},
+        )
+    )
     db.commit()
-    result, _ = _offer(db, chat, state=_turn(chat, (COLOR, {"attribute": "x"}, "completed")))
+    result, _ = _offer(
+        db, chat, state=_turn(chat, (COLOR, {"attribute": "x"}, "completed"))
+    )
     assert "has not run successfully on the current view" in result["error"]
 
 
 def _no_calls(chat, db, state, text="6つのコミュニティに色分けしました。"):
     return hooks.build_context(
         hooks.HookEvent.NO_TOOL_CALLS,
-        chat_id=chat.id, network_id=chat.network_id, turn_state=state, db=db,
+        chat_id=chat.id,
+        network_id=chat.network_id,
+        turn_state=state,
+        db=db,
         assistant_text=text,
     )
 
@@ -612,14 +722,24 @@ def test_arf_result_can_offer_a_panel_after_render(db, chat):
     [
         ([(COLOR, {"attribute": "x"}, "completed")], "done", False),
         ([(LOUVAIN, {}, "completed")], "done", False),
-        ([(LOUVAIN, {}, "completed"), ("visualization_get_state", {}, "completed")], "done", False),
+        (
+            [(LOUVAIN, {}, "completed"), ("visualization_get_state", {}, "completed")],
+            "done",
+            False,
+        ),
         ([(FA2, {}, "completed")], "done", False),
-        ([(LOUVAIN, {}, "completed"), ("offer_parameter_tuning", {}, "failed")], "done", False),
+        (
+            [(LOUVAIN, {}, "completed"), ("offer_parameter_tuning", {}, "failed")],
+            "done",
+            False,
+        ),
         ([(LOUVAIN, {}, "completed")], "", False),
         ([(LOUVAIN, {}, "completed")], "done", True),
     ],
 )
-def test_nudge_stays_quiet_when_a_panel_is_not_the_missing_piece(db, chat, calls, text, active):
+def test_nudge_stays_quiet_when_a_panel_is_not_the_missing_piece(
+    db, chat, calls, text, active
+):
     from app.services.llm.hooks.builtin.tuning import nudge_tuning_offer
 
     if active:
@@ -638,16 +758,25 @@ def test_tuning_request_about_an_earlier_view_exposes_the_offer(db, chat):
         (COLOR, {"attribute": "louvain_community"}),
         ("skill_load", {"name": "x"}),
     ]:
-        db.add(models.ToolExecution(
-            message_id=message.id, tool_name=name, status="completed", arguments=args,
-        ))
+        db.add(
+            models.ToolExecution(
+                message_id=message.id,
+                tool_name=name,
+                status="completed",
+                arguments=args,
+            )
+        )
     db.commit()
 
     def turn_start(text):
         state = {}
         ctx = hooks.build_context(
-            hooks.HookEvent.TURN_START, chat_id=chat.id, network_id=chat.network_id,
-            turn_state=state, db=db, user_text=text,
+            hooks.HookEvent.TURN_START,
+            chat_id=chat.id,
+            network_id=chat.network_id,
+            turn_state=state,
+            db=db,
+            user_text=text,
         )
         inject_active_tuning(ctx)
         return state, "\n".join(ctx.context_additions)

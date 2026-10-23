@@ -47,13 +47,21 @@ def legacy_params(name: str, G) -> dict:
         iterations, threshold = (
             (1000, 1e-6) if n < 500 else (500, 1e-5) if n < 2000 else (200, 1e-4)
         )
-        return {"k": 2.0 / math.sqrt(n), "iterations": iterations,
-                "threshold": threshold, "seed": 42}
+        return {
+            "k": 2.0 / math.sqrt(n),
+            "iterations": iterations,
+            "threshold": threshold,
+            "seed": 42,
+        }
     if name == "forceatlas2":
         avg_degree = 2 * G.number_of_edges() / n if n else 0
-        return {"max_iter": max(200, min(2000, n)),
-                "scaling_ratio": max(2.0, min(10.0, avg_degree * 0.5)),
-                "gravity": 1.0, "jitter_tolerance": 1.0, "seed": 42}
+        return {
+            "max_iter": max(200, min(2000, n)),
+            "scaling_ratio": max(2.0, min(10.0, avg_degree * 0.5)),
+            "gravity": 1.0,
+            "jitter_tolerance": 1.0,
+            "seed": 42,
+        }
     if name == "arf":
         return {"max_iter": 1000 if n < 500 else (500 if n < 2000 else 200)}
     return {}
@@ -75,7 +83,9 @@ def load_graphs(data_dir: Path, max_nodes: int):
     graphs["synthetic_fragmented"] = fragmented
     graphs["synthetic_tree300"] = nx.random_labeled_tree(300, seed=1)
     graphs["synthetic_ba500"] = nx.barabasi_albert_graph(500, 2, seed=1)
-    graphs["synthetic_grid"] = nx.convert_node_labels_to_integers(nx.grid_2d_graph(15, 15))
+    graphs["synthetic_grid"] = nx.convert_node_labels_to_integers(
+        nx.grid_2d_graph(15, 15)
+    )
     return {k: v for k, v in graphs.items() if v.number_of_nodes() <= max_nodes}
 
 
@@ -107,17 +117,23 @@ def rows_for(graph_name, G, layout_name):
     def record(variant, graph, params, report=None, seconds=None):
         if report is None:
             report, seconds = draw(spec, graph, params, size)
-        rows.append({
-            "graph": graph_name, "nodes": graph.number_of_nodes(),
-            "edges": graph.number_of_edges(), "layout": layout_name,
-            "variant": variant, "seconds": round(seconds, 3),
-            **{k: v for k, v in report.as_dict().items() if k != "issues"},
-            "issues": " ".join(report.issues),
-            "params": json.dumps(
-                {k: v for k, v in params.items() if not isinstance(v, dict)},
-                sort_keys=True, default=str,
-            ),
-        })
+        rows.append(
+            {
+                "graph": graph_name,
+                "nodes": graph.number_of_nodes(),
+                "edges": graph.number_of_edges(),
+                "layout": layout_name,
+                "variant": variant,
+                "seconds": round(seconds, 3),
+                **{k: v for k, v in report.as_dict().items() if k != "issues"},
+                "issues": " ".join(report.issues),
+                "params": json.dumps(
+                    {k: v for k, v in params.items() if not isinstance(v, dict)},
+                    sort_keys=True,
+                    default=str,
+                ),
+            }
+        )
 
     record("nx_default", G, {"seed": 42} if "seed" in spec.params else {})
 
@@ -125,7 +141,9 @@ def rows_for(graph_name, G, layout_name):
     legacy = legacy_params(layout_name, G)
     if raw is not None:
         record("legacy", raw, {**legacy, "weight": "weight"})
-        record("legacy_x10", with_weights(G, 10.0, False), {**legacy, "weight": "weight"})
+        record(
+            "legacy_x10", with_weights(G, 10.0, False), {**legacy, "weight": "weight"}
+        )
     else:
         record("legacy", G, legacy)
 
@@ -151,7 +169,9 @@ def main():
     parser.add_argument("--out", type=Path, default=Path("layout_quality.csv"))
     parser.add_argument("--layouts", nargs="+", default=list(LAYOUTS))
     parser.add_argument(
-        "--max-nodes", type=int, default=800,
+        "--max-nodes",
+        type=int,
+        default=800,
         help="Skip larger graphs; ForceAtlas2 is O(n^2) per iteration.",
     )
     args = parser.parse_args()
@@ -160,7 +180,10 @@ def main():
     rows = []
     for graph_name, G in graphs.items():
         for layout_name in args.layouts:
-            print(f"{graph_name} ({G.number_of_nodes()} nodes) / {layout_name}", flush=True)
+            print(
+                f"{graph_name} ({G.number_of_nodes()} nodes) / {layout_name}",
+                flush=True,
+            )
             rows.extend(rows_for(graph_name, G, layout_name))
 
     with args.out.open("w", newline="") as f:

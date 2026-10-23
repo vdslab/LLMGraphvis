@@ -6,6 +6,7 @@ assert on refusal, not on advice.
 """
 
 import pytest
+
 from app.services.llm import markup
 from app.services.llm.hooks.builtin import guards, intent, normalize
 from app.services.llm.hooks.types import HookContext, HookEvent, new_turn_state
@@ -245,7 +246,6 @@ class TestGuardAttributeExists:
     def test_no_attributes_known_means_no_block(self):
         c = ctx("visualization_set_node_color", {"attribute": "club"}, node_attrs=[])
         assert guards.guard_attribute_exists(c) is None
-
 
 
 class TestGuardChannelOverwrite:
@@ -677,7 +677,10 @@ def test_unexposed_known_tool_is_deferred():
     from app.services.llm.hooks.types import HookContext, HookEvent
 
     catalog = ToolCatalog(
-        [ToolDefinition("skill_load", "", {}), ToolDefinition("analysis_pagerank", "", {})]
+        [
+            ToolDefinition("skill_load", "", {}),
+            ToolDefinition("analysis_pagerank", "", {}),
+        ]
     )
     state = {}
     catalog.initialize_turn(state)
@@ -727,7 +730,9 @@ class TestGuardNetworkOwnership:
 
     def test_allows_own_subgraph_and_root(self, owned):
         for network_id in (10, 11):
-            c = self._ctx(owned, "visualization_switch_network", {"network_id": network_id})
+            c = self._ctx(
+                owned, "visualization_switch_network", {"network_id": network_id}
+            )
             assert guards.guard_network_ownership(c) is None
 
     def test_denies_another_users_network(self, owned):
@@ -737,7 +742,9 @@ class TestGuardNetworkOwnership:
             assert decision.action == "deny", tool
 
     def test_denies_any_network_id_argument(self, owned):
-        c = self._ctx(owned, "subgraph_future", {"network_id": 11, "source_network_id": 20})
+        c = self._ctx(
+            owned, "subgraph_future", {"network_id": 11, "source_network_id": 20}
+        )
         assert guards.guard_network_ownership(c).action == "deny"
 
     def test_denies_missing_network(self, owned):

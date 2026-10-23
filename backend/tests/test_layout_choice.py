@@ -3,7 +3,10 @@
 import pytest
 
 from app.services.llm import hooks
-from app.services.llm.hooks.builtin.tuning import nudge_layout_choice, nudge_tuning_offer
+from app.services.llm.hooks.builtin.tuning import (
+    nudge_layout_choice,
+    nudge_tuning_offer,
+)
 from common import models
 
 FA2 = "layout_forceatlas2"
@@ -27,7 +30,11 @@ def _state(chat, *calls):
     return {
         "network_id": chat.network_id,
         "executed_calls": [
-            {"name": name, "args": {"network_id": chat.network_id, **args}, "status": status}
+            {
+                "name": name,
+                "args": {"network_id": chat.network_id, **args},
+                "status": status,
+            }
             for name, args, status in calls
         ],
     }
@@ -36,7 +43,10 @@ def _state(chat, *calls):
 def _ctx(chat, db, state, text="ForceAtlas2 で配置しました。"):
     return hooks.build_context(
         hooks.HookEvent.NO_TOOL_CALLS,
-        chat_id=chat.id, network_id=chat.network_id, turn_state=state, db=db,
+        chat_id=chat.id,
+        network_id=chat.network_id,
+        turn_state=state,
+        db=db,
         assistant_text=text,
     )
 
@@ -45,10 +55,14 @@ def _earlier(db, chat, name, args=None):
     message = models.ChatMessage(chat_id=chat.id, role="model", content="done")
     db.add(message)
     db.flush()
-    db.add(models.ToolExecution(
-        message_id=message.id, tool_name=name, status="completed",
-        arguments=args if args is not None else {"network_id": chat.network_id},
-    ))
+    db.add(
+        models.ToolExecution(
+            message_id=message.id,
+            tool_name=name,
+            status="completed",
+            arguments=args if args is not None else {"network_id": chat.network_id},
+        )
+    )
     db.commit()
 
 
@@ -116,12 +130,12 @@ def test_evaluation_tools_are_not_a_previous_layout(db, chat):
 @pytest.mark.parametrize(
     "calls, text",
     [
-        (_drawn(gravity=3.0), "done"),                      # parameters were chosen
-        ([(FA2, {}, "completed")], "done"),                 # computed but not drawn
-        (_drawn("layout_circular"), "done"),                # no knobs
+        (_drawn(gravity=3.0), "done"),  # parameters were chosen
+        ([(FA2, {}, "completed")], "done"),  # computed but not drawn
+        (_drawn("layout_circular"), "done"),  # no knobs
         (_drawn() + [("layout_suggest_parameters", {}, "completed")], "done"),
         (_drawn() + [("offer_parameter_tuning", {}, "completed")], "done"),
-        (_drawn(), ""),                                     # no closing text
+        (_drawn(), ""),  # no closing text
     ],
 )
 def test_stays_quiet(db, chat, calls, text):

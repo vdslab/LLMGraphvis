@@ -27,13 +27,13 @@ class GraphProfile:
     edges: int
     density: float
     avg_degree: float
-    degree_cv: float                # spread of degrees; high = hub-dominated
-    components: int                 # weakly connected, for directed graphs
+    degree_cv: float  # spread of degrees; high = hub-dominated
+    components: int  # weakly connected, for directed graphs
     largest_component_share: float  # nodes in the largest component / nodes
     isolates: int
-    weighted: bool                  # the layout will read a weight
-    avg_strength: Optional[float]   # average weighted degree (weights as read)
-    weight_ratio: Optional[float]   # max / min positive weight
+    weighted: bool  # the layout will read a weight
+    avg_strength: Optional[float]  # average weighted degree (weights as read)
+    weight_ratio: Optional[float]  # max / min positive weight
     is_forest: bool
     is_planar: Optional[bool]
     is_bipartite: Optional[bool]
@@ -103,25 +103,39 @@ def recommend_layouts(profile: GraphProfile) -> list:
     fits = []
     if profile.is_forest and profile.nodes > 1:
         fits.append(
-            ("bfs", "the graph is a tree/forest, so BFS levels show its hierarchy "
-             "(pass the root as `start`)")
+            (
+                "bfs",
+                "the graph is a tree/forest, so BFS levels show its hierarchy "
+                "(pass the root as `start`)",
+            )
         )
     fits.append(
-        ("forceatlas2", "general-purpose; separates communities and scales to large graphs")
+        (
+            "forceatlas2",
+            "general-purpose; separates communities and scales to large graphs",
+        )
     )
     if profile.nodes <= KAMADA_KAWAI_LIMIT and profile.components == 1:
         fits.append(
-            ("kamada_kawai", f"small and connected ({profile.nodes} nodes), so its "
-             "O(n^2) cost is affordable and it keeps graph distances faithfully")
+            (
+                "kamada_kawai",
+                f"small and connected ({profile.nodes} nodes), so its "
+                "O(n^2) cost is affordable and it keeps graph distances faithfully",
+            )
         )
     fits.append(("spring", "even spacing with milder clustering than ForceAtlas2"))
     if profile.is_bipartite and profile.edges > 0:
         fits.append(
-            ("bipartite", "the graph is two-colourable; a node attribute naming the "
-             "two sides is needed as `partition_attribute`")
+            (
+                "bipartite",
+                "the graph is two-colourable; a node attribute naming the "
+                "two sides is needed as `partition_attribute`",
+            )
         )
     if profile.is_planar and not profile.is_forest and profile.edges > 0:
-        fits.append(("planar", "the graph is planar, so it can be drawn with no crossings"))
+        fits.append(
+            ("planar", "the graph is planar, so it can be drawn with no crossings")
+        )
     return [{"layout": name, "reason": reason} for name, reason in fits]
 
 
@@ -129,18 +143,29 @@ def unsuitable_layouts(profile: GraphProfile) -> list:
     """Layouts that will fail or mislead on this graph, with the reason."""
     bad = []
     if profile.is_planar is False:
-        bad.append({"layout": "planar", "reason": "the graph is not planar; it will fail"})
+        bad.append(
+            {"layout": "planar", "reason": "the graph is not planar; it will fail"}
+        )
     if profile.nodes > KAMADA_KAWAI_LIMIT:
         bad.append(
-            {"layout": "kamada_kawai", "reason": f"{profile.nodes} nodes; O(n^2) makes it slow"}
+            {
+                "layout": "kamada_kawai",
+                "reason": f"{profile.nodes} nodes; O(n^2) makes it slow",
+            }
         )
     if profile.components > 1:
         bad.append(
-            {"layout": "kamada_kawai", "reason": "disconnected graphs have no distance "
-             "between components, so parts are placed arbitrarily"}
+            {
+                "layout": "kamada_kawai",
+                "reason": "disconnected graphs have no distance "
+                "between components, so parts are placed arbitrarily",
+            }
         )
     if profile.density > 0.3 and profile.nodes > 30:
         bad.append(
-            {"layout": "spectral", "reason": "dense graphs tend to collapse onto a line"}
+            {
+                "layout": "spectral",
+                "reason": "dense graphs tend to collapse onto a line",
+            }
         )
     return bad

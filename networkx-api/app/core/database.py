@@ -18,9 +18,8 @@ engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True, pool_recycle
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-
-
 import contextlib
+
 
 def get_db():
     db = SessionLocal()
@@ -28,6 +27,7 @@ def get_db():
         yield db
     finally:
         db.close()
+
 
 @contextlib.contextmanager
 def get_db_context():
@@ -42,4 +42,3 @@ def get_db_context():
         yield db
     finally:
         db.close()
-

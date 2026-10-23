@@ -3,8 +3,8 @@ from typing import Any, List, Tuple
 
 from sqlalchemy.orm import Session
 
-from common import models
 from app.core.logging import get_logger
+from common import models
 
 from . import context, emitters, engine, events, history
 from .providers.types import UsageData
@@ -65,7 +65,9 @@ async def process_chat(
 
         # 2. Delegate to GraphVisAgent, honoring the chat's pin, else the user's default
         provider_name, model_name = engine.resolve_chat_model(chat)
-        agent = engine.GraphVisAgent(db, provider_name=provider_name, model_name=model_name)
+        agent = engine.GraphVisAgent(
+            db, provider_name=provider_name, model_name=model_name
+        )
 
         final_response_text, execution_log, total_usage = await agent.process_turn(
             history=chat_history,
@@ -78,7 +80,13 @@ async def process_chat(
             resumed_from_input=resumed_from_input,
         )
 
-        return final_response_text, execution_log, total_usage, agent.provider_name, agent.provider.model_name
+        return (
+            final_response_text,
+            execution_log,
+            total_usage,
+            agent.provider_name,
+            agent.provider.model_name,
+        )
 
     except Exception as e:
         logger.exception(f"Error in process_chat: {e}")

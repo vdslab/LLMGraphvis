@@ -1,12 +1,12 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from app import schemas
 from app.api.v1.endpoints.chat import update_chat
 from app.services import chat_service
 from app.services.llm import titles
 from app.services.llm.providers.types import StreamChunk
-
 from common import models
 
 # --- pure helpers ---------------------------------------------------------
@@ -150,13 +150,14 @@ async def test_autoname_renames_after_first_exchange(db):
     _add_user_messages(db, chat.id, 1)
 
     mock_queue = AsyncMock()
-    with patch(
-        "app.services.llm.titles.generate_chat_title",
-        new_callable=AsyncMock,
-        return_value="Karate club communities",
-    ), patch(
-        "app.services.llm.get_event_queue", new_callable=AsyncMock
-    ) as get_queue:
+    with (
+        patch(
+            "app.services.llm.titles.generate_chat_title",
+            new_callable=AsyncMock,
+            return_value="Karate club communities",
+        ),
+        patch("app.services.llm.get_event_queue", new_callable=AsyncMock) as get_queue,
+    ):
         get_queue.return_value = mock_queue
         await chat_service._maybe_autoname_chat(
             db, chat.id, "分析して", "done", "google", "gemini-2.5-flash"
@@ -220,19 +221,22 @@ async def test_upload_names_chat_after_the_file(
     user has already named the chat themselves."""
     chat_id, network_id = 1, 100
 
-    with patch(
-        "app.services.network_service.import_graphml", new_callable=AsyncMock
-    ) as mock_import, patch(
-        "app.services.network_service.calculate_layout", new_callable=AsyncMock
-    ), patch(
-        "app.services.network_service.build_visualization", new_callable=AsyncMock
-    ) as mock_vis, patch(
-        "app.services.llm.get_event_queue", new_callable=AsyncMock
-    ) as mock_get_queue, patch(
-        "app.services.llm.context.build_data_overview", new_callable=AsyncMock
-    ) as mock_overview, patch(
-        "app.core.database.SessionLocal"
-    ) as mock_session_cls:
+    with (
+        patch(
+            "app.services.network_service.import_graphml", new_callable=AsyncMock
+        ) as mock_import,
+        patch("app.services.network_service.calculate_layout", new_callable=AsyncMock),
+        patch(
+            "app.services.network_service.build_visualization", new_callable=AsyncMock
+        ) as mock_vis,
+        patch(
+            "app.services.llm.get_event_queue", new_callable=AsyncMock
+        ) as mock_get_queue,
+        patch(
+            "app.services.llm.context.build_data_overview", new_callable=AsyncMock
+        ) as mock_overview,
+        patch("app.core.database.SessionLocal") as mock_session_cls,
+    ):
         mock_import.return_value = network_id
         mock_vis.return_value = {"network_id": network_id, "nodes": [], "links": []}
         mock_overview.return_value = ("", "")

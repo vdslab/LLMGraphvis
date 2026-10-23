@@ -1,4 +1,5 @@
 from unittest.mock import AsyncMock, MagicMock
+
 import pytest
 
 from app.services.llm.providers.anthropic_provider import AnthropicProvider
@@ -32,11 +33,7 @@ def test_converts_history_and_preserves_tool_call_ids():
         ),
         LLMMessage(
             "tool",
-            [
-                LLMFunctionResponsePart(
-                    "analysis_degree", {"values":[1,2]}, "call_1"
-                )
-            ],
+            [LLMFunctionResponsePart("analysis_degree", {"values": [1, 2]}, "call_1")],
         ),
     ]
 
@@ -77,7 +74,9 @@ def test_converts_tools_and_lowercases_schemas():
     assert len(anthropic_tools) == 1
     assert anthropic_tools[0]["name"] == "test_tool"
     assert anthropic_tools[0]["input_schema"]["type"] == "object"
-    assert anthropic_tools[0]["input_schema"]["properties"]["count"]["type"] == "integer"
+    assert (
+        anthropic_tools[0]["input_schema"]["properties"]["count"]["type"] == "integer"
+    )
 
 
 @pytest.mark.asyncio

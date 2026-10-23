@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
 from app.services.llm import context, mcp_client
 
 NODE_ATTRS = [
@@ -161,16 +162,22 @@ async def test_context_summary_keeps_attribute_types_and_ranges():
 
 @pytest.mark.asyncio
 async def test_context_summary_preserves_dataset_and_attribute_meaning():
-    nodes = [{
-        "name": "club", "data_type": "string",
-        "description": "Recorded affiliation.\nNot a detected community.",
-        "stats": {"top_values": ["Mr. Hi", "Officer"]},
-    }]
-    edges = [{
-        "name": "contexts", "data_type": "float",
-        "description": "Interaction contexts, not distance.",
-        "stats": {"min": 1, "max": 7},
-    }]
+    nodes = [
+        {
+            "name": "club",
+            "data_type": "string",
+            "description": "Recorded affiliation.\nNot a detected community.",
+            "stats": {"top_values": ["Mr. Hi", "Officer"]},
+        }
+    ]
+    edges = [
+        {
+            "name": "contexts",
+            "data_type": "float",
+            "description": "Interaction contexts, not distance.",
+            "stats": {"min": 1, "max": 7},
+        }
+    ]
     with _patch_resources(nodes=nodes, edges=edges):
         summary = await context.build_context_summary(1)
 
@@ -185,12 +192,25 @@ async def test_context_summary_preserves_dataset_and_attribute_meaning():
 async def test_context_summary_marks_attributes_computed_here():
     """Provenance, so a computed score is not reported as recorded data."""
     nodes = [
-        {"name": "club", "data_type": "string", "is_derived": False,
-         "stats": {"top_values": ["Mr. Hi"]}},
-        {"name": "louvain_community", "data_type": "string", "is_derived": True,
-         "derived_from": "louvain", "stats": {"top_values": ["0"]}},
-        {"name": "forceatlas2_x", "data_type": "float", "is_derived": True,
-         "stats": {"min": -1.0, "max": 1.0}},
+        {
+            "name": "club",
+            "data_type": "string",
+            "is_derived": False,
+            "stats": {"top_values": ["Mr. Hi"]},
+        },
+        {
+            "name": "louvain_community",
+            "data_type": "string",
+            "is_derived": True,
+            "derived_from": "louvain",
+            "stats": {"top_values": ["0"]},
+        },
+        {
+            "name": "forceatlas2_x",
+            "data_type": "float",
+            "is_derived": True,
+            "stats": {"min": -1.0, "max": 1.0},
+        },
     ]
     with _patch_resources(nodes=nodes):
         summary = await context.build_context_summary(1)
@@ -224,12 +244,19 @@ async def test_coordinates_do_not_crowd_out_imported_attributes():
     the dataset's own attributes behind '... and N more'."""
     layouts = [f"layout{i}" for i in range(10)]
     coordinates = [
-        {"name": f"{name}_{axis}", "data_type": "float", "role": "coordinate",
-         "is_derived": True, "derived_from": f"layout:{name}"}
+        {
+            "name": f"{name}_{axis}",
+            "data_type": "float",
+            "role": "coordinate",
+            "is_derived": True,
+            "derived_from": f"layout:{name}",
+        }
         for name in layouts
         for axis in ("x", "y")
     ]
-    data = [{"name": f"col{i}", "data_type": "string", "role": "data"} for i in range(5)]
+    data = [
+        {"name": f"col{i}", "data_type": "string", "role": "data"} for i in range(5)
+    ]
     with _patch_resources(nodes=coordinates + data):
         summary = await context.build_context_summary(1)
 
@@ -243,12 +270,23 @@ async def test_context_summary_shows_measurement_and_parameters():
     """The measurement decides the encoding, and the parameters say what a
     computed value is a result of."""
     nodes = [
-        {"name": "group", "data_type": "float", "measurement": "discrete",
-         "role": "data", "is_derived": False, "stats": {"min": 1.0, "max": 4.0}},
-        {"name": "louvain_community", "data_type": "string",
-         "measurement": "categorical", "role": "community", "is_derived": True,
-         "derived_from": "community:louvain",
-         "parameters": {"resolution": 1.0, "seed": 42}},
+        {
+            "name": "group",
+            "data_type": "float",
+            "measurement": "discrete",
+            "role": "data",
+            "is_derived": False,
+            "stats": {"min": 1.0, "max": 4.0},
+        },
+        {
+            "name": "louvain_community",
+            "data_type": "string",
+            "measurement": "categorical",
+            "role": "community",
+            "is_derived": True,
+            "derived_from": "community:louvain",
+            "parameters": {"resolution": 1.0, "seed": 42},
+        },
     ]
     with _patch_resources(nodes=nodes):
         summary = await context.build_context_summary(1)

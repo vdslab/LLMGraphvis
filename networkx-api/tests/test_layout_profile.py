@@ -2,6 +2,7 @@
 
 import networkx as nx
 import pytest
+from tests.test_layout_parameters import setup_graph
 
 from app.logic.layout import calculate_layout, format_layout_result
 from app.logic.layouts import SPECS, get_spec
@@ -11,7 +12,6 @@ from app.logic.layouts.profile import (
     recommend_layouts,
     unsuitable_layouts,
 )
-from tests.test_layout_parameters import setup_graph
 
 
 def _fragmented():
@@ -48,7 +48,10 @@ class TestRecommendations:
         assert recs[0]["layout"] == "bfs"
 
     def test_planar_graph_offers_planar(self):
-        names = [r["layout"] for r in recommend_layouts(profile_graph(nx.grid_2d_graph(4, 4)))]
+        names = [
+            r["layout"]
+            for r in recommend_layouts(profile_graph(nx.grid_2d_graph(4, 4)))
+        ]
         assert "planar" in names
 
     def test_large_or_split_graph_rules_out_kamada_kawai(self):
@@ -61,7 +64,9 @@ class TestRecommendations:
 
 class TestTuning:
     def test_fragmented_graph_raises_forceatlas2_gravity(self):
-        params, notes = get_spec("forceatlas2").tuned(_fragmented(), profile_graph(_fragmented()))
+        params, notes = get_spec("forceatlas2").tuned(
+            _fragmented(), profile_graph(_fragmented())
+        )
         assert params["gravity"] > 1.0
         assert any("`gravity`" in n for n in notes)
 
@@ -101,7 +106,9 @@ class TestTuning:
         assert any("`max_iter`" in n for n in notes)
 
     def test_fragmented_graph_switches_spring_to_energy(self):
-        params, notes = get_spec("spring").tuned(_fragmented(), profile_graph(_fragmented()))
+        params, notes = get_spec("spring").tuned(
+            _fragmented(), profile_graph(_fragmented())
+        )
         assert params["method"] == "energy" and params["gravity"] > 1
         assert notes
 
@@ -126,9 +133,12 @@ class TestTuning:
     def test_tree_gets_few_spring_iterations(self):
         G = nx.random_labeled_tree(100, seed=1)
         params, notes = get_spec("spring").tuned(G, profile_graph(G))
-        assert params["iterations"] < get_spec("spring").tuned(
-            nx.karate_club_graph(), profile_graph(nx.karate_club_graph())
-        )[0]["iterations"]
+        assert (
+            params["iterations"]
+            < get_spec("spring").tuned(
+                nx.karate_club_graph(), profile_graph(nx.karate_club_graph())
+            )[0]["iterations"]
+        )
         assert any("`iterations`" in n for n in notes)
 
 

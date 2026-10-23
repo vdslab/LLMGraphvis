@@ -11,8 +11,8 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from app.services import chat_service
 
+from app.services import chat_service
 from common import models
 
 
@@ -27,19 +27,22 @@ async def _run_upload(
     network_name="New Chat Network",
     exec_side_effect=None,
 ):
-    with patch(
-        "app.services.network_service.import_graphml", new_callable=AsyncMock
-    ) as mock_import, patch(
-        "app.services.network_service.calculate_layout", new_callable=AsyncMock
-    ), patch(
-        "app.services.network_service.build_visualization", new_callable=AsyncMock
-    ) as mock_vis, patch(
-        "app.services.llm.get_event_queue", new_callable=AsyncMock
-    ) as mock_get_queue, patch(
-        "app.services.llm.context.build_data_overview", new_callable=AsyncMock
-    ) as mock_overview, patch(
-        "app.core.database.SessionLocal"
-    ) as mock_session_cls:
+    with (
+        patch(
+            "app.services.network_service.import_graphml", new_callable=AsyncMock
+        ) as mock_import,
+        patch("app.services.network_service.calculate_layout", new_callable=AsyncMock),
+        patch(
+            "app.services.network_service.build_visualization", new_callable=AsyncMock
+        ) as mock_vis,
+        patch(
+            "app.services.llm.get_event_queue", new_callable=AsyncMock
+        ) as mock_get_queue,
+        patch(
+            "app.services.llm.context.build_data_overview", new_callable=AsyncMock
+        ) as mock_overview,
+        patch("app.core.database.SessionLocal") as mock_session_cls,
+    ):
         mock_import.return_value = 100
         mock_import.side_effect = exec_side_effect
         mock_vis.return_value = {"network_id": 100, "nodes": [], "links": []}
@@ -112,7 +115,10 @@ async def test_overview_is_saved_folded_behind_its_title():
         overview=("Uploaded network — Karate — 34 nodes, 78 edges", "- **Size:** …")
     )
 
-    assert ':::collapsible{title="Uploaded network — Karate — 34 nodes, 78 edges"}' in content
+    assert (
+        ':::collapsible{title="Uploaded network — Karate — 34 nodes, 78 edges"}'
+        in content
+    )
     assert "- **Size:** …" in content
 
 

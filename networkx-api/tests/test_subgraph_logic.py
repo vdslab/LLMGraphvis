@@ -1,6 +1,7 @@
-from common import models
-from app.logic import subgraph
 from sqlalchemy.orm import Session
+
+from app.logic import subgraph
+from common import models
 
 
 def test_subgraph_fresh_view(db: Session):
@@ -44,7 +45,10 @@ def test_subgraph_fresh_view(db: Session):
         network_id=network.id, attribute_name="y", data_type="float", is_derived=True
     )
     attr_deg = models.NodeAttribute(
-        network_id=network.id, attribute_name="degree", data_type="float", is_derived=True
+        network_id=network.id,
+        attribute_name="degree",
+        data_type="float",
+        is_derived=True,
     )
     attr_custom = models.NodeAttribute(
         network_id=network.id, attribute_name="custom_score", data_type="float"
@@ -167,13 +171,22 @@ def test_subgraph_cutout_view(db: Session):
     db.commit()
 
     attr_x = models.NodeAttribute(
-        network_id=network.id, attribute_name="forceatlas2_x", data_type="float", is_derived=True
+        network_id=network.id,
+        attribute_name="forceatlas2_x",
+        data_type="float",
+        is_derived=True,
     )
     attr_y = models.NodeAttribute(
-        network_id=network.id, attribute_name="forceatlas2_y", data_type="float", is_derived=True
+        network_id=network.id,
+        attribute_name="forceatlas2_y",
+        data_type="float",
+        is_derived=True,
     )
     attr_deg = models.NodeAttribute(
-        network_id=network.id, attribute_name="degree", data_type="float", is_derived=True
+        network_id=network.id,
+        attribute_name="degree",
+        data_type="float",
+        is_derived=True,
     )
     db.add_all([attr_x, attr_y, attr_deg])
     db.commit()

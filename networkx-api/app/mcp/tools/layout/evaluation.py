@@ -59,8 +59,15 @@ def layout_profile(
 @handle_tool_errors
 def layout_suggest_parameters(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    layout: Annotated[Optional[str], Field(description="Layout to tune, e.g. 'forceatlas2' or 'spring'. Omit to tune the layout currently drawn.")] = None,
-    max_candidates: Annotated[int, Field(ge=1, le=5, description="How many candidates to return, best first.")] = 3,
+    layout: Annotated[
+        Optional[str],
+        Field(
+            description="Layout to tune, e.g. 'forceatlas2' or 'spring'. Omit to tune the layout currently drawn."
+        ),
+    ] = None,
+    max_candidates: Annotated[
+        int, Field(ge=1, le=5, description="How many candidates to return, best first.")
+    ] = 3,
 ) -> dict:
     """
     Searches for layout parameters that make the drawing more readable, by running the

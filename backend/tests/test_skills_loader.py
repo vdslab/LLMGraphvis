@@ -4,6 +4,7 @@ import textwrap
 from pathlib import Path
 
 import pytest
+
 from app.services.llm.skills.loader import (
     Skill,
     SkillParseError,
@@ -351,9 +352,14 @@ class TestShippedSkills:
         for skill in skills:
             for ref in set(candidate.findall(skill.body)):
                 suffixes = (
-                    "-tuning", "-flow", "-planning",
-                    "-encoding", "-workflow", "-recovery",
-                    "-navigation", "-analysis",
+                    "-tuning",
+                    "-flow",
+                    "-planning",
+                    "-encoding",
+                    "-workflow",
+                    "-recovery",
+                    "-navigation",
+                    "-analysis",
                 )
                 if ref.endswith(suffixes) or ref.startswith("layout-"):
                     assert ref in names, (
@@ -367,28 +373,74 @@ class TestShippedSkills:
 # parameter its tool does not have sends the model into a validation error.
 LAYOUT_TOOL_ARGUMENTS = {
     "forceatlas2": {
-        "max_iter", "gravity", "scaling_ratio", "jitter_tolerance", "strong_gravity",
-        "linlog", "distributed_action", "node_mass", "size_aware", "node_size",
-        "weight", "seed", "pos", "init_from_layout", "force_recompute",
+        "max_iter",
+        "gravity",
+        "scaling_ratio",
+        "jitter_tolerance",
+        "strong_gravity",
+        "linlog",
+        "distributed_action",
+        "node_mass",
+        "size_aware",
+        "node_size",
+        "weight",
+        "seed",
+        "pos",
+        "init_from_layout",
+        "force_recompute",
     },
     "spring": {
-        "iterations", "k", "threshold", "method", "gravity", "fixed", "weight",
-        "scale", "center", "seed", "pos", "init_from_layout", "force_recompute",
+        "iterations",
+        "k",
+        "threshold",
+        "method",
+        "gravity",
+        "fixed",
+        "weight",
+        "scale",
+        "center",
+        "seed",
+        "pos",
+        "init_from_layout",
+        "force_recompute",
     },
     "arf": {
-        "scaling", "a", "etol", "dt", "max_iter", "seed", "pos",
-        "init_from_layout", "force_recompute",
+        "scaling",
+        "a",
+        "etol",
+        "dt",
+        "max_iter",
+        "seed",
+        "pos",
+        "init_from_layout",
+        "force_recompute",
     },
     "kamada_kawai": {
-        "weight", "dist", "scale", "center", "pos", "init_from_layout",
+        "weight",
+        "dist",
+        "scale",
+        "center",
+        "pos",
+        "init_from_layout",
         "force_recompute",
     },
     "bipartite": {
-        "partition_attribute", "partition_value", "nodes", "align", "aspect_ratio",
-        "scale", "center", "force_recompute",
+        "partition_attribute",
+        "partition_value",
+        "nodes",
+        "align",
+        "aspect_ratio",
+        "scale",
+        "center",
+        "force_recompute",
     },
     "multipartite": {
-        "subset_attribute", "subset_key", "align", "scale", "center", "force_recompute",
+        "subset_attribute",
+        "subset_key",
+        "align",
+        "scale",
+        "center",
+        "force_recompute",
     },
     "shell": {"nlist", "rotate", "scale", "center", "force_recompute"},
     "bfs": {"start", "align", "scale", "center", "force_recompute"},
@@ -396,10 +448,24 @@ LAYOUT_TOOL_ARGUMENTS = {
 
 # Backticked words in a layout skill that are not parameters.
 _NOT_PARAMETERS = {
-    "layout", "layout_quality", "score", "issues", "knobs", "arguments", "tradeoff",
-    "metric_deltas", "stopped_early", "recommended", "unsuitable", "none",
-    "node_overlap", "outliers_compress_core", "clumped", "uneven_edge_lengths",
-    "distorted_aspect", "louvain_community",
+    "layout",
+    "layout_quality",
+    "score",
+    "issues",
+    "knobs",
+    "arguments",
+    "tradeoff",
+    "metric_deltas",
+    "stopped_early",
+    "recommended",
+    "unsuitable",
+    "none",
+    "node_overlap",
+    "outliers_compress_core",
+    "clumped",
+    "uneven_edge_lengths",
+    "distorted_aspect",
+    "louvain_community",
 }
 
 
@@ -412,7 +478,9 @@ class TestLayoutSkills:
     def test_every_algorithm_skill_exposes_its_tools(self):
         for skill in self._layout_skills():
             layout_tools = [t for t in skill.related_tools if t.startswith("layout_")]
-            assert any(t[len("layout_"):] in LAYOUT_TOOL_ARGUMENTS for t in layout_tools), skill.name
+            assert any(
+                t[len("layout_") :] in LAYOUT_TOOL_ARGUMENTS for t in layout_tools
+            ), skill.name
             assert "visualization_generate" in skill.related_tools, skill.name
 
     def test_algorithm_skills_name_only_real_parameters(self):
@@ -421,13 +489,16 @@ class TestLayoutSkills:
         token = re.compile(r"`([a-z][a-z0-9_]*)(?:=[^`]*)?`")
         for skill in self._layout_skills():
             layouts = [
-                t[len("layout_"):]
+                t[len("layout_") :]
                 for t in skill.related_tools
-                if t[len("layout_"):] in LAYOUT_TOOL_ARGUMENTS
+                if t[len("layout_") :] in LAYOUT_TOOL_ARGUMENTS
             ]
             allowed = set().union(*(LAYOUT_TOOL_ARGUMENTS[name] for name in layouts))
             for word in set(token.findall(skill.body)):
-                if word.startswith(("layout_", "visualization_")) or word in _NOT_PARAMETERS:
+                if (
+                    word.startswith(("layout_", "visualization_"))
+                    or word in _NOT_PARAMETERS
+                ):
                     continue
                 assert word in allowed, f"{skill.name} names unknown parameter `{word}`"
 
@@ -447,12 +518,18 @@ class TestLayoutSkills:
         from app.services.llm.skills.registry import SkillRegistry
 
         registry = SkillRegistry()
-        block = registry.suggestion_block("もう少し広げて", current_layout="forceatlas2")
+        block = registry.suggestion_block(
+            "もう少し広げて", current_layout="forceatlas2"
+        )
         assert "`layout`" in block and "`layout-forceatlas2`" in block
-        partitioned = registry.suggestion_block("レイアウトを整えて", current_layout="bfs")
+        partitioned = registry.suggestion_block(
+            "レイアウトを整えて", current_layout="bfs"
+        )
         assert "`layout-partitioned`" in partitioned
 
-    @pytest.mark.parametrize("answer", ["おまかせで調整", "今の値から自分で調整", "このままでよい"])
+    @pytest.mark.parametrize(
+        "answer", ["おまかせで調整", "今の値から自分で調整", "このままでよい"]
+    )
     def test_each_answer_to_the_tuning_question_reaches_the_layout_skill(self, answer):
         """The answer arrives in the next turn (ADR 0018); its procedure is in `layout`."""
         from app.services.llm.skills.registry import SkillRegistry
@@ -463,13 +540,17 @@ class TestLayoutSkills:
     def test_no_algorithm_skill_without_a_layout_request(self):
         from app.services.llm.skills.registry import SkillRegistry
 
-        block = SkillRegistry().suggestion_block("色分けして", current_layout="forceatlas2")
+        block = SkillRegistry().suggestion_block(
+            "色分けして", current_layout="forceatlas2"
+        )
         assert "layout-forceatlas2" not in block
 
     def test_layout_without_a_skill_adds_nothing(self):
         from app.services.llm.skills.registry import SkillRegistry
 
-        block = SkillRegistry().suggestion_block("レイアウト", current_layout="circular")
+        block = SkillRegistry().suggestion_block(
+            "レイアウト", current_layout="circular"
+        )
         assert "`layout`" in block and "layout-" not in block
 
 

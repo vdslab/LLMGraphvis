@@ -12,7 +12,6 @@ from unittest.mock import patch
 import networkx as nx
 import pytest
 
-
 from app.logic.layout import (
     LAYOUT_PARAM_KEYS,
     calculate_layout,
@@ -57,9 +56,11 @@ def setup_graph(db, network_id=1, n=6, weighted=False, attrs=None, weights=None)
         from app.logic.attributes import bulk_save_node_attributes
 
         for attr_name, values in attrs.items():
-            data_type = "float" if all(
-                isinstance(v, (int, float)) for v in values.values()
-            ) else "string"
+            data_type = (
+                "float"
+                if all(isinstance(v, (int, float)) for v in values.values())
+                else "string"
+            )
             bulk_save_node_attributes(
                 network_id,
                 attr_name,
@@ -72,9 +73,11 @@ def setup_graph(db, network_id=1, n=6, weighted=False, attrs=None, weights=None)
 
 
 def stored_layouts(db, network_id, name):
-    return db.query(models.NodeAttribute).filter_by(
-        network_id=network_id, attribute_name=f"{name}_x"
-    ).first()
+    return (
+        db.query(models.NodeAttribute)
+        .filter_by(network_id=network_id, attribute_name=f"{name}_x")
+        .first()
+    )
 
 
 # --------------------------------------------------------------------------
@@ -424,7 +427,9 @@ class TestWarmStart:
     def test_missing_source_layout_is_a_clear_error(self, db):
         setup_graph(db)
         with pytest.raises(ValueError, match="No stored 'circular' layout"):
-            calculate_layout(1, "spring", db, overrides={"init_from_layout": "circular"})
+            calculate_layout(
+                1, "spring", db, overrides={"init_from_layout": "circular"}
+            )
 
     def test_unsupported_layout_rejects_warm_start(self, db):
         setup_graph(db)
@@ -465,7 +470,9 @@ class TestWarmStart:
         calculate_layout(1, "circular", db)
         calculate_layout(1, "spring", db, overrides={"init_from_layout": "circular"})
         with patch("networkx.spring_layout") as spy:
-            calculate_layout(1, "spring", db, overrides={"init_from_layout": "circular"})
+            calculate_layout(
+                1, "spring", db, overrides={"init_from_layout": "circular"}
+            )
         spy.assert_not_called()
 
 
@@ -527,12 +534,14 @@ class TestNewAlgorithms:
         idx = 0
         for i in range(5):
             for j in range(i + 1, 5):
-                db.add(models.Edge(
-                    network_id=2,
-                    source_node_id=node_map[f"k{i}"],
-                    target_node_id=node_map[f"k{j}"],
-                    edge_id=f"ke{idx}",
-                ))
+                db.add(
+                    models.Edge(
+                        network_id=2,
+                        source_node_id=node_map[f"k{i}"],
+                        target_node_id=node_map[f"k{j}"],
+                        edge_id=f"ke{idx}",
+                    )
+                )
                 idx += 1
         db.commit()
 
@@ -559,16 +568,14 @@ class TestNewAlgorithms:
             calculate_layout(1, "bipartite", db)
 
     def test_bipartite_rejects_more_than_two_values_without_a_choice(self, db):
-        setup_graph(
-            db, n=6, attrs={"grp": {f"n{i}": f"g{i % 3}" for i in range(6)}}
-        )
+        setup_graph(db, n=6, attrs={"grp": {f"n{i}": f"g{i % 3}" for i in range(6)}})
         with pytest.raises(ValueError, match="does not define two sides"):
-            calculate_layout(1, "bipartite", db, overrides={"partition_attribute": "grp"})
+            calculate_layout(
+                1, "bipartite", db, overrides={"partition_attribute": "grp"}
+            )
 
     def test_bipartite_accepts_an_explicit_value_among_many(self, db):
-        setup_graph(
-            db, n=6, attrs={"grp": {f"n{i}": f"g{i % 3}" for i in range(6)}}
-        )
+        setup_graph(db, n=6, attrs={"grp": {f"n{i}": f"g{i % 3}" for i in range(6)}})
         calculate_layout(
             1,
             "bipartite",
@@ -588,19 +595,13 @@ class TestNewAlgorithms:
             )
 
     def test_multipartite_from_an_attribute(self, db):
-        setup_graph(
-            db, n=6, attrs={"level": {f"n{i}": float(i % 3) for i in range(6)}}
-        )
-        calculate_layout(
-            1, "multipartite", db, overrides={"subset_attribute": "level"}
-        )
+        setup_graph(db, n=6, attrs={"level": {f"n{i}": float(i % 3) for i in range(6)}})
+        calculate_layout(1, "multipartite", db, overrides={"subset_attribute": "level"})
         assert stored_layouts(db, 1, "multipartite") is not None
 
     def test_multipartite_requires_every_node_to_have_a_value(self, db):
         """nx raises an opaque KeyError; this must say what is wrong."""
-        setup_graph(
-            db, n=6, attrs={"level": {f"n{i}": float(i) for i in range(3)}}
-        )
+        setup_graph(db, n=6, attrs={"level": {f"n{i}": float(i) for i in range(3)}})
         with pytest.raises(ValueError, match="have no 'level' value"):
             calculate_layout(
                 1, "multipartite", db, overrides={"subset_attribute": "level"}

@@ -4,12 +4,12 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
+
 from app.services import usage_report
 from app.services.llm import usage as llm_usage
 from app.services.llm.pricing import estimate_cost_usd
 from app.services.llm.providers.google_genai import usage_from_metadata
 from app.services.llm.providers.types import TurnUsage, UsageData
-
 from common import models
 
 

@@ -6,6 +6,7 @@ unknown cost rather than erroring, so drift here degrades gracefully but should
 still be avoided). LM Studio is added dynamically because its model id is
 chosen by the user in LM Studio rather than by this application.
 """
+
 import os
 from typing import Any, Dict, List
 
@@ -63,9 +64,7 @@ def resolve_default_provider() -> str:
     return configured or DEFAULT_PROVIDER
 
 
-def resolve_default_model(
-    provider_id: str, lmstudio_models: List[str]
-) -> str:
+def resolve_default_model(provider_id: str, lmstudio_models: List[str]) -> str:
     """Resolve the model an unpinned chat will actually use for a provider."""
     if provider_id == "lmstudio":
         configured = (os.getenv("LM_STUDIO_MODEL") or "").strip()
@@ -101,8 +100,7 @@ def get_available_provider_catalog() -> List[Dict[str, Any]]:
                 "id": "lmstudio",
                 "label": "LM Studio (Local)",
                 "models": [
-                    {"id": model_id, "label": model_id}
-                    for model_id in lmstudio_models
+                    {"id": model_id, "label": model_id} for model_id in lmstudio_models
                 ],
             }
         )

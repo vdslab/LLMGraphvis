@@ -1,9 +1,9 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 from app.core.mcp import mcp
 from app.mcp import resources, tools
-
 from common import models
 
 
@@ -13,10 +13,12 @@ def mock_importer():
     with patch("app.logic.importer.parse_and_save_graphml") as mock:
         yield mock
 
+
 @pytest.fixture
 def mock_layout():
     with patch("app.logic.layout.calculate_layout") as mock:
         yield mock
+
 
 @pytest.fixture
 def mock_builder():
@@ -24,11 +26,12 @@ def mock_builder():
         mock.return_value = {"nodes": [{"id": "n1"}], "edges": []}
         yield mock
 
+
 def test_initialize_network_structure(mock_importer, mock_layout, mock_builder):
     """
     Test that the network_initialize tool calls all logic components correctly.
     """
-    mock_importer.return_value = 101 # Final network ID
+    mock_importer.return_value = 101  # Final network ID
 
     with patch("app.core.database.SessionLocal") as mock_session_cls:
         mock_db = MagicMock()
@@ -46,6 +49,7 @@ def test_initialize_network_structure(mock_importer, mock_layout, mock_builder):
         assert len(result["network"]["nodes"]) == 1
 
         mock_db.close.assert_called()
+
 
 def test_resources_execution():
     """

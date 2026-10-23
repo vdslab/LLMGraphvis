@@ -3,17 +3,15 @@ from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
-from common import models
 from app.core import database
 from app.core.logging import get_logger
 from app.services import llm as llm_service
 from app.services import network_service
 from app.services.llm import context as llm_context
-from app.services.llm import emitters
-from app.services.llm import markup
-from app.services.llm import titles
+from app.services.llm import emitters, markup, titles
 from app.services.llm import usage as llm_usage
 from app.services.llm.providers.types import UsageData
+from common import models
 
 logger = get_logger(__name__)
 
@@ -126,7 +124,12 @@ def _name_network_after_file(network_id: int, filename: Optional[str]) -> None:
 async def _handle_background_error(chat_id: int, e: Exception, message: str) -> None:
     logger.exception(f"{message}: {e}")
     queue = await llm_service.get_event_queue(chat_id)
-    await queue.put({"event": "training_error" if "training" in message else "agent_error", "data": json.dumps(str(e))})
+    await queue.put(
+        {
+            "event": "training_error" if "training" in message else "agent_error",
+            "data": json.dumps(str(e)),
+        }
+    )
 
     # If it's a process error, persist to DB
     if "process" in message:
@@ -149,6 +152,7 @@ async def _handle_background_error(chat_id: int, e: Exception, message: str) -> 
         finally:
             db_error.close()
 
+
 async def handle_upload_background(
     chat_id: int,
     network_id: int,
@@ -162,7 +166,7 @@ async def handle_upload_background(
     logger.info(
         f"Background upload started for chat_id={chat_id}, network_id={network_id}"
     )
-    
+
     queue = await llm_service.get_event_queue(chat_id)
 
     # Fixed pipeline steps, reported as `progress` events rather than
@@ -208,22 +212,22 @@ async def handle_upload_background(
         db_session = database.SessionLocal()
         try:
             chat = (
-                db_session.query(models.Chat)
-                .filter(models.Chat.id == chat_id)
-                .first()
+                db_session.query(models.Chat).filter(models.Chat.id == chat_id).first()
             )
             if chat:
                 # Update network_id if collision occurred
                 if final_network_id != network_id:
-                     logger.info(
+                    logger.info(
                         f"Network ID updated from {network_id} to {final_network_id} due to collision/re-upload."
                     )
-                     chat.network_id = final_network_id
-                
+                    chat.network_id = final_network_id
+
                 # ALWAYS save the initial visualization state
                 if vis_data:
                     chat.visualization_state = vis_data
-                    logger.info(f"Saved initial visualization state for chat_id={chat_id}")
+                    logger.info(
+                        f"Saved initial visualization state for chat_id={chat_id}"
+                    )
 
                 # Provisional name from the uploaded file, so the chat stops
                 # being "New Chat" before the first message is even sent. The
@@ -247,32 +251,40 @@ async def handle_upload_background(
                 final_content = "\n\n".join(part for part in parts if part)
 
                 db_msg = models.ChatMessage(
-                    chat_id=chat_id,
-                    role="model",
-                    content=final_content
+                    chat_id=chat_id, role="model", content=final_content
                 )
                 db_session.add(db_msg)
                 db_session.commit()
                 db_session.refresh(db_msg)
-                
+
                 if renamed_to:
                     logger.info(f"Named chat {chat_id} after upload: {renamed_to!r}")
-                    await queue.put({
-                        "event": "chat_renamed",
-                        "data": json.dumps({"chat_id": chat_id, "name": renamed_to}),
-                    })
+                    await queue.put(
+                        {
+                            "event": "chat_renamed",
+                            "data": json.dumps(
+                                {"chat_id": chat_id, "name": renamed_to}
+                            ),
+                        }
+                    )
 
                 # Broadcast message event (replaces system_message)
                 # We send role="assistant" for frontend consistency
-                await queue.put({
-                    "event": "message",
-                    "data": json.dumps({
-                        "id": db_msg.id,
-                        "role": "assistant",
-                        "content": db_msg.content,
-                        "created_at": db_msg.created_at.isoformat() if db_msg.created_at else None
-                    })
-                })
+                await queue.put(
+                    {
+                        "event": "message",
+                        "data": json.dumps(
+                            {
+                                "id": db_msg.id,
+                                "role": "assistant",
+                                "content": db_msg.content,
+                                "created_at": db_msg.created_at.isoformat()
+                                if db_msg.created_at
+                                else None,
+                            }
+                        ),
+                    }
+                )
 
         finally:
             db_session.close()
@@ -299,7 +311,7 @@ async def _report_upload_failure(
         part
         for part in (
             markup.steps_block(steps),
-            f"The upload failed during \"{failed_step}\": {e}",
+            f'The upload failed during "{failed_step}": {e}',
         )
         if part
     )
@@ -311,17 +323,21 @@ async def _report_upload_failure(
         db_session.commit()
         db_session.refresh(db_msg)
         # `message` is terminal on the frontend, so this also ends the turn.
-        await queue.put({
-            "event": "message",
-            "data": json.dumps({
-                "id": db_msg.id,
-                "role": "assistant",
-                "content": db_msg.content,
-                "created_at": (
-                    db_msg.created_at.isoformat() if db_msg.created_at else None
+        await queue.put(
+            {
+                "event": "message",
+                "data": json.dumps(
+                    {
+                        "id": db_msg.id,
+                        "role": "assistant",
+                        "content": db_msg.content,
+                        "created_at": (
+                            db_msg.created_at.isoformat() if db_msg.created_at else None
+                        ),
+                    }
                 ),
-            }),
-        })
+            }
+        )
     except Exception as inner_e:
         logger.error(f"Failed to save upload error for chat {chat_id}: {inner_e}")
         db_session.rollback()
@@ -399,37 +415,49 @@ async def handle_process_background(
                             )
                             db.add(execution)
                 db.commit()
-            
+
             logger.info(f"Saved assistant message for chat_id={chat_id}")
 
             # Emit message_complete event
             queue = await llm_service.get_event_queue(chat_id)
-            
+
             # Prepare tool executions for frontend
             tool_executions_data = []
             if execution_log:
                 for step in execution_log:
                     if step.get("step_type") == "tool_execution":
                         for tool_call in step.get("tool_calls", []):
-                            tool_executions_data.append({
-                                "tool_name": tool_call.get("name"),
-                                "arguments": tool_call.get("args"),
-                                "result": tool_call.get("result"),
-                                "thought": step.get("thought"),
-                                "status": tool_call.get("status", "unknown"),
-                                "error": tool_call.get("error"),
-                                "started_at": tool_call.get("started_at").isoformat() if tool_call.get("started_at") else None,
-                                "completed_at": tool_call.get("completed_at").isoformat() if tool_call.get("completed_at") else None
-                            })
+                            tool_executions_data.append(
+                                {
+                                    "tool_name": tool_call.get("name"),
+                                    "arguments": tool_call.get("args"),
+                                    "result": tool_call.get("result"),
+                                    "thought": step.get("thought"),
+                                    "status": tool_call.get("status", "unknown"),
+                                    "error": tool_call.get("error"),
+                                    "started_at": tool_call.get(
+                                        "started_at"
+                                    ).isoformat()
+                                    if tool_call.get("started_at")
+                                    else None,
+                                    "completed_at": tool_call.get(
+                                        "completed_at"
+                                    ).isoformat()
+                                    if tool_call.get("completed_at")
+                                    else None,
+                                }
+                            )
 
             await queue.put(
                 {
                     "event": "message_complete",
-                    "data": json.dumps({
-                        "id": db_msg.id,
-                        "content": db_msg.content,
-                        "tool_executions": tool_executions_data
-                    })
+                    "data": json.dumps(
+                        {
+                            "id": db_msg.id,
+                            "content": db_msg.content,
+                            "tool_executions": tool_executions_data,
+                        }
+                    ),
                 }
             )
 
@@ -437,7 +465,12 @@ async def handle_process_background(
             # turn is already reported as complete, so a slow or failing title
             # call cannot delay the answer.
             await _maybe_autoname_chat(
-                db, chat_id, user_message, final_response_text, provider_name, model_name
+                db,
+                chat_id,
+                user_message,
+                final_response_text,
+                provider_name,
+                model_name,
             )
         else:
             # Even an empty response must emit a terminal event, otherwise the
@@ -456,11 +489,9 @@ async def handle_process_background(
             await queue.put(
                 {
                     "event": "message_complete",
-                    "data": json.dumps({
-                        "id": None,
-                        "content": None,
-                        "tool_executions": []
-                    })
+                    "data": json.dumps(
+                        {"id": None, "content": None, "tool_executions": []}
+                    ),
                 }
             )
 

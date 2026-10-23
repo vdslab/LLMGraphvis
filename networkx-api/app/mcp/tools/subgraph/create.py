@@ -1,10 +1,12 @@
-from typing import Annotated, Any, Dict, List, Optional
-from pydantic import Field
-from app.core.mcp import mcp
-from app.core.database import get_db_context
-from app.core.decorators import handle_tool_errors
 import logging
 import traceback
+from typing import Annotated, Any, Dict, List, Optional
+
+from pydantic import Field
+
+from app.core.database import get_db_context
+from app.core.decorators import handle_tool_errors
+from app.core.mcp import mcp
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +14,7 @@ logger = logging.getLogger(__name__)
 @mcp.tool()
 @handle_tool_errors
 def subgraph_list(
-    network_id: Annotated[int, Field(description="The ID of the parent network.")]
+    network_id: Annotated[int, Field(description="The ID of the parent network.")],
 ) -> dict:
     """
     Lists all subgraphs derived from the given parent network.
@@ -26,6 +28,7 @@ def subgraph_list(
     """
     with get_db_context() as db:
         from app.logic import network_metadata
+
         subgraphs = network_metadata.get_subgraphs(db, network_id)
         return {"subgraphs": subgraphs}
 
@@ -34,9 +37,19 @@ def subgraph_list(
 @handle_tool_errors
 def subgraph_create_from_nodes(
     network_id: Annotated[int, Field(description="The ID of the source network.")],
-    node_ids: Annotated[List[str], Field(description="Explicit list of node string IDs to include in the subgraph.")],
-    description: Annotated[str, Field(description="Description for the new subgraph.")] = "Custom subgraph",
-    preserve_layout: Annotated[bool, Field(description="If True, copies x,y coordinates from the source network.")] = True
+    node_ids: Annotated[
+        List[str],
+        Field(
+            description="Explicit list of node string IDs to include in the subgraph."
+        ),
+    ],
+    description: Annotated[
+        str, Field(description="Description for the new subgraph.")
+    ] = "Custom subgraph",
+    preserve_layout: Annotated[
+        bool,
+        Field(description="If True, copies x,y coordinates from the source network."),
+    ] = True,
 ) -> dict:
     """
     Creates a new subgraph from an explicit list of node IDs.
@@ -53,17 +66,18 @@ def subgraph_create_from_nodes(
     """
     with get_db_context() as db:
         from app.logic import subgraph
+
         result = subgraph.create_subgraph_from_nodes(
             source_network_id=network_id,
             node_ids=node_ids,
             db=db,
             suffix="Subgraph",
             preserve_layout=preserve_layout,
-            description=description
+            description=description,
         )
         return {
             "new_network_id": result["new_network_id"],
-            "content": f"Subgraph created (ID: {result['new_network_id']}) with {len(node_ids)} nodes."
+            "content": f"Subgraph created (ID: {result['new_network_id']}) with {len(node_ids)} nodes.",
         }
 
 
@@ -71,15 +85,22 @@ def subgraph_create_from_nodes(
 @handle_tool_errors
 def subgraph_create_by_filter(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    conditions: Annotated[List[Dict[str, Any]], Field(
-        description=(
-            "List of filter conditions combined with AND logic. "
-            "Each condition: {\"attribute\": \"Name\", \"categories\": [\"A\", \"B\"], \"ranges\": [{\"min\": 10, \"max\": 20}]}. "
-            "Within a condition, categories and ranges are combined with OR."
-        )
-    )],
-    preserve_layout: Annotated[bool, Field(description="If True, keeps x,y positions from source network.")] = True,
-    description: Annotated[Optional[str], Field(description="Description for the new subgraph.")] = None
+    conditions: Annotated[
+        List[Dict[str, Any]],
+        Field(
+            description=(
+                "List of filter conditions combined with AND logic. "
+                'Each condition: {"attribute": "Name", "categories": ["A", "B"], "ranges": [{"min": 10, "max": 20}]}. '
+                "Within a condition, categories and ranges are combined with OR."
+            )
+        ),
+    ],
+    preserve_layout: Annotated[
+        bool, Field(description="If True, keeps x,y positions from source network.")
+    ] = True,
+    description: Annotated[
+        Optional[str], Field(description="Description for the new subgraph.")
+    ] = None,
 ) -> dict:
     """
     Creates a new subgraph by filtering nodes based on attribute conditions.
@@ -114,13 +135,17 @@ def subgraph_create_by_filter(
                 ranges_data = cond_dict.get("ranges")
                 parsed_ranges = None
                 if ranges_data:
-                    parsed_ranges = [Range(min=r.get("min"), max=r.get("max")) for r in ranges_data]
+                    parsed_ranges = [
+                        Range(min=r.get("min"), max=r.get("max")) for r in ranges_data
+                    ]
 
-                parsed_conditions.append(AttributeCondition(
-                    attribute_name=attr_name,
-                    categories=categories,
-                    ranges=parsed_ranges
-                ))
+                parsed_conditions.append(
+                    AttributeCondition(
+                        attribute_name=attr_name,
+                        categories=categories,
+                        ranges=parsed_ranges,
+                    )
+                )
 
             if not parsed_conditions:
                 raise ValueError("No valid conditions provided.")
@@ -131,14 +156,16 @@ def subgraph_create_by_filter(
                 suffix="Filtered",
                 db=db,
                 preserve_layout=preserve_layout,
-                description=description or "Custom filtered subgraph"
+                description=description or "Custom filtered subgraph",
             )
 
             return {
                 "new_network_id": result["new_network_id"],
-                "content": f"Subgraph created (ID: {result['new_network_id']}) based on filters."
+                "content": f"Subgraph created (ID: {result['new_network_id']}) based on filters.",
             }
 
         except Exception as e:
-            logger.error(f"subgraph_create_by_filter failed: {e}\n{traceback.format_exc()}")
+            logger.error(
+                f"subgraph_create_by_filter failed: {e}\n{traceback.format_exc()}"
+            )
             raise RuntimeError(f"Subgraph creation by filter failed: {str(e)}") from e

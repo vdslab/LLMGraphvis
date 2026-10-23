@@ -1,7 +1,6 @@
-
-import sys
-import os
 import logging
+import os
+import sys
 
 # Add current directory to path
 sys.path.append(os.getcwd())
@@ -13,6 +12,7 @@ from common import models
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 def reproduce():
     with get_db_context() as db:
@@ -32,15 +32,14 @@ def reproduce():
         logger.info("Attempting get_node_details...")
         try:
             # Note: The tool returns a JSON string, not dict
-            result = retrieval.get_node_details(
-                network_id=net_id,
-                node_id="n500"
-            )
+            result = retrieval.get_node_details(network_id=net_id, node_id="n500")
             logger.info(f"Success! Result: {result}")
         except Exception as e:
             logger.error(f"Caught error: {e}")
             import traceback
+
             traceback.print_exc()
+
 
 if __name__ == "__main__":
     reproduce()

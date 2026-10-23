@@ -2,17 +2,38 @@
 
 from typing import Annotated
 
+from pydantic import Field
+
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
 from app.core.mcp import mcp
 from app.logic import connectivity
-from pydantic import Field
 
 NetworkId = Annotated[int, Field(description="ID of the network to analyze.")]
-ComponentLimit = Annotated[int, Field(ge=1, le=100, description="How many components to list, largest first. `count` and `size_distribution` (component size -> how many components have it) always cover all of them.")]
-NodeLimit = Annotated[int, Field(ge=1, le=500, description="How many node IDs to list per component; `omitted_nodes` says how many more it has. Raise only when the members themselves are needed.")]
-ListLimit = Annotated[int, Field(ge=1, le=500, description="How many to list. `count` is always the total and `omitted` the number not listed.")]
-
+ComponentLimit = Annotated[
+    int,
+    Field(
+        ge=1,
+        le=100,
+        description="How many components to list, largest first. `count` and `size_distribution` (component size -> how many components have it) always cover all of them.",
+    ),
+]
+NodeLimit = Annotated[
+    int,
+    Field(
+        ge=1,
+        le=500,
+        description="How many node IDs to list per component; `omitted_nodes` says how many more it has. Raise only when the members themselves are needed.",
+    ),
+]
+ListLimit = Annotated[
+    int,
+    Field(
+        ge=1,
+        le=500,
+        description="How many to list. `count` is always the total and `omitted` the number not listed.",
+    ),
+]
 
 
 @mcp.tool()
@@ -28,7 +49,9 @@ def analysis_connected_components(
     Use weakly/strongly connected components for a directed network.
     """
     with get_db_context() as db:
-        return connectivity.components(network_id, db, "connected_components", limit, node_limit)
+        return connectivity.components(
+            network_id, db, "connected_components", limit, node_limit
+        )
 
 
 @mcp.tool()
@@ -43,7 +66,9 @@ def analysis_weakly_connected_components(
     changing the active network. Requires a directed graph.
     """
     with get_db_context() as db:
-        return connectivity.components(network_id, db, "weakly_connected_components", limit, node_limit)
+        return connectivity.components(
+            network_id, db, "weakly_connected_components", limit, node_limit
+        )
 
 
 @mcp.tool()
@@ -57,8 +82,9 @@ def analysis_strongly_connected_components(
     largest groups first. Read-only: does not extract subgraphs or change the view.
     """
     with get_db_context() as db:
-        return connectivity.components(network_id, db, "strongly_connected_components", limit, node_limit)
-
+        return connectivity.components(
+            network_id, db, "strongly_connected_components", limit, node_limit
+        )
 
 
 @mcp.tool()

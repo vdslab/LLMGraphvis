@@ -111,6 +111,7 @@ class GraphMLParser:
 
         return data
 
+
 def parse_graphml_content(content: str) -> ParsedGraphData:
     """Helper to parse content string using GraphMLParser."""
     parser = GraphMLParser()

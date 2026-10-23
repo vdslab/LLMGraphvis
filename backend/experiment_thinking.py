@@ -1,11 +1,12 @@
-
 import asyncio
 import os
+
+from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from dotenv import load_dotenv
 
 load_dotenv()
+
 
 async def main():
     project_id = os.getenv("VERTEX_PROJECT_ID")
@@ -21,7 +22,7 @@ async def main():
         client = genai.Client(api_key=api_key)
 
     model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-    
+
     print(f"Model: {model}")
 
     config = types.GenerateContentConfig(
@@ -32,7 +33,7 @@ async def main():
         response = await client.aio.models.generate_content_stream(
             model=model,
             contents="Why is the sky blue? Explain with thoughts.",
-            config=config
+            config=config,
         )
 
         async for chunk in response:
@@ -42,10 +43,10 @@ async def main():
                     for part in cand.content.parts:
                         print("-" * 20)
                         print(f"Part keys: {dir(part)}")
-                        
+
                         thought_val = getattr(part, "thought", "MISSING")
                         text_val = getattr(part, "text", "MISSING")
-                        
+
                         print(f"part.thought type: {type(thought_val)}")
                         print(f"part.thought value: {thought_val}")
                         print(f"part.text type: {type(text_val)}")
@@ -57,6 +58,7 @@ async def main():
 
     except Exception as e:
         print(f"Error: {e}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())

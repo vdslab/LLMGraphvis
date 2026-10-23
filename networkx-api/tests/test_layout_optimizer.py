@@ -4,13 +4,13 @@ import itertools
 
 import networkx as nx
 import pytest
+from tests.test_layout_parameters import setup_graph
 
 from app.logic import layout_optimizer as opt
 from app.logic.layout import calculate_layout
 from app.logic.layouts import get_spec
 from app.logic.layouts.base import Knob
 from app.logic.layouts.profile import profile_graph
-from tests.test_layout_parameters import setup_graph
 
 
 def _fragmented():

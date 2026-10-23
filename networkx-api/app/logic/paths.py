@@ -55,8 +55,14 @@ def shortest_path(network_id, source, target, db, weight=None, method="dijkstra"
 
 
 def single_source_distances(
-    network_id, source, db, weight=None, method="dijkstra", cutoff=None,
-    limit=None, targets=None,
+    network_id,
+    source,
+    db,
+    weight=None,
+    method="dijkstra",
+    cutoff=None,
+    limit=None,
+    targets=None,
 ):
     if cutoff is not None and (not math.isfinite(cutoff) or cutoff < 0):
         raise ValueError("cutoff must be a finite nonnegative distance")

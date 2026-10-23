@@ -1,6 +1,6 @@
-from common import models
 from app.logic.attributes import clear_network_data
 from app.logic.importer import parse_and_save_graphml
+from common import models
 
 # Removed custom db_session fixture
 

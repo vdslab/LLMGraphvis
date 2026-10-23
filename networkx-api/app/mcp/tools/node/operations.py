@@ -1,10 +1,12 @@
+import json
+import logging
 from typing import Annotated, List, Optional
+
 from pydantic import Field
-from app.core.mcp import mcp
+
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
-import logging
-import json
+from app.core.mcp import mcp
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +15,15 @@ logger = logging.getLogger(__name__)
 @handle_tool_errors
 def node_search(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    query: Annotated[str, Field(description="Search string matched against node ID and label (case-insensitive partial match).")],
-    limit: Annotated[int, Field(description="Maximum number of results to return.")] = 10
+    query: Annotated[
+        str,
+        Field(
+            description="Search string matched against node ID and label (case-insensitive partial match)."
+        ),
+    ],
+    limit: Annotated[
+        int, Field(description="Maximum number of results to return.")
+    ] = 10,
 ) -> str:
     """
     Searches for nodes whose ID or label contains the query string.
@@ -27,6 +36,7 @@ def node_search(
     """
     with get_db_context() as db:
         from app.logic import search
+
         results = search.search_nodes(network_id, query, limit=limit, db=db)
         return json.dumps(results, default=str)
 
@@ -35,7 +45,10 @@ def node_search(
 @handle_tool_errors
 def node_get_details(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    node_id: Annotated[str, Field(description="The string ID of the node (as returned by node_search).")]
+    node_id: Annotated[
+        str,
+        Field(description="The string ID of the node (as returned by node_search)."),
+    ],
 ) -> str:
     """
     Retrieves all attributes and metadata for a specific node.
@@ -49,9 +62,12 @@ def node_get_details(
     """
     with get_db_context() as db:
         from app.logic import search
+
         result = search.get_node_details(network_id, node_id, db)
         if result is None:
-            return json.dumps({"error": f"Node '{node_id}' not found in network {network_id}."})
+            return json.dumps(
+                {"error": f"Node '{node_id}' not found in network {network_id}."}
+            )
         return json.dumps(result, default=str)
 
 
@@ -59,9 +75,17 @@ def node_get_details(
 @handle_tool_errors
 def node_get_top_ranked(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    metric: Annotated[str, Field(description="Node attribute to rank by (e.g., 'degree_centrality', 'pagerank', 'betweenness_centrality'). Calculate it first if needed.")],
+    metric: Annotated[
+        str,
+        Field(
+            description="Node attribute to rank by (e.g., 'degree_centrality', 'pagerank', 'betweenness_centrality'). Calculate it first if needed."
+        ),
+    ],
     n: Annotated[int, Field(description="Number of top nodes to return.")] = 10,
-    order: Annotated[str, Field(description="'desc' (highest first, default) or 'asc' (lowest first).")] = "desc"
+    order: Annotated[
+        str,
+        Field(description="'desc' (highest first, default) or 'asc' (lowest first)."),
+    ] = "desc",
 ) -> str:
     """
     Returns the top N nodes ranked by a specific numeric attribute.
@@ -75,18 +99,35 @@ def node_get_top_ranked(
     """
     with get_db_context() as db:
         from app.logic import centrality
-        return json.dumps(centrality.get_top_nodes(network_id, metric, n, order, db), default=str)
+
+        return json.dumps(
+            centrality.get_top_nodes(network_id, metric, n, order, db), default=str
+        )
 
 
 @mcp.tool()
 @handle_tool_errors
 def node_filter(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    attribute_name: Annotated[str, Field(description="Attribute name to filter by (e.g., 'country', 'community').")],
-    value: Annotated[Optional[str], Field(description="Exact match value (text or numeric as string).")] = None,
-    min_value: Annotated[Optional[float], Field(description="Minimum numeric value (inclusive).")] = None,
-    max_value: Annotated[Optional[float], Field(description="Maximum numeric value (inclusive).")] = None,
-    limit: Annotated[int, Field(description="Maximum number of nodes to return.")] = 100
+    attribute_name: Annotated[
+        str,
+        Field(
+            description="Attribute name to filter by (e.g., 'country', 'community')."
+        ),
+    ],
+    value: Annotated[
+        Optional[str],
+        Field(description="Exact match value (text or numeric as string)."),
+    ] = None,
+    min_value: Annotated[
+        Optional[float], Field(description="Minimum numeric value (inclusive).")
+    ] = None,
+    max_value: Annotated[
+        Optional[float], Field(description="Maximum numeric value (inclusive).")
+    ] = None,
+    limit: Annotated[
+        int, Field(description="Maximum number of nodes to return.")
+    ] = 100,
 ) -> dict:
     """
     Lists nodes matching a specific attribute condition WITHOUT creating a new network.
@@ -132,8 +173,20 @@ def node_filter(
 def node_get_neighbors(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     node_id: Annotated[str, Field(description="The string ID of the node.")],
-    include_attributes: Annotated[bool, Field(description="If True, include each listed neighbour's attributes (layout coordinates excluded). Costly for many neighbours; prefer node_compare on a few chosen IDs.")] = False,
-    limit: Annotated[int, Field(ge=1, le=500, description="How many neighbours to list, best-connected first. `degree` always reports the full count.")] = 30,
+    include_attributes: Annotated[
+        bool,
+        Field(
+            description="If True, include each listed neighbour's attributes (layout coordinates excluded). Costly for many neighbours; prefer node_compare on a few chosen IDs."
+        ),
+    ] = False,
+    limit: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=500,
+            description="How many neighbours to list, best-connected first. `degree` always reports the full count.",
+        ),
+    ] = 30,
 ) -> str:
     """
     Returns the immediate neighbors (1-hop) of a specific node, ignoring edge direction.
@@ -154,7 +207,9 @@ def node_get_neighbors(
 
         graph = build_graph_from_db(network_id, db).to_undirected(as_view=True)
         if node_id not in graph:
-            return json.dumps({"error": f"Node '{node_id}' not found in network {network_id}."})
+            return json.dumps(
+                {"error": f"Node '{node_id}' not found in network {network_id}."}
+            )
 
         ranked = sorted(graph[node_id], key=lambda n: (-graph.degree(n), n))
         listed = [n for n in ranked if n != node_id][:limit]
@@ -176,12 +231,15 @@ def node_get_neighbors(
             ]
 
         degree = sum(1 for n in graph[node_id] if n != node_id)
-        return json.dumps({
-            "node_id": node_id,
-            "degree": degree,
-            "neighbors": result,
-            "omitted": degree - len(result),
-        }, default=str)
+        return json.dumps(
+            {
+                "node_id": node_id,
+                "degree": degree,
+                "neighbors": result,
+                "omitted": degree - len(result),
+            },
+            default=str,
+        )
 
 
 @mcp.tool()
@@ -190,7 +248,14 @@ def node_common_neighbors(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     node_a: Annotated[str, Field(description="Exact ID of the first node.")],
     node_b: Annotated[str, Field(description="Exact ID of the second node.")],
-    limit: Annotated[int, Field(ge=1, le=200, description="How many shared neighbours to list, best-connected first.")] = 30,
+    limit: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=200,
+            description="How many shared neighbours to list, best-connected first.",
+        ),
+    ] = 30,
 ) -> dict:
     """
     Returns the nodes connected to both A and B, whether A and B are directly linked, and their Jaccard overlap.
@@ -200,6 +265,7 @@ def node_common_neighbors(
     """
     with get_db_context() as db:
         from app.logic import exploration
+
         return exploration.common_neighbors(network_id, db, node_a, node_b, limit)
 
 
@@ -207,8 +273,15 @@ def node_common_neighbors(
 @handle_tool_errors
 def node_compare(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    node_ids: Annotated[List[str], Field(description="Exact IDs of up to 25 nodes to compare.")],
-    attributes: Annotated[Optional[List[str]], Field(description="Attributes to include. None includes every node attribute except layout coordinates.")] = None,
+    node_ids: Annotated[
+        List[str], Field(description="Exact IDs of up to 25 nodes to compare.")
+    ],
+    attributes: Annotated[
+        Optional[List[str]],
+        Field(
+            description="Attributes to include. None includes every node attribute except layout coordinates."
+        ),
+    ] = None,
 ) -> dict:
     """
     Returns a side-by-side table (label, degree, attributes) for several nodes in one call.
@@ -218,6 +291,7 @@ def node_compare(
     """
     with get_db_context() as db:
         from app.logic import exploration
+
         return exploration.compare_nodes(network_id, db, node_ids, attributes)
 
 
@@ -226,7 +300,7 @@ def node_compare(
 def node_update_label(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     node_id: Annotated[str, Field(description="The string ID of the node to rename.")],
-    new_label: Annotated[str, Field(description="The new display label to assign.")]
+    new_label: Annotated[str, Field(description="The new display label to assign.")],
 ) -> str:
     """
     Updates the display label of a specific node.
@@ -239,5 +313,6 @@ def node_update_label(
     """
     with get_db_context() as db:
         from app.logic import edit
+
         result = edit.update_node_label(network_id, node_id, new_label, db)
         return json.dumps(result)

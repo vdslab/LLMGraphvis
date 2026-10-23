@@ -225,9 +225,7 @@ def guard_expensive_computation(ctx: HookContext) -> Optional[ToolCallDecision]:
 
     threshold = _env_int("AGENT_EXPENSIVE_NODE_THRESHOLD", 2000)
     network_id = (
-        ctx.args.get("network_id")
-        or ctx.turn_state.get("network_id")
-        or ctx.network_id
+        ctx.args.get("network_id") or ctx.turn_state.get("network_id") or ctx.network_id
     )
     node_count, edge_count = dbinfo.cached_graph_size(
         ctx.turn_state, ctx.db, network_id
@@ -298,7 +296,6 @@ def guard_attribute_exists(ctx: HookContext) -> Optional[ToolCallDecision]:
         f"cannot use it. Available: {_format_candidates(known)}. "
         f"Pick the correct name, or ask the user if none of these is what they meant."
     )
-
 
 
 _SIBLING_NODE_CHANNEL = {

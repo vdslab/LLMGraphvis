@@ -68,7 +68,9 @@ class ToolCatalog:
         enabled = turn_state.get("enabled_tool_names", set())
         return [tool for tool in self._tools if tool.name in enabled]
 
-    def activate(self, names: Iterable[str], turn_state: dict) -> tuple[list[str], list[str]]:
+    def activate(
+        self, names: Iterable[str], turn_state: dict
+    ) -> tuple[list[str], list[str]]:
         enabled = turn_state.setdefault("enabled_tool_names", set())
         activated: list[str] = []
         missing: list[str] = []
@@ -150,7 +152,9 @@ class ToolCatalog:
 
         text: dict[str, list[str]] = {}
         for skill in registry.all():
-            searchable = " ".join([skill.name, skill.description, *skill.triggers]).lower()
+            searchable = " ".join(
+                [skill.name, skill.description, *skill.triggers]
+            ).lower()
             for tool_name in skill.related_tools:
                 text.setdefault(tool_name, []).append(searchable)
         return {name: " ".join(parts) for name, parts in text.items()}

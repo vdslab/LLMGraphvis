@@ -1,9 +1,10 @@
 """Numeric mappings: transform, explicit range, and uniform edge styles (ADR 0029)."""
 
 import pytest
+from pydantic import ValidationError
+
 from app.logic.style_service import DEFAULT_EDGE_COLOR, StyleService
 from app.schemas.visualization import EdgeColorConfig, NodeSizeConfig
-from pydantic import ValidationError
 
 ATTR = {"score": 1}
 # A skewed metric: most nodes near zero, one outlier (like betweenness).

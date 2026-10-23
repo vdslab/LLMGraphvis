@@ -1,5 +1,7 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from app.mcp.tools import subgraph
 
 
@@ -14,10 +16,14 @@ def test_create_k_core_subgraph_success():
         mock_session_cls.return_value = mock_db
 
         with patch("app.logic.subgraph.create_k_core_subgraph") as mock_logic_create:
-            with patch("app.logic.visualization_builder.build_visualization") as mock_build_vis:
-
+            with patch(
+                "app.logic.visualization_builder.build_visualization"
+            ) as mock_build_vis:
                 # Setup return values
-                mock_logic_create.return_value = {"new_network_id": 999, "name": "K-Core (k=2)"}
+                mock_logic_create.return_value = {
+                    "new_network_id": 999,
+                    "name": "K-Core (k=2)",
+                }
 
                 # Execute
                 result = subgraph.subgraph_k_core(

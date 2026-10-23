@@ -1,10 +1,12 @@
-from typing import Annotated
-from pydantic import Field
-from app.core.mcp import mcp
-from app.core.database import get_db_context
-from app.core.decorators import handle_tool_errors
 import logging
 import traceback
+from typing import Annotated
+
+from pydantic import Field
+
+from app.core.database import get_db_context
+from app.core.decorators import handle_tool_errors
+from app.core.mcp import mcp
 
 logger = logging.getLogger(__name__)
 
@@ -12,8 +14,15 @@ logger = logging.getLogger(__name__)
 @mcp.tool()
 @handle_tool_errors
 def network_import_graphml(
-    network_id: Annotated[int, Field(description="The ID of the network record in the database.")],
-    graphml_data: Annotated[str, Field(description="The **raw XML string content** of the GraphML file (not a file path).")]
+    network_id: Annotated[
+        int, Field(description="The ID of the network record in the database.")
+    ],
+    graphml_data: Annotated[
+        str,
+        Field(
+            description="The **raw XML string content** of the GraphML file (not a file path)."
+        ),
+    ],
 ) -> dict:
     """
     Parses raw GraphML content and saves it to the database for the given network ID.
@@ -28,15 +37,26 @@ def network_import_graphml(
     """
     with get_db_context() as db:
         from app.logic import importer
+
         final_network_id = importer.parse_and_save_graphml(network_id, graphml_data, db)
-        return {"network_id": final_network_id, "content": f"Imported network {final_network_id}"}
+        return {
+            "network_id": final_network_id,
+            "content": f"Imported network {final_network_id}",
+        }
 
 
 @mcp.tool()
 @handle_tool_errors
 def network_initialize(
-    network_id: Annotated[int, Field(description="The ID of the network record in the database.")],
-    graphml_data: Annotated[str, Field(description="The **raw XML string content** of the GraphML file (not a file path).")]
+    network_id: Annotated[
+        int, Field(description="The ID of the network record in the database.")
+    ],
+    graphml_data: Annotated[
+        str,
+        Field(
+            description="The **raw XML string content** of the GraphML file (not a file path)."
+        ),
+    ],
 ) -> dict:
     """
     DEPRECATED — prefer the three explicit steps below.
@@ -58,7 +78,9 @@ def network_initialize(
         dict: {"network_id": int, "network": dict, "content": str}
     """
     with get_db_context() as db:
-        logger.info(f"network_initialize: network_id={network_id}, graphml_data type={type(graphml_data)}")
+        logger.info(
+            f"network_initialize: network_id={network_id}, graphml_data type={type(graphml_data)}"
+        )
 
         from app.logic import importer, layout, visualization_builder
 
@@ -69,5 +91,5 @@ def network_initialize(
         return {
             "network_id": final_network_id,
             "network": vis_data,
-            "content": f"Network initialized (ID: {final_network_id}) with {len(vis_data['nodes'])} nodes."
+            "content": f"Network initialized (ID: {final_network_id}) with {len(vis_data['nodes'])} nodes.",
         }

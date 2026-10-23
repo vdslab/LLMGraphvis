@@ -1,8 +1,8 @@
 """Reduction candidates are measured, never created (ADR 0034)."""
 
-from app.logic import network_metadata, reduction, subgraph
 from tests.test_subgraph_features_comprehensive import create_source_network
 
+from app.logic import network_metadata, reduction, subgraph
 from common import models
 
 
@@ -53,7 +53,9 @@ def test_categorical_attribute_lists_its_group_sizes(db):
     assert group["attribute"] == "group"
     assert group["tool"] == "subgraph_extract_filter"
     assert sorted((g["value"], g["nodes"]) for g in group["groups"]) == [
-        ("A", 5), ("B", 4), ("C", 5)
+        ("A", 5),
+        ("B", 4),
+        ("C", 5),
     ]
 
 

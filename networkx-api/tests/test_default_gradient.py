@@ -1,7 +1,8 @@
+from test_layout_parameters import setup_graph
+
 from app.logic.layout import calculate_layout
 from app.logic.visualization_builder import build_visualization
 from app.schemas.visualization import NodeColorConfig
-from test_layout_parameters import setup_graph
 
 
 def test_unspecified_gradient_matches_legend_and_survives_reload(db):

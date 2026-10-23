@@ -125,7 +125,9 @@ def nudge_layout_choice(ctx: HookContext) -> None:
     if not (ctx.assistant_text or "").strip():
         return
 
-    calls = [c for c in (state.get("executed_calls") or []) if c["status"] == "completed"]
+    calls = [
+        c for c in (state.get("executed_calls") or []) if c["status"] == "completed"
+    ]
     if any(c["name"] in _TUNING_STARTED for c in calls):
         return
     layout = _drawn_force_layout(calls)
@@ -182,7 +184,9 @@ def _previous_layout(ctx: HookContext, network_id) -> Optional[str]:
 
     rows = (
         ctx.db.query(models.ToolExecution.tool_name, models.ToolExecution.arguments)
-        .join(models.ChatMessage, models.ToolExecution.message_id == models.ChatMessage.id)
+        .join(
+            models.ChatMessage, models.ToolExecution.message_id == models.ChatMessage.id
+        )
         .filter(
             models.ChatMessage.chat_id == ctx.chat_id,
             models.ToolExecution.status == "completed",

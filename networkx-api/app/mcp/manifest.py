@@ -14,6 +14,7 @@ import asyncio
 import json
 from pathlib import Path
 
+
 def _common_dir() -> Path:
     """`/app/common` in the container, `<repo>/common` on the host.
 

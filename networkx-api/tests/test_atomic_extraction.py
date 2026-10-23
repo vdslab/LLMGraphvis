@@ -1,9 +1,9 @@
 from unittest.mock import patch
 
 import pytest
-from app.logic.extraction import extract_nodes
 from test_layout_parameters import setup_graph
 
+from app.logic.extraction import extract_nodes
 from common import models
 
 

@@ -43,11 +43,11 @@ MIN_NODES_FOR_SPREAD = 20
 # density (les_miserables sits near 8 per edge under any force layout), so they
 # are only compared between candidates, through `score`.
 THRESHOLDS = {
-    "node_overlap": 0.05,           # share of nodes touching another node
+    "node_overlap": 0.05,  # share of nodes touching another node
     "outliers_compress_core": 0.15,  # core_extent below this
-    "uneven_edge_lengths": 1.0,      # edge_length_cv above this
-    "distorted_aspect": 3.0,         # aspect above this
-    "clumped": 0.15,                 # occupancy below this
+    "uneven_edge_lengths": 1.0,  # edge_length_cv above this
+    "distorted_aspect": 3.0,  # aspect above this
+    "clumped": 0.15,  # occupancy below this
 }
 
 # Weights of the penalty `score` sums; lower is better. Overlap dominates
@@ -193,11 +193,17 @@ def diagnose(report: QualityReport) -> List[str]:
     issues = []
     if report.node_overlap > t["node_overlap"]:
         issues.append("node_overlap")
-    if report.core_extent is not None and report.core_extent < t["outliers_compress_core"]:
+    if (
+        report.core_extent is not None
+        and report.core_extent < t["outliers_compress_core"]
+    ):
         issues.append("outliers_compress_core")
     if report.occupancy is not None and report.occupancy < t["clumped"]:
         issues.append("clumped")
-    if report.edge_length_cv is not None and report.edge_length_cv > t["uneven_edge_lengths"]:
+    if (
+        report.edge_length_cv is not None
+        and report.edge_length_cv > t["uneven_edge_lengths"]
+    ):
         issues.append("uneven_edge_lengths")
     if report.aspect > t["distorted_aspect"]:
         issues.append("distorted_aspect")
@@ -321,7 +327,10 @@ def _crossings(
         i, j = np.triu_indices(m, k=1)
         count = 0
         for start in range(0, len(i), _CROSSING_CHUNK):
-            a, b = i[start : start + _CROSSING_CHUNK], j[start : start + _CROSSING_CHUNK]
+            a, b = (
+                i[start : start + _CROSSING_CHUNK],
+                j[start : start + _CROSSING_CHUNK],
+            )
             count += int(_crossing_mask(points, edges[a], edges[b]).sum())
         return count, 2.0 * count / m, False
 

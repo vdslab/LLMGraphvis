@@ -155,7 +155,11 @@ class TuningField(BaseModel):
         if not isinstance(value, dict):
             return value
         normalized = dict(value)
-        for alias, name in (("min", "minimum"), ("max", "maximum"), ("default", "suggested")):
+        for alias, name in (
+            ("min", "minimum"),
+            ("max", "maximum"),
+            ("default", "suggested"),
+        ):
             if alias in normalized and normalized.get(name) is None:
                 normalized[name] = normalized.pop(alias)
         return normalized
@@ -345,7 +349,9 @@ def _summarize(result) -> str:
         text = f"rendered {len(result['nodes'])} nodes, {len(result['links'])} edges"
         # The number of categories is what a granularity change is judged by.
         color = (result.get("legend") or {}).get("node_color") or {}
-        if color.get("type") == "categorical" and isinstance(color.get("mapping"), dict):
+        if color.get("type") == "categorical" and isinstance(
+            color.get("mapping"), dict
+        ):
             text += f"; {color.get('attribute')}: {len(color['mapping'])} categories"
         return text
     if isinstance(result, dict):
@@ -382,7 +388,9 @@ def _earlier_calls(db, chat_id, tools) -> list[dict]:
     """
     rows = (
         db.query(models.ToolExecution)
-        .join(models.ChatMessage, models.ToolExecution.message_id == models.ChatMessage.id)
+        .join(
+            models.ChatMessage, models.ToolExecution.message_id == models.ChatMessage.id
+        )
         .filter(
             models.ChatMessage.chat_id == chat_id,
             models.ToolExecution.tool_name.in_(list(tools)),
@@ -454,9 +462,13 @@ def _build(form: TuningForm, turn_state: dict, network_id: int, earlier=()):
                 )
             low, high = _schema_value(prop, "minimum"), _schema_value(prop, "maximum")
             if low is not None and field.minimum is not None and field.minimum < low:
-                raise TuningError(f"{field.id}: minimum is below the tool's bound {low}")
+                raise TuningError(
+                    f"{field.id}: minimum is below the tool's bound {low}"
+                )
             if high is not None and field.maximum is not None and field.maximum > high:
-                raise TuningError(f"{field.id}: maximum is above the tool's bound {high}")
+                raise TuningError(
+                    f"{field.id}: maximum is above the tool's bound {high}"
+                )
             if integer:
                 spec["step"] = field.step if field.step is not None else 1
                 bounds = (spec["step"], field.minimum, field.maximum)
@@ -638,7 +650,9 @@ async def apply(
     if visualization is None:
         try:
             generated = await mcp_client.execute_tool(
-                "visualization_generate", {"network_id": row.network_id}, session=session
+                "visualization_generate",
+                {"network_id": row.network_id},
+                session=session,
             )
         except Exception as exc:
             raise TuningExecutionError("visualization_generate", str(exc)) from exc
@@ -678,7 +692,9 @@ async def apply(
     }
 
 
-async def apply_from_agent(chat_id, db, arguments, turn_state, queue=None, session=None):
+async def apply_from_agent(
+    chat_id, db, arguments, turn_state, queue=None, session=None
+):
     """`apply_parameter_tuning`: the words path onto the shared state."""
     try:
         request = ApplyRequest.model_validate(arguments)
@@ -747,7 +763,9 @@ def confirm(chat, db, tuning_id, content: str):
     row.status = "confirmed"
     row.confirmed_at = datetime.now(timezone.utc)
     lines = [(content or "").strip() or row.specification["question"]]
-    lines += [f"{param} = {_format_value(value)}" for param, value in row.values.items()]
+    lines += [
+        f"{param} = {_format_value(value)}" for param, value in row.values.items()
+    ]
     return "\n".join(lines)
 
 
@@ -774,7 +792,9 @@ def offerable_pipeline(db, chat_id, network_id, user_text: str) -> list[str] | N
         return None
     rows = (
         db.query(models.ToolExecution.tool_name, models.ToolExecution.arguments)
-        .join(models.ChatMessage, models.ToolExecution.message_id == models.ChatMessage.id)
+        .join(
+            models.ChatMessage, models.ToolExecution.message_id == models.ChatMessage.id
+        )
         .filter(
             models.ChatMessage.chat_id == chat_id,
             models.ToolExecution.status == "completed",
@@ -788,12 +808,12 @@ def offerable_pipeline(db, chat_id, network_id, user_text: str) -> list[str] | N
         if is_tunable_tool(name)
         and (arguments or {}).get("network_id", network_id) == network_id
     ]
-    starts = [i for i, name in enumerate(names) if not name.startswith("visualization_")]
+    starts = [
+        i for i, name in enumerate(names) if not name.startswith("visualization_")
+    ]
     if not starts:
         return None
-    after = [
-        n for n in dict.fromkeys(names[starts[-1] + 1 :]) if is_rendering_tool(n)
-    ]
+    after = [n for n in dict.fromkeys(names[starts[-1] + 1 :]) if is_rendering_tool(n)]
     return [names[starts[-1]], *after]
 
 
@@ -831,7 +851,9 @@ def context_block(db, row) -> str:
         else:
             detail += f"; range {_format_bounds(spec)}"
         if spec.get("low_label") or spec.get("high_label"):
-            detail += f"; {spec.get('low_label') or '?'} → {spec.get('high_label') or '?'}"
+            detail += (
+                f"; {spec.get('low_label') or '?'} → {spec.get('high_label') or '?'}"
+            )
         lines.append(detail)
 
     history = row.history or []

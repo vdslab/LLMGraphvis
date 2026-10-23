@@ -2,7 +2,6 @@
 
 from app.api.v1.endpoints import networks
 from app.logic import visualization_builder
-
 from common import models
 
 # Above the 4 MiB the MCP transport accepts, which is what stalled an upload.

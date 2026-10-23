@@ -1,9 +1,11 @@
+import logging
 from typing import Annotated, Optional
+
 from pydantic import Field
-from app.core.mcp import mcp
+
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
-import logging
+from app.core.mcp import mcp
 
 logger = logging.getLogger(__name__)
 
@@ -12,18 +14,41 @@ logger = logging.getLogger(__name__)
 @handle_tool_errors
 def analysis_detect_communities(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    algorithm: Annotated[str, Field(
-        description=(
-            "Community detection algorithm to use:\n"
-            "- 'louvain' (default): High-quality, fast, works well on most graphs.\n"
-            "- 'greedy_modularity': Good modularity optimization, deterministic.\n"
-            "- 'label_propagation': Semi-synchronous propagation for undirected graphs."
-        )
-    )] = "louvain",
-    resolution: Annotated[Optional[float], Field(description="Louvain or greedy modularity. Higher values favor smaller/more numerous communities, lower values favor larger/fewer communities. Rejected for other algorithms. Defaults to networkx's own default (1.0) if not specified.")] = None,
-    seed: Annotated[Optional[int], Field(description="Louvain-only. Random seed for reproducible results. Rejected for 'greedy_modularity' and 'label_propagation' (neither supports a seed in networkx). Defaults to non-deterministic if not specified.")] = None,
-    best_n: Annotated[Optional[int], Field(description="'greedy_modularity'-only. Forces merging until at most this many communities remain. Rejected for other algorithms. Defaults to networkx's own automatic choice if not specified.")] = None,
-    force_recompute: Annotated[bool, Field(description="If True, bypasses the cache and always recomputes, even if a valid cached result exists for this exact graph state and parameters. Default False preserves current auto-caching behavior.")] = False
+    algorithm: Annotated[
+        str,
+        Field(
+            description=(
+                "Community detection algorithm to use:\n"
+                "- 'louvain' (default): High-quality, fast, works well on most graphs.\n"
+                "- 'greedy_modularity': Good modularity optimization, deterministic.\n"
+                "- 'label_propagation': Semi-synchronous propagation for undirected graphs."
+            )
+        ),
+    ] = "louvain",
+    resolution: Annotated[
+        Optional[float],
+        Field(
+            description="Louvain or greedy modularity. Higher values favor smaller/more numerous communities, lower values favor larger/fewer communities. Rejected for other algorithms. Defaults to networkx's own default (1.0) if not specified."
+        ),
+    ] = None,
+    seed: Annotated[
+        Optional[int],
+        Field(
+            description="Louvain-only. Random seed for reproducible results. Rejected for 'greedy_modularity' and 'label_propagation' (neither supports a seed in networkx). Defaults to non-deterministic if not specified."
+        ),
+    ] = None,
+    best_n: Annotated[
+        Optional[int],
+        Field(
+            description="'greedy_modularity'-only. Forces merging until at most this many communities remain. Rejected for other algorithms. Defaults to networkx's own automatic choice if not specified."
+        ),
+    ] = None,
+    force_recompute: Annotated[
+        bool,
+        Field(
+            description="If True, bypasses the cache and always recomputes, even if a valid cached result exists for this exact graph state and parameters. Default False preserves current auto-caching behavior."
+        ),
+    ] = False,
 ) -> str:
     """
     DEPRECATED — use analysis_louvain_communities, analysis_greedy_modularity_communities
@@ -47,6 +72,7 @@ def analysis_detect_communities(
     """
     with get_db_context() as db:
         from app.logic import community
+
         attr_name = community.calculate_community(
             network_id,
             algorithm,
@@ -63,12 +89,42 @@ def analysis_detect_communities(
 @handle_tool_errors
 def analysis_louvain_communities(
     network_id: Annotated[int, Field(description="Network to partition.")],
-    weight: Annotated[Optional[str], Field(description="Edge strength attribute, 'weight' for imported strength; omit/null/'none' for unweighted.")] = None,
-    resolution: Annotated[float, Field(gt=0, allow_inf_nan=False, description="Below 1 favors larger communities; above 1 favors smaller communities.")] = 1.0,
-    threshold: Annotated[float, Field(ge=0, allow_inf_nan=False, description="Stop when modularity gain between levels is below this value.")] = 1e-7,
-    max_level: Annotated[Optional[int], Field(gt=0, description="Maximum hierarchy levels; omit for no explicit cap.")] = None,
-    seed: Annotated[Optional[int], Field(description="Random seed; 42 is reproducible, null uses fresh randomness.")] = 42,
-    force_recompute: Annotated[bool, Field(description="Bypass a valid cache for the same graph and parameters.")] = False,
+    weight: Annotated[
+        Optional[str],
+        Field(
+            description="Edge strength attribute, 'weight' for imported strength; omit/null/'none' for unweighted."
+        ),
+    ] = None,
+    resolution: Annotated[
+        float,
+        Field(
+            gt=0,
+            allow_inf_nan=False,
+            description="Below 1 favors larger communities; above 1 favors smaller communities.",
+        ),
+    ] = 1.0,
+    threshold: Annotated[
+        float,
+        Field(
+            ge=0,
+            allow_inf_nan=False,
+            description="Stop when modularity gain between levels is below this value.",
+        ),
+    ] = 1e-7,
+    max_level: Annotated[
+        Optional[int],
+        Field(gt=0, description="Maximum hierarchy levels; omit for no explicit cap."),
+    ] = None,
+    seed: Annotated[
+        Optional[int],
+        Field(
+            description="Random seed; 42 is reproducible, null uses fresh randomness."
+        ),
+    ] = 42,
+    force_recompute: Annotated[
+        bool,
+        Field(description="Bypass a valid cache for the same graph and parameters."),
+    ] = False,
 ) -> str:
     """Run Louvain modularity optimization and save 'louvain_community' node attribute.
 
@@ -79,9 +135,18 @@ def analysis_louvain_communities(
     """
     with get_db_context() as db:
         from app.logic.community import calculate_community
-        name = calculate_community(network_id, "louvain", db, weight=weight,
-                                   resolution=resolution, threshold=threshold,
-                                   max_level=max_level, seed=seed, force=force_recompute)
+
+        name = calculate_community(
+            network_id,
+            "louvain",
+            db,
+            weight=weight,
+            resolution=resolution,
+            threshold=threshold,
+            max_level=max_level,
+            seed=seed,
+            force=force_recompute,
+        )
         return f"Saved '{name}'."
 
 
@@ -89,11 +154,36 @@ def analysis_louvain_communities(
 @handle_tool_errors
 def analysis_greedy_modularity_communities(
     network_id: Annotated[int, Field(description="Network to partition.")],
-    weight: Annotated[Optional[str], Field(description="Edge strength attribute; omit/null/'none' for unweighted.")] = None,
-    resolution: Annotated[float, Field(gt=0, allow_inf_nan=False, description="Modularity resolution; below 1 favors larger communities, above 1 smaller.")] = 1.0,
-    cutoff: Annotated[int, Field(ge=1, description="Stop merging at this lower bound on the number of groups, even if modularity could improve.")] = 1,
-    best_n: Annotated[Optional[int], Field(ge=1, description="Force merging until at most this many groups remain. For exactly k groups, set cutoff=best_n=k. Must be at least cutoff and at most node count.")] = None,
-    force_recompute: Annotated[bool, Field(description="Bypass a valid cache for the same graph and parameters.")] = False,
+    weight: Annotated[
+        Optional[str],
+        Field(description="Edge strength attribute; omit/null/'none' for unweighted."),
+    ] = None,
+    resolution: Annotated[
+        float,
+        Field(
+            gt=0,
+            allow_inf_nan=False,
+            description="Modularity resolution; below 1 favors larger communities, above 1 smaller.",
+        ),
+    ] = 1.0,
+    cutoff: Annotated[
+        int,
+        Field(
+            ge=1,
+            description="Stop merging at this lower bound on the number of groups, even if modularity could improve.",
+        ),
+    ] = 1,
+    best_n: Annotated[
+        Optional[int],
+        Field(
+            ge=1,
+            description="Force merging until at most this many groups remain. For exactly k groups, set cutoff=best_n=k. Must be at least cutoff and at most node count.",
+        ),
+    ] = None,
+    force_recompute: Annotated[
+        bool,
+        Field(description="Bypass a valid cache for the same graph and parameters."),
+    ] = False,
 ) -> str:
     """Run Clauset-Newman-Moore greedy modularity maximization and save 'greedy_modularity_community' node attribute.
 
@@ -104,9 +194,17 @@ def analysis_greedy_modularity_communities(
     """
     with get_db_context() as db:
         from app.logic.community import calculate_community
-        name = calculate_community(network_id, "greedy_modularity", db, weight=weight,
-                                   resolution=resolution, cutoff=cutoff, best_n=best_n,
-                                   force=force_recompute)
+
+        name = calculate_community(
+            network_id,
+            "greedy_modularity",
+            db,
+            weight=weight,
+            resolution=resolution,
+            cutoff=cutoff,
+            best_n=best_n,
+            force=force_recompute,
+        )
         return f"Saved '{name}'."
 
 
@@ -114,7 +212,9 @@ def analysis_greedy_modularity_communities(
 @handle_tool_errors
 def analysis_label_propagation_communities(
     network_id: Annotated[int, Field(description="Undirected network to partition.")],
-    force_recompute: Annotated[bool, Field(description="Bypass a valid cache for the same graph.")] = False,
+    force_recompute: Annotated[
+        bool, Field(description="Bypass a valid cache for the same graph.")
+    ] = False,
 ) -> str:
     """Run semi-synchronous label propagation and save 'label_propagation_community' node attribute.
 
@@ -125,5 +225,8 @@ def analysis_label_propagation_communities(
     """
     with get_db_context() as db:
         from app.logic.community import calculate_community
-        name = calculate_community(network_id, "label_propagation", db, force=force_recompute)
+
+        name = calculate_community(
+            network_id, "label_propagation", db, force=force_recompute
+        )
         return f"Saved '{name}'."

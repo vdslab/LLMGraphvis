@@ -4,9 +4,7 @@ from app.services.llm.catalog import get_available_provider_catalog
 
 
 def _provider_ids():
-    with patch(
-        "app.services.llm.catalog.list_lmstudio_model_ids", return_value=[]
-    ):
+    with patch("app.services.llm.catalog.list_lmstudio_model_ids", return_value=[]):
         return [provider["id"] for provider in get_available_provider_catalog()]
 
 
@@ -36,9 +34,7 @@ def test_other_providers_are_not_affected(monkeypatch):
 
 
 def test_lmstudio_is_hidden_when_server_has_no_models():
-    with patch(
-        "app.services.llm.catalog.list_lmstudio_model_ids", return_value=[]
-    ):
+    with patch("app.services.llm.catalog.list_lmstudio_model_ids", return_value=[]):
         assert "lmstudio" not in [
             provider["id"] for provider in get_available_provider_catalog()
         ]
@@ -77,9 +73,7 @@ def test_google_is_the_default_when_provider_is_not_configured(monkeypatch):
     monkeypatch.delenv("LLM_PROVIDER", raising=False)
     monkeypatch.delenv("GEMINI_MODEL", raising=False)
 
-    with patch(
-        "app.services.llm.catalog.list_lmstudio_model_ids", return_value=[]
-    ):
+    with patch("app.services.llm.catalog.list_lmstudio_model_ids", return_value=[]):
         providers = get_available_provider_catalog()
 
     defaults = [

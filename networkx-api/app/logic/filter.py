@@ -3,10 +3,10 @@ from typing import List, Set
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from common import models
 from app.core.logging import get_logger
 from app.logic.subgraph import create_subgraph_from_nodes
 from app.schemas.filter import AttributeCondition
+from common import models
 
 logger = get_logger(__name__)
 
@@ -182,31 +182,28 @@ def get_nodes_by_filter(
     """
     # Start with all node IDs in the network
     all_query = db.query(models.Node).filter(models.Node.network_id == network_id)
-    
+
     # Use sets for intersection
     candidate_node_ids = set([node.node_id for node in all_query.all()])
-    
+
     if not candidate_node_ids:
         return []
 
     for condition in conditions:
         matched_ids = _get_nodes_matching_condition(network_id, condition, db)
         candidate_node_ids &= matched_ids
-        
+
         if not candidate_node_ids:
             return []
-            
+
     # Fetch details for the remaining nodes
     final_nodes = (
         db.query(models.Node)
         .filter(
             models.Node.network_id == network_id,
-            models.Node.node_id.in_(candidate_node_ids)
+            models.Node.node_id.in_(candidate_node_ids),
         )
         .all()
     )
-    
-    return [
-        {"id": node.node_id, "label": node.label}
-        for node in final_nodes
-    ]
+
+    return [{"id": node.node_id, "label": node.label} for node in final_nodes]

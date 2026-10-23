@@ -20,6 +20,7 @@ from .types import (
 
 logger = get_logger(__name__)
 
+
 class OpenAIProvider(LLMProvider):
     """OpenAI Chat Completions adapter for the provider-agnostic agent loop."""
 
@@ -76,9 +77,7 @@ class OpenAIProvider(LLMProvider):
 
             else:
                 text = "".join(
-                    part.text
-                    for part in msg.parts
-                    if isinstance(part, LLMTextPart)
+                    part.text for part in msg.parts if isinstance(part, LLMTextPart)
                 )
                 if text:
                     messages.append({"role": "user", "content": text})

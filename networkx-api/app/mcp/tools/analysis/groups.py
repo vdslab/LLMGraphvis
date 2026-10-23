@@ -2,11 +2,12 @@
 
 from typing import Annotated, Optional
 
+from pydantic import Field
+
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
 from app.core.mcp import mcp
 from app.logic import exploration
-from pydantic import Field
 
 NetworkId = Annotated[int, Field(description="ID of the network to query.")]
 
@@ -15,10 +16,29 @@ NetworkId = Annotated[int, Field(description="ID of the network to query.")]
 @handle_tool_errors
 def analysis_attribute_distribution(
     network_id: NetworkId,
-    attribute: Annotated[str, Field(description="Node attribute to describe, imported or computed (e.g. 'pagerank', 'country').")],
-    group_by: Annotated[Optional[str], Field(description="Optional second node attribute (usually categorical, e.g. a community) to break the description down by group.")] = None,
-    bins: Annotated[int, Field(ge=2, le=30, description="Histogram bins for a numeric attribute.")] = 10,
-    top: Annotated[int, Field(ge=1, le=50, description="Most frequent categories, or largest groups, to list; the rest are counted, not listed.")] = 15,
+    attribute: Annotated[
+        str,
+        Field(
+            description="Node attribute to describe, imported or computed (e.g. 'pagerank', 'country')."
+        ),
+    ],
+    group_by: Annotated[
+        Optional[str],
+        Field(
+            description="Optional second node attribute (usually categorical, e.g. a community) to break the description down by group."
+        ),
+    ] = None,
+    bins: Annotated[
+        int, Field(ge=2, le=30, description="Histogram bins for a numeric attribute.")
+    ] = 10,
+    top: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=50,
+            description="Most frequent categories, or largest groups, to list; the rest are counted, not listed.",
+        ),
+    ] = 15,
 ) -> dict:
     """Describe how one node attribute is distributed, optionally per group.
 
@@ -38,8 +58,18 @@ def analysis_attribute_distribution(
 @handle_tool_errors
 def analysis_group_connectivity(
     network_id: NetworkId,
-    attribute: Annotated[str, Field(description="Categorical node attribute that defines the groups, e.g. 'louvain_community' or 'country'.")],
-    top: Annotated[int, Field(ge=1, le=50, description="Largest groups and strongest group pairs to list.")] = 20,
+    attribute: Annotated[
+        str,
+        Field(
+            description="Categorical node attribute that defines the groups, e.g. 'louvain_community' or 'country'."
+        ),
+    ],
+    top: Annotated[
+        int,
+        Field(
+            ge=1, le=50, description="Largest groups and strongest group pairs to list."
+        ),
+    ] = 20,
 ) -> dict:
     """Count edges within each group and between pairs of groups.
 

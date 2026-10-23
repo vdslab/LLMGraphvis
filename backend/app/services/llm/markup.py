@@ -68,9 +68,7 @@ def sanitize_model_output(text: str) -> str:
     )
 
 
-_THOUGHT_DIRECTIVE_BLOCK = re.compile(
-    r"(?m)^(:{3,})thought\b[\s\S]*?(?:^\1[ \t]*$|\Z)"
-)
+_THOUGHT_DIRECTIVE_BLOCK = re.compile(r"(?m)^(:{3,})thought\b[\s\S]*?(?:^\1[ \t]*$|\Z)")
 
 
 def visible_text(text: str) -> str:

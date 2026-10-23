@@ -1,9 +1,11 @@
+import logging
 from typing import Annotated, Dict, Optional, Tuple
+
 from pydantic import Field
-from app.core.mcp import mcp
+
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
-import logging
+from app.core.mcp import mcp
 
 logger = logging.getLogger(__name__)
 
@@ -27,12 +29,35 @@ _SCALE_CENTER_DESC = (
 @handle_tool_errors
 def layout_kamada_kawai(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    weight: Annotated[Optional[str], Field(description=_WEIGHT_DESC + " Here a weight is treated as the target DISTANCE along an edge, so heavier edges place their endpoints further apart — the opposite of a connection-strength reading. Because of that this layout is the one layout that is NOT weighted by default: pass this only when the attribute really does mean distance or cost, not strength.")] = None,
-    dist: Annotated[Optional[Dict[str, Dict[str, float]]], Field(description="Optional precomputed pairwise target distances as {source: {target: distance}}. Omit to use shortest-path distances, which is almost always what you want.")] = None,
+    weight: Annotated[
+        Optional[str],
+        Field(
+            description=_WEIGHT_DESC
+            + " Here a weight is treated as the target DISTANCE along an edge, so heavier edges place their endpoints further apart — the opposite of a connection-strength reading. Because of that this layout is the one layout that is NOT weighted by default: pass this only when the attribute really does mean distance or cost, not strength."
+        ),
+    ] = None,
+    dist: Annotated[
+        Optional[Dict[str, Dict[str, float]]],
+        Field(
+            description="Optional precomputed pairwise target distances as {source: {target: distance}}. Omit to use shortest-path distances, which is almost always what you want."
+        ),
+    ] = None,
     scale: Annotated[Optional[float], Field(description=_SCALE_CENTER_DESC)] = None,
-    center: Annotated[Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)] = None,
-    pos: Annotated[Optional[dict[str, Tuple[float, float]]], Field(description="Explicit initial x/y coordinates keyed by exact node ID. Partial positions are allowed where NetworkX supports them. Cannot be combined with init_from_layout; fixed nodes must have positions.")] = None,
-    init_from_layout: Annotated[Optional[str], Field(description="Name of a previously computed layout whose stored coordinates become the starting positions for the optimization. A good starting point (e.g. 'forceatlas2') both speeds up convergence and avoids poor local minima.")] = None,
+    center: Annotated[
+        Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)
+    ] = None,
+    pos: Annotated[
+        Optional[dict[str, Tuple[float, float]]],
+        Field(
+            description="Explicit initial x/y coordinates keyed by exact node ID. Partial positions are allowed where NetworkX supports them. Cannot be combined with init_from_layout; fixed nodes must have positions."
+        ),
+    ] = None,
+    init_from_layout: Annotated[
+        Optional[str],
+        Field(
+            description="Name of a previously computed layout whose stored coordinates become the starting positions for the optimization. A good starting point (e.g. 'forceatlas2') both speeds up convergence and avoids poor local minima."
+        ),
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -57,6 +82,7 @@ def layout_kamada_kawai(
     """
     with get_db_context() as db:
         from app.logic import layout
+
         overrides = {
             "weight": weight,
             "dist": dist,
@@ -79,9 +105,17 @@ def layout_kamada_kawai(
 @handle_tool_errors
 def layout_spectral(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    weight: Annotated[Optional[str], Field(description=_WEIGHT_DESC + " The Laplacian is built from the weighted adjacency matrix, so a heavier edge pulls its endpoints together. Leave unset: the imported edge weights are used automatically when they vary, and the return message names any other numeric edge attribute available. Pass one of those names to use it instead, or 'none' to force an unweighted Laplacian.")] = None,
+    weight: Annotated[
+        Optional[str],
+        Field(
+            description=_WEIGHT_DESC
+            + " The Laplacian is built from the weighted adjacency matrix, so a heavier edge pulls its endpoints together. Leave unset: the imported edge weights are used automatically when they vary, and the return message names any other numeric edge attribute available. Pass one of those names to use it instead, or 'none' to force an unweighted Laplacian."
+        ),
+    ] = None,
     scale: Annotated[Optional[float], Field(description=_SCALE_CENTER_DESC)] = None,
-    center: Annotated[Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)] = None,
+    center: Annotated[
+        Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -108,6 +142,7 @@ def layout_spectral(
     """
     with get_db_context() as db:
         from app.logic import layout
+
         overrides = {"weight": weight, "scale": scale, "center": center}
         info = layout.calculate_layout(
             network_id, "spectral", db, overrides=overrides, force=force_recompute

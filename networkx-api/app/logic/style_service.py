@@ -330,21 +330,21 @@ class StyleService:
                 target_min = config.get("min")
                 if target_min is None:
                     target_min = smart_defaults["min"]
-                
+
                 target_max = config.get("max")
                 if target_max is None:
                     target_max = smart_defaults["max"]
-                    
+
                 size = utils.normalize(
                     _position(val, stats), 0.0, 1.0, target_min, target_max
                 )
-        
+
         # Apply scaling factor if present
         if config:
             scaling_factor = config.get("scaling_factor", 1.0)
             if scaling_factor != 1.0:
                 size *= scaling_factor
-                
+
         return size
 
     @classmethod
@@ -387,7 +387,7 @@ class StyleService:
             if scale_type == "LINEAR":
                 val = cls.get_val(db_id, config.get("attribute"), attr_map, values_map)
                 if isinstance(val, (int, float)) and stats[0]:
-                    gradient = (config.get("gradient") or DEFAULT_NODE_GRADIENT)
+                    gradient = config.get("gradient") or DEFAULT_NODE_GRADIENT
                     return utils.interpolate_gradient(
                         _position(val, stats), 0.0, 1.0, gradient
                     )
@@ -423,11 +423,11 @@ class StyleService:
                 target_min = config.get("min")
                 if target_min is None:
                     target_min = smart_defaults["min"]
-                
+
                 target_max = config.get("max")
                 if target_max is None:
                     target_max = smart_defaults["max"]
-                    
+
                 width = utils.normalize(
                     _position(val, stats), 0.0, 1.0, target_min, target_max
                 )
@@ -449,9 +449,7 @@ class StyleService:
         scale_type = config.get("scale_type", "LINEAR")
         if scale_type == "LINEAR" and stats[0] and isinstance(val, (int, float)):
             gradient = config.get("gradient") or DEFAULT_EDGE_GRADIENT
-            return utils.interpolate_gradient(
-                _position(val, stats), 0.0, 1.0, gradient
-            )
+            return utils.interpolate_gradient(_position(val, stats), 0.0, 1.0, gradient)
         if scale_type == "CATEGORICAL" and val is not None:
             color_map = config.get("color_map") or {}
             if str(val) in color_map:

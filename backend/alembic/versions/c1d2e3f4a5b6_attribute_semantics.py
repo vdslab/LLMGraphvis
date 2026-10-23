@@ -38,8 +38,19 @@ BACKFILL = (
 # Names as of this revision: a later layout or algorithm writes its own
 # provenance and never needs this.
 LAYOUTS = (
-    "arf", "bfs", "bipartite", "circular", "forceatlas2", "kamada_kawai",
-    "multipartite", "planar", "random", "shell", "spectral", "spiral", "spring",
+    "arf",
+    "bfs",
+    "bipartite",
+    "circular",
+    "forceatlas2",
+    "kamada_kawai",
+    "multipartite",
+    "planar",
+    "random",
+    "shell",
+    "spectral",
+    "spiral",
+    "spring",
 )
 COMMUNITY_ALGORITHMS = ("louvain", "greedy_modularity", "label_propagation")
 
@@ -62,9 +73,7 @@ def _backfill_unmarked(table: str) -> None:
                 f"UPDATE {table} SET is_derived = true, "
                 "derived_from = :source, role = 'community', "
                 f"measurement = 'categorical' WHERE {unmarked}"
-            ).bindparams(
-                source=f"community:{algorithm}", name=f"{algorithm}_community"
-            )
+            ).bindparams(source=f"community:{algorithm}", name=f"{algorithm}_community")
         )
 
 

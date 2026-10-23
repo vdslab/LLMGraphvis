@@ -1,11 +1,11 @@
 """Highlight, label visibility and viewport channels (ADR 0023)."""
 
 import pytest
+from test_layout_parameters import setup_graph
+
 from app.core import database
 from app.logic import visualization_builder
 from app.mcp import tools
-from test_layout_parameters import setup_graph
-
 from common import models
 
 
@@ -35,7 +35,11 @@ def test_path_highlight_marks_route_edges_and_dims_the_rest(bound):
     assert "highlighted" not in nodes["n0"] and nodes["n0"]["opacity"] < 0.5
     assert edges[("n1", "n2")]["highlighted"] and edges[("n2", "n3")]["highlighted"]
     assert "highlighted" not in edges[("n0", "n1")]
-    assert vis["legend"]["highlight"] == {"node_count": 3, "edge_count": 2, "edges": "path"}
+    assert vis["legend"]["highlight"] == {
+        "node_count": 3,
+        "edge_count": 2,
+        "edges": "path",
+    }
 
 
 def test_highlight_persists_through_other_channels_until_reset(bound):
@@ -119,4 +123,6 @@ def test_current_state_reports_highlight(bound):
     tools.visualization_highlight(1, ["n1"])
     state = visualization_builder.get_current_visualization(bound, 1)
     assert state["highlight"]["node_ids"] == ["n1"]
-    assert bound.query(models.Network).get(1).last_highlight_config["edges"] == "induced"
+    assert (
+        bound.query(models.Network).get(1).last_highlight_config["edges"] == "induced"
+    )

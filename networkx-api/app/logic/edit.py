@@ -1,11 +1,16 @@
-from typing import Dict, Any
+from typing import Any, Dict
+
 from sqlalchemy.orm import Session
-from common import models
+
 from app.core.logging import get_logger
+from common import models
 
 logger = get_logger(__name__)
 
-def update_node_label(network_id: int, node_id: str, new_label: str, db: Session) -> Dict[str, Any]:
+
+def update_node_label(
+    network_id: int, node_id: str, new_label: str, db: Session
+) -> Dict[str, Any]:
     """
     Updates the label of a specific node in a network.
 
@@ -32,13 +37,12 @@ def update_node_label(network_id: int, node_id: str, new_label: str, db: Session
     db.commit()
     db.refresh(node)
 
-    logger.info(f"Updated node label: Network={network_id}, Node={node_id}, '{old_label}' -> '{new_label}'")
+    logger.info(
+        f"Updated node label: Network={network_id}, Node={node_id}, '{old_label}' -> '{new_label}'"
+    )
 
     return {
         "status": "success",
         "message": f"Updated label for node '{node_id}' from '{old_label}' to '{new_label}'",
-        "node": {
-            "id": node.node_id,
-            "label": node.label
-        }
+        "node": {"id": node.node_id, "label": node.label},
     }

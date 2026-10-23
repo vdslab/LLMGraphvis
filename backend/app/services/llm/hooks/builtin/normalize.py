@@ -135,8 +135,7 @@ def normalize_attribute_case(ctx: HookContext) -> Optional[ToolCallDecision]:
     return ToolCallDecision.modify(
         args,
         reason=(
-            f"attribute '{requested}' was corrected to '{resolved}' "
-            f"(exact stored name)"
+            f"attribute '{requested}' was corrected to '{resolved}' (exact stored name)"
         ),
     )
 

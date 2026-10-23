@@ -4,6 +4,7 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from app.services.llm import trace
 from app.services.llm.engine import GraphVisAgent
 from app.services.llm.hooks import (
@@ -88,7 +89,13 @@ async def test_a_denied_call_is_traced_with_the_deciding_hook(trace_dir):
         ):
             await agent._execute_tools_and_update_history(
                 [FunctionCallData(name="test_tool", args={"x": 1}, call_id="c1")],
-                "", "", [], AsyncMock(), chat_id=1, turn_state=state, session=None,
+                "",
+                "",
+                [],
+                AsyncMock(),
+                chat_id=1,
+                turn_state=state,
+                session=None,
             )
     finally:
         registry._hooks[HookEvent.PRE_TOOL] = [

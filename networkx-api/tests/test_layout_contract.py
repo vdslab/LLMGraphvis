@@ -5,10 +5,11 @@ from unittest.mock import patch
 
 import networkx as nx
 import pytest
+from test_layout_parameters import setup_graph
+
 from app.logic.layout import calculate_layout
 from app.logic.layouts import SPECS
 from app.mcp.tools import layout as tools
-from test_layout_parameters import setup_graph
 
 # Intentional application contracts, not accidentally missing parameters.
 NATIVE_EXCEPTIONS = {

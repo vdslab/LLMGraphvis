@@ -62,7 +62,9 @@ class AnthropicProvider(LLMProvider):
         self.client = self._initialize_client()
         # `or` chains (instead of os.getenv defaults) so that empty-string values —
         # e.g. docker-compose passing through an unset host variable — still fall back.
-        self.model_name = model_name or os.getenv("CLAUDE_MODEL") or DEFAULT_CLAUDE_MODEL
+        self.model_name = (
+            model_name or os.getenv("CLAUDE_MODEL") or DEFAULT_CLAUDE_MODEL
+        )
         self.max_tokens = int(os.getenv("ANTHROPIC_MAX_TOKENS") or DEFAULT_MAX_TOKENS)
 
     @property
@@ -73,6 +75,7 @@ class AnthropicProvider(LLMProvider):
 
     def _initialize_client(self):
         import anthropic
+
         project_id = os.getenv("VERTEX_PROJECT_ID")
         if project_id:
             # Anthropic on Vertex AI — uses Google Cloud ADC, no ANTHROPIC_API_KEY needed.
@@ -85,7 +88,9 @@ class AnthropicProvider(LLMProvider):
             logger.info(
                 f"Using Anthropic on Vertex AI (Project: {project_id}, Region: {region})"
             )
-            return anthropic.AsyncAnthropicVertex(project_id=project_id, region=region, max_retries=5)
+            return anthropic.AsyncAnthropicVertex(
+                project_id=project_id, region=region, max_retries=5
+            )
         else:
             logger.info("Using Anthropic API (direct)")
             return anthropic.AsyncAnthropic(max_retries=5)
@@ -106,12 +111,14 @@ class AnthropicProvider(LLMProvider):
                     if isinstance(part, LLMTextPart) and part.text:
                         content.append({"type": "text", "text": part.text})
                     elif isinstance(part, LLMFunctionCallPart):
-                        content.append({
-                            "type": "tool_use",
-                            "id": part.call_id or f"call_{part.name}",
-                            "name": part.name,
-                            "input": part.args,
-                        })
+                        content.append(
+                            {
+                                "type": "tool_use",
+                                "id": part.call_id or f"call_{part.name}",
+                                "name": part.name,
+                                "input": part.args,
+                            }
+                        )
                 if content:
                     messages.append({"role": "assistant", "content": content})
 
@@ -120,18 +127,22 @@ class AnthropicProvider(LLMProvider):
                 for part in msg.parts:
                     if isinstance(part, LLMFunctionResponsePart):
                         resp = serialize_observation(part.response)
-                        content.append({
-                            "type": "tool_result",
-                            "tool_use_id": part.call_id or f"call_{part.name}",
-                            "content": resp,
-                        })
+                        content.append(
+                            {
+                                "type": "tool_result",
+                                "tool_use_id": part.call_id or f"call_{part.name}",
+                                "content": resp,
+                            }
+                        )
                 if content:
                     if messages and messages[-1]["role"] == "user":
                         prev = messages[-1]["content"]
                         if isinstance(prev, list):
                             prev.extend(content)
                         else:
-                            messages[-1]["content"] = [{"type": "text", "text": prev}] + content
+                            messages[-1]["content"] = [
+                                {"type": "text", "text": prev}
+                            ] + content
                     else:
                         messages.append({"role": "user", "content": content})
 
@@ -238,12 +249,18 @@ class AnthropicProvider(LLMProvider):
                     if idx in pending_tools:
                         tc = pending_tools.pop(idx)
                         try:
-                            args = json.loads(tc["input_str"]) if tc["input_str"] else {}
+                            args = (
+                                json.loads(tc["input_str"]) if tc["input_str"] else {}
+                            )
                         except json.JSONDecodeError:
                             args = {}
-                        yield StreamChunk(function_calls=[
-                            FunctionCallData(name=tc["name"], args=args, call_id=tc["id"])
-                        ])
+                        yield StreamChunk(
+                            function_calls=[
+                                FunctionCallData(
+                                    name=tc["name"], args=args, call_id=tc["id"]
+                                )
+                            ]
+                        )
 
                 elif etype == "message_start":
                     u = getattr(event.message, "usage", None)
@@ -270,9 +287,11 @@ class AnthropicProvider(LLMProvider):
                             usage_output = output_tokens
 
                 elif etype == "message_stop":
-                    yield StreamChunk(usage=UsageData(
-                        input_tokens=usage_input,
-                        output_tokens=usage_output,
-                        cached_input_tokens=usage_cached,
-                        cache_write_tokens=usage_cache_write,
-                    ))
+                    yield StreamChunk(
+                        usage=UsageData(
+                            input_tokens=usage_input,
+                            output_tokens=usage_output,
+                            cached_input_tokens=usage_cached,
+                            cache_write_tokens=usage_cache_write,
+                        )
+                    )

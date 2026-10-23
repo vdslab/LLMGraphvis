@@ -31,7 +31,10 @@ def _manifest_path() -> Path:
 
 
 MCP_TOOLS = json.loads(_manifest_path().read_text(encoding="utf-8"))
-LOCAL_TOOLS = {tool.name: sorted(tool.parameters.get("properties", {})) for tool in get_local_tools()}
+LOCAL_TOOLS = {
+    tool.name: sorted(tool.parameters.get("properties", {}))
+    for tool in get_local_tools()
+}
 # Added by mcp_client next to the discovered tools.
 PROTOCOL_TOOLS = {"read_resource": ["uri"], "list_resources": []}
 ALL_TOOLS = {**MCP_TOOLS, **LOCAL_TOOLS, **PROTOCOL_TOOLS}
@@ -48,7 +51,14 @@ SEARCH_ONLY = {
     "read_resource": "context is injected; resources are read by the backend",
 }
 
-_TOOL_PREFIXES = ("network_", "node_", "subgraph_", "analysis_", "layout_", "visualization_")
+_TOOL_PREFIXES = (
+    "network_",
+    "node_",
+    "subgraph_",
+    "analysis_",
+    "layout_",
+    "visualization_",
+)
 _BACKTICKED = re.compile(r"`([a-z][a-z0-9_]*)")
 _CALL_ARGS = re.compile(r"`([a-z][a-z0-9_]*)\(([^`)]*)")
 _DOTTED = re.compile(r"`([a-z][a-z0-9_]*)\.([a-z][a-z0-9_]*)`")
@@ -90,7 +100,8 @@ def test_named_tools_are_exposed_by_this_skill_or_one_it_points_to(skill):
     """Telling the model to call a tool it cannot see wastes a refused round."""
     pointed = {name for name in _BACKTICKED.findall(skill.body) if name in SKILL_NAMES}
     pointed |= {
-        name for name in re.findall(r"`([a-z]+(?:-[a-z0-9]+)+)`", skill.body)
+        name
+        for name in re.findall(r"`([a-z]+(?:-[a-z0-9]+)+)`", skill.body)
         if name in SKILL_NAMES
     }
     reachable = set(skill.related_tools)

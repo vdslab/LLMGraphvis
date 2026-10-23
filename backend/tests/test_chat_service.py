@@ -1,8 +1,11 @@
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-from common import models
+
 from app.services import chat_service
 from app.services.llm.providers.types import UsageData
+from common import models
+
 
 @pytest.mark.asyncio
 async def test_handle_process_background_success(db):
@@ -27,7 +30,9 @@ async def test_handle_process_background_success(db):
 
         # Mock Queue
         mock_queue = AsyncMock()
-        with patch("app.services.llm.get_event_queue", new_callable=AsyncMock) as mock_get_queue:
+        with patch(
+            "app.services.llm.get_event_queue", new_callable=AsyncMock
+        ) as mock_get_queue:
             mock_get_queue.return_value = mock_queue
 
             # Mock DB Session used inside service (it creates its own SessionLocal)
@@ -55,6 +60,7 @@ async def test_handle_process_background_success(db):
                 event_data = args[0]
                 assert event_data["event"] == "message_complete"
 
+
 @pytest.mark.asyncio
 async def test_handle_upload_background_success(db):
     """
@@ -66,19 +72,27 @@ async def test_handle_upload_background_success(db):
     new_network_id = 101
     graphml = "<graph></graph>"
 
-    with patch(
-        "app.services.network_service.import_graphml", new_callable=AsyncMock
-    ) as mock_import, patch(
-        "app.services.network_service.calculate_layout", new_callable=AsyncMock
-    ) as mock_layout, patch(
-        "app.services.network_service.build_visualization", new_callable=AsyncMock
-    ) as mock_vis, patch(
-        "app.services.llm.mcp_client.execute_tool", new_callable=AsyncMock
-    ) as mock_exec, patch(
-        "app.services.llm.context.build_data_overview", new_callable=AsyncMock
-    ) as mock_overview, patch(
-        "app.services.llm.get_event_queue", new_callable=AsyncMock
-    ) as mock_get_queue, patch("app.core.database.SessionLocal") as mock_session_cls:
+    with (
+        patch(
+            "app.services.network_service.import_graphml", new_callable=AsyncMock
+        ) as mock_import,
+        patch(
+            "app.services.network_service.calculate_layout", new_callable=AsyncMock
+        ) as mock_layout,
+        patch(
+            "app.services.network_service.build_visualization", new_callable=AsyncMock
+        ) as mock_vis,
+        patch(
+            "app.services.llm.mcp_client.execute_tool", new_callable=AsyncMock
+        ) as mock_exec,
+        patch(
+            "app.services.llm.context.build_data_overview", new_callable=AsyncMock
+        ) as mock_overview,
+        patch(
+            "app.services.llm.get_event_queue", new_callable=AsyncMock
+        ) as mock_get_queue,
+        patch("app.core.database.SessionLocal") as mock_session_cls,
+    ):
         mock_import.return_value = new_network_id
         mock_vis.return_value = {"network_id": new_network_id, "nodes": [], "links": []}
         mock_overview.return_value = ("", "")
@@ -113,6 +127,7 @@ async def test_process_chat_failure_emits_agent_error(db):
     EventSource routes that name to onerror, which shows a lost connection."""
     import asyncio
     import json
+
     from app.services.llm import service
 
     queue = asyncio.Queue()

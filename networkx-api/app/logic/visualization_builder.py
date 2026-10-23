@@ -2,17 +2,17 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
-from common import models
+from app.logic.attributes import fetch_attribute_values
 from app.logic.common_utils import calculate_smart_edge_width, calculate_smart_node_size
+from app.logic.layout_quality import evaluate as evaluate_layout
+from app.logic.layout_quality import normalize_like_renderer
 from app.logic.style_service import (
     DEFAULT_EDGE_COLOR,
     DEFAULT_NODE_GRADIENT,
     StyleService,
 )
-from app.logic.attributes import fetch_attribute_values
-from app.logic.layout_quality import evaluate as evaluate_layout
-from app.logic.layout_quality import normalize_like_renderer
 from app.logic.view_state import Highlight, label_flags
+from common import models
 
 
 class VisualizationBuilder:
@@ -162,8 +162,6 @@ class VisualizationBuilder:
             self.network_id, required_edge_attrs
         )
 
-
-
         # 3. Fetch Focus Data
         if self.focus_network_id:
             self.focus_node_map = self._get_focus_node_map(self.focus_network_id)
@@ -296,11 +294,11 @@ class VisualizationBuilder:
             nc = self.node_color_config
             attr = nc.get("attribute")
             scale = nc.get("scale_type", "LINEAR")  # Default to linear if valid
-            
+
             # Refine scale based on stats similar to resolve logic
             if not self.node_color_stats[0] and scale == "LINEAR":
-                 # If stats failed, it might be effectively nothing or categorical fallback
-                 pass
+                # If stats failed, it might be effectively nothing or categorical fallback
+                pass
 
             info = {"attribute": attr}
             if scale == "CATEGORICAL":
@@ -324,7 +322,7 @@ class VisualizationBuilder:
         if self.node_size_config:
             ns = self.node_size_config
             attr = ns.get("attribute")
-            info = {"attribute": attr, "type": "linear"} # Size is usually linear
+            info = {"attribute": attr, "type": "linear"}  # Size is usually linear
             if self.node_size_stats[0]:
                 info["data_min"] = self.node_size_stats[1]
                 info["data_max"] = self.node_size_stats[2]
@@ -358,7 +356,6 @@ class VisualizationBuilder:
                 info["width"] = ew["default"]
             summary["edge_width"] = info
 
-
         # 4. Layout
         if self.layout_name:
             summary["layout"] = self.layout_name
@@ -387,12 +384,11 @@ class VisualizationBuilder:
 
         # Calculate defaults based on VISIBLE count, not DB count
         smart_defaults = calculate_smart_node_size(len(visible_nodes))
-        
+
         vis_nodes = []
         for n in visible_nodes:
             is_focused = n.node_id in focus_node_ids_str
             # Visibility check already done above check
-
 
             # Resolve Size & Color common logic
             size = StyleService.resolve_node_size(
@@ -610,7 +606,11 @@ class VisualizationBuilder:
                     "width": width,
                     "color": color,
                     "opacity": opacity,
-                    **({"base_opacity": base_opacity} if base_opacity is not None else {}),
+                    **(
+                        {"base_opacity": base_opacity}
+                        if base_opacity is not None
+                        else {}
+                    ),
                     **({"highlighted": True} if highlighted else {}),
                 }
             )
@@ -657,17 +657,27 @@ class VisualizationBuilder:
 
     def _fetch_node_data(self, net_id, attrs):
         return self._fetch_element_data(
-            net_id, attrs, models.NodeAttribute,
-            models.NodeAttributeValue, models.NodeFloatAttributeValue, models.NodeTextAttributeValue
+            net_id,
+            attrs,
+            models.NodeAttribute,
+            models.NodeAttributeValue,
+            models.NodeFloatAttributeValue,
+            models.NodeTextAttributeValue,
         )
 
     def _fetch_edge_data(self, net_id, attrs):
         return self._fetch_element_data(
-            net_id, attrs, models.EdgeAttribute,
-            models.EdgeAttributeValue, models.EdgeFloatAttributeValue, models.EdgeTextAttributeValue
+            net_id,
+            attrs,
+            models.EdgeAttribute,
+            models.EdgeAttributeValue,
+            models.EdgeFloatAttributeValue,
+            models.EdgeTextAttributeValue,
         )
 
-    def _fetch_element_data(self, net_id, attrs, attribute_model, val_model, float_val_model, text_val_model):
+    def _fetch_element_data(
+        self, net_id, attrs, attribute_model, val_model, float_val_model, text_val_model
+    ):
         if not attrs:
             return {}, {}
         defs = (
@@ -683,13 +693,13 @@ class VisualizationBuilder:
 
         # --- Inject Core Attributes Logic ---
         core_values = {}
-        
+
         # 1. Edge Weight
         if attribute_model == models.EdgeAttribute and "weight" in attrs:
             # Use negative ID to avoid collision with real DB IDs
             WEIGHT_ID = -1
             attr_map["weight"] = WEIGHT_ID
-            
+
             # Fetch directly from Edge table
             weights = (
                 self.db.query(models.Edge.id, models.Edge.weight)
@@ -705,7 +715,7 @@ class VisualizationBuilder:
         if attribute_model == models.NodeAttribute and "label" in attrs:
             LABEL_ID = -2
             attr_map["label"] = LABEL_ID
-            
+
             # Fetch directly from Node table
             labels = (
                 self.db.query(models.Node.id, models.Node.label)
@@ -713,9 +723,9 @@ class VisualizationBuilder:
                 .all()
             )
             for nid, l in labels:
-                 if nid not in core_values:
+                if nid not in core_values:
                     core_values[nid] = {}
-                 core_values[nid][LABEL_ID] = l
+                core_values[nid][LABEL_ID] = l
 
         # ------------------------------------
 
@@ -723,9 +733,11 @@ class VisualizationBuilder:
             val_model,
             float_val_model,
             text_val_model,
-            list(attr_map.values()), # This will include negative IDs but they won't match DB queries, which is fine
+            list(
+                attr_map.values()
+            ),  # This will include negative IDs but they won't match DB queries, which is fine
         )
-        
+
         # Merge core values
         for entity_id, val_dict in core_values.items():
             if entity_id not in values:
@@ -748,7 +760,6 @@ class VisualizationBuilder:
         )
 
 
-
 def _mapping_summary(config: Dict[str, Any]) -> Dict[str, Any]:
     """The transform and explicit range of a numeric mapping, when not the default."""
     info: Dict[str, Any] = {}
@@ -767,7 +778,7 @@ def get_current_visualization(db: Session, network_id: int) -> Dict[str, Any]:
     network = db.query(models.Network).filter(models.Network.id == network_id).first()
     if not network:
         return {}
-    
+
     return {
         "layout_name": network.last_layout_name,
         "node_size": network.last_node_size_config,
@@ -777,7 +788,6 @@ def get_current_visualization(db: Session, network_id: int) -> Dict[str, Any]:
         "node_label": network.last_node_label_config,
         "highlight": network.last_highlight_config,
     }
-
 
 
 # Style channels that can be reset, mapped to the column holding their config.
@@ -854,12 +864,32 @@ def build_visualization(
     agent and the canvas's layout information panel.
     """
     # Convert Pydantic models to dicts if needed
-    nc_conf = node_color_config.model_dump() if hasattr(node_color_config, "model_dump") else node_color_config
-    ns_conf = node_size_config.model_dump() if hasattr(node_size_config, "model_dump") else node_size_config
-    ew_conf = edge_width_config.model_dump() if hasattr(edge_width_config, "model_dump") else edge_width_config
-    ec_conf = edge_color_config.model_dump() if hasattr(edge_color_config, "model_dump") else edge_color_config
-    nl_conf = node_label_config.model_dump() if hasattr(node_label_config, "model_dump") else node_label_config
-    
+    nc_conf = (
+        node_color_config.model_dump()
+        if hasattr(node_color_config, "model_dump")
+        else node_color_config
+    )
+    ns_conf = (
+        node_size_config.model_dump()
+        if hasattr(node_size_config, "model_dump")
+        else node_size_config
+    )
+    ew_conf = (
+        edge_width_config.model_dump()
+        if hasattr(edge_width_config, "model_dump")
+        else edge_width_config
+    )
+    ec_conf = (
+        edge_color_config.model_dump()
+        if hasattr(edge_color_config, "model_dump")
+        else edge_color_config
+    )
+    nl_conf = (
+        node_label_config.model_dump()
+        if hasattr(node_label_config, "model_dump")
+        else node_label_config
+    )
+
     builder = VisualizationBuilder(
         network_id=network_id,
         db=db,

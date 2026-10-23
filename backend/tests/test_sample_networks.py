@@ -8,7 +8,6 @@ from app.main import app
 from app.services import sample_networks
 from common import models
 
-
 GRAPHML_NS = {"g": "http://graphml.graphdrawing.org/xmlns"}
 
 
@@ -67,9 +66,7 @@ async def test_select_sample_uses_the_upload_pipeline(async_client, db):
         response = await async_client.post(f"/chat/{chat.id}/samples/karate-club")
 
     assert response.status_code == 202
-    graphml = sample_networks.load_graphml(
-        sample_networks.get_sample("karate-club")
-    )
+    graphml = sample_networks.load_graphml(sample_networks.get_sample("karate-club"))
     handle_upload.assert_awaited_once_with(
         chat.id,
         chat.network_id,

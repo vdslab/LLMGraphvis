@@ -21,16 +21,19 @@ def test_container_fence_cannot_be_closed_by_its_body():
 
 def test_sanitize_model_output_removes_only_invented_visualization_markers():
     text = (
-        "Done. <visualization_output network_id=\"42\" type=\"full\"/>\n"
+        'Done. <visualization_output network_id="42" type="full"/>\n'
         "`<div>` is still documentation."
     )
 
     assert markup.sanitize_model_output(text) == (
         "Done. \n`<div>` is still documentation."
     )
-    assert markup.sanitize_model_output(
-        "&lt;visualization-output network_id=\"42\"/&gt;Ready"
-    ) == "Ready"
+    assert (
+        markup.sanitize_model_output(
+            '&lt;visualization-output network_id="42"/&gt;Ready'
+        )
+        == "Ready"
+    )
 
 
 def test_sanitize_model_output_canonicalizes_textual_thinking_protocol():
@@ -45,7 +48,7 @@ def test_sanitize_model_text_removes_engine_owned_markers_copied_by_model():
     text = (
         '::tool-execution{index="0"}\n'
         '<visualization_output network_id="42"/>\n'
-        '<thought>Keep the supported thinking protocol.</thought>'
+        "<thought>Keep the supported thinking protocol.</thought>"
     )
 
     assert markup.sanitize_model_text(text) == (

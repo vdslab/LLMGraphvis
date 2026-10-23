@@ -4,9 +4,9 @@ from unittest.mock import patch
 
 import networkx as nx
 import pytest
+from tests.test_layout_parameters import setup_graph
 
 from app.logic.layout import calculate_layout, load_layout_positions
-from tests.test_layout_parameters import setup_graph
 
 
 def _positions(db, network_id, layout):
@@ -58,7 +58,9 @@ class TestSizeAware:
             return real(G, **kwargs)
 
         with patch("networkx.forceatlas2_layout", side_effect=spy):
-            info = calculate_layout(1, "forceatlas2", db, overrides={"size_aware": True})
+            info = calculate_layout(
+                1, "forceatlas2", db, overrides={"size_aware": True}
+            )
 
         # First pass without sizes, second with radii for every node.
         assert calls[0] is None

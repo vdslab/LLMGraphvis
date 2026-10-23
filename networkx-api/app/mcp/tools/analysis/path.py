@@ -3,16 +3,29 @@
 import json
 from typing import Annotated, Literal
 
+from pydantic import Field
+
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
 from app.core.mcp import mcp
 from app.logic import paths
-from pydantic import Field
 
 NetworkId = Annotated[int, Field(description="ID of the network to query.")]
-NodeId = Annotated[str, Field(description="Exact string node ID; use node_search for labels.")]
-Cost = Annotated[str | None, Field(description="Omit (the default) to count hops, which is the right answer unless the user said edges are distances, costs or travel times. A named numeric edge attribute is summed as a COST: larger means farther. The imported 'weight' of most networks (co-occurrences, interaction counts, similarities) is a STRENGTH, where larger means closer; passing it here makes the most tightly connected pairs look farthest apart. Missing edge values default to 1.")]
-Method = Annotated[Literal["dijkstra", "bellman-ford"], Field(description="Weighted-path algorithm. Dijkstra requires nonnegative costs. Bellman-Ford supports negative costs but rejects reachable negative cycles. With no weight, unweighted traversal is used.")]
+NodeId = Annotated[
+    str, Field(description="Exact string node ID; use node_search for labels.")
+]
+Cost = Annotated[
+    str | None,
+    Field(
+        description="Omit (the default) to count hops, which is the right answer unless the user said edges are distances, costs or travel times. A named numeric edge attribute is summed as a COST: larger means farther. The imported 'weight' of most networks (co-occurrences, interaction counts, similarities) is a STRENGTH, where larger means closer; passing it here makes the most tightly connected pairs look farthest apart. Missing edge values default to 1."
+    ),
+]
+Method = Annotated[
+    Literal["dijkstra", "bellman-ford"],
+    Field(
+        description="Weighted-path algorithm. Dijkstra requires nonnegative costs. Bellman-Ford supports negative costs but rejects reachable negative cycles. With no weight, unweighted traversal is used."
+    ),
+]
 
 
 @mcp.tool()
@@ -31,9 +44,11 @@ def analysis_shortest_path(
     Negative cycles make weighted shortest paths undefined and return an error.
     """
     with get_db_context() as db:
-        return json.dumps(paths.shortest_path(
-            network_id, source_node_id, target_node_id, db, weight, method
-        ))
+        return json.dumps(
+            paths.shortest_path(
+                network_id, source_node_id, target_node_id, db, weight, method
+            )
+        )
 
 
 @mcp.tool()
@@ -43,9 +58,28 @@ def analysis_single_source_distances(
     source_node_id: NodeId,
     weight: Cost = None,
     method: Method = "dijkstra",
-    cutoff: Annotated[float | None, Field(ge=0, allow_inf_nan=False, description="Maximum returned distance/cost, inclusive. Omit for all reachable nodes. With negative costs filtering occurs after Bellman-Ford finishes.")] = None,
-    limit: Annotated[int, Field(ge=1, le=500, description="How many of the nearest reachable nodes to list in `distances`. `reachable_count` and `summary` (whose `distribution` maps hop count -> node count for unweighted queries) always cover every reachable node.")] = 30,
-    target_node_ids: Annotated[list[str] | None, Field(description="Exact node IDs whose distance you need. When given, `distances` lists exactly these (null = unreachable or beyond cutoff) and `limit` is ignored.")] = None,
+    cutoff: Annotated[
+        float | None,
+        Field(
+            ge=0,
+            allow_inf_nan=False,
+            description="Maximum returned distance/cost, inclusive. Omit for all reachable nodes. With negative costs filtering occurs after Bellman-Ford finishes.",
+        ),
+    ] = None,
+    limit: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=500,
+            description="How many of the nearest reachable nodes to list in `distances`. `reachable_count` and `summary` (whose `distribution` maps hop count -> node count for unweighted queries) always cover every reachable node.",
+        ),
+    ] = 30,
+    target_node_ids: Annotated[
+        list[str] | None,
+        Field(
+            description="Exact node IDs whose distance you need. When given, `distances` lists exactly these (null = unreachable or beyond cutoff) and `limit` is ignored."
+        ),
+    ] = None,
 ) -> dict:
     """Return distances from one node to reachable nodes, optionally within a cutoff.
 
@@ -57,8 +91,14 @@ def analysis_single_source_distances(
     """
     with get_db_context() as db:
         return paths.single_source_distances(
-            network_id, source_node_id, db, weight, method, cutoff,
-            limit=limit, targets=target_node_ids,
+            network_id,
+            source_node_id,
+            db,
+            weight,
+            method,
+            cutoff,
+            limit=limit,
+            targets=target_node_ids,
         )
 
 
@@ -84,7 +124,14 @@ def analysis_k_shortest_paths(
     network_id: NetworkId,
     source_node_id: NodeId,
     target_node_id: NodeId,
-    k: Annotated[int, Field(ge=1, le=10, description="How many alternative routes to return, shortest first.")] = 3,
+    k: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=10,
+            description="How many alternative routes to return, shortest first.",
+        ),
+    ] = 3,
     weight: Cost = None,
 ) -> dict:
     """Return up to k loopless routes between two nodes, shortest first.

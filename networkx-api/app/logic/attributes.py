@@ -4,8 +4,8 @@ from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from common import models
 from app.core.logging import get_logger
+from common import models
 
 from .attribute_semantics import (
     IDENTIFIER,
@@ -145,7 +145,7 @@ def bulk_save_node_attributes(
 
     # 5. Bulk Insert Values (Float or Text)
     value_data = []
-    
+
     if attr_type == "float":
         for node_id, value in data_map.items():
             nav_id = nav_map.get(node_id)
@@ -165,7 +165,7 @@ def bulk_save_node_attributes(
                 )
         if value_data:
             db.bulk_insert_mappings(models.NodeTextAttributeValue, value_data)
-    
+
     db.commit()
 
 
@@ -398,7 +398,10 @@ def load_node_attribute_values(
     result: Dict[str, Any] = {}
 
     q_float = (
-        db.query(models.NodeAttributeValue.node_id, models.NodeFloatAttributeValue.float_value)
+        db.query(
+            models.NodeAttributeValue.node_id,
+            models.NodeFloatAttributeValue.float_value,
+        )
         .join(
             models.NodeFloatAttributeValue,
             models.NodeAttributeValue.id
@@ -413,7 +416,9 @@ def load_node_attribute_values(
             result[node_id_str] = value
 
     q_text = (
-        db.query(models.NodeAttributeValue.node_id, models.NodeTextAttributeValue.text_value)
+        db.query(
+            models.NodeAttributeValue.node_id, models.NodeTextAttributeValue.text_value
+        )
         .join(
             models.NodeTextAttributeValue,
             models.NodeAttributeValue.id
@@ -431,7 +436,11 @@ def load_node_attribute_values(
 
 
 def delete_attribute_values(
-    network_id: int, attribute_id: int, model_val_class: Type[models.Base], db: Session, commit: bool = True
+    network_id: int,
+    attribute_id: int,
+    model_val_class: Type[models.Base],
+    db: Session,
+    commit: bool = True,
 ) -> None:
     """
     Delete all attribute values for a specific attribute in a network.
@@ -472,7 +481,7 @@ def delete_attribute_values(
     db.query(model_val_class).filter(
         model_val_class.attribute_id == attribute_id
     ).delete(synchronize_session=False)
-    
+
     if commit:
         db.commit()
 
@@ -534,7 +543,9 @@ def _describe_attribute(
         "data_type": attr.data_type,
         "description": attr.description,
         "role": attr.role or ROLE_DATA,
-        "measurement": _stored_measurement(attr, model_val, model_float, model_text, db),
+        "measurement": _stored_measurement(
+            attr, model_val, model_float, model_text, db
+        ),
         # Whether a value came with the file or was computed in the
         # conversation cannot be recovered from its name, and a reader that
         # cannot tell them apart will report a computed score as recorded
@@ -729,7 +740,7 @@ def get_attribute_stats(
                 }
             )
         except Exception as e:
-             logger.error(f"Error fetching label stats: {e}")
+            logger.error(f"Error fetching label stats: {e}")
 
     return result
 

@@ -1,9 +1,11 @@
+import logging
 from typing import Annotated, Optional, Tuple
+
 from pydantic import Field
-from app.core.mcp import mcp
+
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
-import logging
+from app.core.mcp import mcp
 
 logger = logging.getLogger(__name__)
 
@@ -45,20 +47,81 @@ _INIT_FROM_DESC = (
 @handle_tool_errors
 def layout_forceatlas2(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    max_iter: Annotated[Optional[int], Field(ge=1, description="Maximum iterations. Defaults to auto from graph size. Runtime grows linearly with it. More is not always better: long runs keep contracting dense regions, so lowering it can reduce overlap.")] = None,
-    gravity: Annotated[Optional[float], Field(ge=0, description="Pull toward the center. Higher keeps disconnected parts and isolated nodes near the rest, so outliers stop squeezing the drawing into a corner; lower lets the graph spread out. Defaults to 1, raised automatically for graphs in several parts (the reply says so).")] = None,
-    scaling_ratio: Annotated[Optional[float], Field(gt=0, description="Repulsion between nodes. Higher spreads nodes apart; lower compacts them. Defaults to auto from the (weighted) average degree.")] = None,
-    jitter_tolerance: Annotated[Optional[float], Field(gt=0, description="Tolerance for the adaptive step size (nx 'jitter tolerance'). Defaults to 1.0. Lower converges more precisely but more slowly; higher allows faster, looser movement.")] = None,
-    strong_gravity: Annotated[Optional[bool], Field(description="If True, gravity grows with distance from the center, pulling far-flung nodes and components back in, which gives a rounder, more centered drawing. Useful when outliers squeeze the rest, or the graph spreads too thinly.")] = None,
-    linlog: Annotated[Optional[bool], Field(description="If True, use a logarithmic attraction model. Separates clusters more sharply than the default linear model — a good choice when the user wants community structure emphasized.")] = None,
-    distributed_action: Annotated[Optional[bool], Field(description="If True, distributes the attraction force across a node's degree, which prevents high-degree hubs from collapsing their neighbors onto themselves.")] = None,
-    node_mass: Annotated[Optional[dict[str, float]], Field(description="Optional mapping of node id to mass. Heavier nodes move less. Omit for the default (mass derived from degree).")] = None,
-    size_aware: Annotated[Optional[bool], Field(description="If True, repulsion accounts for how large each node is drawn (its current node-size style), so large nodes push each other apart instead of overlapping. Use this when large nodes overlap; it roughly doubles the runtime. Recompute after changing node sizes.")] = None,
-    node_size: Annotated[Optional[dict[str, float]], Field(description="Explicit node id -> radius in the layout's own coordinate units (not drawn units). Rarely needed; prefer size_aware=True, which derives radii from the drawn sizes. Cannot be combined with size_aware.")] = None,
+    max_iter: Annotated[
+        Optional[int],
+        Field(
+            ge=1,
+            description="Maximum iterations. Defaults to auto from graph size. Runtime grows linearly with it. More is not always better: long runs keep contracting dense regions, so lowering it can reduce overlap.",
+        ),
+    ] = None,
+    gravity: Annotated[
+        Optional[float],
+        Field(
+            ge=0,
+            description="Pull toward the center. Higher keeps disconnected parts and isolated nodes near the rest, so outliers stop squeezing the drawing into a corner; lower lets the graph spread out. Defaults to 1, raised automatically for graphs in several parts (the reply says so).",
+        ),
+    ] = None,
+    scaling_ratio: Annotated[
+        Optional[float],
+        Field(
+            gt=0,
+            description="Repulsion between nodes. Higher spreads nodes apart; lower compacts them. Defaults to auto from the (weighted) average degree.",
+        ),
+    ] = None,
+    jitter_tolerance: Annotated[
+        Optional[float],
+        Field(
+            gt=0,
+            description="Tolerance for the adaptive step size (nx 'jitter tolerance'). Defaults to 1.0. Lower converges more precisely but more slowly; higher allows faster, looser movement.",
+        ),
+    ] = None,
+    strong_gravity: Annotated[
+        Optional[bool],
+        Field(
+            description="If True, gravity grows with distance from the center, pulling far-flung nodes and components back in, which gives a rounder, more centered drawing. Useful when outliers squeeze the rest, or the graph spreads too thinly."
+        ),
+    ] = None,
+    linlog: Annotated[
+        Optional[bool],
+        Field(
+            description="If True, use a logarithmic attraction model. Separates clusters more sharply than the default linear model — a good choice when the user wants community structure emphasized."
+        ),
+    ] = None,
+    distributed_action: Annotated[
+        Optional[bool],
+        Field(
+            description="If True, distributes the attraction force across a node's degree, which prevents high-degree hubs from collapsing their neighbors onto themselves."
+        ),
+    ] = None,
+    node_mass: Annotated[
+        Optional[dict[str, float]],
+        Field(
+            description="Optional mapping of node id to mass. Heavier nodes move less. Omit for the default (mass derived from degree)."
+        ),
+    ] = None,
+    size_aware: Annotated[
+        Optional[bool],
+        Field(
+            description="If True, repulsion accounts for how large each node is drawn (its current node-size style), so large nodes push each other apart instead of overlapping. Use this when large nodes overlap; it roughly doubles the runtime. Recompute after changing node sizes."
+        ),
+    ] = None,
+    node_size: Annotated[
+        Optional[dict[str, float]],
+        Field(
+            description="Explicit node id -> radius in the layout's own coordinate units (not drawn units). Rarely needed; prefer size_aware=True, which derives radii from the drawn sizes. Cannot be combined with size_aware."
+        ),
+    ] = None,
     weight: Annotated[Optional[str], Field(description=_WEIGHT_DESC)] = None,
     seed: Annotated[Optional[int], Field(description=_SEED_DESC)] = 42,
-    pos: Annotated[Optional[dict[str, Tuple[float, float]]], Field(description="Explicit initial x/y coordinates keyed by exact node ID. Partial positions are allowed where NetworkX supports them. Cannot be combined with init_from_layout; fixed nodes must have positions.")] = None,
-    init_from_layout: Annotated[Optional[str], Field(description=_INIT_FROM_DESC)] = None,
+    pos: Annotated[
+        Optional[dict[str, Tuple[float, float]]],
+        Field(
+            description="Explicit initial x/y coordinates keyed by exact node ID. Partial positions are allowed where NetworkX supports them. Cannot be combined with init_from_layout; fixed nodes must have positions."
+        ),
+    ] = None,
+    init_from_layout: Annotated[
+        Optional[str], Field(description=_INIT_FROM_DESC)
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -87,6 +150,7 @@ def layout_forceatlas2(
     """
     with get_db_context() as db:
         from app.logic import layout
+
         overrides = {
             "max_iter": max_iter,
             "gravity": gravity,
@@ -117,18 +181,61 @@ def layout_forceatlas2(
 @handle_tool_errors
 def layout_spring(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    iterations: Annotated[Optional[int], Field(ge=1, description="Number of iterations. Defaults to auto from graph size. More is not always better: on trees and sparse graphs long runs can pile leaves onto each other, so fewer iterations may reduce overlap.")] = None,
-    k: Annotated[Optional[float], Field(gt=0, description="Optimal distance between nodes, relative to the other forces. Defaults to auto from node count. Higher gives more room between neighbours relative to the whole drawing; because the drawing is rescaled to the canvas, its effect on overlap depends on the graph.")] = None,
-    threshold: Annotated[Optional[float], Field(gt=0, description="Convergence threshold on total node movement; iteration stops below it. Defaults to auto from graph size. Lower is more precise and slower.")] = None,
-    method: Annotated[Optional[str], Field(description="Force computation method: 'auto' (default: 'force' below 500 nodes, 'energy' from 500), 'energy' (energy minimization with per-component gravity, set automatically for graphs in several parts), or 'force' (Fruchterman-Reingold force simulation).")] = None,
-    gravity: Annotated[Optional[float], Field(ge=0, description="Pull of each connected component toward the center. Higher keeps separate parts close to the rest, so they stop squeezing the drawing. Only used by the 'energy' method, which runs when method='energy', when 'auto' picks it (graphs of 500+ nodes), or when the app selects it for a graph in several parts (the reply says so). Under method='force' it has no effect.")] = None,
-    fixed: Annotated[Optional[list[str]], Field(description="List of node ids to hold at their current positions while the rest of the graph moves around them. Requires pos or init_from_layout for those nodes. Renderer normalization can still change their screen positions.")] = None,
+    iterations: Annotated[
+        Optional[int],
+        Field(
+            ge=1,
+            description="Number of iterations. Defaults to auto from graph size. More is not always better: on trees and sparse graphs long runs can pile leaves onto each other, so fewer iterations may reduce overlap.",
+        ),
+    ] = None,
+    k: Annotated[
+        Optional[float],
+        Field(
+            gt=0,
+            description="Optimal distance between nodes, relative to the other forces. Defaults to auto from node count. Higher gives more room between neighbours relative to the whole drawing; because the drawing is rescaled to the canvas, its effect on overlap depends on the graph.",
+        ),
+    ] = None,
+    threshold: Annotated[
+        Optional[float],
+        Field(
+            gt=0,
+            description="Convergence threshold on total node movement; iteration stops below it. Defaults to auto from graph size. Lower is more precise and slower.",
+        ),
+    ] = None,
+    method: Annotated[
+        Optional[str],
+        Field(
+            description="Force computation method: 'auto' (default: 'force' below 500 nodes, 'energy' from 500), 'energy' (energy minimization with per-component gravity, set automatically for graphs in several parts), or 'force' (Fruchterman-Reingold force simulation)."
+        ),
+    ] = None,
+    gravity: Annotated[
+        Optional[float],
+        Field(
+            ge=0,
+            description="Pull of each connected component toward the center. Higher keeps separate parts close to the rest, so they stop squeezing the drawing. Only used by the 'energy' method, which runs when method='energy', when 'auto' picks it (graphs of 500+ nodes), or when the app selects it for a graph in several parts (the reply says so). Under method='force' it has no effect.",
+        ),
+    ] = None,
+    fixed: Annotated[
+        Optional[list[str]],
+        Field(
+            description="List of node ids to hold at their current positions while the rest of the graph moves around them. Requires pos or init_from_layout for those nodes. Renderer normalization can still change their screen positions."
+        ),
+    ] = None,
     weight: Annotated[Optional[str], Field(description=_WEIGHT_DESC)] = None,
     scale: Annotated[Optional[float], Field(description=_SCALE_CENTER_DESC)] = None,
-    center: Annotated[Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)] = None,
+    center: Annotated[
+        Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)
+    ] = None,
     seed: Annotated[Optional[int], Field(description=_SEED_DESC)] = 42,
-    pos: Annotated[Optional[dict[str, Tuple[float, float]]], Field(description="Explicit initial x/y coordinates keyed by exact node ID. Partial positions are allowed where NetworkX supports them. Cannot be combined with init_from_layout; fixed nodes must have positions.")] = None,
-    init_from_layout: Annotated[Optional[str], Field(description=_INIT_FROM_DESC)] = None,
+    pos: Annotated[
+        Optional[dict[str, Tuple[float, float]]],
+        Field(
+            description="Explicit initial x/y coordinates keyed by exact node ID. Partial positions are allowed where NetworkX supports them. Cannot be combined with init_from_layout; fixed nodes must have positions."
+        ),
+    ] = None,
+    init_from_layout: Annotated[
+        Optional[str], Field(description=_INIT_FROM_DESC)
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -155,6 +262,7 @@ def layout_spring(
     """
     with get_db_context() as db:
         from app.logic import layout
+
         overrides = {
             "iterations": iterations,
             "k": k,
@@ -183,14 +291,48 @@ def layout_spring(
 @handle_tool_errors
 def layout_arf(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    scaling: Annotated[Optional[float], Field(gt=0, description="Repulsion scale. Higher spreads nodes further apart, reducing overlap and clumping.")] = None,
-    a: Annotated[Optional[float], Field(gt=1, description="Strength of the spring force relative to repulsion. Must be > 1. Higher pulls connected nodes tighter together, which also draws far-flung nodes back in.")] = None,
-    etol: Annotated[Optional[float], Field(description="Energy tolerance for stopping. Lower converges further at more cost.")] = None,
-    dt: Annotated[Optional[float], Field(description="Integration step size. Smaller is more stable but slower to converge.")] = None,
-    max_iter: Annotated[Optional[int], Field(ge=1, description="Maximum iterations. Defaults to auto from graph size.")] = None,
+    scaling: Annotated[
+        Optional[float],
+        Field(
+            gt=0,
+            description="Repulsion scale. Higher spreads nodes further apart, reducing overlap and clumping.",
+        ),
+    ] = None,
+    a: Annotated[
+        Optional[float],
+        Field(
+            gt=1,
+            description="Strength of the spring force relative to repulsion. Must be > 1. Higher pulls connected nodes tighter together, which also draws far-flung nodes back in.",
+        ),
+    ] = None,
+    etol: Annotated[
+        Optional[float],
+        Field(
+            description="Energy tolerance for stopping. Lower converges further at more cost."
+        ),
+    ] = None,
+    dt: Annotated[
+        Optional[float],
+        Field(
+            description="Integration step size. Smaller is more stable but slower to converge."
+        ),
+    ] = None,
+    max_iter: Annotated[
+        Optional[int],
+        Field(
+            ge=1, description="Maximum iterations. Defaults to auto from graph size."
+        ),
+    ] = None,
     seed: Annotated[Optional[int], Field(description=_SEED_DESC)] = 42,
-    pos: Annotated[Optional[dict[str, Tuple[float, float]]], Field(description="Explicit initial x/y coordinates keyed by exact node ID. Partial positions are allowed where NetworkX supports them. Cannot be combined with init_from_layout; fixed nodes must have positions.")] = None,
-    init_from_layout: Annotated[Optional[str], Field(description=_INIT_FROM_DESC)] = None,
+    pos: Annotated[
+        Optional[dict[str, Tuple[float, float]]],
+        Field(
+            description="Explicit initial x/y coordinates keyed by exact node ID. Partial positions are allowed where NetworkX supports them. Cannot be combined with init_from_layout; fixed nodes must have positions."
+        ),
+    ] = None,
+    init_from_layout: Annotated[
+        Optional[str], Field(description=_INIT_FROM_DESC)
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -214,6 +356,7 @@ def layout_arf(
     """
     with get_db_context() as db:
         from app.logic import layout
+
         overrides = {
             "scaling": scaling,
             "a": a,
@@ -227,4 +370,6 @@ def layout_arf(
         info = layout.calculate_layout(
             network_id, "arf", db, overrides=overrides, force=force_recompute
         )
-        return layout.format_layout_result(info, "ARF layout calculated. Call `visualization_generate` to render.")
+        return layout.format_layout_result(
+            info, "ARF layout calculated. Call `visualization_generate` to render."
+        )

@@ -1,9 +1,11 @@
+import logging
 from typing import Annotated, List
+
 from pydantic import Field
-from app.core.mcp import mcp
+
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
-import logging
+from app.core.mcp import mcp
 
 logger = logging.getLogger(__name__)
 
@@ -11,7 +13,7 @@ logger = logging.getLogger(__name__)
 @mcp.tool()
 @handle_tool_errors
 def visualization_generate(
-    network_id: Annotated[int, Field(description="The ID of the network.")]
+    network_id: Annotated[int, Field(description="The ID of the network.")],
 ) -> dict:
     """
     Renders the network and returns the visualization, using its saved style configuration.
@@ -43,6 +45,7 @@ def visualization_generate(
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
+
         vis_data = visualization_builder.build_visualization(
             db, network_id, with_quality=True
         )
@@ -53,7 +56,7 @@ def visualization_generate(
 @mcp.tool()
 @handle_tool_errors
 def visualization_get_state(
-    network_id: Annotated[int, Field(description="The ID of the network.")]
+    network_id: Annotated[int, Field(description="The ID of the network.")],
 ) -> dict:
     """
     Returns the current visualization configuration (layout, color/size settings) without re-rendering.
@@ -66,13 +69,14 @@ def visualization_get_state(
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
+
         return visualization_builder.get_current_visualization(db, network_id)
 
 
 @mcp.tool()
 @handle_tool_errors
 def visualization_apply_layout(
-    network_id: Annotated[int, Field(description="The ID of the network.")]
+    network_id: Annotated[int, Field(description="The ID of the network.")],
 ) -> dict:
     """
     DEPRECATED — use `visualization_generate` instead, which does exactly the same thing.
@@ -86,6 +90,7 @@ def visualization_apply_layout(
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
+
         vis_data = visualization_builder.build_visualization(
             db, network_id, with_quality=True
         )
@@ -97,7 +102,12 @@ def visualization_apply_layout(
 @handle_tool_errors
 def visualization_reset_style(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    targets: Annotated[List[str], Field(description="Which visual channels to return to their default. Any of: 'node_color', 'node_size', 'node_label', 'edge_color', 'edge_width', 'highlight'. Pass several to reset several at once; pass only the ones you mean, since the rest are preserved. The zoom is not a channel: reset it with visualization_set_viewport(target='all').")]
+    targets: Annotated[
+        List[str],
+        Field(
+            description="Which visual channels to return to their default. Any of: 'node_color', 'node_size', 'node_label', 'edge_color', 'edge_width', 'highlight'. Pass several to reset several at once; pass only the ones you mean, since the rest are preserved. The zoom is not a channel: reset it with visualization_set_viewport(target='all')."
+        ),
+    ],
 ) -> dict:
     """
     Returns one or more visual channels to their default (uniform) appearance.
@@ -121,6 +131,7 @@ def visualization_reset_style(
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
+
         cleared = visualization_builder.reset_style(db, network_id, targets)
         vis_data = visualization_builder.build_visualization(
             db, network_id, with_quality=True
@@ -133,7 +144,9 @@ def visualization_reset_style(
 @mcp.tool()
 @handle_tool_errors
 def visualization_switch_network(
-    network_id: Annotated[int, Field(description="The ID of the network to switch to.")]
+    network_id: Annotated[
+        int, Field(description="The ID of the network to switch to.")
+    ],
 ) -> dict:
     """
     Switches the active view to a different network and renders its last saved visualization.
@@ -146,6 +159,7 @@ def visualization_switch_network(
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
+
         vis_data = visualization_builder.build_visualization(
             db, network_id, with_quality=True
         )

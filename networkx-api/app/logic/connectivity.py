@@ -26,7 +26,8 @@ def components(network_id, db, kind, limit=10, node_limit=50):
         choices = (
             "analysis_weakly_connected_components or "
             "analysis_strongly_connected_components"
-            if graph.is_directed() else "analysis_connected_components"
+            if graph.is_directed()
+            else "analysis_connected_components"
         )
         raise ValueError(f"Incompatible graph direction. Use {choices}.")
     groups = sorted(
@@ -46,7 +47,9 @@ def components(network_id, db, kind, limit=10, node_limit=50):
         "components": listed,
         "count": len(groups),
         "omitted": len(groups) - len(listed),
-        "size_distribution": {str(size): sizes[size] for size in sorted(sizes, reverse=True)},
+        "size_distribution": {
+            str(size): sizes[size] for size in sorted(sizes, reverse=True)
+        },
         "is_directed": directed,
     }
 
@@ -63,7 +66,11 @@ def _undirected_graph(network_id, db):
 def bridges(network_id, db, limit=50):
     graph = _undirected_graph(network_id, db)
     edges = sorted(sorted(edge) for edge in nx.bridges(graph))
-    return {"bridges": edges[:limit], "count": len(edges), "omitted": max(0, len(edges) - limit)}
+    return {
+        "bridges": edges[:limit],
+        "count": len(edges),
+        "omitted": max(0, len(edges) - limit),
+    }
 
 
 def articulation_points(network_id, db, limit=50):

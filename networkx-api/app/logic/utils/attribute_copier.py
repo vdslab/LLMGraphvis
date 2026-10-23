@@ -2,8 +2,8 @@ from typing import Dict, List
 
 from sqlalchemy.orm import Session
 
-from common import models
 from app.core.logging import get_logger
+from common import models
 
 logger = get_logger(__name__)
 

@@ -1,5 +1,3 @@
-
-
 # Assuming network ID 1 exists from previous tests or seed data
 # If not, we might need to create one, but let's try with 1 first or use the logic from other tests
 

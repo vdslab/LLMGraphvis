@@ -1,10 +1,12 @@
+import json
+import logging
 from typing import Annotated, Optional
+
 from pydantic import Field
-from app.core.mcp import mcp
+
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
-import logging
-import json
+from app.core.mcp import mcp
 
 logger = logging.getLogger(__name__)
 
@@ -21,28 +23,35 @@ def network_list_all() -> str:
     """
     with get_db_context() as db:
         from common import models
+
         networks = db.query(models.Network).all()
         result = []
         for net in networks:
-            node_count = db.query(models.Node).filter(models.Node.network_id == net.id).count()
-            edge_count = db.query(models.Edge).filter(models.Edge.network_id == net.id).count()
-            result.append({
-                "id": net.id,
-                "name": net.name,
-                "description": net.description,
-                "parent_network_id": net.parent_network_id,
-                "node_count": node_count,
-                "edge_count": edge_count,
-                "last_layout": net.last_layout_name,
-                "created_at": str(net.created_at),
-            })
+            node_count = (
+                db.query(models.Node).filter(models.Node.network_id == net.id).count()
+            )
+            edge_count = (
+                db.query(models.Edge).filter(models.Edge.network_id == net.id).count()
+            )
+            result.append(
+                {
+                    "id": net.id,
+                    "name": net.name,
+                    "description": net.description,
+                    "parent_network_id": net.parent_network_id,
+                    "node_count": node_count,
+                    "edge_count": edge_count,
+                    "last_layout": net.last_layout_name,
+                    "created_at": str(net.created_at),
+                }
+            )
         return json.dumps(result, default=str)
 
 
 @mcp.tool()
 @handle_tool_errors
 def network_get_info(
-    network_id: Annotated[int, Field(description="The ID of the network.")]
+    network_id: Annotated[int, Field(description="The ID of the network.")],
 ) -> str:
     """
     Returns a full summary of the network: node/edge counts, density, metadata (name, description),
@@ -54,6 +63,7 @@ def network_get_info(
     """
     with get_db_context() as db:
         from app.logic import network_metadata
+
         structure = network_metadata.get_network_structure(db, network_id)
         metadata = network_metadata.get_network_metadata(db, network_id)
         return json.dumps({**structure, **metadata}, default=str)
@@ -62,7 +72,7 @@ def network_get_info(
 @mcp.tool()
 @handle_tool_errors
 def network_list_node_attributes(
-    network_id: Annotated[int, Field(description="The ID of the network.")]
+    network_id: Annotated[int, Field(description="The ID of the network.")],
 ) -> str:
     """
     Lists all available node attributes in the network (e.g., 'degree_centrality', 'community', 'country').
@@ -82,13 +92,16 @@ def network_list_node_attributes(
     """
     with get_db_context() as db:
         from app.logic import network_metadata
-        return json.dumps(network_metadata.list_node_attributes(db, network_id), default=str)
+
+        return json.dumps(
+            network_metadata.list_node_attributes(db, network_id), default=str
+        )
 
 
 @mcp.tool()
 @handle_tool_errors
 def network_list_edge_attributes(
-    network_id: Annotated[int, Field(description="The ID of the network.")]
+    network_id: Annotated[int, Field(description="The ID of the network.")],
 ) -> str:
     """
     Lists all available edge attributes in the network (e.g., 'weight', 'type').
@@ -103,15 +116,22 @@ def network_list_edge_attributes(
     """
     with get_db_context() as db:
         from app.logic import network_metadata
-        return json.dumps(network_metadata.list_edge_attributes(db, network_id), default=str)
+
+        return json.dumps(
+            network_metadata.list_edge_attributes(db, network_id), default=str
+        )
 
 
 @mcp.tool()
 @handle_tool_errors
 def network_update_metadata(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    name: Annotated[Optional[str], Field(description="New name for the network.")] = None,
-    description: Annotated[Optional[str], Field(description="New description for the network.")] = None
+    name: Annotated[
+        Optional[str], Field(description="New name for the network.")
+    ] = None,
+    description: Annotated[
+        Optional[str], Field(description="New description for the network.")
+    ] = None,
 ) -> str:
     """
     Updates the network's name or description.
@@ -122,4 +142,7 @@ def network_update_metadata(
     """
     with get_db_context() as db:
         from app.logic import network_metadata
-        return network_metadata.update_network_metadata(db, network_id, description, name)
+
+        return network_metadata.update_network_metadata(
+            db, network_id, description, name
+        )

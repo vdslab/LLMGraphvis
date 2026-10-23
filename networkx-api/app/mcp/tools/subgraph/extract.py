@@ -1,9 +1,11 @@
+import logging
 from typing import Annotated
+
 from pydantic import Field
-from app.core.mcp import mcp
+
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
-import logging
+from app.core.mcp import mcp
 
 logger = logging.getLogger(__name__)
 
@@ -12,8 +14,15 @@ logger = logging.getLogger(__name__)
 @handle_tool_errors
 def subgraph_ego_network(
     network_id: Annotated[int, Field(description="The ID of the source network.")],
-    center_node_id: Annotated[str, Field(description="The string ID of the center node.")],
-    radius: Annotated[int, Field(description="Hop radius: 1 = direct neighbors only, 2 = neighbors-of-neighbors, etc.")] = 1
+    center_node_id: Annotated[
+        str, Field(description="The string ID of the center node.")
+    ],
+    radius: Annotated[
+        int,
+        Field(
+            description="Hop radius: 1 = direct neighbors only, 2 = neighbors-of-neighbors, etc."
+        ),
+    ] = 1,
 ) -> dict:
     """
     Creates an ego network — a subgraph centered on one node including all neighbors within a given radius.
@@ -28,18 +37,19 @@ def subgraph_ego_network(
     """
     with get_db_context() as db:
         from app.logic import subgraph
+
         result = subgraph.create_ego_network(
             source_network_id=network_id,
             center_node_id=center_node_id,
             radius=radius,
             db=db,
             preserve_layout=True,
-            description=f"Ego network of '{center_node_id}' (radius={radius})."
+            description=f"Ego network of '{center_node_id}' (radius={radius}).",
         )
         new_id = result["new_network_id"]
         return {
             "new_network_id": new_id,
-            "content": f"Ego network created (ID: {new_id}) centered on '{center_node_id}' (radius={radius})."
+            "content": f"Ego network created (ID: {new_id}) centered on '{center_node_id}' (radius={radius}).",
         }
 
 
@@ -47,8 +57,18 @@ def subgraph_ego_network(
 @handle_tool_errors
 def subgraph_community(
     network_id: Annotated[int, Field(description="The ID of the source network.")],
-    community_id: Annotated[str, Field(description="The community label to extract (a value of community_attribute, e.g. '3').")],
-    community_attribute: Annotated[str, Field(description="The exact node attribute name holding community labels. Pass the exact attribute name returned by the community detection tool (e.g. 'louvain_community').")]
+    community_id: Annotated[
+        str,
+        Field(
+            description="The community label to extract (a value of community_attribute, e.g. '3')."
+        ),
+    ],
+    community_attribute: Annotated[
+        str,
+        Field(
+            description="The exact node attribute name holding community labels. Pass the exact attribute name returned by the community detection tool (e.g. 'louvain_community')."
+        ),
+    ],
 ) -> dict:
     """
     Creates a subgraph containing only nodes belonging to a specific community.
@@ -68,8 +88,7 @@ def subgraph_community(
         from app.schemas.filter import AttributeCondition
 
         condition = AttributeCondition(
-            attribute_name=community_attribute,
-            categories=[community_id]
+            attribute_name=community_attribute, categories=[community_id]
         )
         result = filter_logic.create_subgraph_by_filter(
             network_id=network_id,
@@ -77,12 +96,12 @@ def subgraph_community(
             suffix=f"Community {community_id} ({community_attribute})",
             db=db,
             preserve_layout=True,
-            description=f"Community '{community_id}' subgraph (attribute='{community_attribute}')."
+            description=f"Community '{community_id}' subgraph (attribute='{community_attribute}').",
         )
         new_id = result["new_network_id"]
         return {
             "new_network_id": new_id,
-            "content": f"Community subgraph created (ID: {new_id}) for community '{community_id}'."
+            "content": f"Community subgraph created (ID: {new_id}) for community '{community_id}'.",
         }
 
 
@@ -90,8 +109,16 @@ def subgraph_community(
 @handle_tool_errors
 def subgraph_k_core(
     network_id: Annotated[int, Field(description="The ID of the source network.")],
-    k: Annotated[int, Field(description="Core number k: the largest subgraph where every node has degree >= k.")],
-    preserve_layout: Annotated[bool, Field(description="If True, copies x,y coordinates from the source network.")] = True
+    k: Annotated[
+        int,
+        Field(
+            description="Core number k: the largest subgraph where every node has degree >= k."
+        ),
+    ],
+    preserve_layout: Annotated[
+        bool,
+        Field(description="If True, copies x,y coordinates from the source network."),
+    ] = True,
 ) -> dict:
     """
     Creates a k-core subgraph — the densest cohesive subgroup in the network.
@@ -106,22 +133,20 @@ def subgraph_k_core(
     """
     with get_db_context() as db:
         from app.logic import subgraph
+
         result = subgraph.create_k_core_subgraph(
-            source_network_id=network_id,
-            k=k,
-            db=db,
-            preserve_layout=preserve_layout
+            source_network_id=network_id, k=k, db=db, preserve_layout=preserve_layout
         )
         return {
             "new_network_id": result["new_network_id"],
-            "content": f"K-core subgraph created (ID: {result['new_network_id']}, k={k})."
+            "content": f"K-core subgraph created (ID: {result['new_network_id']}, k={k}).",
         }
 
 
 @mcp.tool()
 @handle_tool_errors
 def subgraph_largest_component(
-    network_id: Annotated[int, Field(description="The ID of the source network.")]
+    network_id: Annotated[int, Field(description="The ID of the source network.")],
 ) -> dict:
     """
     Creates a subgraph containing only the largest connected component.
@@ -136,16 +161,17 @@ def subgraph_largest_component(
     """
     with get_db_context() as db:
         from app.logic import subgraph
+
         result = subgraph.create_largest_component_subgraph(
             source_network_id=network_id,
             db=db,
             preserve_layout=True,
-            description="Largest connected component of the network."
+            description="Largest connected component of the network.",
         )
         new_id = result["new_network_id"]
         return {
             "new_network_id": new_id,
-            "content": f"Largest component subgraph created (ID: {new_id})."
+            "content": f"Largest component subgraph created (ID: {new_id}).",
         }
 
 
@@ -153,7 +179,12 @@ def subgraph_largest_component(
 @handle_tool_errors
 def subgraph_high_degree_nodes(
     network_id: Annotated[int, Field(description="The ID of the source network.")],
-    min_degree: Annotated[int, Field(description="Minimum degree threshold. Only nodes with degree >= this value are kept.")]
+    min_degree: Annotated[
+        int,
+        Field(
+            description="Minimum degree threshold. Only nodes with degree >= this value are kept."
+        ),
+    ],
 ) -> dict:
     """
     Creates a subgraph containing only nodes with degree at or above a threshold.
@@ -168,15 +199,16 @@ def subgraph_high_degree_nodes(
     """
     with get_db_context() as db:
         from app.logic import subgraph
+
         result = subgraph.filter_nodes_by_degree(
             source_network_id=network_id,
             min_degree=min_degree,
             db=db,
             preserve_layout=True,
-            description=f"Nodes with degree >= {min_degree}."
+            description=f"Nodes with degree >= {min_degree}.",
         )
         new_id = result["new_network_id"]
         return {
             "new_network_id": new_id,
-            "content": f"High-degree subgraph created (ID: {new_id}, min_degree={min_degree})."
+            "content": f"High-degree subgraph created (ID: {new_id}, min_degree={min_degree}).",
         }

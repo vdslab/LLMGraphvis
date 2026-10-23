@@ -24,12 +24,42 @@ MODEL_PRICING = {
     # Anthropic — current defaults used by this codebase (see anthropic_provider.py
     # CLAUDE_MODEL default) plus adjacent tiers, per platform.claude.com/docs/en/pricing.
     # cache_write is the 5-minute cache TTL rate: 1.25x input.
-    "claude-opus-4-8": {"input": 5.00, "output": 25.00, "cached_input": 0.50, "cache_write": 6.25},
-    "claude-opus-4-7": {"input": 5.00, "output": 25.00, "cached_input": 0.50, "cache_write": 6.25},
-    "claude-opus-4-6": {"input": 5.00, "output": 25.00, "cached_input": 0.50, "cache_write": 6.25},
-    "claude-sonnet-5": {"input": 3.00, "output": 15.00, "cached_input": 0.30, "cache_write": 3.75},
-    "claude-sonnet-4-6": {"input": 3.00, "output": 15.00, "cached_input": 0.30, "cache_write": 3.75},
-    "claude-haiku-4-5": {"input": 1.00, "output": 5.00, "cached_input": 0.10, "cache_write": 1.25},
+    "claude-opus-4-8": {
+        "input": 5.00,
+        "output": 25.00,
+        "cached_input": 0.50,
+        "cache_write": 6.25,
+    },
+    "claude-opus-4-7": {
+        "input": 5.00,
+        "output": 25.00,
+        "cached_input": 0.50,
+        "cache_write": 6.25,
+    },
+    "claude-opus-4-6": {
+        "input": 5.00,
+        "output": 25.00,
+        "cached_input": 0.50,
+        "cache_write": 6.25,
+    },
+    "claude-sonnet-5": {
+        "input": 3.00,
+        "output": 15.00,
+        "cached_input": 0.30,
+        "cache_write": 3.75,
+    },
+    "claude-sonnet-4-6": {
+        "input": 3.00,
+        "output": 15.00,
+        "cached_input": 0.30,
+        "cache_write": 3.75,
+    },
+    "claude-haiku-4-5": {
+        "input": 1.00,
+        "output": 5.00,
+        "cached_input": 0.10,
+        "cache_write": 1.25,
+    },
     # Google Gemini — standard Google AI Studio text rates. Pro entries use the
     # <=200k-token tier because this estimator does not receive prompt size.
     "gemini-3.8-flash": {"input": 0.75, "output": 3.75, "cached_input": 0.075},

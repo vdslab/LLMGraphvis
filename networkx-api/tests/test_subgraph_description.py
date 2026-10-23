@@ -1,9 +1,10 @@
 import pytest
-from common import models
-from app.logic import filter, subgraph
-from app.schemas.filter import AttributeCondition, Range
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+
+from app.logic import filter, subgraph
+from app.schemas.filter import AttributeCondition, Range
+from common import models
 
 # Use in-memory SQLite for verification of logic independent of current broken Postgres schema
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"

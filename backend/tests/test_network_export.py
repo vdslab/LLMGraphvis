@@ -1,9 +1,9 @@
 import httpx
 import pytest
+
 from app.api.v1.endpoints.auth import get_current_user
 from app.main import app
 from app.services import network_service
-
 from common import models
 
 GRAPHML = '<?xml version="1.0"?><graphml><graph edgedefault="undirected"/></graphml>'

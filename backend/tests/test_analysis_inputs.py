@@ -5,9 +5,9 @@ from fastapi import BackgroundTasks, HTTPException
 
 from app import schemas
 from app.api.v1.endpoints.chat import get_analysis_input, process_message
+from app.services.llm import local_tools
 from app.services.llm.engine import GraphVisAgent
 from app.services.llm.inputs import InputForm, accept_answer, present_question
-from app.services.llm import local_tools
 from app.services.llm.providers.types import (
     FunctionCallData,
     StreamChunk,
@@ -99,7 +99,9 @@ def test_form_merges_split_single_option_select_fields():
                 "id": "goal_1_centrality",
                 "label": "仲介者を見る",
                 "kind": "select",
-                "options": ["クラブ所属で色分けし、媒介中心性でサイズを決定するビュー。"],
+                "options": [
+                    "クラブ所属で色分けし、媒介中心性でサイズを決定するビュー。"
+                ],
             },
             {
                 "id": "goal_2_community",
@@ -126,8 +128,18 @@ def test_form_merges_split_single_option_select_fields():
     split_form_en = {
         "question": "Which perspective would you like to explore?",
         "fields": [
-            {"id": "opt_1", "label": "Option 1", "kind": "select", "options": ["View A"]},
-            {"id": "opt_2", "label": "Option 2", "kind": "select", "options": ["View B"]},
+            {
+                "id": "opt_1",
+                "label": "Option 1",
+                "kind": "select",
+                "options": ["View A"],
+            },
+            {
+                "id": "opt_2",
+                "label": "Option 2",
+                "kind": "select",
+                "options": ["View B"],
+            },
         ],
     }
     validated_en = InputForm.model_validate(split_form_en)
@@ -139,8 +151,19 @@ def test_form_merges_split_single_option_select_fields():
     mixed_form = {
         "question": "Parameters",
         "fields": [
-            {"id": "method", "label": "Method", "kind": "select", "options": ["A", "B"]},
-            {"id": "param", "label": "Param", "kind": "slider", "minimum": 1, "maximum": 10},
+            {
+                "id": "method",
+                "label": "Method",
+                "kind": "select",
+                "options": ["A", "B"],
+            },
+            {
+                "id": "param",
+                "label": "Param",
+                "kind": "slider",
+                "minimum": 1,
+                "maximum": 10,
+            },
         ],
     }
     validated_mixed = InputForm.model_validate(mixed_form)
@@ -460,12 +483,14 @@ async def test_answering_turn_reopens_with_the_tools_the_question_had(db, chat):
     async def no_session():
         yield None
 
-    with patch(
-        "app.services.llm.mcp_client.get_tools",
-        new_callable=AsyncMock,
-        return_value=catalog_tools,
-    ), patch("app.services.llm.mcp_client.session_scope", no_session), patch(
-        "app.services.llm.context.build_context_summary", return_value=""
+    with (
+        patch(
+            "app.services.llm.mcp_client.get_tools",
+            new_callable=AsyncMock,
+            return_value=catalog_tools,
+        ),
+        patch("app.services.llm.mcp_client.session_scope", no_session),
+        patch("app.services.llm.context.build_context_summary", return_value=""),
     ):
         # Turn 1: the model earns the tool, then asks a question.
         state = {"network_id": chat.network_id}
@@ -483,7 +508,14 @@ async def test_answering_turn_reopens_with_the_tools_the_question_had(db, chat):
         # What _tools_for_generation would have recorded for that request.
         state["presented_tool_names"] = set(state["enabled_tool_names"])
         await agent._execute_tool_loop(
-            asking_stream(), [], catalog, AsyncMock(), chat.id, chat.network_id, None, state
+            asking_stream(),
+            [],
+            catalog,
+            AsyncMock(),
+            chat.id,
+            chat.network_id,
+            None,
+            state,
         )
         request = db.query(models.AnalysisInput).one()
         accept_answer(chat, db, request.id, {"method": "中心性", "iterations": 20}, "")
@@ -565,11 +597,14 @@ async def test_consecutive_question_allowed_after_tool_execution_in_resumed_turn
     agent.provider.generate = mock_generate
     agent.provider.supports_native_thinking = False
 
-    with patch(
-        "app.services.llm.mcp_client.execute_tool",
-        new_callable=AsyncMock,
-        return_value={"content": "Betweenness centrality calculated."},
-    ), patch("app.services.llm.mcp_client.session_scope", no_session):
+    with (
+        patch(
+            "app.services.llm.mcp_client.execute_tool",
+            new_callable=AsyncMock,
+            return_value={"content": "Betweenness centrality calculated."},
+        ),
+        patch("app.services.llm.mcp_client.session_scope", no_session),
+    ):
         initial_stream = agent.provider.generate([], catalog.active_tools(state), "")
         final_text, execution_log, _ = await agent._execute_tool_loop(
             initial_stream,

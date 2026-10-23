@@ -6,12 +6,12 @@ drawn on a gradient, or a score split into unrelated colours.
 """
 
 import pytest
+from test_community import setup_clique_network
+
 from app.logic import attribute_semantics as sem
 from app.logic import attributes, network_metadata
 from app.logic.community import calculate_community
 from app.logic.importer import parse_and_save_graphml
-from test_community import setup_clique_network
-
 from common import models
 
 # --- Inference ---------------------------------------------------------------
@@ -175,9 +175,7 @@ def test_measurement_is_inferred_once_for_rows_that_predate_it(db):
     club.measurement = None
     db.commit()
 
-    assert (
-        attributes.get_measurement(network_id, "club", "node", db) == sem.CATEGORICAL
-    )
+    assert attributes.get_measurement(network_id, "club", "node", db) == sem.CATEGORICAL
     db.refresh(club)
     assert club.measurement == sem.CATEGORICAL
 

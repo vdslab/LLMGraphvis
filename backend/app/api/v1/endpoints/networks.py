@@ -3,12 +3,12 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from common import models
 from app import schemas
 from app.api.v1.endpoints.auth import get_current_user
 from app.core import database
 from app.services.llm import mcp_client
 from app.services.network_service import NetworkService
+from common import models
 
 router = APIRouter(prefix="/networks", tags=["networks"])
 

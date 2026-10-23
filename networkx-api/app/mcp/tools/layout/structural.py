@@ -2,12 +2,14 @@
 partition, rather than by force simulation or pure geometry.
 """
 
+import logging
 from typing import Annotated, List, Optional, Tuple
+
 from pydantic import Field
-from app.core.mcp import mcp
+
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
-import logging
+from app.core.mcp import mcp
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +32,35 @@ _ALIGN_DESC = (
 @handle_tool_errors
 def layout_bipartite(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    partition_attribute: Annotated[Optional[str], Field(description="Node attribute that splits the graph into two sides (e.g. 'type', 'role', 'is_author'). Required unless `nodes` is given. If the attribute has exactly two distinct values, either may be treated as the first side; otherwise also pass `partition_value`.")] = None,
-    partition_value: Annotated[Optional[str], Field(description="Which value of `partition_attribute` forms the first (left/top) side. Nodes with any other value form the second side. Required when the attribute has more than two distinct values.")] = None,
-    nodes: Annotated[Optional[List[str]], Field(description="Explicit list of node IDs forming one side, as an alternative to `partition_attribute`. Use this only when the split is not recorded as an attribute.")] = None,
+    partition_attribute: Annotated[
+        Optional[str],
+        Field(
+            description="Node attribute that splits the graph into two sides (e.g. 'type', 'role', 'is_author'). Required unless `nodes` is given. If the attribute has exactly two distinct values, either may be treated as the first side; otherwise also pass `partition_value`."
+        ),
+    ] = None,
+    partition_value: Annotated[
+        Optional[str],
+        Field(
+            description="Which value of `partition_attribute` forms the first (left/top) side. Nodes with any other value form the second side. Required when the attribute has more than two distinct values."
+        ),
+    ] = None,
+    nodes: Annotated[
+        Optional[List[str]],
+        Field(
+            description="Explicit list of node IDs forming one side, as an alternative to `partition_attribute`. Use this only when the split is not recorded as an attribute."
+        ),
+    ] = None,
     align: Annotated[Optional[str], Field(description=_ALIGN_DESC)] = None,
-    aspect_ratio: Annotated[Optional[float], Field(description="Ratio of the layout's width to its height. Defaults to 4/3. Raise it to spread the two sides further apart.")] = None,
+    aspect_ratio: Annotated[
+        Optional[float],
+        Field(
+            description="Ratio of the layout's width to its height. Defaults to 4/3. Raise it to spread the two sides further apart."
+        ),
+    ] = None,
     scale: Annotated[Optional[float], Field(description=_SCALE_CENTER_DESC)] = None,
-    center: Annotated[Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)] = None,
+    center: Annotated[
+        Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -60,6 +84,7 @@ def layout_bipartite(
     """
     with get_db_context() as db:
         from app.logic import layout
+
         overrides = {
             "partition_attribute": partition_attribute,
             "partition_value": partition_value,
@@ -72,18 +97,33 @@ def layout_bipartite(
         info = layout.calculate_layout(
             network_id, "bipartite", db, overrides=overrides, force=force_recompute
         )
-        return layout.format_layout_result(info, "Bipartite layout calculated. Call `visualization_generate` to render.")
+        return layout.format_layout_result(
+            info,
+            "Bipartite layout calculated. Call `visualization_generate` to render.",
+        )
 
 
 @mcp.tool()
 @handle_tool_errors
 def layout_multipartite(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    subset_attribute: Annotated[Optional[str], Field(description="Node attribute whose distinct values define the layers, one column (or row) per value — e.g. 'level', 'generation', 'year', or a community attribute such as 'louvain_community'. EVERY node must have a value. Omit when passing explicit subset_key groups.")] = None,
-    subset_key: Annotated[Optional[dict[str, List[str]]], Field(description="Explicit mapping from layer name to node IDs, as an alternative to subset_attribute. Each node must occur exactly once.")] = None,
+    subset_attribute: Annotated[
+        Optional[str],
+        Field(
+            description="Node attribute whose distinct values define the layers, one column (or row) per value — e.g. 'level', 'generation', 'year', or a community attribute such as 'louvain_community'. EVERY node must have a value. Omit when passing explicit subset_key groups."
+        ),
+    ] = None,
+    subset_key: Annotated[
+        Optional[dict[str, List[str]]],
+        Field(
+            description="Explicit mapping from layer name to node IDs, as an alternative to subset_attribute. Each node must occur exactly once."
+        ),
+    ] = None,
     align: Annotated[Optional[str], Field(description=_ALIGN_DESC)] = None,
     scale: Annotated[Optional[float], Field(description=_SCALE_CENTER_DESC)] = None,
-    center: Annotated[Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)] = None,
+    center: Annotated[
+        Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -108,6 +148,7 @@ def layout_multipartite(
     """
     with get_db_context() as db:
         from app.logic import layout
+
         overrides = {
             "subset_attribute": subset_attribute,
             "subset_key": subset_key,
@@ -118,7 +159,10 @@ def layout_multipartite(
         info = layout.calculate_layout(
             network_id, "multipartite", db, overrides=overrides, force=force_recompute
         )
-        return layout.format_layout_result(info, "Multipartite layout calculated. Call `visualization_generate` to render.")
+        return layout.format_layout_result(
+            info,
+            "Multipartite layout calculated. Call `visualization_generate` to render.",
+        )
 
 
 @mcp.tool()
@@ -126,7 +170,9 @@ def layout_multipartite(
 def layout_planar(
     network_id: Annotated[int, Field(description="The ID of the network.")],
     scale: Annotated[Optional[float], Field(description=_SCALE_CENTER_DESC)] = None,
-    center: Annotated[Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)] = None,
+    center: Annotated[
+        Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -149,21 +195,36 @@ def layout_planar(
     """
     with get_db_context() as db:
         from app.logic import layout
+
         overrides = {"scale": scale, "center": center}
         info = layout.calculate_layout(
             network_id, "planar", db, overrides=overrides, force=force_recompute
         )
-        return layout.format_layout_result(info, "Planar layout calculated. Call `visualization_generate` to render.")
+        return layout.format_layout_result(
+            info, "Planar layout calculated. Call `visualization_generate` to render."
+        )
 
 
 @mcp.tool()
 @handle_tool_errors
 def layout_bfs(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    start: Annotated[str, Field(description="Node ID to use as the root. Nodes are placed in layers by their BFS distance from it. Use `node_search` first if you have a label rather than an ID.")],
-    align: Annotated[Optional[str], Field(description=_ALIGN_DESC + " Layers here are BFS distances from the root.")] = None,
+    start: Annotated[
+        str,
+        Field(
+            description="Node ID to use as the root. Nodes are placed in layers by their BFS distance from it. Use `node_search` first if you have a label rather than an ID."
+        ),
+    ],
+    align: Annotated[
+        Optional[str],
+        Field(
+            description=_ALIGN_DESC + " Layers here are BFS distances from the root."
+        ),
+    ] = None,
     scale: Annotated[Optional[float], Field(description=_SCALE_CENTER_DESC)] = None,
-    center: Annotated[Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)] = None,
+    center: Annotated[
+        Optional[Tuple[float, float]], Field(description=_SCALE_CENTER_DESC)
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -187,6 +248,7 @@ def layout_bfs(
     """
     with get_db_context() as db:
         from app.logic import layout
+
         overrides = {
             "start": start,
             "align": align,
@@ -196,4 +258,6 @@ def layout_bfs(
         info = layout.calculate_layout(
             network_id, "bfs", db, overrides=overrides, force=force_recompute
         )
-        return layout.format_layout_result(info, "BFS layout calculated. Call `visualization_generate` to render.")
+        return layout.format_layout_result(
+            info, "BFS layout calculated. Call `visualization_generate` to render."
+        )

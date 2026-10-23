@@ -3,9 +3,9 @@
 import json
 
 import pytest
+
 from app.core import database
 from app.mcp import tools
-
 from common import models
 
 
@@ -23,17 +23,27 @@ def square(db, monkeypatch):
         db.add(node)
         db.flush()
         ids[name] = node.id
-    for i, (s, t) in enumerate([("a", "b"), ("b", "d"), ("a", "c"), ("c", "d"), ("d", "e")]):
-        db.add(models.Edge(network_id=net.id, edge_id=f"e{i}",
-                           source_node_id=ids[s], target_node_id=ids[t]))
+    for i, (s, t) in enumerate(
+        [("a", "b"), ("b", "d"), ("a", "c"), ("c", "d"), ("d", "e")]
+    ):
+        db.add(
+            models.Edge(
+                network_id=net.id,
+                edge_id=f"e{i}",
+                source_node_id=ids[s],
+                target_node_id=ids[t],
+            )
+        )
     db.commit()
 
     from app.logic.attributes import bulk_save_node_attributes
 
-    bulk_save_node_attributes(net.id, "group", "string",
-                              {ids[n]: g for n, g in zip("abcde", "XXYYY")}, db)
-    bulk_save_node_attributes(net.id, "score", "float",
-                              {ids[n]: float(i) for i, n in enumerate("abcde")}, db)
+    bulk_save_node_attributes(
+        net.id, "group", "string", {ids[n]: g for n, g in zip("abcde", "XXYYY")}, db
+    )
+    bulk_save_node_attributes(
+        net.id, "score", "float", {ids[n]: float(i) for i, n in enumerate("abcde")}, db
+    )
     db.commit()
     return net.id
 
@@ -43,7 +53,8 @@ def test_k_shortest_paths_returns_alternatives_shortest_first(square):
 
     assert [p["hops"] for p in result["paths"]] == [3, 3]
     assert {tuple(p["path"]) for p in result["paths"]} == {
-        ("a", "b", "d", "e"), ("a", "c", "d", "e"),
+        ("a", "b", "d", "e"),
+        ("a", "c", "d", "e"),
     }
 
 

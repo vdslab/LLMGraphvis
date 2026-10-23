@@ -15,6 +15,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+
 from app.services.llm.hooks.types import HookEvent
 from app.services.llm.local_tools import LOCAL_TOOL_NAMES
 

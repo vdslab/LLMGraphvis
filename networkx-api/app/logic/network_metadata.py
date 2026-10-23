@@ -116,14 +116,22 @@ def get_visualization_state(db: Session, network_id: int) -> Dict[str, Any]:
         "node_color": {
             "config": node_color_config,
             # If there's a pre-calculated map (from Categorical/Ranking), return it
-            "color_map": node_color_config.get("color_map") if node_color_config else None,
-            "attribute": node_color_config.get("attribute") if node_color_config else None,
-            "scale_type": node_color_config.get("scale_type") if node_color_config else None,
+            "color_map": node_color_config.get("color_map")
+            if node_color_config
+            else None,
+            "attribute": node_color_config.get("attribute")
+            if node_color_config
+            else None,
+            "scale_type": node_color_config.get("scale_type")
+            if node_color_config
+            else None,
         },
         "node_size": {
             "config": node_size_config,
-            "attribute": node_size_config.get("attribute") if node_size_config else None,
-        }
+            "attribute": node_size_config.get("attribute")
+            if node_size_config
+            else None,
+        },
     }
 
 
@@ -148,7 +156,8 @@ def _compact_listing(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         values = stats.get("top_values")
         if isinstance(values, list):
             stats["top_values"] = [
-                v if not isinstance(v, str) or len(v) <= LISTED_VALUE_CHARS
+                v
+                if not isinstance(v, str) or len(v) <= LISTED_VALUE_CHARS
                 else v[:LISTED_VALUE_CHARS] + "…"
                 for v in values[:LISTED_TOP_VALUES]
             ]
@@ -161,13 +170,14 @@ def _compact_listing(entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 def list_node_attributes(db: Session, network_id: int) -> List[Dict[str, Any]]:
     """Lists available node attributes."""
     from app.logic import attributes
+
     stats = attributes.get_attribute_stats(
         network_id,
         models.NodeAttribute,
         models.NodeAttributeValue,
         models.NodeFloatAttributeValue,
         models.NodeTextAttributeValue,
-        db
+        db,
     )
     return _compact_listing(stats)
 
@@ -175,12 +185,13 @@ def list_node_attributes(db: Session, network_id: int) -> List[Dict[str, Any]]:
 def list_edge_attributes(db: Session, network_id: int) -> List[Dict[str, Any]]:
     """Lists available edge attributes."""
     from app.logic import attributes
+
     stats = attributes.get_attribute_stats(
         network_id,
         models.EdgeAttribute,
         models.EdgeAttributeValue,
         models.EdgeFloatAttributeValue,
         models.EdgeTextAttributeValue,
-        db
+        db,
     )
     return _compact_listing(stats)

@@ -2,21 +2,30 @@
 
 from typing import Annotated
 
+from pydantic import Field
+
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
 from app.core.mcp import mcp
 from app.logic.extraction import extract_nodes
 from app.logic.filter import get_nodes_by_filter
 from app.schemas.filter import AttributeCondition
-from pydantic import Field
 
 
 @mcp.tool()
 @handle_tool_errors
 def subgraph_extract_nodes(
     network_id: Annotated[int, Field(description="Source network ID.")],
-    node_ids: Annotated[list[str], Field(min_length=1, description="Node IDs to retain, including all edges between them. Unknown IDs are rejected.")],
-    description: Annotated[str, Field(description="Purpose of this extracted network.")] = "Subgraph",
+    node_ids: Annotated[
+        list[str],
+        Field(
+            min_length=1,
+            description="Node IDs to retain, including all edges between them. Unknown IDs are rejected.",
+        ),
+    ],
+    description: Annotated[
+        str, Field(description="Purpose of this extracted network.")
+    ] = "Subgraph",
 ) -> dict:
     """Extract an induced subgraph; return created_network_id without switching.
 
@@ -33,8 +42,16 @@ def subgraph_extract_nodes(
 @handle_tool_errors
 def subgraph_extract_filter(
     network_id: Annotated[int, Field(description="Source network ID.")],
-    conditions: Annotated[list[AttributeCondition], Field(min_length=1, description="AND between attribute conditions; OR between categories and numeric ranges within each condition. Use attribute_name for the attribute key.")],
-    description: Annotated[str, Field(description="Purpose of this extracted network.")] = "Filtered subgraph",
+    conditions: Annotated[
+        list[AttributeCondition],
+        Field(
+            min_length=1,
+            description="AND between attribute conditions; OR between categories and numeric ranges within each condition. Use attribute_name for the attribute key.",
+        ),
+    ],
+    description: Annotated[
+        str, Field(description="Purpose of this extracted network.")
+    ] = "Filtered subgraph",
 ) -> dict:
     """Extract matching nodes server-side without layout or view changes.
 
@@ -44,13 +61,20 @@ def subgraph_extract_filter(
     """
     with get_db_context() as db:
         matches = get_nodes_by_filter(network_id, conditions, db)
-        return extract_nodes(network_id, [row["id"] for row in matches], db, description)
+        return extract_nodes(
+            network_id, [row["id"] for row in matches], db, description
+        )
 
 
 @mcp.tool()
 @handle_tool_errors
 def network_select(
-    network_id: Annotated[int, Field(description="Existing network to use for subsequent analysis in this chat.")],
+    network_id: Annotated[
+        int,
+        Field(
+            description="Existing network to use for subsequent analysis in this chat."
+        ),
+    ],
 ) -> dict:
     """Select the analysis context without computing a layout or drawing.
 
@@ -63,4 +87,7 @@ def network_select(
         network = db.get(models.Network, network_id)
         if network is None:
             raise ValueError(f"Network {network_id} not found")
-        return {"network_id": network_id, "content": "Analysis context selected; not rendered."}
+        return {
+            "network_id": network_id,
+            "content": "Analysis context selected; not rendered.",
+        }

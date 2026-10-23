@@ -1,6 +1,7 @@
 """Tests for hook registration and dispatch semantics."""
 
 import pytest
+
 from app.services.llm.hooks.registry import HookRegistry
 from app.services.llm.hooks.types import (
     HookContext,
@@ -83,17 +84,20 @@ class TestPriorityOrdering:
         order = []
         reg.register(
             HookEvent.PRE_TOOL,
-            lambda c: order.append("late"), priority=90,
+            lambda c: order.append("late"),
+            priority=90,
             name="late",
         )
         reg.register(
             HookEvent.PRE_TOOL,
-            lambda c: order.append("early"), priority=10,
+            lambda c: order.append("early"),
+            priority=10,
             name="early",
         )
         reg.register(
             HookEvent.PRE_TOOL,
-            lambda c: order.append("mid"), priority=50,
+            lambda c: order.append("mid"),
+            priority=50,
             name="mid",
         )
         await reg.run_pre_tool(make_ctx())
@@ -137,7 +141,8 @@ class TestPreToolDecisions:
         )
         reg.register(
             HookEvent.PRE_TOOL,
-            lambda c: ran.append("after"), priority=20,
+            lambda c: ran.append("after"),
+            priority=20,
             name="after",
         )
         await reg.run_pre_tool(make_ctx())
@@ -223,6 +228,7 @@ class TestAsyncAndErrorHandling:
     @pytest.mark.asyncio
     async def test_a_raising_hook_fails_open_and_is_counted(self, reg):
         """A buggy guard must not take down every tool call, but must be visible."""
+
         def broken(ctx):
             raise RuntimeError("boom")
 
@@ -230,7 +236,8 @@ class TestAsyncAndErrorHandling:
         reg.register(HookEvent.PRE_TOOL, broken, priority=10, name="broken")
         reg.register(
             HookEvent.PRE_TOOL,
-            lambda c: ran_after.append(1), priority=20,
+            lambda c: ran_after.append(1),
+            priority=20,
             name="after",
         )
 
@@ -246,12 +253,14 @@ class TestOtherEvents:
     async def test_turn_start_collects_context_additions(self, reg):
         reg.register(
             HookEvent.TURN_START,
-            lambda c: c.add_context("block A"), priority=10,
+            lambda c: c.add_context("block A"),
+            priority=10,
             name="a",
         )
         reg.register(
             HookEvent.TURN_START,
-            lambda c: c.add_context("block B"), priority=20,
+            lambda c: c.add_context("block B"),
+            priority=20,
             name="b",
         )
         ctx = make_ctx(HookEvent.TURN_START, tool_name=None)

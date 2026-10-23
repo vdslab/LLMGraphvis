@@ -1,24 +1,32 @@
+import logging
 from typing import Annotated, Any, Dict, List, Literal, Optional
+
 from pydantic import Field
-from app.core.mcp import mcp
+
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
-import logging
+from app.core.mcp import mcp
 
 logger = logging.getLogger(__name__)
 
 # Shared by every numeric mapping (node colour/size, edge colour/width), ADR 0029.
 Transform = Annotated[
     Literal["linear", "log", "rank"],
-    Field(description="How numeric values spread over the range. 'linear' (default): in proportion to the value. 'log': compresses large values, so a few very high values (typical of centrality) no longer make every other element look the same; zero and negative values keep their order. 'rank': spreads elements evenly by their order, ignoring how far apart the values are. Ignored for CATEGORICAL and RANKING."),
+    Field(
+        description="How numeric values spread over the range. 'linear' (default): in proportion to the value. 'log': compresses large values, so a few very high values (typical of centrality) no longer make every other element look the same; zero and negative values keep their order. 'rank': spreads elements evenly by their order, ignoring how far apart the values are. Ignored for CATEGORICAL and RANKING."
+    ),
 ]
 ValueMin = Annotated[
     Optional[float],
-    Field(description="Value placed at the low end of the range; lower values are drawn like it. Omit to use the attribute's minimum."),
+    Field(
+        description="Value placed at the low end of the range; lower values are drawn like it. Omit to use the attribute's minimum."
+    ),
 ]
 ValueMax = Annotated[
     Optional[float],
-    Field(description="Value placed at the high end of the range; higher values are drawn like it. Omit to use the attribute's maximum. Lower it so a few outliers stop compressing everything else."),
+    Field(
+        description="Value placed at the high end of the range; higher values are drawn like it. Omit to use the attribute's maximum. Lower it so a few outliers stop compressing everything else."
+    ),
 ]
 
 
@@ -57,14 +65,69 @@ def _add_encoding_note(
 @handle_tool_errors
 def visualization_set_node_color(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    attribute: Annotated[str, Field(description="Node attribute name to use for coloring (e.g., 'community', 'degree_centrality', 'country').")],
-    scale_type: Annotated[str, Field(description="Color scale type, chosen from the attribute's measurement in [Current Network Context]: 'CATEGORICAL' for categorical values (groups, communities), 'LINEAR' for quantitative values (magnitudes), or 'RANKING' (top-N rules on a quantitative value). A discrete attribute (few whole numbers) is CATEGORICAL when its numbers are codes and LINEAR when they are counts; decide from its name and description.")],
-    mapping: Annotated[Optional[Dict[str, str]], Field(description="For CATEGORICAL: dict mapping values that actually occur in the named attribute to hex colors, e.g. {\"A\": \"#FF0000\"}. Copy category names exactly from the network data or a previous legend. Omitted categories are filled from the selected named palette.")] = None,
-    palette: Annotated[Optional[Literal["accent", "category10", "dark2", "observable10", "paired", "pastel1", "pastel2", "set1", "set2", "set3", "tableau10", "extended20"]], Field(description="For CATEGORICAL: named D3 categorical palette for values omitted from mapping. Omit to choose tableau10 for up to 10 values, paired for 11-12, or extended20 for larger sets.")] = None,
-    gradient: Annotated[Optional[List[str]], Field(description="For LINEAR: list of hex strings ordered from low value to high, e.g. [\"#C6DBEF\", \"#6BAED6\", \"#08306B\"].")] = None,
-    ranking_rules: Annotated[Optional[List[Dict[str, Any]]], Field(description="For RANKING: list of rules applied in order, each {\"top\": N, \"color\": \"#RRGGBB\"} — e.g. [{\"top\": 10, \"color\": \"#e15759\"}, {\"top\": 50, \"color\": \"#f28e2b\"}] colors the 10 highest-valued nodes red and the next 40 orange. Everything unmatched gets default_color. Use this for 'highlight the top N' requests, where position in the ordering matters more than the value itself.")] = None,
-    default_color: Annotated[str, Field(description="Fallback color for nodes with missing attribute values, or unmatched by any RANKING rule.")] = "#d3d3d3",
-    fixed: Annotated[bool, Field(description="If True, only colors nodes whose value is in the mapping; others get default_color.")] = False,
+    attribute: Annotated[
+        str,
+        Field(
+            description="Node attribute name to use for coloring (e.g., 'community', 'degree_centrality', 'country')."
+        ),
+    ],
+    scale_type: Annotated[
+        str,
+        Field(
+            description="Color scale type, chosen from the attribute's measurement in [Current Network Context]: 'CATEGORICAL' for categorical values (groups, communities), 'LINEAR' for quantitative values (magnitudes), or 'RANKING' (top-N rules on a quantitative value). A discrete attribute (few whole numbers) is CATEGORICAL when its numbers are codes and LINEAR when they are counts; decide from its name and description."
+        ),
+    ],
+    mapping: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description='For CATEGORICAL: dict mapping values that actually occur in the named attribute to hex colors, e.g. {"A": "#FF0000"}. Copy category names exactly from the network data or a previous legend. Omitted categories are filled from the selected named palette.'
+        ),
+    ] = None,
+    palette: Annotated[
+        Optional[
+            Literal[
+                "accent",
+                "category10",
+                "dark2",
+                "observable10",
+                "paired",
+                "pastel1",
+                "pastel2",
+                "set1",
+                "set2",
+                "set3",
+                "tableau10",
+                "extended20",
+            ]
+        ],
+        Field(
+            description="For CATEGORICAL: named D3 categorical palette for values omitted from mapping. Omit to choose tableau10 for up to 10 values, paired for 11-12, or extended20 for larger sets."
+        ),
+    ] = None,
+    gradient: Annotated[
+        Optional[List[str]],
+        Field(
+            description='For LINEAR: list of hex strings ordered from low value to high, e.g. ["#C6DBEF", "#6BAED6", "#08306B"].'
+        ),
+    ] = None,
+    ranking_rules: Annotated[
+        Optional[List[Dict[str, Any]]],
+        Field(
+            description='For RANKING: list of rules applied in order, each {"top": N, "color": "#RRGGBB"} — e.g. [{"top": 10, "color": "#e15759"}, {"top": 50, "color": "#f28e2b"}] colors the 10 highest-valued nodes red and the next 40 orange. Everything unmatched gets default_color. Use this for \'highlight the top N\' requests, where position in the ordering matters more than the value itself.'
+        ),
+    ] = None,
+    default_color: Annotated[
+        str,
+        Field(
+            description="Fallback color for nodes with missing attribute values, or unmatched by any RANKING rule."
+        ),
+    ] = "#d3d3d3",
+    fixed: Annotated[
+        bool,
+        Field(
+            description="If True, only colors nodes whose value is in the mapping; others get default_color."
+        ),
+    ] = False,
     transform: Transform = "linear",
     value_min: ValueMin = None,
     value_max: ValueMax = None,
@@ -121,11 +184,36 @@ def visualization_set_node_color(
 @handle_tool_errors
 def visualization_set_node_size(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    attribute: Annotated[str, Field(description="Node attribute name to use for sizing (e.g., 'degree_centrality', 'pagerank'). Size implies 'more', so use a quantitative attribute (or a discrete one holding counts), never a categorical one. Calculate first if needed.")],
-    min_size: Annotated[Optional[float], Field(description="Minimum node size (area-proportional; rendered radius = sqrt(size * 10 / π)). Leave as None for adaptive auto-sizing (recommended).")] = None,
-    max_size: Annotated[Optional[float], Field(description="Maximum node size (area-proportional; rendered radius = sqrt(size * 10 / π)). Leave as None for adaptive auto-sizing (recommended).")] = None,
-    default_size: Annotated[Optional[float], Field(description="Default node size (area-proportional; rendered radius = sqrt(size * 10 / π)) for nodes with missing attribute values.")] = None,
-    scaling_factor: Annotated[float, Field(description="Global size multiplier. Use > 1.0 to enlarge all nodes, < 1.0 to shrink.")] = 1.0,
+    attribute: Annotated[
+        str,
+        Field(
+            description="Node attribute name to use for sizing (e.g., 'degree_centrality', 'pagerank'). Size implies 'more', so use a quantitative attribute (or a discrete one holding counts), never a categorical one. Calculate first if needed."
+        ),
+    ],
+    min_size: Annotated[
+        Optional[float],
+        Field(
+            description="Minimum node size (area-proportional; rendered radius = sqrt(size * 10 / π)). Leave as None for adaptive auto-sizing (recommended)."
+        ),
+    ] = None,
+    max_size: Annotated[
+        Optional[float],
+        Field(
+            description="Maximum node size (area-proportional; rendered radius = sqrt(size * 10 / π)). Leave as None for adaptive auto-sizing (recommended)."
+        ),
+    ] = None,
+    default_size: Annotated[
+        Optional[float],
+        Field(
+            description="Default node size (area-proportional; rendered radius = sqrt(size * 10 / π)) for nodes with missing attribute values."
+        ),
+    ] = None,
+    scaling_factor: Annotated[
+        float,
+        Field(
+            description="Global size multiplier. Use > 1.0 to enlarge all nodes, < 1.0 to shrink."
+        ),
+    ] = 1.0,
     transform: Transform = "linear",
     value_min: ValueMin = None,
     value_max: ValueMax = None,
@@ -174,14 +262,57 @@ def visualization_set_node_size(
 @handle_tool_errors
 def visualization_set_node_labels(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    attribute: Annotated[Optional[str], Field(description="Node attribute whose value becomes the label text (e.g. 'country', 'score'). None keeps each node's own label (its name, else its ID).")] = None,
-    visibility: Annotated[Optional[Literal["auto", "all", "hover", "top_n", "nodes", "highlighted"]], Field(description="Which nodes show a permanent label. 'auto': every node of a small network, otherwise only the best-connected ones. 'all': every node. 'hover': none (labels appear on hover). 'top_n': the top_n nodes by rank_by. 'nodes': exactly node_ids. 'highlighted': the nodes of the current visualization_highlight. None with show_all=False leaves visibility to the user's Labels button.")] = None,
-    top_n: Annotated[Optional[int], Field(ge=1, le=500, description="For visibility='top_n' (or to override 'auto' on a large network): how many nodes to label.")] = None,
-    rank_by: Annotated[Optional[str], Field(description="Numeric node attribute that decides which nodes are 'top' (e.g. 'pagerank'). None ranks by degree in the drawn graph.")] = None,
-    node_ids: Annotated[Optional[List[str]], Field(description="For visibility='nodes': exact node IDs to label (resolve names with node_search).")] = None,
-    font_size: Annotated[Optional[float], Field(gt=0, le=48, description="Label size in screen pixels; it stays the same while the user zooms. None uses the canvas default.")] = None,
-    max_length: Annotated[Optional[int], Field(ge=1, le=200, description="Labels longer than this many characters are shortened with an ellipsis; the full text stays in the hover tooltip.")] = None,
-    show_all: Annotated[bool, Field(description="Legacy shortcut for visibility='all'.")] = False,
+    attribute: Annotated[
+        Optional[str],
+        Field(
+            description="Node attribute whose value becomes the label text (e.g. 'country', 'score'). None keeps each node's own label (its name, else its ID)."
+        ),
+    ] = None,
+    visibility: Annotated[
+        Optional[Literal["auto", "all", "hover", "top_n", "nodes", "highlighted"]],
+        Field(
+            description="Which nodes show a permanent label. 'auto': every node of a small network, otherwise only the best-connected ones. 'all': every node. 'hover': none (labels appear on hover). 'top_n': the top_n nodes by rank_by. 'nodes': exactly node_ids. 'highlighted': the nodes of the current visualization_highlight. None with show_all=False leaves visibility to the user's Labels button."
+        ),
+    ] = None,
+    top_n: Annotated[
+        Optional[int],
+        Field(
+            ge=1,
+            le=500,
+            description="For visibility='top_n' (or to override 'auto' on a large network): how many nodes to label.",
+        ),
+    ] = None,
+    rank_by: Annotated[
+        Optional[str],
+        Field(
+            description="Numeric node attribute that decides which nodes are 'top' (e.g. 'pagerank'). None ranks by degree in the drawn graph."
+        ),
+    ] = None,
+    node_ids: Annotated[
+        Optional[List[str]],
+        Field(
+            description="For visibility='nodes': exact node IDs to label (resolve names with node_search)."
+        ),
+    ] = None,
+    font_size: Annotated[
+        Optional[float],
+        Field(
+            gt=0,
+            le=48,
+            description="Label size in screen pixels; it stays the same while the user zooms. None uses the canvas default.",
+        ),
+    ] = None,
+    max_length: Annotated[
+        Optional[int],
+        Field(
+            ge=1,
+            le=200,
+            description="Labels longer than this many characters are shortened with an ellipsis; the full text stays in the hover tooltip.",
+        ),
+    ] = None,
+    show_all: Annotated[
+        bool, Field(description="Legacy shortcut for visibility='all'.")
+    ] = False,
 ) -> dict:
     """
     Sets the label channel: what text each node shows, which nodes show it, and how it looks.
@@ -241,12 +372,42 @@ def visualization_set_node_labels(
 @handle_tool_errors
 def visualization_set_edge_color(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    attribute: Annotated[Optional[str], Field(description="Edge attribute name to use for coloring (e.g., 'weight', 'type'). Omit to draw every edge in default_color.")] = None,
-    scale_type: Annotated[str, Field(description="Color scale type, chosen from the attribute's measurement: 'CATEGORICAL' for categorical values (edge types, groups) or 'LINEAR' for quantitative values (magnitudes such as weight).")] = "LINEAR",
-    mapping: Annotated[Optional[Dict[str, str]], Field(description="For CATEGORICAL: dict mapping attribute values to hex colors.")] = None,
-    gradient: Annotated[Optional[List[str]], Field(description="For LINEAR: list of [start_color, end_color] hex strings.")] = None,
-    default_color: Annotated[Optional[str], Field(description="Color of every edge when attribute is omitted, and of edges missing the attribute's value. Defaults to grey.")] = None,
-    opacity: Annotated[Optional[float], Field(ge=0.05, le=1, description="Opacity of every edge, from 0.05 (almost invisible) to 1 (solid). Omit for the canvas default of 0.3. Use for 'make the edges fainter / stronger'; edges dimmed by a highlight stay fainter still.")] = None,
+    attribute: Annotated[
+        Optional[str],
+        Field(
+            description="Edge attribute name to use for coloring (e.g., 'weight', 'type'). Omit to draw every edge in default_color."
+        ),
+    ] = None,
+    scale_type: Annotated[
+        str,
+        Field(
+            description="Color scale type, chosen from the attribute's measurement: 'CATEGORICAL' for categorical values (edge types, groups) or 'LINEAR' for quantitative values (magnitudes such as weight)."
+        ),
+    ] = "LINEAR",
+    mapping: Annotated[
+        Optional[Dict[str, str]],
+        Field(
+            description="For CATEGORICAL: dict mapping attribute values to hex colors."
+        ),
+    ] = None,
+    gradient: Annotated[
+        Optional[List[str]],
+        Field(description="For LINEAR: list of [start_color, end_color] hex strings."),
+    ] = None,
+    default_color: Annotated[
+        Optional[str],
+        Field(
+            description="Color of every edge when attribute is omitted, and of edges missing the attribute's value. Defaults to grey."
+        ),
+    ] = None,
+    opacity: Annotated[
+        Optional[float],
+        Field(
+            ge=0.05,
+            le=1,
+            description="Opacity of every edge, from 0.05 (almost invisible) to 1 (solid). Omit for the canvas default of 0.3. Use for 'make the edges fainter / stronger'; edges dimmed by a highlight stay fainter still.",
+        ),
+    ] = None,
     transform: Transform = "linear",
     value_min: ValueMin = None,
     value_max: ValueMax = None,
@@ -294,10 +455,27 @@ def visualization_set_edge_color(
 @handle_tool_errors
 def visualization_set_edge_width(
     network_id: Annotated[int, Field(description="The ID of the network.")],
-    attribute: Annotated[Optional[str], Field(description="Edge attribute name to use for width (e.g., 'weight'). Width implies 'more', so use a quantitative attribute. Omit to draw every edge at default_width.")] = None,
-    min_width: Annotated[Optional[float], Field(description="Minimum edge width in pixels. Defaults to adaptive.")] = None,
-    max_width: Annotated[Optional[float], Field(description="Maximum edge width in pixels. Defaults to adaptive.")] = None,
-    default_width: Annotated[Optional[float], Field(gt=0, description="Width in pixels of every edge when attribute is omitted, and of edges missing the attribute's value. Defaults to adaptive.")] = None,
+    attribute: Annotated[
+        Optional[str],
+        Field(
+            description="Edge attribute name to use for width (e.g., 'weight'). Width implies 'more', so use a quantitative attribute. Omit to draw every edge at default_width."
+        ),
+    ] = None,
+    min_width: Annotated[
+        Optional[float],
+        Field(description="Minimum edge width in pixels. Defaults to adaptive."),
+    ] = None,
+    max_width: Annotated[
+        Optional[float],
+        Field(description="Maximum edge width in pixels. Defaults to adaptive."),
+    ] = None,
+    default_width: Annotated[
+        Optional[float],
+        Field(
+            gt=0,
+            description="Width in pixels of every edge when attribute is omitted, and of edges missing the attribute's value. Defaults to adaptive.",
+        ),
+    ] = None,
     transform: Transform = "linear",
     value_min: ValueMin = None,
     value_max: ValueMax = None,

@@ -1,5 +1,6 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.services.llm import local_tools
 from app.services.llm.engine import GraphVisAgent, _truncate_tool_result
@@ -11,9 +12,9 @@ from app.services.llm.providers.google_genai import (
 from app.services.llm.providers.types import (
     FunctionCallData,
     StreamChunk,
+    ToolDefinition,
     UsageData,
 )
-from app.services.llm.providers.types import ToolDefinition
 from app.services.llm.tool_catalog import ToolCatalog
 
 
@@ -49,12 +50,15 @@ async def _async_iter(items):
 
 # --- _consume_stream ---
 
+
 @pytest.mark.asyncio
 async def test_consume_stream_text_only(mock_agent, mock_queue):
     """Test consuming a stream that only contains text."""
     stream = _async_iter([StreamChunk(text="Hello"), StreamChunk(text=" World")])
 
-    text, thought, tool_calls, usage = await mock_agent._consume_stream(stream, mock_queue)
+    text, thought, tool_calls, usage = await mock_agent._consume_stream(
+        stream, mock_queue
+    )
 
     assert text == "Hello World"
     assert thought == ""
@@ -67,12 +71,16 @@ async def test_consume_stream_text_only(mock_agent, mock_queue):
 async def test_consume_stream_with_tool_call(mock_agent, mock_queue):
     """Test consuming a stream that has a tool call."""
     fc = FunctionCallData(name="get_network_structure", args={})
-    stream = _async_iter([
-        StreamChunk(text="I will check."),
-        StreamChunk(function_calls=[fc]),
-    ])
+    stream = _async_iter(
+        [
+            StreamChunk(text="I will check."),
+            StreamChunk(function_calls=[fc]),
+        ]
+    )
 
-    text, thought, tool_calls, usage = await mock_agent._consume_stream(stream, mock_queue)
+    text, thought, tool_calls, usage = await mock_agent._consume_stream(
+        stream, mock_queue
+    )
 
     assert text == "I will check."
     assert len(tool_calls) == 1
@@ -82,10 +90,14 @@ async def test_consume_stream_with_tool_call(mock_agent, mock_queue):
 @pytest.mark.asyncio
 async def test_consume_stream_accumulates_usage(mock_agent, mock_queue):
     """Usage chunks are summed defensively even if yielded more than once."""
-    stream = _async_iter([
-        StreamChunk(text="hi", usage=UsageData(input_tokens=10, output_tokens=5)),
-        StreamChunk(usage=UsageData(input_tokens=1, output_tokens=2, cached_input_tokens=3)),
-    ])
+    stream = _async_iter(
+        [
+            StreamChunk(text="hi", usage=UsageData(input_tokens=10, output_tokens=5)),
+            StreamChunk(
+                usage=UsageData(input_tokens=1, output_tokens=2, cached_input_tokens=3)
+            ),
+        ]
+    )
 
     _, _, _, usage = await mock_agent._consume_stream(stream, mock_queue)
 
@@ -174,17 +186,17 @@ async def test_loop_uses_tools_activated_by_search_on_the_next_generation(
     state = new_turn_state(10)
     state["network_id"] = 1
     catalog.initialize_turn(state)
-    state["presented_tool_names"] = {
-        "skill_load", "tool_search", "ask_user"
-    }
+    state["presented_tool_names"] = {"skill_load", "tool_search", "ask_user"}
     calls = [
-        _async_iter([
-            StreamChunk(
-                function_calls=[
-                    FunctionCallData("analysis_pagerank", {}, call_id="run")
-                ]
-            )
-        ]),
+        _async_iter(
+            [
+                StreamChunk(
+                    function_calls=[
+                        FunctionCallData("analysis_pagerank", {}, call_id="run")
+                    ]
+                )
+            ]
+        ),
         _async_iter([StreamChunk(text="Done.")]),
     ]
     mock_agent.provider.generate = MagicMock(side_effect=calls)
@@ -195,17 +207,19 @@ async def test_loop_uses_tools_activated_by_search_on_the_next_generation(
         return_value={"content": "pagerank saved"},
     ):
         final, _log, _usage = await mock_agent._execute_tool_loop(
-            initial_stream=_async_iter([
-                StreamChunk(
-                    function_calls=[
-                        FunctionCallData(
-                            "tool_search",
-                            {"query": "analysis_pagerank"},
-                            call_id="search",
-                        )
-                    ]
-                )
-            ]),
+            initial_stream=_async_iter(
+                [
+                    StreamChunk(
+                        function_calls=[
+                            FunctionCallData(
+                                "tool_search",
+                                {"query": "analysis_pagerank"},
+                                call_id="search",
+                            )
+                        ]
+                    )
+                ]
+            ),
             history=[],
             all_tools=catalog,
             queue=mock_queue,
@@ -251,10 +265,13 @@ async def test_loop_does_not_nudge_a_question_to_the_user(mock_agent, mock_queue
 
 # --- tool execution ---
 
+
 @pytest.mark.asyncio
 async def test_execute_tools_and_update_history(mock_agent, mock_queue):
     """Tool execution appends model + tool turns and records the step log."""
-    mock_agent._run_tool = AsyncMock(return_value=({"content": "ok"}, "completed", None))
+    mock_agent._run_tool = AsyncMock(
+        return_value=({"content": "ok"}, "completed", None)
+    )
 
     fc = FunctionCallData(
         name="test_tool",
@@ -267,8 +284,14 @@ async def test_execute_tools_and_update_history(mock_agent, mock_queue):
     turn_state["network_id"] = 1
 
     step_log = await mock_agent._execute_tools_and_update_history(
-        [fc], "Calling tool.", "", history, mock_queue,
-        chat_id=1, turn_state=turn_state, session=None,
+        [fc],
+        "Calling tool.",
+        "",
+        history,
+        mock_queue,
+        chat_id=1,
+        turn_state=turn_state,
+        session=None,
     )
 
     mock_agent._run_tool.assert_called_once()
@@ -300,9 +323,7 @@ async def test_same_batch_search_does_not_retroactively_expose_tool(
     state = new_turn_state(10)
     state["network_id"] = 1
     catalog.initialize_turn(state)
-    state["presented_tool_names"] = {
-        "skill_load", "tool_search", "ask_user"
-    }
+    state["presented_tool_names"] = {"skill_load", "tool_search", "ask_user"}
     calls = [
         FunctionCallData(
             "tool_search", {"query": "analysis_pagerank"}, call_id="search"
@@ -319,7 +340,8 @@ async def test_same_batch_search_does_not_retroactively_expose_tool(
 
     remote.assert_not_called()
     assert [call["status"] for call in result["tool_calls"]] == [
-        "completed", "deferred"
+        "completed",
+        "deferred",
     ]
 
 
@@ -396,9 +418,7 @@ async def test_post_tool_hook_finishes_before_next_tool(mock_agent, mock_queue):
     mock_agent._dispatch_tool_hooks = AsyncMock(side_effect=dispatch_hook)
     calls = [
         FunctionCallData(name="layout_spring", args={}, call_id="layout"),
-        FunctionCallData(
-            name="visualization_generate", args={}, call_id="render"
-        ),
+        FunctionCallData(name="visualization_generate", args={}, call_id="render"),
     ]
 
     await mock_agent._execute_tools_and_update_history(
@@ -435,8 +455,12 @@ async def test_a_denied_tool_is_never_executed(mock_agent, mock_queue):
     )
     try:
         result, status, error, *_ = await mock_agent._run_tool_with_events(
-            "test_tool", {"a": 1}, chat_id=1, session=None,
-            queue=mock_queue, turn_state=new_turn_state(10),
+            "test_tool",
+            {"a": 1},
+            chat_id=1,
+            session=None,
+            queue=mock_queue,
+            turn_state=new_turn_state(10),
         )
     finally:
         registry._hooks[HookEvent.PRE_TOOL] = [
@@ -492,18 +516,26 @@ async def test_modified_arguments_are_reported_in_the_result(mock_agent, mock_qu
     """The model must see what actually ran, not what it asked for."""
     from app.services.llm.hooks import HookEvent, ToolCallDecision, registry
 
-    mock_agent._run_tool = AsyncMock(return_value=({"content": "ok"}, "completed", None))
+    mock_agent._run_tool = AsyncMock(
+        return_value=({"content": "ok"}, "completed", None)
+    )
     reg_name = "test_modifying_hook"
     registry.register(
         HookEvent.PRE_TOOL,
-        lambda ctx: ToolCallDecision.modify({**ctx.args, "k": 1}, reason="k was clamped"),
+        lambda ctx: ToolCallDecision.modify(
+            {**ctx.args, "k": 1}, reason="k was clamped"
+        ),
         priority=1,
         name=reg_name,
     )
     try:
         result, status, *_ = await mock_agent._run_tool_with_events(
-            "test_tool", {"k": -5}, chat_id=1, session=None,
-            queue=mock_queue, turn_state=new_turn_state(10),
+            "test_tool",
+            {"k": -5},
+            chat_id=1,
+            session=None,
+            queue=mock_queue,
+            turn_state=new_turn_state(10),
         )
     finally:
         registry._hooks[HookEvent.PRE_TOOL] = [
@@ -548,6 +580,7 @@ async def test_loop_aborts_when_a_hook_sets_should_abort(mock_agent, mock_queue)
 
 # --- result truncation ---
 
+
 def test_truncate_tool_result_limits_long_lists():
     result = {"items": list(range(100)), "nested": [list(range(20))]}
     truncated = _truncate_tool_result(result, max_list_items=15)
@@ -582,8 +615,7 @@ def test_truncate_tool_result_compacts_visualization_payload_semantically():
 
 def test_visualization_compaction_recovers_counts_from_legacy_truncation():
     old_result = {
-        "nodes": [{"id": i} for i in range(15)]
-        + ["[19 items omitted for brevity]"],
+        "nodes": [{"id": i} for i in range(15)] + ["[19 items omitted for brevity]"],
         "links": [{"source": 0, "target": i} for i in range(15)]
         + ["[63 items omitted for brevity]"],
     }
@@ -596,8 +628,10 @@ def test_visualization_compaction_recovers_counts_from_legacy_truncation():
 
 # --- retry predicate & retry behavior (Google provider) ---
 
+
 def test_is_retryable_error():
     """Test the retry predicate."""
+
     class MockError:
         def __init__(self, code=None, status=None, message=""):
             self.code = code
@@ -621,7 +655,9 @@ def test_is_retryable_error():
 
 @pytest.fixture
 def mock_google_provider():
-    with patch.object(GoogleGenAIProvider, "_initialize_client", return_value=MagicMock()):
+    with patch.object(
+        GoogleGenAIProvider, "_initialize_client", return_value=MagicMock()
+    ):
         provider = GoogleGenAIProvider()
     return provider
 
@@ -629,6 +665,7 @@ def mock_google_provider():
 @pytest.mark.asyncio
 async def test_raw_generate_retry_success(mock_google_provider):
     """Retries on 429 and eventually succeeds."""
+
     class MockError(Exception):
         def __init__(self, code=None):
             self.code = code
@@ -642,12 +679,15 @@ async def test_raw_generate_retry_success(mock_google_provider):
         result = await mock_google_provider._raw_generate([], [], None)
 
     assert result == "Success"
-    assert mock_google_provider.client.aio.models.generate_content_stream.call_count == 2
+    assert (
+        mock_google_provider.client.aio.models.generate_content_stream.call_count == 2
+    )
 
 
 @pytest.mark.asyncio
 async def test_raw_generate_fail_non_retryable(mock_google_provider):
     """Does NOT retry on a non-retryable error."""
+
     class MockError(Exception):
         def __init__(self, code=None):
             self.code = code
@@ -659,14 +699,20 @@ async def test_raw_generate_fail_non_retryable(mock_google_provider):
     with pytest.raises(MockError):
         await mock_google_provider._raw_generate([], [], None)
 
-    assert mock_google_provider.client.aio.models.generate_content_stream.call_count == 1
+    assert (
+        mock_google_provider.client.aio.models.generate_content_stream.call_count == 1
+    )
 
 
 @pytest.mark.asyncio
 async def test_error_envelope_is_a_failure_not_a_completed_tool(mock_agent):
-    with patch("app.services.llm.engine.mcp_client.execute_tool", new_callable=AsyncMock) as execute:
+    with patch(
+        "app.services.llm.engine.mcp_client.execute_tool", new_callable=AsyncMock
+    ) as execute:
         execute.return_value = {"error": "Unknown attribute"}
-        result, status, reason = await mock_agent._run_tool("analysis_test", {}, 1, None)
+        result, status, reason = await mock_agent._run_tool(
+            "analysis_test", {}, 1, None
+        )
     assert result == {"error": "Unknown attribute"}
     assert status == "failed"
     assert reason == "Unknown attribute"

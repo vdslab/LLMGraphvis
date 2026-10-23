@@ -11,9 +11,9 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
 
@@ -60,21 +60,28 @@ class Network(Base):
     last_node_label_config = Column(JSON, nullable=True)
     last_highlight_config = Column(JSON, nullable=True)
 
+    parent_network_id = Column(
+        Integer, ForeignKey("networks.id"), nullable=True, index=True
+    )
 
-    parent_network_id = Column(Integer, ForeignKey("networks.id"), nullable=True, index=True)
-
-    subgraphs = relationship("Network", back_populates="parent_network", cascade="all, delete-orphan")
+    subgraphs = relationship(
+        "Network", back_populates="parent_network", cascade="all, delete-orphan"
+    )
     parent_network = relationship(
         "Network", remote_side=[id], back_populates="subgraphs"
     )
 
     chat = relationship("Chat", back_populates="network", uselist=False)
-    
+
     # Graph Relationships
     nodes = relationship("Node", back_populates="network", cascade="all, delete-orphan")
     edges = relationship("Edge", back_populates="network", cascade="all, delete-orphan")
-    node_attributes = relationship("NodeAttribute", back_populates="network", cascade="all, delete-orphan")
-    edge_attributes = relationship("EdgeAttribute", back_populates="network", cascade="all, delete-orphan")
+    node_attributes = relationship(
+        "NodeAttribute", back_populates="network", cascade="all, delete-orphan"
+    )
+    edge_attributes = relationship(
+        "EdgeAttribute", back_populates="network", cascade="all, delete-orphan"
+    )
 
 
 class Chat(Base):
@@ -116,15 +123,24 @@ class ChatMessage(Base):
     )
 
     chat = relationship("Chat", back_populates="messages")
-    tool_executions = relationship("ToolExecution", back_populates="message", cascade="all, delete-orphan")
-    usage = relationship("LlmUsage", back_populates="message", uselist=False, cascade="all, delete-orphan")
+    tool_executions = relationship(
+        "ToolExecution", back_populates="message", cascade="all, delete-orphan"
+    )
+    usage = relationship(
+        "LlmUsage",
+        back_populates="message",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
 
 
 class ToolExecution(Base):
     __tablename__ = "tool_executions"
 
     id = Column(Integer, primary_key=True, index=True)
-    message_id = Column(Integer, ForeignKey("chat_messages.id"), nullable=False, index=True)
+    message_id = Column(
+        Integer, ForeignKey("chat_messages.id"), nullable=False, index=True
+    )
     tool_name = Column(String, nullable=False)
     arguments = Column(JSON, nullable=True)
     result = Column(JSON, nullable=True)
@@ -153,7 +169,9 @@ class Node(Base):
     )
 
     network = relationship("Network", back_populates="nodes")
-    attribute_values = relationship("NodeAttributeValue", back_populates="node", cascade="all, delete-orphan")
+    attribute_values = relationship(
+        "NodeAttributeValue", back_populates="node", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         UniqueConstraint("network_id", "node_id", name="unique_network_node"),
@@ -175,7 +193,9 @@ class Edge(Base):
     )
 
     network = relationship("Network", back_populates="edges")
-    attribute_values = relationship("EdgeAttributeValue", back_populates="edge", cascade="all, delete-orphan")
+    attribute_values = relationship(
+        "EdgeAttributeValue", back_populates="edge", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         UniqueConstraint("network_id", "edge_id", name="unique_network_edge"),
@@ -221,7 +241,9 @@ class NodeAttribute(Base):
     )
 
     network = relationship("Network", back_populates="node_attributes")
-    values = relationship("NodeAttributeValue", back_populates="attribute", cascade="all, delete-orphan")
+    values = relationship(
+        "NodeAttributeValue", back_populates="attribute", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         UniqueConstraint(
@@ -235,7 +257,9 @@ class NodeAttributeValue(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     node_id = Column(Integer, ForeignKey("nodes.id"), nullable=False)
-    attribute_id = Column(Integer, ForeignKey("node_attributes.id"), nullable=False, index=True)
+    attribute_id = Column(
+        Integer, ForeignKey("node_attributes.id"), nullable=False, index=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -245,10 +269,16 @@ class NodeAttributeValue(Base):
     attribute = relationship("NodeAttribute", back_populates="values")
 
     text_value = relationship(
-        "NodeTextAttributeValue", uselist=False, back_populates="parent", cascade="all, delete-orphan"
+        "NodeTextAttributeValue",
+        uselist=False,
+        back_populates="parent",
+        cascade="all, delete-orphan",
     )
     float_value = relationship(
-        "NodeFloatAttributeValue", uselist=False, back_populates="parent", cascade="all, delete-orphan"
+        "NodeFloatAttributeValue",
+        uselist=False,
+        back_populates="parent",
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (
@@ -317,7 +347,9 @@ class EdgeAttribute(Base):
     )
 
     network = relationship("Network", back_populates="edge_attributes")
-    values = relationship("EdgeAttributeValue", back_populates="attribute", cascade="all, delete-orphan")
+    values = relationship(
+        "EdgeAttributeValue", back_populates="attribute", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         UniqueConstraint(
@@ -331,7 +363,9 @@ class EdgeAttributeValue(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     edge_id = Column(Integer, ForeignKey("edges.id"), nullable=False)
-    attribute_id = Column(Integer, ForeignKey("edge_attributes.id"), nullable=False, index=True)
+    attribute_id = Column(
+        Integer, ForeignKey("edge_attributes.id"), nullable=False, index=True
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -341,10 +375,16 @@ class EdgeAttributeValue(Base):
     attribute = relationship("EdgeAttribute", back_populates="values")
 
     text_value = relationship(
-        "EdgeTextAttributeValue", uselist=False, back_populates="parent", cascade="all, delete-orphan"
+        "EdgeTextAttributeValue",
+        uselist=False,
+        back_populates="parent",
+        cascade="all, delete-orphan",
     )
     float_value = relationship(
-        "EdgeFloatAttributeValue", uselist=False, back_populates="parent", cascade="all, delete-orphan"
+        "EdgeFloatAttributeValue",
+        uselist=False,
+        back_populates="parent",
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (
@@ -386,12 +426,22 @@ class LlmUsage(Base):
     __tablename__ = "llm_usages"
 
     id = Column(Integer, primary_key=True, index=True)
-    message_id = Column(Integer, ForeignKey("chat_messages.id"), nullable=True, unique=True)
-    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="SET NULL"), nullable=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
-    purpose = Column(String, nullable=False, default="agent_turn", server_default="agent_turn")
-    provider = Column(String, nullable=False)  # "google" | "anthropic" | "openai" | "lmstudio"
-    model = Column(String, nullable=False)               # e.g. "gemini-3.8-flash", "claude-opus-4-8"
+    message_id = Column(
+        Integer, ForeignKey("chat_messages.id"), nullable=True, unique=True
+    )
+    chat_id = Column(
+        Integer, ForeignKey("chats.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    purpose = Column(
+        String, nullable=False, default="agent_turn", server_default="agent_turn"
+    )
+    provider = Column(
+        String, nullable=False
+    )  # "google" | "anthropic" | "openai" | "lmstudio"
+    model = Column(String, nullable=False)  # e.g. "gemini-3.8-flash", "claude-opus-4-8"
     input_tokens = Column(Integer, nullable=False, default=0)
     output_tokens = Column(Integer, nullable=False, default=0)
     cached_input_tokens = Column(Integer, nullable=False, default=0)
@@ -410,8 +460,12 @@ class AnalysisInput(Base):
 
     __tablename__ = "analysis_inputs"
     id = Column(String(36), primary_key=True)
-    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False, index=True)
-    network_id = Column(Integer, ForeignKey("networks.id", ondelete="CASCADE"), nullable=False)
+    chat_id = Column(
+        Integer, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    network_id = Column(
+        Integer, ForeignKey("networks.id", ondelete="CASCADE"), nullable=False
+    )
     specification = Column(JSON, nullable=False)
     status = Column(String, nullable=False, default="pending")
     answer = Column(JSON, nullable=True)
@@ -431,8 +485,12 @@ class ParameterTuning(Base):
 
     __tablename__ = "parameter_tunings"
     id = Column(String(36), primary_key=True)
-    chat_id = Column(Integer, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False, index=True)
-    network_id = Column(Integer, ForeignKey("networks.id", ondelete="CASCADE"), nullable=False)
+    chat_id = Column(
+        Integer, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    network_id = Column(
+        Integer, ForeignKey("networks.id", ondelete="CASCADE"), nullable=False
+    )
     # question and fields (with the schema description copied in).
     specification = Column(JSON, nullable=False)
     # [{tool, arguments}] in execution order: the effective arguments that ran.

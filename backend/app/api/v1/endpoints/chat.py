@@ -13,15 +13,15 @@ from fastapi import (
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 
-from common import models
 from app import schemas
 from app.api.v1.endpoints.auth import get_current_user
 from app.core import database
 from app.core.logging import get_logger
+from app.services import chat_service, network_service, sample_networks, usage_report
 from app.services import llm as llm_service
 from app.services.llm import mcp_client
 from app.services.llm.catalog import get_available_provider_catalog
-from app.services import chat_service, network_service, sample_networks, usage_report
+from common import models
 
 logger = get_logger(__name__)
 
@@ -135,7 +135,7 @@ def get_messages(
 ):
     """Get all messages for a specific chat"""
     from sqlalchemy.orm import joinedload
-    
+
     # Verify ownership
     verify_chat_ownership(chat_id, current_user.id, db)
 
@@ -331,9 +331,13 @@ async def process_message(
         resumed_from_input = True
     else:
         if request_id is None:
-            pending = db.query(models.AnalysisInput).filter_by(
-                chat_id=chat_id, network_id=chat.network_id, status="pending"
-            ).first()
+            pending = (
+                db.query(models.AnalysisInput)
+                .filter_by(
+                    chat_id=chat_id, network_id=chat.network_id, status="pending"
+                )
+                .first()
+            )
             if pending:
                 request_id = pending.id
         if request_id is not None:
@@ -417,9 +421,9 @@ def get_analysis_input(
     from app.services.llm.inputs import serialize_request
 
     chat = verify_chat_ownership(chat_id, current_user.id, db)
-    request = db.query(models.AnalysisInput).filter_by(
-        id=request_id, chat_id=chat_id
-    ).first()
+    request = (
+        db.query(models.AnalysisInput).filter_by(id=request_id, chat_id=chat_id).first()
+    )
     if request is None:
         raise HTTPException(status_code=404, detail="Question not found")
     return serialize_request(request, chat.network_id)
@@ -435,7 +439,11 @@ def get_parameter_tuning(
     from app.services.llm.tuning import serialize_tuning
 
     chat = verify_chat_ownership(chat_id, current_user.id, db)
-    row = db.query(models.ParameterTuning).filter_by(id=tuning_id, chat_id=chat_id).first()
+    row = (
+        db.query(models.ParameterTuning)
+        .filter_by(id=tuning_id, chat_id=chat_id)
+        .first()
+    )
     if row is None:
         raise HTTPException(status_code=404, detail="Tuning panel not found")
     return serialize_tuning(row, chat.network_id)

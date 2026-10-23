@@ -2,11 +2,11 @@ from unittest.mock import patch
 
 import networkx as nx
 import pytest
+from test_layout_parameters import add_edge_attribute, setup_graph
+
 from app.logic.community import calculate_community
 from app.logic.layout import calculate_layout
 from app.logic.utils.cache import compute_graph_state_hash
-from test_layout_parameters import add_edge_attribute, setup_graph
-
 from common import models
 
 

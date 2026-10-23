@@ -1,5 +1,6 @@
-from app.core.database import engine
 from sqlalchemy import text
+
+from app.core.database import engine
 
 
 def add_columns():

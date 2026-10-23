@@ -185,7 +185,9 @@ def label_flags(
 
 
 def viewport_directive(
-    mode: str, node_ids: Optional[List[str]] = None, padding: float = DEFAULT_VIEWPORT_PADDING
+    mode: str,
+    node_ids: Optional[List[str]] = None,
+    padding: float = DEFAULT_VIEWPORT_PADDING,
 ) -> Dict[str, Any]:
     """A one-shot instruction for the canvas; `nonce` makes each one distinct."""
     return {

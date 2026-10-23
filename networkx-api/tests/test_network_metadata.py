@@ -1,5 +1,5 @@
-from common import models
 from app.logic import attributes, network_metadata
+from common import models
 
 
 def test_get_network_metadata(db):
@@ -91,12 +91,8 @@ def test_get_visualization_state(db):
         "attribute": "community",
         "color_map": {"0": "#1f77b4", "1": "#ff7f0e"},  # Blue and Orange
     }
-    network.last_node_size_config = {
-        "attribute": "degree", 
-        "min": 5, 
-        "max": 15
-    }
-    
+    network.last_node_size_config = {"attribute": "degree", "min": 5, "max": 15}
+
     db.add(network)
     db.commit()
 
@@ -105,14 +101,14 @@ def test_get_visualization_state(db):
 
     # Verify
     assert state["network_id"] == network.id
-    
+
     # Check Color Config
     node_color = state["node_color"]
     assert node_color["scale_type"] == "CATEGORICAL"
     assert node_color["attribute"] == "community"
     assert node_color["color_map"]["0"] == "#1f77b4"
     assert node_color["color_map"]["1"] == "#ff7f0e"
-    
+
     # Check Size Config
     node_size = state["node_size"]
     assert node_size["attribute"] == "degree"

@@ -3,9 +3,7 @@ import os
 import sys
 
 # Process-wide log level, e.g. LOG_LEVEL=DEBUG. Defaults to INFO.
-_LOG_LEVEL = getattr(
-    logging, (os.getenv("LOG_LEVEL") or "INFO").upper(), logging.INFO
-)
+_LOG_LEVEL = getattr(logging, (os.getenv("LOG_LEVEL") or "INFO").upper(), logging.INFO)
 
 
 def get_logger(name: str) -> logging.Logger:

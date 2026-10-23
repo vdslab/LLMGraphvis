@@ -15,9 +15,7 @@ logger = get_logger(__name__)
 
 def get_lmstudio_base_url() -> str:
     """Return the configured OpenAI-compatible API root without a trailing slash."""
-    return (
-        os.getenv("LM_STUDIO_BASE_URL") or DEFAULT_LM_STUDIO_BASE_URL
-    ).rstrip("/")
+    return (os.getenv("LM_STUDIO_BASE_URL") or DEFAULT_LM_STUDIO_BASE_URL).rstrip("/")
 
 
 def get_lmstudio_server_url() -> str:

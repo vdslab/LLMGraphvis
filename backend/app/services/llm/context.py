@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.core.logging import get_logger
+
 from . import mcp_client
 
 logger = get_logger(__name__)
@@ -379,7 +380,7 @@ async def build_data_overview(network_id: int) -> Tuple[str, str]:
                 lines.append(
                     "- **Large network:** the first layout was shortened to finish "
                     "quickly, and the drawing is dense. Ask to narrow it down "
-                    "(e.g. \"reduce the network\") to see measured options."
+                    '(e.g. "reduce the network") to see measured options.'
                 )
 
             density = structure.get("density")

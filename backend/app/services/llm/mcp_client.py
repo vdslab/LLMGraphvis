@@ -7,6 +7,7 @@ from mcp import ClientSession
 from mcp.client.sse import sse_client
 
 from app.core.logging import get_logger
+
 from .providers.types import ToolDefinition
 
 logger = get_logger(__name__)
@@ -74,6 +75,7 @@ def _truncate_args_for_log(arguments: dict) -> dict:
             log_args[k] = v[:100] + f"... ({len(v)} chars)"
     return log_args
 
+
 async def get_tools() -> list[ToolDefinition]:
     """
     Connects to the NetworkXAPI MCP Server, discovers tools,
@@ -84,17 +86,17 @@ async def get_tools() -> list[ToolDefinition]:
         return _tools_cache
 
     async with session_scope() as session:
+        # List tools from the MCP server
+        result = await session.list_tools()
+        tools = result.tools
 
-            # List tools from the MCP server
-            result = await session.list_tools()
-            tools = result.tools
+        tool_list: list[ToolDefinition] = []
+        for tool in tools:
+            tool_list.append(_mcp_to_tool_definition(tool))
 
-            tool_list: list[ToolDefinition] = []
-            for tool in tools:
-                tool_list.append(_mcp_to_tool_definition(tool))
-
-            # Add client-side MCP protocol tools
-            tool_list.extend([
+        # Add client-side MCP protocol tools
+        tool_list.extend(
+            [
                 ToolDefinition(
                     name="read_resource",
                     description="Reads a resource from the MCP server using its URI.",
@@ -117,12 +119,13 @@ async def get_tools() -> list[ToolDefinition]:
                         "properties": {},
                     },
                 ),
-            ])
+            ]
+        )
 
-            _tools_cache = tool_list
-            _tools_cache_at = time.monotonic()
-            logger.info(f"Discovered {len(tool_list)} MCP tools")
-            return tool_list
+        _tools_cache = tool_list
+        _tools_cache_at = time.monotonic()
+        logger.info(f"Discovered {len(tool_list)} MCP tools")
+        return tool_list
 
 
 def _mcp_to_tool_definition(mcp_tool) -> ToolDefinition:
@@ -229,6 +232,7 @@ def _sanitize_schema(schema: dict) -> dict:
 
 from contextlib import asynccontextmanager
 
+
 @asynccontextmanager
 async def session_scope():
     """
@@ -250,6 +254,7 @@ async def session_scope():
         _log_exception_details(e, "MCP Session connection")
         raise _unwrap_exception(e) from e
 
+
 def _unwrap_exception(e: BaseException) -> BaseException:
     """
     Unwraps an ExceptionGroup if it contains only a single exception.
@@ -259,8 +264,9 @@ def _unwrap_exception(e: BaseException) -> BaseException:
             if len(e.exceptions) == 1:
                 return _unwrap_exception(e.exceptions[0])
     except NameError:
-        pass # Pre-3.11
+        pass  # Pre-3.11
     return e
+
 
 async def execute_tool(tool_name: str, arguments: dict, session: ClientSession = None):
     """
@@ -287,6 +293,7 @@ async def execute_tool(tool_name: str, arguments: dict, session: ClientSession =
         )
         raise ToolTimeoutError(tool_name, CALL_TIMEOUT_SECONDS) from e
 
+
 async def _execute_internal(session: ClientSession, tool_name: str, arguments: dict):
     try:
         # Handle client-side tools
@@ -296,27 +303,35 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
             result = await session.read_resource(uri)
             # Inspect the first content item (assuming single file for now)
             content_item = result.contents[0]
-            
+
             # naive mimeType check
             mime = getattr(content_item, "mimeType", None) or "text/plain"
-            
+
             if "application/json" in mime:
-                 try:
+                try:
                     parsed_result = json.loads(content_item.text)
                     if isinstance(parsed_result, list):
                         return {"result": parsed_result}
                     return parsed_result
-                 except json.JSONDecodeError:
+                except json.JSONDecodeError:
                     # Fallback to text if JSON parse fails despite mimeType
                     return {"content": content_item.text, "error": "Invalid JSON"}
-            
+
             # Default: Return as text wrapped in dict
             return {"content": content_item.text}
 
         if tool_name == "list_resources":
             result = await session.list_resources()
             # Convert Resource objects to dicts
-            resources = [{"uri": r.uri, "name": r.name, "description": r.description, "mimeType": r.mimeType} for r in result.resources]
+            resources = [
+                {
+                    "uri": r.uri,
+                    "name": r.name,
+                    "description": r.description,
+                    "mimeType": r.mimeType,
+                }
+                for r in result.resources
+            ]
             return {"resources": resources}
 
         result = await session.call_tool(tool_name, arguments)
@@ -343,7 +358,8 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
 
     except Exception as e:
         _log_exception_details(
-            e, f"executing tool {tool_name} with args {_truncate_args_for_log(arguments)}"
+            e,
+            f"executing tool {tool_name} with args {_truncate_args_for_log(arguments)}",
         )
         logger.exception(f"Tool execution raised: {tool_name}")
         raise _unwrap_exception(e) from e
@@ -356,13 +372,14 @@ async def get_resource(uri: str, session: ClientSession = None) -> dict | list:
     """
     try:
         if session:
-             return await _read_resource_internal(session, uri)
+            return await _read_resource_internal(session, uri)
 
         async with session_scope() as session:
-             return await _read_resource_internal(session, uri)
+            return await _read_resource_internal(session, uri)
     except Exception as e:
         _log_exception_details(e, f"reading resource {uri}")
         return {}
+
 
 async def _read_resource_internal(session: ClientSession, uri: str) -> dict | list:
     result = await session.read_resource(uri)
@@ -394,16 +411,20 @@ def _log_exception_details(e: BaseException, context: str):
     # Python 3.11+ ExceptionGroup / BaseExceptionGroup handling
     is_group = False
     try:
-        if isinstance(e, BaseExceptionGroup): # Checks for ExceptionGroup too as it inherits
-             is_group = True
+        if isinstance(
+            e, BaseExceptionGroup
+        ):  # Checks for ExceptionGroup too as it inherits
+            is_group = True
     except NameError:
-        pass # Pre-3.11 environment
+        pass  # Pre-3.11 environment
 
     if is_group:
         logger.error(f"TaskGroup/ExceptionGroup error in {context}: {e}")
         if hasattr(e, "exceptions"):
             for i, sub_exc in enumerate(e.exceptions):
-                logger.error(f"  Sub-exception {i+1}: {type(sub_exc).__name__}: {sub_exc}")
+                logger.error(
+                    f"  Sub-exception {i + 1}: {type(sub_exc).__name__}: {sub_exc}"
+                )
                 if "connection" in str(sub_exc).lower():
                     logger.error(f"  -> Likely connection issue in {context}")
     else:

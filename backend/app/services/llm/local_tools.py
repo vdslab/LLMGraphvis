@@ -1,7 +1,8 @@
 from sqlalchemy.orm import Session
 
-from common import models
 from app.core.logging import get_logger
+from common import models
+
 from .providers.types import ToolDefinition
 
 logger = get_logger(__name__)
@@ -12,16 +13,15 @@ def _get_chat_and_network(chat_id: int, db: Session):
     chat = db.query(models.Chat).filter(models.Chat.id == chat_id).first()
     if not chat:
         return None, None, {"content": "Chat not found"}
-        
+
     current_network = (
-        db.query(models.Network)
-        .filter(models.Network.id == chat.network_id)
-        .first()
+        db.query(models.Network).filter(models.Network.id == chat.network_id).first()
     )
     if not current_network:
         return chat, None, {"content": "Current network context not found"}
-        
+
     return chat, current_network, None
+
 
 async def switch_to_main_network(chat_id: int, db: Session) -> dict:
     """
@@ -32,7 +32,6 @@ async def switch_to_main_network(chat_id: int, db: Session) -> dict:
         chat, current_network, error_response = _get_chat_and_network(chat_id, db)
         if error_response:
             return error_response
-
 
         # Traverse up to find the root
         root_network = current_network
@@ -67,7 +66,6 @@ async def switch_to_parent_network(chat_id: int, db: Session) -> dict:
         chat, current_network, error_response = _get_chat_and_network(chat_id, db)
         if error_response:
             return error_response
-
 
         if current_network.parent_network_id is None:
             return {
@@ -309,12 +307,15 @@ async def execute_local_tool(tool_name: str, arguments: dict, context: dict):
 
     if tool_name == "ask_user":
         from .inputs import present_question
+
         return present_question(chat_id, db, arguments, context["turn_state"])
     if tool_name == "offer_parameter_tuning":
         from .tuning import present_tuning
+
         return present_tuning(chat_id, db, arguments, context["turn_state"])
     if tool_name == "apply_parameter_tuning":
         from .tuning import apply_from_agent
+
         return await apply_from_agent(
             chat_id,
             db,
@@ -328,7 +329,9 @@ async def execute_local_tool(tool_name: str, arguments: dict, context: dict):
     elif tool_name == "switch_to_parent_network":
         return await switch_to_parent_network(chat_id, db)
     elif tool_name == "skill_load":
-        return await skill_load(arguments.get("name", ""), context.get("turn_state") or {})
+        return await skill_load(
+            arguments.get("name", ""), context.get("turn_state") or {}
+        )
     elif tool_name == "tool_search":
         return await tool_search(
             arguments.get("query", ""),

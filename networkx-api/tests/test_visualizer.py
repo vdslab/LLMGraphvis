@@ -1,6 +1,7 @@
 import pytest
-from common import models
+
 from app.logic import visualizer
+from common import models
 
 
 # Helper to load data

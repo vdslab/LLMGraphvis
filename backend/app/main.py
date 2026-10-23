@@ -99,7 +99,9 @@ app.openapi = custom_openapi
 # CORS configuration — comma-separated list, e.g. CORS_ORIGINS=http://localhost,http://localhost:5173
 origins = [
     o.strip()
-    for o in (os.getenv("CORS_ORIGINS") or "http://localhost,http://localhost:5173").split(",")
+    for o in (
+        os.getenv("CORS_ORIGINS") or "http://localhost,http://localhost:5173"
+    ).split(",")
     if o.strip()
 ]
 

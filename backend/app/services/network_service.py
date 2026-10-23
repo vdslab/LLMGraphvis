@@ -118,6 +118,7 @@ async def build_visualization(network_id: int) -> dict:
         VISUALIZATION_TIMEOUT_SECONDS,
     )
 
+
 # Upper bound on the parent chain walked to find a root. Subgraphs of subgraphs
 # are legitimate, so this is a cycle/corruption stop, not a design limit.
 MAX_NETWORK_DEPTH = 100

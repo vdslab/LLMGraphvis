@@ -72,7 +72,9 @@ def test_identical_request_still_reuses_the_existing_subgraph(db):
     assert first["new_network_id"] == again["new_network_id"]
 
 
-def test_node_filter_matches_numeric_looking_text_and_reports_the_total(db, monkeypatch):
+def test_node_filter_matches_numeric_looking_text_and_reports_the_total(
+    db, monkeypatch
+):
     from app.mcp.tools.node.operations import node_filter
 
     nid = _barbell(db)

@@ -4,8 +4,8 @@ import networkx as nx
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from common import models
 from app.core.logging import get_logger
+from common import models
 
 logger = get_logger(__name__)
 
@@ -170,9 +170,7 @@ def build_graph_from_db(
     for row in nodes_query:
         G.add_node(row.node_id)
 
-    logger.info(
-        f"GraphBuilder: Loaded {len(G.nodes)} nodes for Network {network_id}."
-    )
+    logger.info(f"GraphBuilder: Loaded {len(G.nodes)} nodes for Network {network_id}.")
 
     # Weights from an edge attribute are keyed by edge db id, so that column has
     # to come back from the edge query as well.
@@ -188,9 +186,7 @@ def build_graph_from_db(
         columns.append(models.Edge.id)
         if attribute_weights is None:
             columns.append(models.Edge.weight)
-    edges_query = (
-        db.query(*columns).filter(models.Edge.network_id == network_id).all()
-    )
+    edges_query = db.query(*columns).filter(models.Edge.network_id == network_id).all()
 
     edge_count = 0
     for row in edges_query:

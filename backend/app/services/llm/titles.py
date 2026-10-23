@@ -9,6 +9,7 @@ stop at the first sign of a human decision (``Chat.name_is_custom``):
 The title call is a plain one-shot generation with no tools: it must never
 touch the graph, so it does not go through the ReAct engine.
 """
+
 import re
 from typing import Optional
 

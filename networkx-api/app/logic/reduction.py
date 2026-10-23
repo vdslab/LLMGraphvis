@@ -132,8 +132,7 @@ def _k_core(G, network_id, target) -> Optional[Dict[str, Any]]:
         "arguments": {"network_id": network_id, "k": k},
         **_size(G, nodes),
         "drops": (
-            f"nodes outside every group whose members each have {k}+ links "
-            "inside it"
+            f"nodes outside every group whose members each have {k}+ links inside it"
         ),
         "keeps": f"the densely knit core (k={k}; the innermost core is k={max_k})",
         "other_k": {str(kk): sizes[kk] for kk in range(2, max_k + 1) if kk != k},
@@ -188,21 +187,23 @@ def _attribute_groups(G, network_id, db):
         if not 2 <= len(counts) <= _MAX_GROUPS:
             continue
         groups = counts.most_common()
-        found.append({
-            "method": "attribute_group",
-            "tool": "subgraph_extract_filter",
-            "arguments": {
-                "network_id": network_id,
-                "conditions": [{"attribute_name": name, "categories": ["<value>"]}],
-            },
-            "attribute": name,
-            "groups": [
-                {"value": _plain(value), "nodes": count}
-                for value, count in groups[:_GROUPS_SHOWN]
-            ],
-            "groups_omitted": max(0, len(groups) - _GROUPS_SHOWN),
-            "keeps": f"only the nodes whose `{name}` is one of the chosen values",
-        })
+        found.append(
+            {
+                "method": "attribute_group",
+                "tool": "subgraph_extract_filter",
+                "arguments": {
+                    "network_id": network_id,
+                    "conditions": [{"attribute_name": name, "categories": ["<value>"]}],
+                },
+                "attribute": name,
+                "groups": [
+                    {"value": _plain(value), "nodes": count}
+                    for value, count in groups[:_GROUPS_SHOWN]
+                ],
+                "groups_omitted": max(0, len(groups) - _GROUPS_SHOWN),
+                "keeps": f"only the nodes whose `{name}` is one of the chosen values",
+            }
+        )
     found.sort(key=lambda c: -c["groups"][0]["nodes"])
     return found[:_ATTRIBUTES_SHOWN], max(0, len(found) - _ATTRIBUTES_SHOWN)
 

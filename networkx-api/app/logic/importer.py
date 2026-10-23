@@ -4,8 +4,8 @@ from collections import defaultdict
 
 from sqlalchemy.orm import Session
 
-from common import models
 from app.logic.parsing.graphml_parser import GraphMLParser
+from common import models
 
 from .attribute_semantics import MeasurementProfiler
 from .attributes import ensure_attributes

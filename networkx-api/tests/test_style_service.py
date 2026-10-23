@@ -161,9 +161,7 @@ def test_named_palette_does_not_cycle_past_its_capacity():
         "palette": "accent",
     }
 
-    result = StyleService.prepare_categorical_map(
-        config, {"group": 1}, values_map
-    )
+    result = StyleService.prepare_categorical_map(config, {"group": 1}, values_map)
 
     assert len(result) == 8
     assert len(set(result.values())) == 8
@@ -172,6 +170,4 @@ def test_named_palette_does_not_cycle_past_its_capacity():
 
 def test_node_color_config_rejects_unknown_palette():
     with pytest.raises(ValidationError):
-        NodeColorConfig(
-            attribute="group", scale_type="CATEGORICAL", palette="made-up"
-        )
+        NodeColorConfig(attribute="group", scale_type="CATEGORICAL", palette="made-up")

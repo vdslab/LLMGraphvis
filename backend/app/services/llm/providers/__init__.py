@@ -1,3 +1,4 @@
+from .base import LLMProvider
 from .types import (
     FunctionCallData,
     LLMFunctionCallPart,
@@ -8,7 +9,6 @@ from .types import (
     StreamChunk,
     ToolDefinition,
 )
-from .base import LLMProvider
 
 __all__ = [
     "FunctionCallData",

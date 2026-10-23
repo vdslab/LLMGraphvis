@@ -28,8 +28,14 @@ async def test_context_summary():
     mock_session_cm.__aenter__.return_value = mock_session
     mock_session_cm.__aexit__.return_value = None
 
-    with patch("app.services.llm.mcp_client.session_scope", return_value=mock_session_cm), \
-         patch("app.services.llm.mcp_client.get_resource", new_callable=AsyncMock) as mock_get:
+    with (
+        patch(
+            "app.services.llm.mcp_client.session_scope", return_value=mock_session_cm
+        ),
+        patch(
+            "app.services.llm.mcp_client.get_resource", new_callable=AsyncMock
+        ) as mock_get,
+    ):
 
         def side_effect(uri, session=None):
             if "structure" in uri:

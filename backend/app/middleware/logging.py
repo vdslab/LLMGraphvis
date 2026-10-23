@@ -1,7 +1,8 @@
 import time
 
-from app.core.logging import get_logger
 from starlette.types import ASGIApp, Receive, Scope, Send
+
+from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 

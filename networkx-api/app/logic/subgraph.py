@@ -3,8 +3,8 @@ from typing import Any, Dict, List
 import networkx as nx
 from sqlalchemy.orm import Session
 
-from common import models
 from app.core.logging import get_logger
+from common import models
 
 from .layout import calculate_layout
 from .utils.attribute_copier import AttributeCopier
@@ -104,15 +104,15 @@ def create_subgraph_from_nodes(
         description=description,
         is_directed=source_network.is_directed,
     )
-    
+
     # [FIX] Inherit visualization settings if preserving layout
     if preserve_layout and source_network:
-         new_network.last_layout_name = source_network.last_layout_name
-         new_network.last_node_size_config = source_network.last_node_size_config
-         new_network.last_node_color_config = source_network.last_node_color_config
-         new_network.last_edge_width_config = source_network.last_edge_width_config
-         new_network.last_edge_color_config = source_network.last_edge_color_config
-         new_network.last_node_label_config = source_network.last_node_label_config
+        new_network.last_layout_name = source_network.last_layout_name
+        new_network.last_node_size_config = source_network.last_node_size_config
+        new_network.last_node_color_config = source_network.last_node_color_config
+        new_network.last_edge_width_config = source_network.last_edge_width_config
+        new_network.last_edge_color_config = source_network.last_edge_color_config
+        new_network.last_node_label_config = source_network.last_node_label_config
 
     db.add(new_network)
     db.commit()
@@ -161,11 +161,13 @@ def create_subgraph_from_nodes(
         logger.info("Calculating initial layout (forceatlas2)...")
         calculate_layout(new_network_id, "forceatlas2", db)
     elif preserve_layout:
-        logger.info(f"Preserving existing layout (x, y copied) from {source_network.last_layout_name}.")
+        logger.info(
+            f"Preserving existing layout (x, y copied) from {source_network.last_layout_name}."
+        )
         # Verify if the specific layout attributes exist?
-        # Ideally, AttributeCopier copied everything. 
+        # Ideally, AttributeCopier copied everything.
         # If source_network.last_layout_name was 'forceatlas2', then 'forceatlas2_x' should have been copied.
-        
+
     return {"new_network_id": new_network_id, "name": new_network.name}
 
 
@@ -447,7 +449,9 @@ def filter_nodes_by_degree(
     preserve_layout: bool = True,
     description: str = None,
 ) -> Dict[str, Any]:
-    logger.info(f"Filtering nodes by degree >= {min_degree} in network {source_network_id}")
+    logger.info(
+        f"Filtering nodes by degree >= {min_degree} in network {source_network_id}"
+    )
     G = build_graph_from_db(source_network_id, db)
     node_ids = [n for n, d in G.degree() if d >= min_degree]
     if not node_ids:

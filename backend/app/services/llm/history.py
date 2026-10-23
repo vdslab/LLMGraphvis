@@ -58,14 +58,16 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[LLMMessa
                     tool_parts = []
                     for exc in step["tool_calls"]:
                         call_id = getattr(exc, "call_id", None) or f"toolu_{exc.id}"
-                        model_parts.append(LLMFunctionCallPart(
-                            name=exc.tool_name,
-                            args=exc.arguments,
-                            call_id=call_id,
-                            thought_signature=_decode_thought_signature(
-                                getattr(exc, "thought_signature", None)
-                            ),
-                        ))
+                        model_parts.append(
+                            LLMFunctionCallPart(
+                                name=exc.tool_name,
+                                args=exc.arguments,
+                                call_id=call_id,
+                                thought_signature=_decode_thought_signature(
+                                    getattr(exc, "thought_signature", None)
+                                ),
+                            )
+                        )
                         result_data = exc.result
                         if exc.status == "failed":
                             result_data = {"error": exc.error}
@@ -73,11 +75,13 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[LLMMessa
                             result_data = compact_past_observation(
                                 truncate_tool_result(result_data)
                             )
-                        tool_parts.append(LLMFunctionResponsePart(
-                            name=exc.tool_name,
-                            response=result_data,
-                            call_id=call_id,
-                        ))
+                        tool_parts.append(
+                            LLMFunctionResponsePart(
+                                name=exc.tool_name,
+                                response=result_data,
+                                call_id=call_id,
+                            )
+                        )
 
                     if model_parts:
                         history.append(LLMMessage(role="model", parts=model_parts))
@@ -86,6 +90,7 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[LLMMessa
 
             except Exception as e:
                 from app.core.logging import get_logger
+
                 get_logger(__name__).warning(
                     f"Failed to expand tool_executions for msg {msg.id}: {e}"
                 )
@@ -99,11 +104,13 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[LLMMessa
                     tool_calls_data = step.get("tool_calls", [])
                     for j, tc in enumerate(tool_calls_data):
                         call_id = f"legacy_{msg.id}_{i}_{j}"
-                        model_parts.append(LLMFunctionCallPart(
-                            name=tc["name"],
-                            args=tc["args"],
-                            call_id=call_id,
-                        ))
+                        model_parts.append(
+                            LLMFunctionCallPart(
+                                name=tc["name"],
+                                args=tc["args"],
+                                call_id=call_id,
+                            )
+                        )
                         result_data = tc.get("result")
                         if tc.get("status") == "failed":
                             result_data = {"error": tc.get("error")}
@@ -111,11 +118,13 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[LLMMessa
                             result_data = compact_past_observation(
                                 truncate_tool_result(result_data)
                             )
-                        tool_parts.append(LLMFunctionResponsePart(
-                            name=tc["name"],
-                            response=result_data,
-                            call_id=call_id,
-                        ))
+                        tool_parts.append(
+                            LLMFunctionResponsePart(
+                                name=tc["name"],
+                                response=result_data,
+                                call_id=call_id,
+                            )
+                        )
 
                     if model_parts:
                         history.append(LLMMessage(role="model", parts=model_parts))
@@ -124,6 +133,7 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[LLMMessa
 
             except Exception as e:
                 from app.core.logging import get_logger
+
                 get_logger(__name__).warning(
                     f"Failed to expand message metadata for msg {msg.id}: {e}"
                 )
@@ -134,7 +144,9 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[LLMMessa
 
     # Append the current user message if not already present
     last_part = history[-1].parts[0] if (history and history[-1].parts) else None
-    if not history or not (isinstance(last_part, LLMTextPart) and last_part.text == user_message):
+    if not history or not (
+        isinstance(last_part, LLMTextPart) and last_part.text == user_message
+    ):
         history.append(LLMMessage(role="user", parts=[LLMTextPart(text=user_message)]))
 
     return history

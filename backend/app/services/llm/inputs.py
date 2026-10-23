@@ -241,7 +241,9 @@ class InputForm(BaseModel):
             if "id" not in extracted_field:
                 if isinstance(raw_fields, str):
                     candidate_id = re.sub(r"<[^>]+>", "", raw_fields).strip()
-                    if candidate_id and re.fullmatch(r"^[a-z][a-z0-9_]{0,39}$", candidate_id):
+                    if candidate_id and re.fullmatch(
+                        r"^[a-z][a-z0-9_]{0,39}$", candidate_id
+                    ):
                         extracted_field["id"] = candidate_id
                 if "id" not in extracted_field:
                     extracted_field["id"] = "goal"
@@ -302,8 +304,7 @@ class InputForm(BaseModel):
         if len(merged_options) >= 2:
             question = str(value.get("question", ""))
             has_japanese = any(
-                "\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff"
-                for c in question
+                "\u3040" <= c <= "\u30ff" or "\u4e00" <= c <= "\u9fff" for c in question
             )
             default_label = "分析目的" if has_japanese else "Analysis goal"
 
@@ -316,7 +317,9 @@ class InputForm(BaseModel):
             if not clean_id or not clean_id[0].isalpha():
                 clean_id = "goal"
 
-            allow_other = any(f.get("allow_other", True) is not False for f in raw_fields)
+            allow_other = any(
+                f.get("allow_other", True) is not False for f in raw_fields
+            )
 
             normalized = dict(value)
             normalized["fields"] = [
@@ -433,9 +436,11 @@ def restore_activation(db, chat_id, active_network_id) -> set[str]:
     source = request
     confirmed = latest_confirmed(db, chat_id, active_network_id)
     if confirmed is not None and confirmed.confirmed_at is not None:
-        if request is None or request.created_at is None or _naive(
-            confirmed.confirmed_at
-        ) > _naive(request.created_at):
+        if (
+            request is None
+            or request.created_at is None
+            or _naive(confirmed.confirmed_at) > _naive(request.created_at)
+        ):
             source = confirmed
     if source is None or not source.activated_tools:
         return set()

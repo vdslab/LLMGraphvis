@@ -20,7 +20,7 @@ RENDERED_RADII = "node_size_in_rendered_units"
 # layout_quality on sample graphs (ADR 0017): on 25 components plus isolates,
 # ForceAtlas2 at gravity 1 left 92% of nodes overlapping in a clump while
 # repulsion flung the small parts outwards; gravity 10 brought it to 16%.
-_FA2_FRAGMENTED_GRAVITY = (2.0, 10.0)   # clamp for 2 * log2(components)
+_FA2_FRAGMENTED_GRAVITY = (2.0, 10.0)  # clamp for 2 * log2(components)
 # N^2 x iterations allowed by default; at the measured 50-80 ns per N^2 per
 # iteration, about half a minute. Quality gained little beyond it (ADR 0033).
 _FA2_ITERATION_BUDGET = 500_000_000
@@ -146,8 +146,17 @@ def tune_arf(G, profile):
 @register(
     "spring",
     params={
-        "k", "pos", "fixed", "iterations", "threshold", "weight",
-        "scale", "center", "seed", "method", "gravity",
+        "k",
+        "pos",
+        "fixed",
+        "iterations",
+        "threshold",
+        "weight",
+        "scale",
+        "center",
+        "seed",
+        "method",
+        "gravity",
     },
     weight_role=WeightRole.STRENGTH,
     tune=tune_spring,
@@ -156,12 +165,27 @@ def tune_arf(G, profile):
         # Direction 0: try both ways. Spacing interacts with the renderer's
         # rescaling, and on a 300-node tree 1000 iterations left 88% of nodes
         # overlapping where 50 left 12%, so neither knob has one right way.
-        Knob("k", 0.25, 4.0, relative=True,
-             fixes={"node_overlap": 0, "outliers_compress_core": +1}),
-        Knob("gravity", 0.5, 20.0, requires={"method": "energy"},
-             fixes={"outliers_compress_core": +1, "clumped": +1, "node_overlap": +1}),
-        Knob("iterations", 50, 3000, integer=True,
-             fixes={"node_overlap": 0, "uneven_edge_lengths": +1}),
+        Knob(
+            "k",
+            0.25,
+            4.0,
+            relative=True,
+            fixes={"node_overlap": 0, "outliers_compress_core": +1},
+        ),
+        Knob(
+            "gravity",
+            0.5,
+            20.0,
+            requires={"method": "energy"},
+            fixes={"outliers_compress_core": +1, "clumped": +1, "node_overlap": +1},
+        ),
+        Knob(
+            "iterations",
+            50,
+            3000,
+            integer=True,
+            fixes={"node_overlap": 0, "uneven_edge_lengths": +1},
+        ),
     ),
 )
 def spring(G, params):
@@ -209,21 +233,41 @@ def _size_aware_forceatlas2(G, params):
 @register(
     "forceatlas2",
     params={
-        "pos", "max_iter", "jitter_tolerance", "scaling_ratio", "gravity",
-        "distributed_action", "strong_gravity", "node_mass", "node_size",
-        "weight", "linlog", "seed",
+        "pos",
+        "max_iter",
+        "jitter_tolerance",
+        "scaling_ratio",
+        "gravity",
+        "distributed_action",
+        "strong_gravity",
+        "node_mass",
+        "node_size",
+        "weight",
+        "linlog",
+        "seed",
     },
     weight_role=WeightRole.STRENGTH,
     tune=tune_forceatlas2,
     prepare=prepare_forceatlas2,
     aliases=("forceatlas2_layout", "force-directed", "force_directed"),
     knobs=(
-        Knob("gravity", 0.1, 30.0,
-             fixes={"node_overlap": +1, "clumped": +1, "outliers_compress_core": +1}),
-        Knob("scaling_ratio", 1.0, 100.0,
-             fixes={"node_overlap": 0, "outliers_compress_core": -1}),
-        Knob("strong_gravity", toggle=True,
-             fixes={"outliers_compress_core": +1, "clumped": +1}),
+        Knob(
+            "gravity",
+            0.1,
+            30.0,
+            fixes={"node_overlap": +1, "clumped": +1, "outliers_compress_core": +1},
+        ),
+        Knob(
+            "scaling_ratio",
+            1.0,
+            100.0,
+            fixes={"node_overlap": 0, "outliers_compress_core": -1},
+        ),
+        Knob(
+            "strong_gravity",
+            toggle=True,
+            fixes={"outliers_compress_core": +1, "clumped": +1},
+        ),
         # Halving max_iter on a 500-node BA graph cut overlap from 17% to 7%:
         # longer runs keep contracting dense regions.
         Knob("max_iter", 100, 3000, integer=True, fixes={"node_overlap": 0}),

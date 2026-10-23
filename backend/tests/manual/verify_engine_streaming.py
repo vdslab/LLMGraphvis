@@ -7,8 +7,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 # Add backend to path (backend/tests/manual -> backend)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
-from app.services.llm import engine
 from google.genai import types
+
+from app.services.llm import engine
 
 
 async def run_verification():

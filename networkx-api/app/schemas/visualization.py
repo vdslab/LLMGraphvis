@@ -81,7 +81,8 @@ class NodeColorConfig(NumericMapping):
         None, description="Fallback color if attribute is missing or no rule matches."
     )
     fixed_mapping: bool = Field(
-        False, description="If True, do not auto-generate colors for values not in color_map."
+        False,
+        description="If True, do not auto-generate colors for values not in color_map.",
     )
 
 
@@ -89,10 +90,17 @@ class NodeSizeConfig(NumericMapping):
     attribute: str = Field(
         ..., description="Name of the node attribute to map to size."
     )
-    min: Optional[float] = Field(None, description="Min node radius. Prefer leaving as None to allow adaptive sizing (recommended). Example range: 10-200.")
-    max: Optional[float] = Field(None, description="Max node radius. Prefer leaving as None to allow adaptive sizing (recommended). Example range: 20-400.")
+    min: Optional[float] = Field(
+        None,
+        description="Min node radius. Prefer leaving as None to allow adaptive sizing (recommended). Example range: 10-200.",
+    )
+    max: Optional[float] = Field(
+        None,
+        description="Max node radius. Prefer leaving as None to allow adaptive sizing (recommended). Example range: 20-400.",
+    )
     default: Optional[float] = Field(
-        None, description="Default radius if attribute is missing. Defaults to adaptive value."
+        None,
+        description="Default radius if attribute is missing. Defaults to adaptive value.",
     )
     scaling_factor: float = Field(
         1.0, description="Multiplier for node sizes (default 1.0)."
@@ -136,7 +144,8 @@ class EdgeColorConfig(NumericMapping):
 
 class NodeLabelConfig(BaseModel):
     attribute: Optional[str] = Field(
-        None, description="Attribute shown as label text; None keeps the node's own label."
+        None,
+        description="Attribute shown as label text; None keeps the node's own label.",
     )
     show_all: bool = Field(
         False,
@@ -147,9 +156,12 @@ class NodeLabelConfig(BaseModel):
     ] = Field(None, description="Which nodes carry a permanent label.")
     top_n: Optional[int] = Field(None, ge=1, description="Label count for top_n.")
     rank_by: Optional[str] = Field(
-        None, description="Numeric attribute ranking nodes for top_n/auto; degree if None."
+        None,
+        description="Numeric attribute ranking nodes for top_n/auto; degree if None.",
     )
-    node_ids: Optional[List[str]] = Field(None, description="Nodes labelled in 'nodes' mode.")
+    node_ids: Optional[List[str]] = Field(
+        None, description="Nodes labelled in 'nodes' mode."
+    )
     font_size: Optional[float] = Field(
         None, gt=0, description="Label font size in screen pixels."
     )

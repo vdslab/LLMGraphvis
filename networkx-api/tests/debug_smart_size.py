@@ -1,7 +1,6 @@
-
 import math
-import sys
 import os
+import sys
 
 # Add relevant paths
 sys.path.append(os.getcwd())
@@ -9,9 +8,11 @@ sys.path.append(os.path.join(os.getcwd(), "networkx-api"))
 
 from app.logic.common_utils import calculate_smart_node_size
 
+
 def test_size(n):
     res = calculate_smart_node_size(n)
     print(f"N={n}: {res}")
+
 
 print("--- Testing calculate_smart_node_size ---")
 test_size(10)
@@ -33,6 +34,6 @@ try:
             lines = content.splitlines()
             for i, line in enumerate(lines):
                 if "class NodeSizeConfig" in line:
-                    print("\n".join(lines[i:i+15]))
+                    print("\n".join(lines[i : i + 15]))
 except Exception as e:
     print(f"Error reading schema: {e}")

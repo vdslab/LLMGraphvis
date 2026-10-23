@@ -1,7 +1,7 @@
 """Preserve imported graph direction; old graphs retain undirected semantics."""
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "b8c9d0e1f2a3"
 down_revision = "a7b8c9d0e1f2"

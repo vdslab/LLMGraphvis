@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
 from app.services.llm.hooks.builtin.side_effects import (
     on_new_network_id,
     on_view_switch,

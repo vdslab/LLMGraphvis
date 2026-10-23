@@ -1,5 +1,6 @@
-from app.core.database import SessionLocal
 from sqlalchemy import text
+
+from app.core.database import SessionLocal
 
 
 def inspect_schema():

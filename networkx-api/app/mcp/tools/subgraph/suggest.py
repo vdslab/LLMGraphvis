@@ -1,16 +1,23 @@
 from typing import Annotated, Optional
 
+from pydantic import Field
+
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
 from app.core.mcp import mcp
-from pydantic import Field
 
 
 @mcp.tool()
 @handle_tool_errors
 def subgraph_suggest_reduction(
     network_id: Annotated[int, Field(description="The ID of the network to shrink.")],
-    target_nodes: Annotated[Optional[int], Field(ge=2, description="Roughly how many nodes the reduced network should keep. Omit to use the default, a size that lays out comfortably. It only chooses the k-core level and the degree cut-off; the other candidates have a fixed size.")] = None,
+    target_nodes: Annotated[
+        Optional[int],
+        Field(
+            ge=2,
+            description="Roughly how many nodes the reduced network should keep. Omit to use the default, a size that lays out comfortably. It only chooses the k-core level and the degree cut-off; the other candidates have a fixed size.",
+        ),
+    ] = None,
 ) -> dict:
     """Measure ways to shrink a large network, without creating anything.
 

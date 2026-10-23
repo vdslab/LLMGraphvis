@@ -82,6 +82,7 @@ def _order_tool_calls(function_calls: List[FunctionCallData]) -> List[FunctionCa
 
     return ordered
 
+
 # Max ReAct loop iterations per turn (each iteration = one LLM generate() call).
 AGENT_MAX_ITERATIONS = int(os.getenv("AGENT_MAX_ITERATIONS") or 10)
 
@@ -92,19 +93,25 @@ AGENT_MAX_ITERATIONS = int(os.getenv("AGENT_MAX_ITERATIONS") or 10)
 hooks.load_builtin_hooks()
 
 
-def _create_provider(provider_name: str, model_name: Optional[str] = None) -> LLMProvider:
+def _create_provider(
+    provider_name: str, model_name: Optional[str] = None
+) -> LLMProvider:
     """Instantiate the given LLM provider, optionally pinned to a specific model."""
     if provider_name == "anthropic":
         from .providers.anthropic_provider import AnthropicProvider
+
         return AnthropicProvider(model_name=model_name)
     if provider_name == "openai":
         from .providers.openai_provider import OpenAIProvider
+
         return OpenAIProvider(model_name=model_name)
     if provider_name == "lmstudio":
         from .providers.lmstudio_provider import LMStudioProvider
+
         return LMStudioProvider(model_name=model_name)
     if provider_name == "google":
         from .providers.google_genai import GoogleGenAIProvider
+
         return GoogleGenAIProvider(model_name=model_name)
     raise ValueError(f"Unsupported LLM provider: {provider_name}")
 
@@ -142,7 +149,12 @@ class GraphVisAgent:
     Encapsulates the LLM interaction loop, tool execution, and state management.
     """
 
-    def __init__(self, db: Any = None, provider_name: Optional[str] = None, model_name: Optional[str] = None):
+    def __init__(
+        self,
+        db: Any = None,
+        provider_name: Optional[str] = None,
+        model_name: Optional[str] = None,
+    ):
         self.db = db
         # provider_name/model_name let a chat pin its own provider/model, overriding
         # the process-wide provider-specific model environment variable defaults.
@@ -158,7 +170,9 @@ class GraphVisAgent:
         # native-thinking support (see LLMProvider.supports_native_thinking) so
         # providers with real thinking streams aren't also told to hand-write
         # <thought> tags in their text — see prompts.build_system_instruction.
-        self.system_instruction = build_system_instruction(self.provider.supports_native_thinking)
+        self.system_instruction = build_system_instruction(
+            self.provider.supports_native_thinking
+        )
 
     async def _consume_stream(
         self,
@@ -209,7 +223,9 @@ class GraphVisAgent:
             execution_log: A list of steps containing tool calls and results for persistence.
             total_usage: Token usage accumulated across every provider.generate() call this turn.
         """
-        logger.info(f"Starting agent turn for Chat ID: {chat_id}, Network ID: {network_id}")
+        logger.info(
+            f"Starting agent turn for Chat ID: {chat_id}, Network ID: {network_id}"
+        )
 
         # Per-turn state shared by every hook in this turn (counters, abort flag,
         # the active network id). Created once here and threaded through.
@@ -223,7 +239,9 @@ class GraphVisAgent:
         # any hook-contributed blocks are appended once here so every generate()
         # call in the loop shares the exact same system instruction (keeps
         # provider prompt caching intact).
-        base_instruction = build_system_instruction(self.provider.supports_native_thinking)
+        base_instruction = build_system_instruction(
+            self.provider.supports_native_thinking
+        )
 
         start_ctx = hooks.build_context(
             hooks.HookEvent.TURN_START,
@@ -349,9 +367,12 @@ class GraphVisAgent:
             turn_state["iteration"] = iteration
 
             # Step A: Consume Stream
-            chunk_text, chunk_thought, function_calls, iter_usage = await self._consume_stream(
-                current_stream, queue
-            )
+            (
+                chunk_text,
+                chunk_thought,
+                function_calls,
+                iter_usage,
+            ) = await self._consume_stream(current_stream, queue)
             chunk_text = markup.sanitize_model_text(chunk_text)
             self.trace.emit(
                 "model_response",
@@ -367,7 +388,9 @@ class GraphVisAgent:
             # input context, so every count is SUMMED across iterations.
             if not iter_usage.is_empty:
                 total_usage.add_call(iter_usage)
-                await self._emit_usage_update(queue, total_usage, provider_name, self.provider.model_name)
+                await self._emit_usage_update(
+                    queue, total_usage, provider_name, self.provider.model_name
+                )
 
             if chunk_thought:
                 full_transcript += f"{markup.thought_block(chunk_thought)}\n\n"
@@ -406,13 +429,23 @@ class GraphVisAgent:
                         requested_by=continuation.get("requested_by"),
                         prompt=clip(continuation.get("prompt")),
                     )
-                    history.append(LLMMessage(
-                        role="model",
-                        parts=[LLMTextPart(text=continuation["model_text"] or "I will now proceed.")],
-                    ))
-                    history.append(LLMMessage(
-                        role="user", parts=[LLMTextPart(text=continuation["prompt"])]
-                    ))
+                    history.append(
+                        LLMMessage(
+                            role="model",
+                            parts=[
+                                LLMTextPart(
+                                    text=continuation["model_text"]
+                                    or "I will now proceed."
+                                )
+                            ],
+                        )
+                    )
+                    history.append(
+                        LLMMessage(
+                            role="user",
+                            parts=[LLMTextPart(text=continuation["prompt"])],
+                        )
+                    )
                     tools = self._tools_for_generation(
                         tool_catalog, turn_state, iteration=iteration
                     )
@@ -428,14 +461,23 @@ class GraphVisAgent:
 
             # Step C: Execute Tools (Parallelized)
             step_log = await self._execute_tools_and_update_history(
-                function_calls, chunk_text, chunk_thought, history, queue, chat_id, turn_state, session
+                function_calls,
+                chunk_text,
+                chunk_thought,
+                history,
+                queue,
+                chat_id,
+                turn_state,
+                session,
             )
             execution_log.append(step_log)
 
             # Step D: Inject Tool Markers into Transcript and Emit
             if step_log.get("tool_calls"):
                 for _ in step_log["tool_calls"]:
-                    marker = f"\n\n{markup.tool_execution_marker(tool_call_counter)}\n\n"
+                    marker = (
+                        f"\n\n{markup.tool_execution_marker(tool_call_counter)}\n\n"
+                    )
                     full_transcript += marker
                     await self._emit_message_chunk(queue, marker)
                     tool_call_counter += 1
@@ -454,9 +496,7 @@ class GraphVisAgent:
             if turn_state.get("should_abort"):
                 reason = turn_state.get("abort_reason") or "the agent stopped early"
                 logger.warning(f"Turn aborted after iteration {iteration}: {reason}")
-                abort_note = (
-                    f"\n\nI stopped before completing the request: {reason}"
-                )
+                abort_note = f"\n\nI stopped before completing the request: {reason}"
                 await self._emit_message_chunk(queue, abort_note)
                 return (
                     markup.sanitize_model_output(full_transcript + abort_note),
@@ -470,7 +510,9 @@ class GraphVisAgent:
             tools = self._tools_for_generation(
                 tool_catalog, turn_state, iteration=iteration
             )
-            current_stream = self.provider.generate(history, tools, self.system_instruction)
+            current_stream = self.provider.generate(
+                history, tools, self.system_instruction
+            )
 
         if not full_transcript.strip():
             return (
@@ -720,7 +762,9 @@ class GraphVisAgent:
                 )
 
             turn_state["tools_blocked"] = turn_state.get("tools_blocked", 0) + 1
-            logger.info(f"Tool '{feature_name}' blocked by {decision.hook_name}: {reason}")
+            logger.info(
+                f"Tool '{feature_name}' blocked by {decision.hook_name}: {reason}"
+            )
             await self._emit_tool_event(queue, feature_name, "failed", reason)
             return (
                 {"error": reason, "blocked_by": decision.hook_name},
@@ -784,9 +828,13 @@ class GraphVisAgent:
                     "queue": queue,
                     "session": session,
                 }
-                result = await local_tools.execute_local_tool(function_name, args, context)
+                result = await local_tools.execute_local_tool(
+                    function_name, args, context
+                )
             else:
-                result = await mcp_client.execute_tool(function_name, args, session=session)
+                result = await mcp_client.execute_tool(
+                    function_name, args, session=session
+                )
 
             if isinstance(result, dict) and result.get("error"):
                 return result, "failed", str(result["error"])
@@ -836,9 +884,18 @@ class GraphVisAgent:
         error: Optional[str] = None,
     ) -> None:
         keys = (
-            "iteration", "max_iterations", "tools_run", "preparation_tools_run",
-            "tool_searches", "tools_blocked", "tools_deferred", "tools_modified",
-            "tools_failed", "hook_errors", "continuations_granted", "should_abort",
+            "iteration",
+            "max_iterations",
+            "tools_run",
+            "preparation_tools_run",
+            "tool_searches",
+            "tools_blocked",
+            "tools_deferred",
+            "tools_modified",
+            "tools_failed",
+            "hook_errors",
+            "continuations_granted",
+            "should_abort",
             "abort_reason",
         )
         self.trace.emit(
@@ -868,13 +925,17 @@ class GraphVisAgent:
     async def _emit_thinking_chunk(self, queue: Any, text: str):
         await emitters.emit_thinking_chunk(queue, text)
 
-    async def _emit_tool_event(self, queue: Any, tool: str, status: str, args_or_error: Any):
+    async def _emit_tool_event(
+        self, queue: Any, tool: str, status: str, args_or_error: Any
+    ):
         await emitters.emit_tool_event(queue, tool, status, args_or_error)
 
     async def _emit_render_update(self, queue: Any, vis_data: Dict):
         await emitters.emit_render_update(queue, vis_data)
 
-    async def _emit_usage_update(self, queue: Any, usage: UsageData, provider_name: str, model_name: str):
+    async def _emit_usage_update(
+        self, queue: Any, usage: UsageData, provider_name: str, model_name: str
+    ):
         await emitters.emit_usage_update(queue, usage, provider_name, model_name)
 
     def _log_history(self, history: List[LLMMessage], iteration: int):
@@ -892,17 +953,22 @@ class GraphVisAgent:
             logger.debug(f"  [{i}] Role: {msg.role}")
             for part in msg.parts:
                 if isinstance(part, LLMTextPart):
-                    logger.debug(f"      TextPart: {part.text[:200].replace(chr(10), ' ')}...")
+                    logger.debug(
+                        f"      TextPart: {part.text[:200].replace(chr(10), ' ')}..."
+                    )
                 elif isinstance(part, LLMFunctionCallPart):
                     logger.debug(f"      ToolCallPart: {part.name}({part.args})")
                 elif isinstance(part, LLMFunctionResponsePart):
                     resp_str = json.dumps(part.response, ensure_ascii=False)
                     # Limit log output to avoid console spam, but show structure
-                    logger.debug(f"      ToolResponsePart: {part.name} -> {resp_str[:300]}...")
+                    logger.debug(
+                        f"      ToolResponsePart: {part.name} -> {resp_str[:300]}..."
+                    )
         logger.debug("-" * 50)
 
 
 # --- Legacy/Functional Interface for compatibility with existing route handlers ---
+
 
 async def execute_tool_loop(
     initial_response, network_id, history, queue, tool_config, chat_id, db

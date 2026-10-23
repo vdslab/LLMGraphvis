@@ -1,6 +1,7 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from app.services.llm.providers.google_genai import GoogleGenAIProvider
 from app.services.llm.providers.types import (
     LLMFunctionCallPart,
@@ -174,7 +175,10 @@ def test_tuning_tool_schemas_survive_gemini_schema_validation(provider):
     ]
     assert len(definitions) == 2
     declarations = provider._to_gemini_tools(definitions)
-    by_name = {d.function_declarations[0].name: d.function_declarations[0] for d in declarations}
+    by_name = {
+        d.function_declarations[0].name: d.function_declarations[0]
+        for d in declarations
+    }
     fields = by_name["offer_parameter_tuning"].parameters.properties["fields"]
     assert fields.type == "ARRAY"
     assert "suggested" in fields.items.properties

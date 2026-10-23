@@ -17,33 +17,39 @@ Revises: a1b2c3d4e5f6
 Create Date: 2026-07-02 00:00:00.000001
 
 """
+
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = 'b2c3d4e5f6a1'
-down_revision: Union[str, Sequence[str], None] = 'a1b2c3d4e5f6'
+revision: str = "b2c3d4e5f6a1"
+down_revision: Union[str, Sequence[str], None] = "a1b2c3d4e5f6"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 _NEW_COLUMNS = (
-    ("is_derived", lambda: sa.Column(
-        "is_derived", sa.Boolean(), nullable=False, server_default=sa.false()
-    )),
+    (
+        "is_derived",
+        lambda: sa.Column(
+            "is_derived", sa.Boolean(), nullable=False, server_default=sa.false()
+        ),
+    ),
     ("derived_from", lambda: sa.Column("derived_from", sa.String(), nullable=True)),
-    ("computation_params", lambda: sa.Column(
-        "computation_params", sa.JSON(), nullable=True
-    )),
-    ("graph_state_hash", lambda: sa.Column(
-        "graph_state_hash", sa.String(), nullable=True
-    )),
-    ("computed_at", lambda: sa.Column(
-        "computed_at", sa.DateTime(timezone=True), nullable=True
-    )),
+    (
+        "computation_params",
+        lambda: sa.Column("computation_params", sa.JSON(), nullable=True),
+    ),
+    (
+        "graph_state_hash",
+        lambda: sa.Column("graph_state_hash", sa.String(), nullable=True),
+    ),
+    (
+        "computed_at",
+        lambda: sa.Column("computed_at", sa.DateTime(timezone=True), nullable=True),
+    ),
 )
 
 

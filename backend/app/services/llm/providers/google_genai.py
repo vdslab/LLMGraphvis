@@ -39,11 +39,20 @@ def _is_retryable_error(exception) -> bool:
         retryable_codes = [429, 500, 502, 503, 504]
         if code in retryable_codes:
             return True
-        retryable_statuses = ["RESOURCE_EXHAUSTED", "INTERNAL", "UNAVAILABLE", "DEADLINE_EXCEEDED"]
+        retryable_statuses = [
+            "RESOURCE_EXHAUSTED",
+            "INTERNAL",
+            "UNAVAILABLE",
+            "DEADLINE_EXCEEDED",
+        ]
         if str(status) in retryable_statuses:
             return True
         msg = str(exception).lower()
-        if "resource exhausted" in msg or "internal server error" in msg or "service unavailable" in msg:
+        if (
+            "resource exhausted" in msg
+            or "internal server error" in msg
+            or "service unavailable" in msg
+        ):
             return True
     except Exception:
         pass
@@ -64,6 +73,7 @@ def usage_from_metadata(meta) -> UsageData:
     billed as output but counted in `thoughts_token_count`, not in
     `candidates_token_count`.
     """
+
     def count(name: str) -> int:
         return getattr(meta, name, 0) or 0
 
@@ -85,13 +95,17 @@ class GoogleGenAIProvider(LLMProvider):
         self.client = self._initialize_client()
         # `or` chains (instead of os.getenv defaults) so that empty-string values —
         # e.g. docker-compose passing through an unset host variable — still fall back.
-        self.model_name = model_name or os.getenv("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
+        self.model_name = (
+            model_name or os.getenv("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
+        )
         self.thinking_budget = int(
             os.getenv("GEMINI_THINKING_BUDGET") or DEFAULT_THINKING_BUDGET
         )
         self.thinking_level = (
-            os.getenv("GEMINI_THINKING_LEVEL") or DEFAULT_THINKING_LEVEL
-        ).strip().lower()
+            (os.getenv("GEMINI_THINKING_LEVEL") or DEFAULT_THINKING_LEVEL)
+            .strip()
+            .lower()
+        )
         if self.thinking_level not in SUPPORTED_THINKING_LEVELS:
             choices = ", ".join(sorted(SUPPORTED_THINKING_LEVELS))
             raise ValueError(f"GEMINI_THINKING_LEVEL must be one of: {choices}")
@@ -108,7 +122,9 @@ class GoogleGenAIProvider(LLMProvider):
         api_key = os.getenv("GOOGLE_API_KEY")
 
         if project_id:
-            logger.info(f"Using Vertex AI (Project: {project_id}, Location: {location})")
+            logger.info(
+                f"Using Vertex AI (Project: {project_id}, Location: {location})"
+            )
             return genai.Client(vertexai=True, project=project_id, location=location)
         else:
             logger.info("Using Google AI Studio (API Key)")
@@ -173,13 +189,15 @@ class GoogleGenAIProvider(LLMProvider):
 
     def _to_gemini_tools(self, tools: List[ToolDefinition]) -> List[types.Tool]:
         return [
-            types.Tool(function_declarations=[
-                types.FunctionDeclaration(
-                    name=t.name,
-                    description=t.description,
-                    parameters=t.parameters,
-                )
-            ])
+            types.Tool(
+                function_declarations=[
+                    types.FunctionDeclaration(
+                        name=t.name,
+                        description=t.description,
+                        parameters=t.parameters,
+                    )
+                ]
+            )
             for t in tools
         ]
 
@@ -238,7 +256,9 @@ class GoogleGenAIProvider(LLMProvider):
     ):
         gemini_history = self._to_gemini_history(history)
         gemini_tools = self._to_gemini_tools(tools)
-        response = await self._raw_generate(gemini_history, gemini_tools, system_instruction)
+        response = await self._raw_generate(
+            gemini_history, gemini_tools, system_instruction
+        )
 
         in_simulated_thought = False
         last_usage = None
@@ -257,10 +277,18 @@ class GoogleGenAIProvider(LLMProvider):
                 # Native thinking (string content or boolean flag styles)
                 is_thought = False
                 thought_text = ""
-                if hasattr(part, "thought") and isinstance(part.thought, str) and part.thought:
+                if (
+                    hasattr(part, "thought")
+                    and isinstance(part.thought, str)
+                    and part.thought
+                ):
                     is_thought = True
                     thought_text = part.thought
-                elif hasattr(part, "thought") and isinstance(part.thought, bool) and part.thought:
+                elif (
+                    hasattr(part, "thought")
+                    and isinstance(part.thought, bool)
+                    and part.thought
+                ):
                     is_thought = True
                     if part.text:
                         thought_text = part.text
@@ -295,14 +323,18 @@ class GoogleGenAIProvider(LLMProvider):
 
                 if part.function_call:
                     fc = part.function_call
-                    yield StreamChunk(function_calls=[
-                        FunctionCallData(
-                            name=fc.name,
-                            args=dict(fc.args),
-                            call_id=getattr(fc, "id", None),
-                            thought_signature=getattr(part, "thought_signature", None),
-                        )
-                    ])
+                    yield StreamChunk(
+                        function_calls=[
+                            FunctionCallData(
+                                name=fc.name,
+                                args=dict(fc.args),
+                                call_id=getattr(fc, "id", None),
+                                thought_signature=getattr(
+                                    part, "thought_signature", None
+                                ),
+                            )
+                        ]
+                    )
 
         if last_usage is not None:
             yield StreamChunk(usage=usage_from_metadata(last_usage))

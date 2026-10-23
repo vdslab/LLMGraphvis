@@ -4,7 +4,6 @@ from app.core import database
 from app.core.logging import get_logger
 from app.core.mcp import mcp
 from app.logic import attributes, centrality, network_metadata
-
 from common import models
 
 logger = get_logger(__name__)
@@ -25,6 +24,7 @@ def _error(uri: str, exc: Exception) -> Dict[str, str]:
 
 
 # --- Resources ---
+
 
 @mcp.resource("network://{network_id}/metadata", mime_type=JSON_MIME)
 def get_network_metadata(network_id: int) -> ResourceResult:
@@ -74,9 +74,7 @@ def get_node_attribute_details_resource(
             )
         return details
     except Exception as e:
-        return _error(
-            f"network://{network_id}/attributes/nodes/{attribute_name}", e
-        )
+        return _error(f"network://{network_id}/attributes/nodes/{attribute_name}", e)
     finally:
         db.close()
 
@@ -117,9 +115,7 @@ def get_edge_attribute_details_resource(
             )
         return details
     except Exception as e:
-        return _error(
-            f"network://{network_id}/attributes/edges/{attribute_name}", e
-        )
+        return _error(f"network://{network_id}/attributes/edges/{attribute_name}", e)
     finally:
         db.close()
 

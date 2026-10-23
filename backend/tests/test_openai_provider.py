@@ -34,11 +34,7 @@ def test_converts_history_and_preserves_tool_call_ids():
         ),
         LLMMessage(
             "tool",
-            [
-                LLMFunctionResponsePart(
-                    "analysis_degree", {"values":[1,2]}, "call_1"
-                )
-            ],
+            [LLMFunctionResponsePart("analysis_degree", {"values": [1, 2]}, "call_1")],
         ),
     ]
 

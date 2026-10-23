@@ -159,10 +159,17 @@ def build_system_instruction(supports_native_thinking: bool) -> str:
     Providers without native thinking rely on those literal tags as their only
     way to expose reasoning, so the tags stay mandatory for them.
     """
-    protocol = _NATIVE_THINKING_PROTOCOL if supports_native_thinking else _TEXTUAL_THINKING_PROTOCOL
+    protocol = (
+        _NATIVE_THINKING_PROTOCOL
+        if supports_native_thinking
+        else _TEXTUAL_THINKING_PROTOCOL
+    )
     return (
-        _ROLE_AND_TOOLS + _TOOL_EXECUTION_RULE + protocol
-        + _STANDING_POLICY + _LANGUAGE_POLICY
+        _ROLE_AND_TOOLS
+        + _TOOL_EXECUTION_RULE
+        + protocol
+        + _STANDING_POLICY
+        + _LANGUAGE_POLICY
     )
 
 

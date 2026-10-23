@@ -146,7 +146,9 @@ def search(
         for knob, direction in _moves_of(best, spec.knobs, moves):
             params, changes = _step(knob, direction, best.params, tuned_params)
             if changes:
-                try_params(params, {**best.changes, **_rebase(changes, best, base_params)})
+                try_params(
+                    params, {**best.changes, **_rebase(changes, best, base_params)}
+                )
         if len(improving) > 1:
             params = {**best.params}
             changes = dict(best.changes)
@@ -174,7 +176,8 @@ def pick_diverse(candidates, baseline: Candidate, limit: int) -> List[Candidate]
     chosen, kinds = [], set()
     for candidate in ranked:
         kind = frozenset(
-            (p, _direction(before, after)) for p, (before, after) in candidate.changes.items()
+            (p, _direction(before, after))
+            for p, (before, after) in candidate.changes.items()
         )
         if kind not in kinds:
             chosen.append(candidate)
@@ -232,7 +235,7 @@ def _moves(knobs, issues, base_params, tuned_params):
             if issue not in knob.fixes:
                 continue
             direction = knob.fixes[issue]
-            for d in ((direction,) if direction else (+1, -1)):
+            for d in (direction,) if direction else (+1, -1):
                 if knob.toggle and d < 0 and not base_params.get(knob.param):
                     continue
                 if (knob, d) not in moves:
@@ -270,7 +273,9 @@ def _step(knob, direction, params, tuned_params):
             current = tuned_params.get(knob.param)
         if current is None:
             # Unset means the networkx default; start from the middle of the range.
-            current = math.sqrt(low * high) if knob.log and low > 0 else (low + high) / 2
+            current = (
+                math.sqrt(low * high) if knob.log and low > 0 else (low + high) / 2
+            )
         if knob.log and current > 0:
             value = current * (2.0 if direction > 0 else 0.5)
         else:
@@ -330,7 +335,9 @@ def suggest_parameters(
     spec = get_spec(layout_name)
 
     stored = {}
-    cached = get_cached_attribute(network_id, f"{spec.name}_x", models.NodeAttribute, db)
+    cached = get_cached_attribute(
+        network_id, f"{spec.name}_x", models.NodeAttribute, db
+    )
     if cached is not None and isinstance(cached.computation_params, dict):
         stored = {
             k: v
@@ -387,13 +394,18 @@ def suggest_parameters(
     return {
         "layout": spec.name,
         "applicable": True,
-        "current": {"arguments": _arguments(baseline.params, tuned, weight_argument), **baseline.report.as_dict()},
+        "current": {
+            "arguments": _arguments(baseline.params, tuned, weight_argument),
+            **baseline.report.as_dict(),
+        },
         "candidates": [
             {
                 "rank": i + 1,
                 "improves_score": c.report.score < baseline.report.score,
                 "arguments": _arguments(c.params, tuned, weight_argument),
-                "changes": {p: [before, after] for p, (before, after) in c.changes.items()},
+                "changes": {
+                    p: [before, after] for p, (before, after) in c.changes.items()
+                },
                 "tradeoff": tradeoff(c, baseline),
                 "metric_deltas": metric_deltas(c, baseline),
                 **c.report.as_dict(),
