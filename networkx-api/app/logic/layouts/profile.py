@@ -109,10 +109,25 @@ def recommend_layouts(profile: GraphProfile) -> list:
                 "(pass the root as `start`)",
             )
         )
+    from .force_directed import fa2_iterations
+
+    fa2_cut_short = fa2_iterations(profile.nodes)[1]
+    if fa2_cut_short:
+        # At this size ForceAtlas2 stops long before it converges and leaves an
+        # even disc; spring's energy method converges in comparable time.
+        fits.append(
+            (
+                "spring",
+                f"{profile.nodes} nodes: ForceAtlas2 has to stop early at this "
+                "size and leaves an unstructured disc, while spring's energy "
+                "method converges and shows the core and its branches",
+            )
+        )
     fits.append(
         (
             "forceatlas2",
-            "general-purpose; separates communities and scales to large graphs",
+            "general-purpose; separates communities"
+            + ("" if fa2_cut_short else " and scales to large graphs"),
         )
     )
     if profile.nodes <= KAMADA_KAWAI_LIMIT and profile.components == 1:
@@ -123,7 +138,8 @@ def recommend_layouts(profile: GraphProfile) -> list:
                 "O(n^2) cost is affordable and it keeps graph distances faithfully",
             )
         )
-    fits.append(("spring", "even spacing with milder clustering than ForceAtlas2"))
+    if not fa2_cut_short:
+        fits.append(("spring", "even spacing with milder clustering than ForceAtlas2"))
     if profile.is_bipartite and profile.edges > 0:
         fits.append(
             (

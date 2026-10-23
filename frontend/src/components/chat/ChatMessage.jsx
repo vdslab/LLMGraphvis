@@ -85,13 +85,13 @@ const isRetriedAskUserFailure = (execution, allExecutions, currentIndex) => {
 
 const HELD_TEXT = {
   en: {
-    held: 'Held: a question arrived before this was sent',
+    held: 'Held: a question or panel arrived before this was sent',
     asRequest: 'Send as new request',
     asAnswer: 'Send as answer',
     discard: 'Discard',
   },
   ja: {
-    held: '保留中：送信前に質問が届きました',
+    held: '保留中：送信前に質問・調整パネルが届きました',
     asRequest: '新しい依頼として送る',
     asAnswer: '回答として送る',
     discard: '取り消す',

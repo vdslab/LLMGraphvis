@@ -54,6 +54,14 @@ class TestRecommendations:
         ]
         assert "planar" in names
 
+    def test_spring_comes_first_where_forceatlas2_is_cut_short(self):
+        """A 3383-node backbone drew as an even disc under 50 FA2 iterations."""
+        small = recommend_layouts(profile_graph(nx.cycle_graph(50)))
+        assert small[0]["layout"] == "forceatlas2"
+        big = recommend_layouts(profile_graph(nx.cycle_graph(1500)))
+        assert [r["layout"] for r in big[:2]] == ["spring", "forceatlas2"]
+        assert "stop early" in big[0]["reason"]
+
     def test_large_or_split_graph_rules_out_kamada_kawai(self):
         big = profile_graph(nx.barabasi_albert_graph(400, 2, seed=0))
         assert "kamada_kawai" not in [r["layout"] for r in recommend_layouts(big)]
