@@ -185,14 +185,14 @@ def layout_spring(
         Optional[int],
         Field(
             ge=1,
-            description="Number of iterations. Defaults to auto from graph size. More is not always better: on trees and sparse graphs long runs can pile leaves onto each other, so fewer iterations may reduce overlap.",
+            description="Number of iterations. Defaults to auto from graph size (from the largest part's size when the graph is packed by part). More is not always better: on trees and sparse graphs long runs can pile leaves onto each other, so fewer iterations may reduce overlap. With pack_components, a part of 500+ nodes treats this as an upper bound: it keeps its state after 50 iterations when that measures more readable than the full run.",
         ),
     ] = None,
     k: Annotated[
         Optional[float],
         Field(
             gt=0,
-            description="Optimal distance between nodes, relative to the other forces. Defaults to auto from node count. Higher gives more room between neighbours relative to the whole drawing; because the drawing is rescaled to the canvas, its effect on overlap depends on the graph.",
+            description="Optimal distance between nodes, relative to the other forces. Defaults to auto from node count. Higher gives more room between neighbours relative to the whole drawing; because the drawing is rescaled to the canvas, its effect on overlap depends on the graph. Always a value for the whole graph: with pack_components each part receives it scaled to its own size.",
         ),
     ] = None,
     threshold: Annotated[
@@ -205,14 +205,20 @@ def layout_spring(
     method: Annotated[
         Optional[str],
         Field(
-            description="Force computation method: 'auto' (default: 'force' below 500 nodes, 'energy' from 500), 'energy' (energy minimization with per-component gravity, set automatically for graphs in several parts), or 'force' (Fruchterman-Reingold force simulation)."
+            description="Force computation method: 'auto' (default: 'force' below 500 nodes, 'energy' from 500; with pack_components decided per part by the part's size), 'energy' (energy minimization with per-component gravity), or 'force' (Fruchterman-Reingold force simulation)."
         ),
     ] = None,
     gravity: Annotated[
         Optional[float],
         Field(
             ge=0,
-            description="Pull of each connected component toward the center. Higher keeps separate parts close to the rest, so they stop squeezing the drawing. Only used by the 'energy' method, which runs when method='energy', when 'auto' picks it (graphs of 500+ nodes), or when the app selects it for a graph in several parts (the reply says so). Under method='force' it has no effect.",
+            description="Pull of each connected component toward the center. Higher keeps separate parts close to the rest, so they stop squeezing the drawing; that matters only with pack_components=False, since packing places the parts itself. Only used by the 'energy' method, which runs when method='energy' or when 'auto' picks it (500+ nodes). Under method='force' it has no effect.",
+        ),
+    ] = None,
+    pack_components: Annotated[
+        Optional[bool],
+        Field(
+            description="If True, each connected part is laid out on its own and the parts are packed around the largest one, so they stay apart and each reads as a group. On by default when the graph has several parts (the reply says so). Set False to solve the whole graph as one system, where the parts settle wherever gravity and repulsion leave them; then method='energy' with a higher gravity keeps them close. Not used when pos or init_from_layout is given: the starting positions decide where everything goes."
         ),
     ] = None,
     fixed: Annotated[
@@ -243,11 +249,16 @@ def layout_spring(
 
     Similar to ForceAtlas2 but uses the classic Fruchterman-Reingold algorithm. It tends
     to produce more even node spacing and less pronounced clustering than ForceAtlas2.
-    Best for: small-to-medium graphs (< 500 nodes) where high-quality convergence is needed.
-    Slower than ForceAtlas2 on large graphs.
+    Best for: small-to-medium graphs (< 500 nodes) where high-quality convergence is needed,
+    and large graphs in many parts, which it lays out part by part. On a large connected
+    graph it is slower than ForceAtlas2.
 
     If the network's edges carry varying weights, they are used as attraction strength
     automatically — no parameter needed.
+
+    A graph in several connected parts is laid out part by part by default: the
+    largest part sits in the middle and the others are placed around it, each
+    readable as a group (see `pack_components`).
 
     After calling this, use `visualization_generate` to render the result; its
     `layout_quality` says how readable the drawing is, and `layout_suggest_parameters`
@@ -269,6 +280,7 @@ def layout_spring(
             "threshold": threshold,
             "method": method,
             "gravity": gravity,
+            "pack_components": pack_components,
             "fixed": fixed,
             "weight": weight,
             "scale": scale,

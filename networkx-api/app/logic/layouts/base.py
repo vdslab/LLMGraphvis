@@ -95,6 +95,9 @@ class LayoutSpec:
     name: str
     compute: Callable  # (G, params) -> {node: (x, y)}
     params: FrozenSet[str]  # allowlist of kwargs that may reach networkx
+    # Accepted like `params`, but consumed by `compute` instead of networkx
+    # (e.g. spring's `pack_components`, ADR 0041).
+    app_params: FrozenSet[str] = frozenset()
     weight_role: WeightRole = WeightRole.NONE
     tune: Optional[Callable] = None  # (G, GraphProfile) -> Tuning
     prepare: Optional[Callable] = None  # (G, network_id, overrides, db) -> None
@@ -106,6 +109,11 @@ class LayoutSpec:
         if not self.tune:
             return {}, []
         return self.tune(G, profile)
+
+    @property
+    def accepted(self) -> FrozenSet[str]:
+        """Every parameter a caller may pass: networkx's and the app's own."""
+        return self.params | self.app_params
 
     @property
     def supports_warm_start(self) -> bool:
@@ -125,6 +133,7 @@ def register(
     name: str,
     *,
     params,
+    app_params=(),
     weight_role: WeightRole = WeightRole.NONE,
     tune: Optional[Callable] = None,
     prepare: Optional[Callable] = None,
@@ -141,6 +150,10 @@ def register(
 
     `knobs` declare which parameters fix which readability problem (see `Knob`);
     a layout with none cannot be tuned by `layout_suggest_parameters`.
+
+    `app_params` are accepted, cached and reported like `params`, but `compute`
+    consumes them before networkx is called, so they are not checked against
+    the networkx signature.
     """
 
     def decorator(fn: Callable) -> Callable:
@@ -148,13 +161,14 @@ def register(
             name=name,
             compute=fn,
             params=frozenset(params),
+            app_params=frozenset(app_params),
             weight_role=weight_role,
             tune=tune,
             prepare=prepare,
             aliases=tuple(aliases),
             knobs=tuple(knobs),
         )
-        unknown = {k.param for k in spec.knobs} - spec.params
+        unknown = {k.param for k in spec.knobs} - spec.accepted
         if unknown:
             raise ValueError(
                 f"Layout '{name}' declares knobs it does not accept: {unknown}"

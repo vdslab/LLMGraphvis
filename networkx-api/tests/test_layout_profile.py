@@ -113,12 +113,31 @@ class TestTuning:
         assert params["max_iter"] < 1500
         assert any("`max_iter`" in n for n in notes)
 
-    def test_fragmented_graph_switches_spring_to_energy(self):
+    def test_fragmented_graph_packs_spring_by_part(self):
+        """ADR 0041: packing replaces the energy method with gravity."""
         params, notes = get_spec("spring").tuned(
             _fragmented(), profile_graph(_fragmented())
         )
-        assert params["method"] == "energy" and params["gravity"] > 1
-        assert notes
+        assert params["pack_components"] is True
+        assert "method" not in params and "gravity" not in params
+        assert any("`pack_components`" in n for n in notes)
+
+    def test_connected_graph_is_not_packed(self):
+        G = nx.karate_club_graph()
+        params, _notes = get_spec("spring").tuned(G, profile_graph(G))
+        assert "pack_components" not in params
+
+    def test_packed_iterations_follow_the_largest_part(self):
+        """Each part is solved alone, so the largest part is the work."""
+        from app.logic.layouts.force_directed import _SPRING_PART_ITERATION_BUDGET
+
+        G = nx.disjoint_union(
+            nx.barabasi_albert_graph(1500, 2, seed=0), nx.path_graph(5)
+        )
+        params, notes = get_spec("spring").tuned(G, profile_graph(G))
+        assert params["iterations"] * 1500 * 1500 <= _SPRING_PART_ITERATION_BUDGET
+        assert any("largest part has 1500 nodes" in n for n in notes)
+        assert any("upper bound" in n for n in notes)
 
     def test_notes_reach_the_tool_message(self, db):
         setup_graph(db, n=6)

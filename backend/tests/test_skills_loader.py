@@ -395,6 +395,7 @@ LAYOUT_TOOL_ARGUMENTS = {
         "threshold",
         "method",
         "gravity",
+        "pack_components",
         "fixed",
         "weight",
         "scale",

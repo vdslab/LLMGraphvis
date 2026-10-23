@@ -343,7 +343,7 @@ def suggest_parameters(
         stored = {
             k: v
             for k, v in cached.computation_params.items()
-            if k in spec.params and k not in BULKY_PARAM_KEYS
+            if k in spec.accepted and k not in BULKY_PARAM_KEYS
         }
     # A stored run without `weight` on a weight-reading layout was unweighted
     # on purpose (weights are automatic otherwise), so keep it unweighted.

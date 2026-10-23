@@ -292,6 +292,7 @@
   "k",
   "method",
   "network_id",
+  "pack_components",
   "pos",
   "scale",
   "seed",

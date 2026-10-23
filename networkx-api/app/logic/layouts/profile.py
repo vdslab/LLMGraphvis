@@ -114,13 +114,20 @@ def recommend_layouts(profile: GraphProfile) -> list:
     fa2_cut_short = fa2_iterations(profile.nodes)[1]
     if fa2_cut_short:
         # At this size ForceAtlas2 stops long before it converges and leaves an
-        # even disc; spring's energy method converges in comparable time.
+        # even disc; spring's energy method converges in comparable time, and
+        # a graph in parts is laid out part by part (ADR 0041).
         fits.append(
             (
                 "spring",
                 f"{profile.nodes} nodes: ForceAtlas2 has to stop early at this "
                 "size and leaves an unstructured disc, while spring's energy "
-                "method converges and shows the core and its branches",
+                "method shows the core and its branches"
+                + (
+                    f", with the other {profile.components - 1} parts placed "
+                    "around the largest"
+                    if profile.fragmented
+                    else ""
+                ),
             )
         )
     fits.append(

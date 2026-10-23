@@ -10,6 +10,7 @@ import networkx as nx
 import numpy as np
 
 from .base import Knob, WeightRole, register
+from .components import layout_by_part
 
 # Graph attribute set by `prepare_forceatlas2`: `node_size` holds radii in drawn
 # (renderer) units rather than in the layout's own coordinate units.
@@ -27,9 +28,19 @@ _FA2_ITERATION_BUDGET = 500_000_000
 # Floor, so a very large graph still settles instead of staying near its
 # random start; past the size where it binds the budget no longer holds.
 _FA2_MIN_ITER = 50
-# Spring's 'energy' method is the one whose gravity holds components together;
-# on the same graph it took overlap from 92% to 0% at gravity 3.
-_SPRING_FRAGMENTED_GRAVITY = 3.0
+# A graph in several parts is laid out part by part and packed (ADR 0041).
+# Each part is solved alone, so the largest part's size, not the graph's, sets
+# the work: N^2 x iterations for it is capped like ForceAtlas2's (ADR 0033).
+# At about 40 ns per N^2 per iteration on the energy method, some 20 seconds.
+_SPRING_PART_ITERATION_BUDGET = 500_000_000
+# Parts solved by the energy method stop here first, and keep this state when
+# it measures better than the full run. On the largest part of the syllabus
+# backbone (ADR 0040) 50 iterations scored 3.0, 100 scored 3.9, 500 4.2: a
+# converged run stretches its long strands and crushes the dense middle. On
+# a dense part (concert, mean degree 15) the full run was better.
+_SPRING_SHORT_ITERATIONS = 50
+# networkx's method='auto' switches from 'force' to 'energy' at this size.
+_SPRING_ENERGY_FROM = 500
 # On trees, long spring runs fold the branches onto each other: on five
 # trees of 120-500 nodes, 1000 iterations left 65-93% of nodes overlapping and
 # 50 iterations 7-77%, always better. networkx's own default is 50.
@@ -45,13 +56,16 @@ def _iterations_by_size(n):
 
 
 def tune_spring(G, profile):
-    """Iterations by graph size, node spacing, and gravity for split graphs.
+    """Iterations by size, node spacing, and part-by-part packing for split graphs.
 
     `k` is the optimal distance between nodes; 2.0/sqrt(N) is a little wider than
     networkx's own 1/sqrt(N), which reduces overlap on the graphs this app sees.
     """
     n = profile.nodes
-    iterations, threshold = _iterations_by_size(n)
+    packed = profile.fragmented
+    # Packed, every part is solved alone and the largest one is the work.
+    sized_by = round(profile.largest_component_share * n) if packed else n
+    iterations, threshold = _iterations_by_size(sized_by)
     params = {
         "k": 2.0 / math.sqrt(n) if n > 0 else None,
         "iterations": iterations,
@@ -65,14 +79,31 @@ def tune_spring(G, profile):
             f"`iterations` {iterations} -> {_SPRING_FOREST_ITERATIONS}, because the "
             "graph is a tree; longer runs fold its branches onto each other."
         )
-    if profile.fragmented:
-        params["method"] = "energy"
-        params["gravity"] = _SPRING_FRAGMENTED_GRAVITY
+    if packed:
+        params["pack_components"] = True
         notes.append(
-            f"`method`='energy' with `gravity` {_SPRING_FRAGMENTED_GRAVITY:g}, because "
-            f"the graph has {profile.components} separate parts that would otherwise "
-            "drift apart and squeeze the rest together."
+            f"`pack_components` on, because the graph has {profile.components} "
+            "separate parts: each is laid out on its own and placed around the "
+            "largest, so the parts stay apart and each reads as a group."
         )
+        cap = max(
+            _SPRING_SHORT_ITERATIONS,
+            _SPRING_PART_ITERATION_BUDGET // max(sized_by * sized_by, 1),
+        )
+        if params["iterations"] > cap:
+            params["iterations"] = cap
+            notes.append(
+                f"`iterations` {cap}, fewer than usual: the largest part has "
+                f"{sized_by} nodes and each iteration compares every pair of them."
+            )
+        if sized_by >= _SPRING_ENERGY_FROM and params["iterations"] > (
+            _SPRING_SHORT_ITERATIONS
+        ):
+            notes.append(
+                f"`iterations` is an upper bound for parts of {_SPRING_ENERGY_FROM}+ "
+                f"nodes: such a part keeps its state after {_SPRING_SHORT_ITERATIONS} "
+                "iterations when that measures more readable than the full run."
+            )
     return params, notes
 
 
@@ -158,6 +189,7 @@ def tune_arf(G, profile):
         "method",
         "gravity",
     },
+    app_params={"pack_components"},
     weight_role=WeightRole.STRENGTH,
     tune=tune_spring,
     aliases=("fruchterman_reingold",),
@@ -189,8 +221,49 @@ def tune_arf(G, profile):
     ),
 )
 def spring(G, params):
-    """Fruchterman-Reingold. Weights are attraction strength."""
+    """Fruchterman-Reingold. Weights are attraction strength.
+
+    With `pack_components`, each connected part is laid out on its own and the
+    parts are packed around the largest (ADR 0041), unless starting positions
+    were given: then they decide where everything goes.
+    """
+    params = dict(params)
+    if params.pop("pack_components", False) and params.get("pos") is None:
+        total = G.number_of_nodes()
+        return layout_by_part(G, lambda part: _spring_part(part, params, total))
     return nx.spring_layout(G, **params)
+
+
+def _spring_part(H, params, total):
+    """Spring on one part of a packed graph of `total` nodes.
+
+    `k` is meant for the whole graph, whose layout spans the same unit square
+    as each part's, so it is scaled up by sqrt(total / part size). A part solved
+    by the energy method runs `_SPRING_SHORT_ITERATIONS` first, continues to
+    `iterations`, and keeps whichever state `layout_quality` scores better.
+    """
+    from ..common_utils import calculate_smart_node_size
+    from ..layout_quality import evaluate
+
+    m = H.number_of_nodes()
+    params = dict(params)
+    if params.get("k") is not None:
+        params["k"] = params["k"] * math.sqrt(total / m)
+    method = params.get("method") or "auto"
+    energy = method == "energy" or (method == "auto" and m >= _SPRING_ENERGY_FROM)
+    iterations = params.get("iterations", _SPRING_SHORT_ITERATIONS)
+    if not energy or iterations <= _SPRING_SHORT_ITERATIONS:
+        return nx.spring_layout(H, **params)
+
+    # Unscaled, so the continued run starts exactly where the short one stopped.
+    params.update(method="energy", scale=None, center=None)
+    short = nx.spring_layout(H, **{**params, "iterations": _SPRING_SHORT_ITERATIONS})
+    full = nx.spring_layout(
+        H,
+        **{**params, "iterations": iterations - _SPRING_SHORT_ITERATIONS, "pos": short},
+    )
+    size = calculate_smart_node_size(total)["default"]
+    return min((short, full), key=lambda pos: evaluate(pos, H.edges(), size).score)
 
 
 def prepare_forceatlas2(G, network_id, overrides, db):

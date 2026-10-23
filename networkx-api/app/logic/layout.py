@@ -275,13 +275,14 @@ def calculate_layout(
         spec.prepare(G, network_id, sanitized_overrides, db)
 
     # Preparation consumes app-level options. Everything remaining must reach
-    # NetworkX: accepting an ignored option would falsely report success.
-    rejected = set(sanitized_overrides) - spec.params
+    # NetworkX or the layout's own `app_params`: accepting an ignored option
+    # would falsely report success.
+    rejected = set(sanitized_overrides) - spec.accepted
     if rejected:
         raise ValueError(
             f"Unsupported parameters for layout '{layout_name}': "
             f"{sorted(rejected)}. Supported computation parameters: "
-            f"{sorted(spec.params)}."
+            f"{sorted(spec.accepted)}."
         )
     params.update(sanitized_overrides)
 
