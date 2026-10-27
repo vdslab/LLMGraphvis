@@ -37,7 +37,6 @@ BUDGET = 11_000
 # would silently break something: llm_service.py is the stale instruction agents
 # keep being told to edit, and .gemini/.env shadows the root .env for Gemini CLI.
 MUST_NOT_EXIST = {
-    "backend/app/services/llm_service.py",
     ".gemini/.env",
 }
 

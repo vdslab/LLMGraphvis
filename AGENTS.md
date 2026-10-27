@@ -52,7 +52,7 @@ listings, DDL and counts went stale before.
 | What a tool does and what its parameters mean | the tool's docstring and `Field(description=...)` in `networkx-api/app/mcp/tools/` |
 | What the model sees of a tool result | `backend/app/services/llm/observations.py` |
 | What a token count means, and its cost | `UsageData` in `llm/providers/types.py` (ADR 0025), `llm/pricing.py` |
-| Which models are offered, the defaults, and per-generation request options | `llm/catalog.py`, `llm/providers/defaults.py`, each adapter in `llm/providers/` (ADR 0043) |
+| Models, defaults, per-model options | `llm/catalog.py`, `llm/providers/` (ADR 0043) |
 | What an attribute means (`role`, `measurement`) | `networkx-api/app/logic/attribute_semantics.py` (ADR 0030) |
 
 Tool docstrings and `Field` descriptions are **prompt surface**, sent to the
@@ -118,13 +118,12 @@ in `backend/.../local_tools.py`: `switch_to_main_network`,
 `offer_parameter_tuning`, `apply_parameter_tuning`.
 
 **To add a tool**: `@mcp.tool()` + `@handle_tool_errors`, exported from its
-package's `__init__.py`; no schema is registered by hand (anything saying to edit
-`backend/app/services/llm_service.py` is stale). Run `python -m app.mcp.manifest`
-in `networkx-api/` to refresh `common/mcp_tools.json`, and list the tool in a
+package's `__init__.py`; no schema is registered by hand. Run
+`python -m app.mcp.manifest` in `networkx-api/` to refresh `common/mcp_tools.json`, and list the tool in a
 skill's `related_tools` (or `SEARCH_ONLY` in
 `backend/tests/test_skill_tool_references.py`, with a reason), or tests fail (ADR 0027).
 Add a skill *only* for procedural guidance, a hook *only* for enforcement.
-Procedures live only in skills; the MCP server serves no prompts.
+The MCP server serves no prompts.
 The backend caches tool definitions for `MCP_TOOLS_CACHE_TTL` seconds (default 300).
 
 ### Invariants that are easy to get wrong
@@ -212,8 +211,8 @@ There is **no CI**.
 
 - `mypy` reports pre-existing errors in `common/models.py` and the
   provider/history modules.
-- Ad-hoc `verify_*.py` / `repro_*.py` / `debug_*.py` scripts are not tests.
-- `test_agents_md_facts.py` skips in Docker (it needs the repo root); run it on
+- Ad-hoc `verify_*`/`repro_*`/`debug_*` scripts are not tests.
+- `test_agents_md_facts.py` needs the repo root and skips in Docker; run it on
   the host after editing this file.
 
 ## Secrets and local config
