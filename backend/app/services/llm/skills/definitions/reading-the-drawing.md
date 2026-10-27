@@ -1,7 +1,7 @@
 ---
 name: reading-the-drawing
 description: Reading what the current drawing shows (where groups, hubs and components sit, whether colors separate) from numbers instead of an image. Load before describing the picture or answering where something is on it.
-triggers: [図から, 図を説明, 図の説明, 何が読み取れ, 読み取れる, どう見える, 見た目を説明, どこにある, どこに集ま, まとまって, 分かれて, 固まって, 散らば, 偏って, 中心にある, 周辺にある, 外れ値, describe the drawing, describe the picture, what does the graph show, what does the drawing show, where are the, clustered together, separated, spread out, outlier]
+triggers: [図から, 図を説明, 図の説明, 何が読み取れ, 読み取れる, どう見える, 見た目を説明, 図のどこ, 図の中で, どこにあ, どこに集ま, どの辺, まとまって, 分かれて, 固まって, 散らば, 偏って, 中心にある, 周辺にある, 外れ値, describe the drawing, describe the picture, what does the graph show, what does the drawing show, where are the, clustered together, separated, spread out, outlier]
 related_tools: [visualization_describe, visualization_get_state, visualization_generate, visualization_highlight]
 ---
 
