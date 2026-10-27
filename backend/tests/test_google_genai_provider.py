@@ -32,7 +32,7 @@ def test_gemini_38_is_default_and_uses_native_thinking(provider):
 
 
 def test_invalid_gemini_thinking_level_fails_fast(monkeypatch):
-    monkeypatch.setenv("GEMINI_THINKING_LEVEL", "minimal")
+    monkeypatch.setenv("GEMINI_THINKING_LEVEL", "none")
     with patch.object(
         GoogleGenAIProvider, "_initialize_client", return_value=MagicMock()
     ):
@@ -105,6 +105,58 @@ async def test_gemini_3_request_uses_thinking_level(provider):
     assert config.thinking_config.thinking_level.value == "MEDIUM"
     assert config.thinking_config.thinking_budget is None
     assert config.thinking_config.include_thoughts is True
+
+
+@pytest.mark.parametrize(
+    "model, level, expected_level",
+    [
+        ("gemini-4-argon", "medium", "MEDIUM"),
+        ("gemini-4-argon", "minimal", "LOW"),
+        ("gemini-3.6-flash", "minimal", "MINIMAL"),
+        ("gemini-2.5-pro", "high", None),
+    ],
+)
+def test_thinking_follows_the_model_generation(provider, model, level, expected_level):
+    provider.model_name = model
+    provider.thinking_level = level
+
+    config = provider._thinking_config()
+
+    assert config.include_thoughts is True
+    assert config.thinking_budget is None
+    if expected_level is None:
+        assert config.thinking_level is None
+    else:
+        assert config.thinking_level.value == expected_level
+
+
+def test_gemini_4_requires_signed_tool_exchanges(provider):
+    provider.model_name = "gemini-4-argon"
+    history = [
+        LLMMessage(role="model", parts=[LLMFunctionCallPart("t", {}, "c1")]),
+        LLMMessage(role="tool", parts=[LLMFunctionResponsePart("t", {}, "c1")]),
+    ]
+    assert provider._to_gemini_history(history) == []
+
+
+@pytest.mark.asyncio
+async def test_stream_separates_thought_summaries_from_text(provider):
+    from google.genai import types
+
+    candidate = MagicMock()
+    candidate.content.parts = [
+        types.Part(text="Considering degree.", thought=True),
+        types.Part(text="Done."),
+    ]
+    chunk = MagicMock(usage_metadata=None, candidates=[candidate])
+    provider._raw_generate = AsyncMock(return_value=_async_iter([chunk]))
+
+    result = [item async for item in provider._stream([], [], "system")]
+
+    assert [(c.thought, c.text) for c in result] == [
+        ("Considering degree.", None),
+        (None, "Done."),
+    ]
 
 
 @pytest.mark.asyncio

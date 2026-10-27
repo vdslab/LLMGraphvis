@@ -60,9 +60,13 @@ def _is_retryable_error(exception) -> bool:
 
 
 DEFAULT_VERTEX_LOCATION = "global"
-DEFAULT_THINKING_BUDGET = 2048
 DEFAULT_THINKING_LEVEL = "medium"
-SUPPORTED_THINKING_LEVELS = {"low", "medium", "high"}
+SUPPORTED_THINKING_LEVELS = {"minimal", "low", "medium", "high"}
+# Only these accept "minimal"; the others are sent "low" instead.
+MINIMAL_THINKING_MODELS = ("gemini-3.6-flash", "gemini-3.5-flash-lite")
+# Gemini 4 Argon can think for minutes before its first token; Google asks
+# for an HTTP timeout of at least 15 minutes (milliseconds here).
+HTTP_TIMEOUT_MS = 15 * 60 * 1000
 
 
 def usage_from_metadata(meta) -> UsageData:
@@ -86,8 +90,12 @@ def usage_from_metadata(meta) -> UsageData:
     )
 
 
-def _is_gemini_3(model_name: str) -> bool:
-    return model_name.startswith("gemini-3")
+def _uses_thinking_level(model_name: str) -> bool:
+    """Whether the model takes `thinking_level` and signs its function calls.
+
+    Gemini 3 and later do (ADR 0007, 0043); only the 2.5 generation does not.
+    """
+    return not model_name.startswith("gemini-2.")
 
 
 class GoogleGenAIProvider(LLMProvider):
@@ -97,9 +105,6 @@ class GoogleGenAIProvider(LLMProvider):
         # e.g. docker-compose passing through an unset host variable — still fall back.
         self.model_name = (
             model_name or os.getenv("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
-        )
-        self.thinking_budget = int(
-            os.getenv("GEMINI_THINKING_BUDGET") or DEFAULT_THINKING_BUDGET
         )
         self.thinking_level = (
             (os.getenv("GEMINI_THINKING_LEVEL") or DEFAULT_THINKING_LEVEL)
@@ -112,23 +117,39 @@ class GoogleGenAIProvider(LLMProvider):
 
     @property
     def supports_native_thinking(self) -> bool:
-        # Gemini 3 uses thinking levels; legacy IDs explicitly containing
-        # "thinking" retain the numeric-budget behavior.
-        return _is_gemini_3(self.model_name) or "thinking" in self.model_name
+        # Every request asks for thought summaries (`include_thoughts`).
+        return True
+
+    def _thinking_config(self) -> types.ThinkingConfig:
+        if not _uses_thinking_level(self.model_name):
+            # Gemini 2.5 thinks with a dynamic budget by default.
+            return types.ThinkingConfig(include_thoughts=True)
+        level = self.thinking_level
+        if level == "minimal" and not self.model_name.startswith(
+            MINIMAL_THINKING_MODELS
+        ):
+            level = "low"
+        return types.ThinkingConfig(thinking_level=level, include_thoughts=True)
 
     def _initialize_client(self) -> genai.Client:
         project_id = os.getenv("VERTEX_PROJECT_ID")
         location = os.getenv("VERTEX_LOCATION") or DEFAULT_VERTEX_LOCATION
         api_key = os.getenv("GOOGLE_API_KEY")
+        http_options = types.HttpOptions(timeout=HTTP_TIMEOUT_MS)
 
         if project_id:
             logger.info(
                 f"Using Vertex AI (Project: {project_id}, Location: {location})"
             )
-            return genai.Client(vertexai=True, project=project_id, location=location)
+            return genai.Client(
+                vertexai=True,
+                project=project_id,
+                location=location,
+                http_options=http_options,
+            )
         else:
             logger.info("Using Google AI Studio (API Key)")
-            return genai.Client(api_key=api_key)
+            return genai.Client(api_key=api_key, http_options=http_options)
 
     def _to_gemini_history(self, history: List[LLMMessage]) -> List[types.Content]:
         result = []
@@ -138,11 +159,11 @@ class GoogleGenAIProvider(LLMProvider):
             call_parts = [
                 part for part in msg.parts if isinstance(part, LLMFunctionCallPart)
             ]
-            # Gemini 3 requires the encrypted signature from the original model
+            # Gemini 3 and later require the encrypted signature from the original model
             # response. Old persisted history only has synthetic calls; omit those
             # tool exchanges while retaining the assistant's final text turns.
             signed_model_turn = not (
-                _is_gemini_3(self.model_name)
+                _uses_thinking_level(self.model_name)
                 and call_parts
                 and not any(part.thought_signature for part in call_parts)
             )
@@ -165,7 +186,7 @@ class GoogleGenAIProvider(LLMProvider):
                     if part.call_id:
                         valid_call_ids.add(part.call_id)
                 elif isinstance(part, LLMFunctionResponsePart):
-                    if _is_gemini_3(self.model_name) and (
+                    if _uses_thinking_level(self.model_name) and (
                         not part.call_id or part.call_id not in valid_call_ids
                     ):
                         continue
@@ -217,18 +238,6 @@ class GoogleGenAIProvider(LLMProvider):
             if gemini_tools
             else None
         )
-        thinking_config = None
-        if _is_gemini_3(self.model_name):
-            thinking_config = types.ThinkingConfig(
-                thinking_level=self.thinking_level,
-                include_thoughts=True,
-            )
-        elif "thinking" in self.model_name:
-            thinking_config = types.ThinkingConfig(
-                thinking_budget=self.thinking_budget,
-                include_thoughts=True,
-            )
-
         return await self.client.aio.models.generate_content_stream(
             model=self.model_name,
             contents=gemini_history,
@@ -236,7 +245,7 @@ class GoogleGenAIProvider(LLMProvider):
                 tools=gemini_tools or None,
                 tool_config=tool_config,
                 system_instruction=system_instruction,
-                thinking_config=thinking_config,
+                thinking_config=self._thinking_config(),
             ),
         )
 
@@ -260,7 +269,6 @@ class GoogleGenAIProvider(LLMProvider):
             gemini_history, gemini_tools, system_instruction
         )
 
-        in_simulated_thought = False
         last_usage = None
 
         async for chunk in response:
@@ -274,51 +282,13 @@ class GoogleGenAIProvider(LLMProvider):
                 continue
 
             for part in cand.content.parts:
-                # Native thinking (string content or boolean flag styles)
-                is_thought = False
-                thought_text = ""
-                if (
-                    hasattr(part, "thought")
-                    and isinstance(part.thought, str)
-                    and part.thought
-                ):
-                    is_thought = True
-                    thought_text = part.thought
-                elif (
-                    hasattr(part, "thought")
-                    and isinstance(part.thought, bool)
-                    and part.thought
-                ):
-                    is_thought = True
+                if part.thought:
                     if part.text:
-                        thought_text = part.text
-
-                if is_thought:
-                    yield StreamChunk(thought=thought_text)
+                        yield StreamChunk(thought=part.text)
                     continue
 
                 if part.text:
-                    txt = part.text
-                    if not in_simulated_thought:
-                        if "<thought>" in txt:
-                            valid_text, rest = txt.split("<thought>", 1)
-                            if valid_text:
-                                yield StreamChunk(text=valid_text)
-                            in_simulated_thought = True
-                            txt = rest
-                        else:
-                            yield StreamChunk(text=txt)
-                            continue
-
-                    if in_simulated_thought:
-                        if "</thought>" in txt:
-                            t_content, rest_text = txt.split("</thought>", 1)
-                            yield StreamChunk(thought=t_content)
-                            in_simulated_thought = False
-                            if rest_text:
-                                yield StreamChunk(text=rest_text)
-                        else:
-                            yield StreamChunk(thought=txt)
+                    yield StreamChunk(text=part.text)
                     continue
 
                 if part.function_call:
