@@ -44,3 +44,4 @@
 | [0038](./0038-no-row-lock-across-await.md) | 行ロックは await をまたがず、イベントループ上で待たない | 採用 |
 | [0041](./0041-pack-components.md) | 複数の連結成分からなるグラフは、成分ごとに配置して詰める | 採用 |
 | [0042](./0042-visualization-describe.md) | 描画の状態を、画像を見ずに数値で説明するツール | 採用 |
+| [0043](./0043-model-generations-and-pricing.md) | モデルの世代差はアダプターで吸収し、単価は期間と入力長で引く | 採用 |
