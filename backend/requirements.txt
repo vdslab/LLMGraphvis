@@ -8,9 +8,9 @@ python-jose[cryptography]
 passlib[argon2]
 python-multipart
 httpx
-google-genai>=2.0,<3
-anthropic
-openai
+google-genai>=2.33,<3
+anthropic[vertex]>=2.3,<3
+openai>=3.39,<4
 python-dotenv
 sse-starlette
 # Pinned to 1.x: mcp 2.0 removed mcp.server.fastmcp (FastMCP) entirely in
