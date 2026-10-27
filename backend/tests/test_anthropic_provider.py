@@ -2,7 +2,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.llm.providers.anthropic_provider import AnthropicProvider
+from app.services.llm.providers.anthropic_provider import (
+    AnthropicProvider,
+    ClaudeRefusalError,
+)
 from app.services.llm.providers.types import (
     LLMFunctionCallPart,
     LLMFunctionResponsePart,
@@ -17,6 +20,7 @@ def _provider(client=None):
     provider.client = client or MagicMock()
     provider.model_name = "claude-sonnet-4-6"
     provider.max_tokens = 4096
+    provider.effort = None
     return provider
 
 
@@ -56,27 +60,94 @@ def test_converts_history_and_preserves_tool_call_ids():
     }
 
 
-def test_converts_tools_and_lowercases_schemas():
+def test_converts_tools_with_an_empty_schema_fallback():
     provider = _provider()
     tools = [
         ToolDefinition(
-            name="test_tool",
+            name="with_schema",
             description="A test tool",
-            parameters={
-                "type": "OBJECT",
-                "properties": {
-                    "count": {"type": "INTEGER"},
-                },
-            },
-        )
+            parameters={"type": "object", "properties": {"n": {"type": "integer"}}},
+        ),
+        ToolDefinition(name="no_schema", description="No parameters", parameters={}),
     ]
     anthropic_tools = provider._to_anthropic_tools(tools)
-    assert len(anthropic_tools) == 1
-    assert anthropic_tools[0]["name"] == "test_tool"
-    assert anthropic_tools[0]["input_schema"]["type"] == "object"
-    assert (
-        anthropic_tools[0]["input_schema"]["properties"]["count"]["type"] == "integer"
+    assert anthropic_tools[0]["input_schema"]["properties"]["n"]["type"] == "integer"
+    assert anthropic_tools[1]["input_schema"] == {"type": "object", "properties": {}}
+
+
+@pytest.mark.parametrize(
+    "model, expected",
+    [
+        ("claude-opus-5-5", {"type": "adaptive", "display": "summarized"}),
+        ("claude-opus-4-8", {"type": "adaptive", "display": "summarized"}),
+        ("claude-sonnet-5", {"type": "adaptive", "display": "summarized"}),
+        ("claude-haiku-5-5", {"type": "adaptive", "display": "summarized"}),
+        ("claude-haiku-4-5", {"type": "enabled", "budget_tokens": 4095}),
+    ],
+)
+def test_thinking_follows_the_model_generation(model, expected):
+    provider = _provider()
+    provider.model_name = model
+    assert provider._thinking_config() == expected
+
+
+def _mock_stream(provider, events):
+    mock_stream = MagicMock()
+    mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
+    mock_stream.__aexit__ = AsyncMock(return_value=None)
+
+    async def event_generator():
+        for e in events:
+            yield e
+
+    mock_stream.__aiter__ = MagicMock(side_effect=event_generator)
+    provider.client.messages.stream = MagicMock(return_value=mock_stream)
+
+
+@pytest.mark.asyncio
+async def test_effort_is_sent_only_to_adaptive_models():
+    provider = _provider()
+    provider.effort = "high"
+    _mock_stream(provider, [])
+    async for _ in provider._stream([], [], "prompt"):
+        pass
+    kwargs = provider.client.messages.stream.call_args.kwargs
+    assert kwargs["output_config"] == {"effort": "high"}
+
+    provider.model_name = "claude-haiku-4-5"
+    _mock_stream(provider, [])
+    async for _ in provider._stream([], [], "prompt"):
+        pass
+    assert "output_config" not in provider.client.messages.stream.call_args.kwargs
+
+
+@pytest.mark.asyncio
+async def test_refusal_reports_usage_then_raises():
+    from types import SimpleNamespace
+
+    provider = _provider()
+    _mock_stream(
+        provider,
+        [
+            SimpleNamespace(
+                type="message_start",
+                message=SimpleNamespace(usage=SimpleNamespace(input_tokens=7)),
+            ),
+            SimpleNamespace(
+                type="message_delta",
+                delta=SimpleNamespace(stop_reason="refusal"),
+                usage=SimpleNamespace(output_tokens=3),
+            ),
+            SimpleNamespace(type="message_stop"),
+        ],
     )
+
+    chunks = []
+    with pytest.raises(ClaudeRefusalError):
+        async for chunk in provider._stream([], [], "prompt"):
+            chunks.append(chunk)
+    assert chunks[-1].usage.input_tokens == 7
+    assert chunks[-1].usage.output_tokens == 3
 
 
 @pytest.mark.asyncio

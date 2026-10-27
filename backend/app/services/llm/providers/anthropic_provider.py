@@ -21,41 +21,23 @@ from .types import (
 logger = get_logger(__name__)
 
 
-# TODO: if the debug log below never fires in production logs, this function and its
-# call site can be safely removed as dead code (Gemini-specific uppercase-type quirk
-# that MCP/Pydantic-generated schemas don't exhibit).
-def _lowercase_schema_types(schema) -> dict:
-    """Recursively convert uppercase JSON Schema type values to lowercase.
+DEFAULT_ANTHROPIC_VERTEX_REGION = "global"
+DEFAULT_MAX_TOKENS = 64000
+# Thinking budget for the models that predate adaptive thinking (ADR 0043).
+DEFAULT_THINKING_BUDGET = 8000
+SUPPORTED_EFFORTS = {"low", "medium", "high", "xhigh", "max"}
 
-    Google GenAI uses uppercase types ("OBJECT", "STRING"), but Anthropic
-    requires standard JSON Schema lowercase types ("object", "string").
-    """
-    if not isinstance(schema, dict):
-        return schema
-    result = {}
-    for key, value in schema.items():
-        if key == "type" and isinstance(value, str):
-            if value != value.lower():
-                logger.debug(
-                    "_lowercase_schema_types: found non-lowercase type value "
-                    f"{value!r} "
-                    "— this function may not be dead code after all"
-                )
-            result[key] = value.lower()
-        elif isinstance(value, dict):
-            result[key] = _lowercase_schema_types(value)
-        elif isinstance(value, list):
-            result[key] = [
-                _lowercase_schema_types(item) if isinstance(item, dict) else item
-                for item in value
-            ]
-        else:
-            result[key] = value
-    return result
+# Models that take a fixed thinking budget instead of adaptive thinking. Newer
+# models are assumed to be adaptive, so only the older generation is listed.
+BUDGET_THINKING_MODELS = ("claude-haiku-4-5", "claude-sonnet-4-5", "claude-opus-4-5")
 
 
-DEFAULT_ANTHROPIC_VERTEX_REGION = "us-east5"
-DEFAULT_MAX_TOKENS = 16000
+def _uses_budget_thinking(model_name: str) -> bool:
+    return model_name.startswith(BUDGET_THINKING_MODELS)
+
+
+class ClaudeRefusalError(RuntimeError):
+    """Claude stopped the response with `stop_reason: "refusal"`."""
 
 
 class AnthropicProvider(LLMProvider):
@@ -67,12 +49,27 @@ class AnthropicProvider(LLMProvider):
             model_name or os.getenv("CLAUDE_MODEL") or DEFAULT_CLAUDE_MODEL
         )
         self.max_tokens = int(os.getenv("ANTHROPIC_MAX_TOKENS") or DEFAULT_MAX_TOKENS)
+        self.effort = (os.getenv("ANTHROPIC_EFFORT") or "").strip().lower() or None
+        if self.effort is not None and self.effort not in SUPPORTED_EFFORTS:
+            choices = ", ".join(sorted(SUPPORTED_EFFORTS))
+            raise ValueError(f"ANTHROPIC_EFFORT must be one of: {choices}")
 
     @property
     def supports_native_thinking(self) -> bool:
-        # `_stream` always requests thinking={"type": "adaptive"} below, so every
-        # Claude call on this provider yields real thinking_delta chunks.
+        # `_thinking_config` requests thinking on every model, with a readable
+        # summary, so every Claude call yields real thinking_delta chunks.
         return True
+
+    def _thinking_config(self) -> dict:
+        """Thinking for this model's generation (ADR 0043).
+
+        Claude Opus 4.7 and later omit the thinking text unless asked, which
+        would stream empty thinking to the chat panel; `summarized` asks for it.
+        """
+        if _uses_budget_thinking(self.model_name):
+            budget = min(DEFAULT_THINKING_BUDGET, self.max_tokens - 1)
+            return {"type": "enabled", "budget_tokens": budget}
+        return {"type": "adaptive", "display": "summarized"}
 
     def _initialize_client(self):
         import anthropic
@@ -167,9 +164,7 @@ class AnthropicProvider(LLMProvider):
             {
                 "name": t.name,
                 "description": t.description,
-                "input_schema": _lowercase_schema_types(t.parameters)
-                if t.parameters
-                else {"type": "object", "properties": {}},
+                "input_schema": t.parameters or {"type": "object", "properties": {}},
             }
             for t in tools
         ]
@@ -215,15 +210,20 @@ class AnthropicProvider(LLMProvider):
         usage_cached = 0
         usage_cache_write = 0
         usage_output = 0
+        stop_reason = None
 
-        async with self.client.messages.stream(
-            model=self.model_name,
-            max_tokens=self.max_tokens,
-            system=system_payload,
-            messages=messages,
-            tools=anthropic_tools,
-            thinking={"type": "adaptive"},
-        ) as stream:
+        request: dict = {
+            "model": self.model_name,
+            "max_tokens": self.max_tokens,
+            "system": system_payload,
+            "messages": messages,
+            "tools": anthropic_tools,
+            "thinking": self._thinking_config(),
+        }
+        if self.effort and not _uses_budget_thinking(self.model_name):
+            request["output_config"] = {"effort": self.effort}
+
+        async with self.client.messages.stream(**request) as stream:
             async for event in stream:
                 etype = event.type
 
@@ -281,6 +281,10 @@ class AnthropicProvider(LLMProvider):
                         )
 
                 elif etype == "message_delta":
+                    stop_reason = (
+                        getattr(getattr(event, "delta", None), "stop_reason", None)
+                        or stop_reason
+                    )
                     u = getattr(event, "usage", None)
                     if u is not None:
                         # message_delta.usage.output_tokens is a running total for this
@@ -298,3 +302,8 @@ class AnthropicProvider(LLMProvider):
                             cache_write_tokens=usage_cache_write,
                         )
                     )
+                    if stop_reason == "refusal":
+                        # Usage is yielded first: a refused response is still billed.
+                        raise ClaudeRefusalError(
+                            "Claude declined to continue this response."
+                        )
