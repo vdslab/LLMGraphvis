@@ -59,8 +59,6 @@ unfixable = []
 "networkx-api/scripts/**" = ["D"]
 "**/verify_*.py" = ["D"]
 "**/repro*.py" = ["D"]
-"backend/experiment_thinking.py" = ["D"]
-"backend/inspect_sdk.py" = ["D"]
 "networkx-api/list_networks.py" = ["D"]
 "networkx-api/test_schema.py" = ["D"]
 

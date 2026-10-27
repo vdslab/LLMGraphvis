@@ -102,9 +102,10 @@ sequenceDiagram
     B-->>F: 202 Accepted
     note right of B: リクエストを即座に受け付け、<br/>以降の処理はバックグラウンドで実行。
 
-    %% Step 1: Backend starts the process and streams thinking
+    %% Step 1: Backend starts the process and streams the model's reasoning
     B->>LLM: ユーザー指示、チャット履歴、ツールリストを送信
-    B-->>F: SSEイベント (event: thinking_stream, data: "ユーザーの意図を解釈中...")
+    LLM-->>B: 推論ストリーム
+    B-->>F: SSEイベント (event: thinking_stream, data: モデルの推論テキスト)
     note right of LLM: ユーザー指示を解釈し、<br/>可視化の全体計画を立てる。
     LLM-->>B: ツール呼び出し要求 (1. read_resource)
 

@@ -52,6 +52,7 @@ listings, DDL and counts went stale before.
 | What a tool does and what its parameters mean | the tool's docstring and `Field(description=...)` in `networkx-api/app/mcp/tools/` |
 | What the model sees of a tool result | `backend/app/services/llm/observations.py` |
 | What a token count means, and its cost | `UsageData` in `llm/providers/types.py` (ADR 0025), `llm/pricing.py` |
+| Which models are offered, the defaults, and per-generation request options | `llm/catalog.py`, `llm/providers/defaults.py`, each adapter in `llm/providers/` (ADR 0043) |
 | What an attribute means (`role`, `measurement`) | `networkx-api/app/logic/attribute_semantics.py` (ADR 0030) |
 
 Tool docstrings and `Field` descriptions are **prompt surface**, sent to the
