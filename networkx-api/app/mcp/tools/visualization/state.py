@@ -88,7 +88,7 @@ def visualization_describe(
         Field(
             ge=1,
             le=15,
-            description="The most entries any list in the result returns (groups, prominent nodes, components, outliers, labels).",
+            description="The most entries any list in the result returns (groups, highest-valued nodes, prominent nodes, components, outliers, labels).",
         ),
     ] = 5,
 ) -> dict:
@@ -108,8 +108,10 @@ def visualization_describe(
       `spread` (0 = tight), and `cohesion`, the share of each member's nearest
       neighbours in the same group, against `chance` for a random drawing.
       `separation` sums this up: 0 = groups are mixed at random, 1 = fully apart.
-    - `numeric_placement`: for numeric size/color encodings, where the highest
-      values sit and `center_correlation` (> 0: high values toward the center).
+    - `numeric_placement`: for numeric size/color encodings, where the top tenth
+      of nodes by value sits, `high_values.nodes` naming the highest ones with
+      their value and position, and `center_correlation` (> 0: high values
+      toward the center).
     - `prominent_nodes`: the largest drawn nodes with their degree and whether
       they sit in the core, middle or periphery.
     - `components`: connected components drawn, isolated nodes, and where the

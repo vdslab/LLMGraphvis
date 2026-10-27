@@ -20,6 +20,8 @@ they see. Never infer positions from the layout's name or from the algorithm.
   `center_correlation` says if high values sit toward the center (positive) or
   the edge (negative); near zero means no pattern worth reporting.
 - **Hubs, islands, stragglers**: `prominent_nodes`, `components`, `outliers`.
+- **Naming nodes**: name only nodes the result lists (`high_values.nodes`,
+  `prominent_nodes`, `outliers`), never from what you know of the dataset.
 
 ## Choosing the groups
 

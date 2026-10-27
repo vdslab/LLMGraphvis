@@ -152,7 +152,7 @@ def describe_drawing(
         result["numeric_placement"] = [
             entry
             for channel, attribute, values in numeric
-            if (entry := _numeric(ids, points, channel, attribute, values))
+            if (entry := _numeric(nodes, points, channel, attribute, values, limit))
         ]
     degree = Counter()
     for link in links:
@@ -255,17 +255,18 @@ def _groups(
 
 
 def _numeric(
-    ids: List[str],
+    nodes: List[Dict],
     points: np.ndarray,
     channel: str,
     attribute: str,
     values: Mapping[str, float],
+    limit: int,
 ) -> Optional[Dict[str, Any]]:
     present = [
-        (i, float(values[node_id]))
-        for i, node_id in enumerate(ids)
-        if isinstance(values.get(node_id), (int, float))
-        and not isinstance(values.get(node_id), bool)
+        (i, float(values[n["id"]]))
+        for i, n in enumerate(nodes)
+        if isinstance(values.get(n["id"]), (int, float))
+        and not isinstance(values.get(n["id"]), bool)
     ]
     if len(present) < 3:
         return None
@@ -276,7 +277,8 @@ def _numeric(
     closeness = -np.hypot(points[idx, 0], points[idx, 1])
     corr = spearmanr(vals, closeness)[0]
     top_n = max(1, int(round(len(vals) * HIGH_VALUE_SHARE)))
-    top = points[idx[np.argsort(-vals)[:top_n]]]
+    order = idx[np.argsort(-vals, kind="stable")[:top_n]]
+    top = points[order]
     return {
         "channel": channel,
         "attribute": attribute,
@@ -286,6 +288,17 @@ def _numeric(
             **_point(top),
             "main_regions": _main_regions(top),
             "placement": dict(Counter(placement_of(x, y) for x, y in top)),
+            "nodes": [
+                {
+                    "id": nodes[i]["id"],
+                    "label": nodes[i]["label"],
+                    "value": _round(values[nodes[i]["id"]], 4),
+                    "region": region_of(*points[i]),
+                    "placement": placement_of(*points[i]),
+                }
+                for i in order[:limit]
+            ],
+            **_omitted(top_n, min(top_n, limit)),
         },
     }
 

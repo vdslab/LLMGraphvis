@@ -108,6 +108,30 @@ def test_numeric_placement_finds_high_values_at_the_center():
     entry = result["numeric_placement"][0]
     assert entry["center_correlation"] > 0.9
     assert entry["high_values"]["region"] == "center"
+    top = entry["high_values"]["nodes"][0]
+    assert top == {
+        "id": "n12",
+        "label": "n12",
+        "value": 0.0,
+        "region": "center",
+        "placement": "core",
+    }
+
+
+def test_high_values_name_the_top_nodes_up_to_limit():
+    """The model names nodes from the result, so the names must be in it."""
+    nodes = [node(f"n{i}", i * 40 - 1000, 0) for i in range(40)]
+    values = {f"n{i}": float(i) for i in range(40)}
+    result = describe_drawing(
+        {"nodes": nodes, "links": [], "legend": {}},
+        numeric=[("node_color", "score", values)],
+        limit=2,
+    )
+    high = result["numeric_placement"][0]["high_values"]
+    assert high["node_count"] == 4
+    assert [n["id"] for n in high["nodes"]] == ["n39", "n38"]
+    assert high["nodes"][0]["value"] == 39.0
+    assert high["omitted"] == 2
 
 
 def test_lists_are_bounded_by_limit():
@@ -151,7 +175,9 @@ def test_tool_describes_the_saved_drawing_without_a_payload(bound):
     assert result["canvas"]["node_count"] == 8
     assert result["groups"]["by"] == "team"
     assert {i["value"] for i in result["groups"]["items"]} == {"red", "blue"}
-    assert result["numeric_placement"][0]["attribute"] == "score"
+    high = result["numeric_placement"][0]
+    assert high["attribute"] == "score"
+    assert high["high_values"]["nodes"][0]["id"] == "n7"
     assert result["prominent_nodes"]["items"][0]["id"] == "n7"
     assert "layout_quality" in result
 
