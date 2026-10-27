@@ -436,6 +436,11 @@
  "visualization_apply_layout": [
   "network_id"
  ],
+ "visualization_describe": [
+  "group_by",
+  "limit",
+  "network_id"
+ ],
  "visualization_generate": [
   "network_id"
  ],

@@ -1,5 +1,5 @@
 import logging
-from typing import Annotated, List
+from typing import Annotated, List, Optional
 
 from pydantic import Field
 
@@ -71,6 +71,111 @@ def visualization_get_state(
         from app.logic import visualization_builder
 
         return visualization_builder.get_current_visualization(db, network_id)
+
+
+@mcp.tool()
+@handle_tool_errors
+def visualization_describe(
+    network_id: Annotated[int, Field(description="The ID of the network.")],
+    group_by: Annotated[
+        Optional[str],
+        Field(
+            description="Node attribute whose values to describe as groups, e.g. a '{algorithm}_community' attribute. Omit to use the attribute node color encodes when it is categorical, or else the drawn colors when only a few are drawn. A numeric attribute with many distinct values is described as a numeric placement instead."
+        ),
+    ] = None,
+    limit: Annotated[
+        int,
+        Field(
+            ge=1,
+            le=15,
+            description="The most entries any list in the result returns (groups, prominent nodes, components, outliers, labels).",
+        ),
+    ] = 5,
+) -> dict:
+    """
+    Describes what the current drawing shows and where, in numbers, so you can check
+    the picture without seeing it. Changes nothing and draws nothing.
+
+    Positions are measured on the whole drawing as the canvas draws it (x right, y
+    down, both in [-1000, 1000]) and named on a 3x3 grid: 'top-left', 'top', ...,
+    'center', ..., 'bottom-right'. The user's current zoom is not known, so this
+    always describes the whole drawing. Returns:
+    - `canvas`: drawn node/edge counts and how many nodes are dimmed.
+    - `encodings`: which attribute each visual channel shows (the legend).
+    - `regions`: share of nodes in each grid region, the densest, the empty ones.
+    - `groups`: per group (see `group_by`), its node count, color, center and
+      region, `main_regions` (where most of it lies; several means it is split),
+      `spread` (0 = tight), and `cohesion`, the share of each member's nearest
+      neighbours in the same group, against `chance` for a random drawing.
+      `separation` sums this up: 0 = groups are mixed at random, 1 = fully apart.
+    - `numeric_placement`: for numeric size/color encodings, where the highest
+      values sit and `center_correlation` (> 0: high values toward the center).
+    - `prominent_nodes`: the largest drawn nodes with their degree and whether
+      they sit in the core, middle or periphery.
+    - `components`: connected components drawn, isolated nodes, and where the
+      largest ones lie and how much of the canvas each spans (`extent`, x and y).
+    - `outliers`: nodes far from every other node (`isolation` = their nearest
+      neighbour distance over the typical one).
+    - `highlight` and `labels`: where the highlighted nodes are, which labels show.
+    - `layout_quality`: the readability metrics `visualization_generate` reports.
+
+    Use it to answer "what does the picture show", to confirm an encoding or layout
+    did what was intended, or before describing the drawing to the user.
+    """
+    with get_db_context() as db:
+        from app.logic import visualization_builder
+        from app.logic.attributes import load_node_attribute_values
+        from app.logic.drawing_description import MAX_CATEGORIES, describe_drawing
+        from common import models
+
+        vis_data = visualization_builder.build_visualization(
+            db, network_id, with_quality=True
+        )
+        legend = vis_data.get("legend") or {}
+        color = legend.get("node_color") or {}
+        size = legend.get("node_size") or {}
+
+        def values_of(attribute: str) -> dict:
+            values = load_node_attribute_values(network_id, attribute, db)
+            if not values:
+                known = [
+                    a.attribute_name
+                    for a in db.query(models.NodeAttribute.attribute_name)
+                    .filter(models.NodeAttribute.network_id == network_id)
+                    .all()
+                ]
+                raise ValueError(
+                    f"Node attribute '{attribute}' has no values on network "
+                    f"{network_id}. Known attributes: {', '.join(sorted(known))}."
+                )
+            return values
+
+        groups = None
+        numeric = []
+        if group_by:
+            values = values_of(group_by)
+            numbers = all(
+                isinstance(v, (int, float)) and not isinstance(v, bool)
+                for v in values.values()
+            )
+            if numbers and len(set(values.values())) > MAX_CATEGORIES:
+                numeric.append(("group_by", group_by, values))
+            else:
+                groups = (group_by, values)
+        elif color.get("type") == "categorical" and color.get("attribute"):
+            groups = (color["attribute"], values_of(color["attribute"]))
+
+        if size.get("attribute"):
+            numeric.append(
+                ("node_size", size["attribute"], values_of(size["attribute"]))
+            )
+        if color.get("type") in ("linear", "ranking") and color.get("attribute"):
+            numeric.append(
+                ("node_color", color["attribute"], values_of(color["attribute"]))
+            )
+
+        description = describe_drawing(vis_data, groups, numeric, limit)
+        return {"network_id": network_id, **description}
 
 
 @mcp.tool()

@@ -43,3 +43,4 @@
 | [0037](./0037-chat-rendering-and-stream-resync.md) | 返答の表示を整え、取りこぼしたターンを保存値から回復する | 採用 |
 | [0038](./0038-no-row-lock-across-await.md) | 行ロックは await をまたがず、イベントループ上で待たない | 採用 |
 | [0041](./0041-pack-components.md) | 複数の連結成分からなるグラフは、成分ごとに配置して詰める | 採用 |
+| [0042](./0042-visualization-describe.md) | 描画の状態を、画像を見ずに数値で説明するツール | 採用 |
