@@ -97,3 +97,27 @@ def test_lmstudio_first_model_is_default_when_not_explicitly_configured(monkeypa
 
     lmstudio = next(provider for provider in providers if provider["id"] == "lmstudio")
     assert [model["default"] for model in lmstudio["models"]] == [True, False]
+
+
+def test_every_catalog_model_has_a_price():
+    from app.services.llm.catalog import PROVIDER_CATALOG
+    from app.services.llm.pricing import MODEL_PRICING
+
+    unpriced = [
+        model["id"]
+        for provider in PROVIDER_CATALOG
+        for model in provider["models"]
+        if model["id"] not in MODEL_PRICING
+    ]
+    assert unpriced == []
+
+
+def test_every_provider_default_is_in_the_catalog():
+    from app.services.llm.catalog import PROVIDER_CATALOG, PROVIDER_MODEL_DEFAULTS
+
+    listed = {
+        provider["id"]: {model["id"] for model in provider["models"]}
+        for provider in PROVIDER_CATALOG
+    }
+    for provider_id, (_, default_model) in PROVIDER_MODEL_DEFAULTS.items():
+        assert default_model in listed[provider_id]

@@ -1,10 +1,11 @@
 """Provider/model options exposed to the frontend for per-chat selection.
 
-Model ids here must stay in sync with the defaults in the provider adapters and
-with pricing.py's MODEL_PRICING keys (a model without a rate is shown with an
-unknown cost rather than erroring, so drift here degrades gracefully but should
-still be avoided). LM Studio is added dynamically because its model id is
-chosen by the user in LM Studio rather than by this application.
+Every model id here must have a rate in pricing.py's MODEL_PRICING
+(tests/test_llm_catalog.py checks it), and each provider's default from
+providers/defaults.py must be listed. Models are kept after a newer one ships,
+because chats stay pinned to the model they started with (ADR 0043). LM Studio
+is added dynamically because its model id is chosen by the user in LM Studio
+rather than by this application.
 """
 
 import os
@@ -23,8 +24,11 @@ PROVIDER_CATALOG: List[Dict[str, Any]] = [
         "label": "Google Gemini",
         "models": [
             {"id": "gemini-3.8-flash", "label": "Gemini 3.8 Flash"},
+            {"id": "gemini-4-argon", "label": "Gemini 4 Argon"},
+            {"id": "gemini-3.6-flash", "label": "Gemini 3.6 Flash"},
             {"id": "gemini-3.1-pro-preview", "label": "Gemini 3.1 Pro (Preview)"},
             {"id": "gemini-3.5-flash-lite", "label": "Gemini 3.5 Flash-Lite"},
+            {"id": "gemini-3.1-flash-lite", "label": "Gemini 3.1 Flash-Lite"},
             {"id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash"},
             {"id": "gemini-2.5-pro", "label": "Gemini 2.5 Pro"},
         ],
@@ -33,6 +37,10 @@ PROVIDER_CATALOG: List[Dict[str, Any]] = [
         "id": "anthropic",
         "label": "Anthropic Claude",
         "models": [
+            {"id": "claude-opus-5-5", "label": "Claude Opus 5.5"},
+            {"id": "claude-sonnet-5-5", "label": "Claude Sonnet 5.5"},
+            {"id": "claude-haiku-5-5", "label": "Claude Haiku 5.5"},
+            {"id": "claude-opus-5", "label": "Claude Opus 5"},
             {"id": "claude-opus-4-8", "label": "Claude Opus 4.8"},
             {"id": "claude-sonnet-5", "label": "Claude Sonnet 5"},
             {"id": "claude-haiku-4-5", "label": "Claude Haiku 4.5"},
@@ -43,6 +51,9 @@ PROVIDER_CATALOG: List[Dict[str, Any]] = [
         "label": "OpenAI ChatGPT",
         "models": [
             {"id": "gpt-5.6-sol", "label": "GPT-5.6 Sol"},
+            {"id": "gpt-6.1-sol", "label": "GPT-6.1 Sol"},
+            {"id": "gpt-6.1-terra", "label": "GPT-6.1 Terra"},
+            {"id": "gpt-6-luna", "label": "GPT-6 Luna"},
             {"id": "gpt-5.6-terra", "label": "GPT-5.6 Terra"},
             {"id": "gpt-5.6-luna", "label": "GPT-5.6 Luna"},
         ],

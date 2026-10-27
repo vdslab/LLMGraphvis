@@ -1,6 +1,6 @@
 """Token usage: normalization, cost, persistence and reports (ADR 0025)."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -50,8 +50,29 @@ def test_cost_uses_one_formula_for_every_provider():
     usage = UsageData(
         input_tokens=1_000_000, cached_input_tokens=400_000, output_tokens=1_000_000
     )
-    cost = estimate_cost_usd("gemini-3.8-flash", usage, provider="google")
+    cost = estimate_cost_usd(
+        "gemini-3.8-flash", usage, provider="google", on=date(2026, 10, 27)
+    )
     assert cost == pytest.approx(0.6 * 0.75 + 0.4 * 0.075 + 3.75)
+
+
+def test_announced_price_change_applies_from_its_date():
+    usage = UsageData(input_tokens=1_000_000, output_tokens=1_000_000)
+    before = estimate_cost_usd("gemini-4-argon", usage, on=date(2026, 11, 30))
+    after = estimate_cost_usd("gemini-4-argon", usage, on=date(2026, 12, 1))
+    assert before == pytest.approx(2.00 + 10.00)
+    assert after == pytest.approx(4.00 + 20.00)
+
+
+def test_long_context_rate_is_chosen_per_call():
+    # gemini-2.5-pro: 1.25 / 10 up to 200k prompt tokens, 2.50 / 15 above.
+    turn = TurnUsage()
+    turn.add_call(UsageData(input_tokens=150_000, output_tokens=1_000))
+    turn.add_call(UsageData(input_tokens=250_000, output_tokens=1_000))
+    cost = estimate_cost_usd("gemini-2.5-pro", turn, provider="google")
+    short = (150_000 * 1.25 + 1_000 * 10.00) / 1_000_000
+    long = (250_000 * 2.50 + 1_000 * 15.00) / 1_000_000
+    assert cost == pytest.approx(short + long)
 
 
 def test_unknown_model_cost_is_unknown_not_free():
