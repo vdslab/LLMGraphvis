@@ -73,9 +73,10 @@ const NetworkGraph = memo(({
     svg.on("click", null);
     svg.on(".zoom", null);
     
-    svg.selectAll("*").remove(); // Clear previous
-
-    if (!nodes.length) return;
+    if (!nodes.length) {
+      svg.selectAll("g.graph-content").remove();
+      return;
+    }
 
     // Use dimensions from state if available, else fallback to ref (though ref should be accurate with observer)
     const width = dimensions.width || svgRef.current?.clientWidth || 0;
@@ -119,7 +120,8 @@ const NetworkGraph = memo(({
        .attr("preserveAspectRatio", "xMidYMid meet");
 
     // Group for zoomable content
-    const g = svg.append("g");
+    const g = svg.selectAll("g.graph-content").data([null]).join("g")
+      .attr("class", "graph-content");
     // viewBox units per screen pixel ("meet" scales by the tighter axis).
     const unitsPerPx = Math.max(viewBoxW / width, viewBoxH / height);
 
@@ -129,9 +131,14 @@ const NetworkGraph = memo(({
     const orderedNodes = [...nodes].sort(byHighlight);
 
     // 3. Draw Links
-    g.append("g")
+    g.selectAll("g.graph-links").data([null]).join("g")
+      .attr("class", "graph-links")
       .selectAll("line")
-      .data(orderedLinks)
+      .data(orderedLinks, (d, i) => d.id ?? d.edge_id ?? JSON.stringify([
+        typeof d.source === 'object' ? d.source.id : d.source,
+        typeof d.target === 'object' ? d.target.id : d.target,
+        i,
+      ]))
       .join("line")
       .attr("x1", d => {
         const sId = typeof d.source === 'object' ? d.source.id : d.source;
@@ -163,11 +170,27 @@ const NetworkGraph = memo(({
       .attr("stroke-width", d => (d.highlighted ? Math.max(d.width || 1, 2) : d.width || 1));
 
     // 4. Draw Nodes
-    const nodeGroup = g.append("g")
+    const nodeGroup = g.selectAll("g.graph-nodes").data([null]).join("g")
+      .attr("class", "graph-nodes")
       .selectAll("g")
-      .data(orderedNodes)
-      .join("g")
+      .data(orderedNodes, d => d.id)
+      .join(enter => {
+        const group = enter.append("g");
+        group.append("circle");
+        group.append("title");
+        return group;
+      })
+      .order()
       .attr("transform", d => `translate(${d.x},${d.y})`)
+      .attr("role", "button")
+      .attr("tabindex", 0)
+      .attr("aria-label", d => `Node ${d.label ?? d.id}`)
+      .on("keydown", (event, d) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onNodeClickRef.current?.(d);
+        }
+      })
       .style("cursor", "pointer") // Indicate clickable
       .on("click", (event, d) => {
         // Prevent background click
@@ -177,7 +200,7 @@ const NetworkGraph = memo(({
         }
       });
 
-    nodeGroup.append("circle")
+    nodeGroup.select("circle")
       .attr("r", d => {
          // NetworkX node_size is area. User script uses size * 10.
          // Area = pi * r^2 = size * 10
@@ -191,7 +214,7 @@ const NetworkGraph = memo(({
       .attr("stroke-width", d => (d.highlighted ? 1.5 : null))
       .attr("vector-effect", "non-scaling-stroke");
 
-    nodeGroup.append("title")
+    nodeGroup.select("title")
       .text(d => d.label);
 
     // 5. Labels: a separate top layer so no node covers a label. Their size is
@@ -200,10 +223,11 @@ const NetworkGraph = memo(({
     const maxLength = labelStyle?.max_length;
     const radius = d => Math.sqrt((d.size || 5) * 10 / Math.PI);
     const candidates = labelCandidates(nodes, { showLabels });
-    const labels = g.append("g")
+    const labels = g.selectAll("g.graph-labels").data([null]).join("g")
+      .attr("class", "graph-labels")
       .style("pointer-events", "none")
       .selectAll("text")
-      .data(candidates)
+      .data(candidates, d => d.id)
       .join("text")
       .text(d => labelText(d.label, maxLength))
       .attr("text-anchor", "middle")
@@ -271,7 +295,6 @@ const NetworkGraph = memo(({
         }
         svg.on("click", null);
         svg.on(".zoom", null);
-        svg.selectAll("*").remove();
     };
 
   }, [nodes, links, showLabels, labelStyle, viewport, dimensions]); // Dependencies updated to exclude callbacks
@@ -282,7 +305,7 @@ const NetworkGraph = memo(({
       data-testid="network-graph"
       style={{ width: '100%', height: '100%', position: 'relative' }}
     >
-      <svg ref={svgRef} style={{ width: '100%', height: '100%', display: 'block' }}></svg>
+      <svg ref={svgRef} role="group" aria-label="Network graph" style={{ width: '100%', height: '100%', display: 'block' }}></svg>
     </div>
   );
 });

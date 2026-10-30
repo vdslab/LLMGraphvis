@@ -124,8 +124,8 @@ Available centrality metrics:
 
 ```bash
 cd backend       && pytest
-cd networkx-api  && pytest tests
-cd frontend      && npm test && npm run lint
+cd networkx-api  && python -m pytest
+cd frontend      && npm run test:ci && npm run lint
 ```
 
 ### Manual Testing

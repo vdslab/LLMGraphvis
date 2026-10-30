@@ -1,10 +1,12 @@
-FROM node:24-slim
-
+FROM node:24.22.2-bookworm-slim AS dependencies
 WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
 
-COPY package*.json ./
-RUN npm install
-
+FROM dependencies AS build
 COPY . .
+RUN npm run build
 
-CMD ["sh", "-c", "npm install && npm run dev -- --host"]
+FROM dependencies AS development
+COPY . .
+CMD ["npm", "run", "dev", "--", "--host"]

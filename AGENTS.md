@@ -13,7 +13,7 @@ This is the single source of agent instructions; `CLAUDE.md` and
 | Service | Port | Role |
 |---|---|---|
 | `backend/` | 8000 | Auth, chat, **the agent loop** (LLM client + MCP client) |
-| `networkx-api/` | 8001 | All graph algorithms, exposed as an **MCP server** at `/mcp/sse` |
+| `networkx-api/` | 8001 | All graph algorithms, exposed as an **MCP server** at `/mcp/` (Streamable HTTP) |
 | `frontend/` | 5173 | React + D3. Draws what the backend sends; computes nothing |
 | `db` | 5433 → 5432 | Postgres. Models are shared via `common/models.py` |
 
@@ -124,7 +124,7 @@ skill's `related_tools` (or `SEARCH_ONLY` in
 `backend/tests/test_skill_tool_references.py`, with a reason), or tests fail (ADR 0027).
 Add a skill *only* for procedural guidance, a hook *only* for enforcement.
 The MCP server serves no prompts.
-The backend caches tool definitions for `MCP_TOOLS_CACHE_TTL` seconds (default 300).
+The backend caches tool definitions (`MCP_TOOLS_CACHE_TTL`).
 
 ### Invariants that are easy to get wrong
 
@@ -197,15 +197,15 @@ docker compose up -d                 # db / backend:8000 / networkx-api:8001 / f
 scripts/local/start.sh               # non-Docker macOS runner (state under .local/)
 
 cd backend       && pytest
-cd networkx-api  && pytest tests     # run from this dir; there is no pytest.ini here
-cd frontend      && npm test && npm run lint
+cd networkx-api  && python -m pytest
+cd frontend      && npm run test:ci && npm run lint
 ```
 
 Schema changes need an Alembic revision in `backend/alembic/versions/` and
 `python -m common.schema_doc` (from `backend/`) to regenerate the ER diagram
 `common/schema.md`; a test fails otherwise (ADR 0031). Lint: root
 `pyproject.toml` (ruff check and format; its per-file exceptions say why).
-There is **no CI**.
+CI runs unit, PostgreSQL lock and browser tests; see `QUICKSTART.md`.
 
 ## Known rough edges
 

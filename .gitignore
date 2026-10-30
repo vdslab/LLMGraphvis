@@ -357,3 +357,7 @@ backend/application_default_credentials.json
 # Playwright MCP scratch output: screenshots, page snapshots, console logs
 # written while driving the frontend. Evidence of a check, not part of the app.
 .playwright-mcp/
+
+# Browser regression artifacts
+frontend/test-results/
+frontend/playwright-report/

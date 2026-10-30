@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import Markdown from '../components/chat/Markdown';
 
 describe('Markdown', () => {
-  it('renders inline math', () => {
+  it('renders inline math', async () => {
     const { container } = render(<Markdown>{'A $\\rightarrow$ B'}</Markdown>);
-    expect(container.querySelector('.katex')).not.toBeNull();
+    await waitFor(() => expect(container.querySelector('.katex')).not.toBeNull());
     expect(container.textContent).not.toContain('$');
   });
 

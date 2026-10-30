@@ -83,15 +83,49 @@ cd networkx-api  && uvicorn app.main:app --reload --host 0.0.0.0 --port 8001
 cd frontend      && npm install && npm run dev
 ```
 
-Python dependencies for both services are declared in the root `pyproject.toml`.
+Python dependencies are declared in each service's `requirements.txt` and
+resolved into hash-checked `requirements.lock` files. Docker installs the locks.
+The root `pyproject.toml` configures lint and typing checks. Run
+`scripts/update-python-locks` with uv installed to refresh Python locks, then run
+the regression checks. Frontend dependencies are installed with `npm ci`.
 
 ## Tests
 
 ```bash
 cd backend       && pytest
-cd networkx-api  && pytest tests     # run from this directory
-cd frontend      && npm test && npm run lint
+cd networkx-api  && python -m pytest
+cd frontend      && npm run test:ci && npm run lint
 ```
+
+## Browser and PostgreSQL regression checks
+
+The test stack uses a separate, ephemeral database and a deterministic assistant.
+HTTP, MCP, graph calculations, tuning, stored messages and SSE are real. No LLM
+key or LM Studio is required.
+
+```bash
+docker compose -p graphvis-tests -f docker-compose.evaluation.yml -f docker-compose.test.yml up -d --build --wait
+cd frontend
+npm ci
+npx playwright install chromium
+npm run test:e2e
+cd ..
+docker compose -p graphvis-tests -f docker-compose.evaluation.yml exec -T evaluation-db psql -U evaluation -d graphvis_evaluation -c 'CREATE DATABASE graphvis_test'
+docker compose -p graphvis-tests -f docker-compose.evaluation.yml exec -T -e TEST_POSTGRES_URL=postgresql+psycopg2://evaluation:evaluation@evaluation-db:5432/graphvis_test evaluation-backend python -m pytest -q
+# Stop only the disposable test stack:
+docker compose -p graphvis-tests -f docker-compose.evaluation.yml -f docker-compose.test.yml down -v
+```
+
+Browser failures retain a screenshot and trace under `frontend/test-results/`.
+The lock regression rejects database names other than `*_test` or `test_*`.
+GitHub Actions runs these checks on pushes and PRs, and reports dependency
+updates weekly. Dependabot proposes npm, Docker and Actions updates.
+
+To update running images, back up PostgreSQL first, then rebuild with
+`docker compose build --pull` and recreate with `docker compose up -d`.
+A `docker compose up` alone does not refresh an existing base image.
+PostgreSQL major upgrades require a separate dump/restore or `pg_upgrade` plan;
+do not point a newer major image at the existing data directory.
 
 ## Troubleshooting
 

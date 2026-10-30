@@ -16,6 +16,7 @@ const NodeDetailsPanel = ({ selectedNode, onClose, onAskAboutNode }) => {
         right: '20px',
         top: '20px',
         width: '320px',
+        maxWidth: 'calc(100% - 40px)',
         backgroundColor: 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(16px)',
         boxShadow: 'var(--md-sys-elevation-3)',

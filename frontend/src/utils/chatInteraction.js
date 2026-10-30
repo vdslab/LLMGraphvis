@@ -19,7 +19,8 @@ export const isUnsent = (message) => UNSENT.has(message?.status);
 
 export const latestInteraction = (messages) => {
   const latest = messages.findLast((message) => !isUnsent(message));
-  if (latest?.role !== 'assistant') return null;
+  // Stored messages use the provider role; streamed messages use the UI role.
+  if (!['assistant', 'model'].includes(latest?.role)) return null;
   const executions = latest.tool_executions ?? [];
   for (let i = executions.length - 1; i >= 0; i -= 1) {
     const interaction = interactionForExecution(executions[i]);

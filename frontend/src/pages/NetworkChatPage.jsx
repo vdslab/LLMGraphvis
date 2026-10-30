@@ -224,47 +224,25 @@ const NetworkChatPage = () => {
     }
   };
 
-  // --- Resize Logic ---
-  const [sidebarWidth, setSidebarWidth] = useState(window.innerWidth / 4);
+  const [sidebarWidth, setSidebarWidth] = useState(() => Math.max(280, Math.min(520, window.innerWidth / 3)));
   const [isResizing, setIsResizing] = useState(false);
-
-  const startResizing = useCallback(() => setIsResizing(true), []);
-  const stopResizing = useCallback(() => setIsResizing(false), []);
-  
-  const resize = useCallback((mouseMoveEvent) => {
-      if (isResizing) {
-        const newWidth = window.innerWidth - mouseMoveEvent.clientX;
-        if (newWidth > 200 && newWidth < window.innerWidth * 0.8) {
-          setSidebarWidth(newWidth);
-        }
-      }
-    },[isResizing]);
-
-  useEffect(() => {
-    const handleMouseUp = () => {
-        stopResizing();
-        document.body.style.userSelect = '';
-        document.body.style.cursor = '';
-    };
-
-    const handleMouseMove = (e) => {
-        resize(e);
-    };
-
-    if (isResizing) {
-        window.addEventListener("mousemove", handleMouseMove);
-        window.addEventListener("mouseup", handleMouseUp);
-        document.body.style.userSelect = 'none';
-        document.body.style.cursor = 'col-resize';
+  const [mobilePanel, setMobilePanel] = useState('graph');
+  const splitRef = useRef(null);
+  const sidebarMaximum = () => Math.max(280, Math.min(800, (splitRef.current?.clientWidth ?? window.innerWidth) - 240));
+  const setClampedWidth = (width) => setSidebarWidth(Math.max(280, Math.min(sidebarMaximum(), width)));
+  const resize = (event) => {
+    if (!isResizing) return;
+    setClampedWidth(splitRef.current.getBoundingClientRect().right - event.clientX);
+  };
+  const stopResizing = () => setIsResizing(false);
+  const handleResizeKey = (event) => {
+    const step = event.shiftKey ? 50 : 20;
+    const widths = { ArrowLeft: sidebarWidth + step, ArrowRight: sidebarWidth - step, Home: 280, End: sidebarMaximum() };
+    if (Object.hasOwn(widths, event.key)) {
+      event.preventDefault();
+      setClampedWidth(widths[event.key]);
     }
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
-    };
-  }, [isResizing, resize, stopResizing]);
+  };
 
   const [showLabels, setShowLabels] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -284,7 +262,7 @@ const NetworkChatPage = () => {
   if (!isAuthenticated) return null;
 
   return (
-    <div style={{ display: 'flex', height: '100%', flexDirection: 'column' }}>
+    <div className="network-workspace" data-mobile-panel={mobilePanel}>
       {/* M3 Error notification */}
       {sseError && (
         <div
@@ -306,12 +284,16 @@ const NetworkChatPage = () => {
         </div>
       )}
 
+      <div className="workspace-tabs" aria-label="Workspace panels">
+        <button type="button" aria-pressed={mobilePanel === 'graph'} onClick={() => setMobilePanel('graph')}>Network</button>
+        <button type="button" aria-pressed={mobilePanel === 'chat'} onClick={() => setMobilePanel('chat')}>Chat</button>
+      </div>
       {/* Main content */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div ref={splitRef} className="workspace-split">
         {/* Left Side: Navigation Sidebar Drawer */}
         {showChatList && (
           <div
-            className="fade-in"
+            className="fade-in workspace-drawer"
             style={{
               width: '280px',
               borderRight: '1px solid var(--md-sys-color-outline-subtle)',
@@ -364,7 +346,8 @@ const NetworkChatPage = () => {
         {/* Center: Graph */}
         <div
           data-testid="network-graph-panel"
-          style={{ flex: 1, position: 'relative', overflow: 'hidden' }}
+          className="workspace-graph"
+          style={{ flex: 1, position: 'relative', overflow: 'hidden', minWidth: 0 }}
         >
           {/* M3 Expressive Floating Action Bar */}
           <div
@@ -493,10 +476,29 @@ const NetworkChatPage = () => {
 
         {/* M3 Expressive Resize Handle with Grab Indicator */}
         <div
-          onMouseDown={startResizing}
+          className="workspace-separator"
+          role="separator"
+          tabIndex={0}
+          aria-label="Chat panel width"
+          aria-controls="workspace-chat"
+          aria-orientation="vertical"
+          aria-valuemin={280}
+          aria-valuemax={800}
+          aria-valuenow={sidebarWidth}
+          onKeyDown={handleResizeKey}
+          onPointerDown={(event) => {
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setIsResizing(true);
+          }}
+          onPointerMove={resize}
+          onPointerUp={stopResizing}
+          onPointerCancel={stopResizing}
+          onLostPointerCapture={stopResizing}
           style={{
             width: '8px',
             cursor: 'col-resize',
+            touchAction: 'none',
+            flexShrink: 0,
             backgroundColor: isResizing
               ? 'var(--md-sys-color-primary)'
               : 'var(--md-sys-color-surface-container)',
@@ -524,8 +526,10 @@ const NetworkChatPage = () => {
 
         {/* Right Side: Chat Interface */}
         <div
+          id="workspace-chat"
+          className="workspace-chat"
           style={{
-            width: sidebarWidth,
+            '--chat-width': `${sidebarWidth}px`,
             display: 'flex',
             flexDirection: 'column',
             overflow: 'hidden',

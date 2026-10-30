@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    ignore:
+      # eslint-plugin-react still declares ESLint <= 9 support.
+      - dependency-name: eslint
+        update-types: [version-update:semver-major]
+      - dependency-name: '@eslint/js'
+        update-types: [version-update:semver-major]
+  - package-ecosystem: docker
+    directories: [/backend, /networkx-api, /frontend, /]
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: python
+        update-types: [version-update:semver-minor, version-update:semver-major]
+      - dependency-name: node
+        update-types: [version-update:semver-major]
+      - dependency-name: postgres
+        update-types: [version-update:semver-major]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

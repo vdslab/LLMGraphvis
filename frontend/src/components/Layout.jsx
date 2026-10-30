@@ -20,14 +20,15 @@ const Layout = ({ children, fullScreen = false }) => {
       style={{
         display: 'flex',
         flexDirection: 'column',
-        height: '100vh',
+        height: '100dvh',
         backgroundColor: 'var(--md-sys-color-surface-container-low)',
       }}
     >
       {/* M3 Expressive Top App Bar */}
-      <header
+      <header className="app-header"
         style={{
-          height: '64px',
+          minHeight: '64px',
+          flexShrink: 0,
           backgroundColor: 'rgba(255, 255, 255, 0.92)',
           backdropFilter: 'blur(16px)',
           borderBottom: '1px solid var(--md-sys-color-outline-subtle)',
@@ -68,7 +69,7 @@ const Layout = ({ children, fullScreen = false }) => {
           </Link>
 
           {isAuthenticated && (
-            <nav style={{ display: 'flex', gap: '0.5rem' }}>
+            <nav className="app-nav" style={{ display: 'flex', gap: '0.5rem' }}>
               <Link
                 to="/"
                 style={{
@@ -134,7 +135,7 @@ const Layout = ({ children, fullScreen = false }) => {
                 >
                   {user?.username?.[0]?.toUpperCase() || 'U'}
                 </div>
-                <span>{user?.username}</span>
+                <span className="app-username">{user?.username}</span>
                 <Settings size={14} aria-hidden style={{ color: 'var(--md-sys-color-on-surface-variant)' }} />
               </Link>
 
@@ -178,6 +179,8 @@ const Layout = ({ children, fullScreen = false }) => {
       <main
         style={{
           flex: 1,
+          minHeight: 0,
+          minWidth: 0,
           overflow: fullScreen ? 'hidden' : 'auto',
           position: 'relative',
           display: 'flex',

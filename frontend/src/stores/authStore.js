@@ -49,8 +49,8 @@ export const useAuthStore = create(
         try {
           // If we have state from persistence, we are "optimistically" authenticated
           // but we still verify with the backend
-          const user = await api.get('/auth/users/me');
-          set({ user: user.data, isAuthenticated: true });
+          const user = await api.get('/auth/session');
+          set({ user: user.data, isAuthenticated: Boolean(user.data) });
         } catch {
           set({ user: null, isAuthenticated: false });
         } finally {

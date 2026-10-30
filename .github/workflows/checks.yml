@@ -1,0 +1,68 @@
+name: Application checks
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 1'
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SECRET_KEY: ci-only-secret-never-use-for-deployment
+      AGENT_TRACE: '0'
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '24.22.2'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: '0.13.6'
+      - name: Start isolated application
+        run: docker compose -p graphvis-ci -f docker-compose.evaluation.yml -f docker-compose.test.yml up -d --build --wait
+      - name: Create disposable row-lock test database
+        run: docker compose -p graphvis-ci -f docker-compose.evaluation.yml exec -T evaluation-db psql -U evaluation -d graphvis_evaluation -c 'CREATE DATABASE graphvis_test'
+      - name: Backend tests including PostgreSQL locks and live MCP
+        run: docker compose -p graphvis-ci -f docker-compose.evaluation.yml exec -T -e TEST_POSTGRES_URL=postgresql+psycopg2://evaluation:evaluation@evaluation-db:5432/graphvis_test evaluation-backend python -m pytest -q -o cache_dir=/tmp/pytest-cache
+      - name: NetworkX tests
+        run: docker compose -p graphvis-ci -f docker-compose.evaluation.yml exec -T evaluation-networkx python -m pytest -q -o cache_dir=/tmp/pytest-cache
+      - name: Host documentation and evaluation tests
+        run: |
+          uv venv --python 3.12 .ci-venv
+          uv pip install --python .ci-venv/bin/python --require-hashes -r backend/requirements.lock -r evaluation/requirements.lock
+          PYTHONPATH=backend:. .ci-venv/bin/python -m pytest -c backend/pytest.ini backend/tests/test_agents_md_facts.py evaluation/tests -q
+      - name: Frontend checks
+        working-directory: frontend
+        run: npm ci && npm run test:ci && npm run lint && npm run build && npm audit
+      - name: Install browser
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Browser regression
+        working-directory: frontend
+        run: npm run test:e2e
+      - name: Scheduled dependency update report
+        if: github.event_name == 'schedule'
+        run: |
+          uv pip list --python .ci-venv/bin/python --outdated | tee -a "$GITHUB_STEP_SUMMARY"
+          cd frontend
+          npm outdated >> "$GITHUB_STEP_SUMMARY" || test "$?" -eq 1
+      - name: Save browser evidence
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: browser-regression
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+      - name: Capture service logs
+        if: failure()
+        run: docker compose -p graphvis-ci -f docker-compose.evaluation.yml logs --no-color
+      - name: Stop isolated application
+        if: always()
+        run: docker compose -p graphvis-ci -f docker-compose.evaluation.yml -f docker-compose.test.yml down -v

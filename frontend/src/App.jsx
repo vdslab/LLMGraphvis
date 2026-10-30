@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
-import HomePage from './pages/HomePage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
-import NetworkChatPage from './pages/NetworkChatPage';
-import SettingsPage from './pages/SettingsPage';
+const HomePage = lazy(() => import('./pages/HomePage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const NetworkChatPage = lazy(() => import('./pages/NetworkChatPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
 import Layout from './components/Layout';
 
 const ProtectedRoute = ({ children }) => {
@@ -78,6 +78,7 @@ function App() {
   return (
     <Router>
       <ErrorBanner />
+      <Suspense fallback={<div role="status" className="page-loading">Loading…</div>}>
       <Routes>
         <Route path="/" element={<Layout><HomePage /></Layout>} />
         <Route path="/login" element={<LoginPage />} />
@@ -104,6 +105,7 @@ function App() {
         />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
+      </Suspense>
     </Router>
   );
 }

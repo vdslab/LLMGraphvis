@@ -64,9 +64,11 @@ const RegisterPage = () => {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Username</label>
+            <label className="form-label" htmlFor="auth-username">Username</label>
             <input
               type="text"
+              id="auth-username"
+              autoComplete="username"
               className="input"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
@@ -76,9 +78,11 @@ const RegisterPage = () => {
             />
           </div>
           <div className="form-group">
-            <label className="form-label">Password</label>
+            <label className="form-label" htmlFor="auth-password">Password</label>
             <input
               type="password"
+              id="auth-password"
+              autoComplete="new-password"
               className="input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
