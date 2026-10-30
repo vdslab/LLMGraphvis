@@ -105,6 +105,15 @@ def _user_for_payload(
     return user
 
 
+@router.get("/session", response_model=Optional[schemas.User])
+def current_session(
+    db: Session = Depends(database.get_db),
+    access_token: Optional[str] = Cookie(None),
+):
+    """Return the cookie-authenticated user, or null for a logged-out visitor."""
+    return _user_for_payload(db, _cookie_payload(access_token))
+
+
 async def get_current_user(
     db: Session = Depends(database.get_db),
     bearer_payload: Optional[Dict[str, Any]] = Depends(auth.get_token_payload),

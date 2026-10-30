@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserBase(BaseModel):
@@ -16,8 +16,7 @@ class UserCreate(UserBase):
 class User(UserBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Token(BaseModel):
@@ -73,8 +72,7 @@ class Chat(ChatBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LlmModelOption(BaseModel):
@@ -108,8 +106,7 @@ class Network(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ChatWithNetwork(Chat):
@@ -117,8 +114,7 @@ class ChatWithNetwork(Chat):
 
     network: Optional[Any] = None  # Allow both Dict and Network model
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ChatMessageBase(BaseModel):
@@ -147,8 +143,7 @@ class ToolExecution(ToolExecutionBase):
     message_id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LlmUsageBase(BaseModel):
@@ -168,8 +163,7 @@ class LlmUsage(LlmUsageBase):
     message_id: Optional[int] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LlmUsageCall(BaseModel):
@@ -235,8 +229,7 @@ class ChatMessage(ChatMessageBase):
     usage: Optional[LlmUsage] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ChatProcessMessage(BaseModel):

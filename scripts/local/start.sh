@@ -93,13 +93,13 @@ if [ ! -x "$VENV_DIR/bin/python" ]; then
   "$PYTHON_BIN" -m venv "$VENV_DIR"
 fi
 REQ_STAMP="$LOCAL_DIR/requirements.sha"
-REQ_HASH="$(cat "$ROOT_DIR/backend/requirements.txt" "$ROOT_DIR/networkx-api/requirements.txt" | shasum | cut -d' ' -f1)"
+REQ_HASH="$(cat "$ROOT_DIR/backend/requirements.lock" "$ROOT_DIR/networkx-api/requirements.lock" | shasum | cut -d' ' -f1)"
 if [ ! -f "$REQ_STAMP" ] || [ "$(cat "$REQ_STAMP")" != "$REQ_HASH" ]; then
   echo "  installing (this may take a few minutes on first run)..."
   "$VENV_DIR/bin/pip" install -q --upgrade pip
-  "$VENV_DIR/bin/pip" install -q \
-    -r "$ROOT_DIR/backend/requirements.txt" \
-    -r "$ROOT_DIR/networkx-api/requirements.txt"
+  "$VENV_DIR/bin/pip" install -q --require-hashes \
+    -r "$ROOT_DIR/backend/requirements.lock" \
+    -r "$ROOT_DIR/networkx-api/requirements.lock"
   echo "$REQ_HASH" >"$REQ_STAMP"
 else
   echo "  up to date"

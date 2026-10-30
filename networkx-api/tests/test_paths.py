@@ -1,5 +1,6 @@
 """Path semantics across persistence, weights, direction, and tool discovery."""
 
+import asyncio
 import json
 from unittest.mock import MagicMock, patch
 
@@ -135,8 +136,12 @@ def test_mcp_path_tools_execute_and_expose_choices(db, network):
         assert analysis_has_path(network.id, "c", "a")["reachable"] is False
         result = json.loads(analysis_shortest_path(network.id, "a", "c", "weight"))
         assert result["length"] == 5
-    tool = mcp._tool_manager.get_tool("analysis_single_source_distances")
-    assert tool.parameters["properties"]["method"]["enum"] == [
+    tool = next(
+        t
+        for t in asyncio.run(mcp.list_tools())
+        if t.name == "analysis_single_source_distances"
+    )
+    assert tool.input_schema["properties"]["method"]["enum"] == [
         "dijkstra",
         "bellman-ford",
     ]

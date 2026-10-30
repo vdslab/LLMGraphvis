@@ -22,7 +22,7 @@ find_pg_bin() {
   fi
   local prefix candidate
   for prefix in /opt/homebrew/opt /usr/local/opt; do
-    for candidate in "$prefix"/postgresql@17 "$prefix"/postgresql@16 \
+    for candidate in "$prefix"/postgresql@18 "$prefix"/postgresql@17 "$prefix"/postgresql@16 \
                      "$prefix"/postgresql@15 "$prefix"/postgresql@14 \
                      "$prefix"/postgresql; do
       if [ -x "$candidate/bin/pg_ctl" ]; then

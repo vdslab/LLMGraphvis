@@ -10,10 +10,10 @@ if [ ! -x "$VENV_DIR/bin/python" ]; then
 fi
 
 "$VENV_DIR/bin/pip" install --upgrade pip
-"$VENV_DIR/bin/pip" install \
-  -r "$ROOT_DIR/backend/requirements.txt" \
-  -r "$ROOT_DIR/networkx-api/requirements.txt" \
-  -r "$ROOT_DIR/evaluation/requirements.txt"
+"$VENV_DIR/bin/pip" install --require-hashes \
+  -r "$ROOT_DIR/backend/requirements.lock" \
+  -r "$ROOT_DIR/networkx-api/requirements.lock" \
+  -r "$ROOT_DIR/evaluation/requirements.lock"
 "$VENV_DIR/bin/python" -m playwright install chromium
 
 echo "Evaluation environment is ready."

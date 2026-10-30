@@ -1,38 +1,40 @@
+"""MCP registration with bounded CPU work and synchronous internal entry points."""
+
 import functools
+import inspect
 
 import anyio
-from mcp.server.fastmcp import FastMCP
+from mcp.server import MCPServer
 
-# Initialize FastMCP Server
-mcp = FastMCP("NetworkX Agent", host="0.0.0.0")
-
-# Tools are plain `def`s doing CPU-bound graph work, and FastMCP calls a sync
-# tool directly on the event loop: one 60-second layout froze every other
-# request, health checks and SSE keep-alives included (chat 277). A few
-# threads keep the server answering without letting parallel chats run an
-# unbounded number of layouts at once.
 TOOL_THREADS = anyio.CapacityLimiter(4)
 
 
-def offload_sync_tools(server: FastMCP) -> int:
-    """Run every registered sync tool in a worker thread. Returns the count.
+class GraphMCPServer(MCPServer):
+    """Register sync tools through the public API with a shared worker limit.
 
-    The module-level functions stay synchronous, so tests and internal callers
-    are unaffected; only the registered MCP entry point becomes async.
+    Keep the decorated Python function synchronous for internal callers. Only
+    the MCP entry point is async; long layouts cannot block the server or start
+    an unbounded number of simultaneous graph calculations.
     """
-    count = 0
-    for tool in server._tool_manager.list_tools():
-        if tool.is_async:
-            continue
-        fn = tool.fn
 
-        @functools.wraps(fn)
-        async def run_in_thread(*args, _fn=fn, **kwargs):
-            return await anyio.to_thread.run_sync(
-                functools.partial(_fn, *args, **kwargs), limiter=TOOL_THREADS
-            )
+    def tool(self, *args, **kwargs):
+        register = super().tool(*args, **kwargs)
 
-        tool.fn = run_in_thread
-        tool.is_async = True
-        count += 1
-    return count
+        def decorate(fn):
+            if inspect.iscoroutinefunction(fn):
+                return register(fn)
+
+            @functools.wraps(fn)
+            async def run_in_thread(*call_args, **call_kwargs):
+                return await anyio.to_thread.run_sync(
+                    functools.partial(fn, *call_args, **call_kwargs),
+                    limiter=TOOL_THREADS,
+                )
+
+            register(run_in_thread)
+            return fn
+
+        return decorate
+
+
+mcp = GraphMCPServer("NetworkX Agent")

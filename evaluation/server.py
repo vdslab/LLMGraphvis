@@ -4,7 +4,8 @@ import json
 import os
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP, Image
+from mcp.server import MCPServer
+from mcp.server.mcpserver.utilities.types import Image
 
 from .bridge import EvaluationBridge
 from .config import EvaluationConfig
@@ -13,7 +14,7 @@ from .surfaces import compact_inventory, find_surface, load_prompt_surfaces
 
 config = EvaluationConfig.from_env()
 bridge = EvaluationBridge(config)
-mcp = FastMCP("GraphVisAgent Prompt Evaluator")
+mcp = MCPServer("GraphVisAgent Prompt Evaluator")
 
 
 def _json(value: Any) -> str:

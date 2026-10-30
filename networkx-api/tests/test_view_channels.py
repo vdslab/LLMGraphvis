@@ -124,5 +124,5 @@ def test_current_state_reports_highlight(bound):
     state = visualization_builder.get_current_visualization(bound, 1)
     assert state["highlight"]["node_ids"] == ["n1"]
     assert (
-        bound.query(models.Network).get(1).last_highlight_config["edges"] == "induced"
+        bound.get(models.Network, 1).last_highlight_config["edges"] == "induced"
     )

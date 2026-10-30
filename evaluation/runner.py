@@ -258,11 +258,7 @@ def main(argv: list[str] | None = None) -> int:
     isolated = not args.existing_stack
     api_url = "http://127.0.0.1:18000" if isolated else "http://127.0.0.1:8000"
     frontend_url = "http://127.0.0.1:15173" if isolated else "http://127.0.0.1:5173"
-    nx_url = (
-        "http://127.0.0.1:18001/mcp/sse"
-        if isolated
-        else "http://127.0.0.1:8001/mcp/sse"
-    )
+    nx_url = "http://127.0.0.1:18001/mcp/" if isolated else "http://127.0.0.1:8001/mcp/"
     lm_studio_url = os.getenv("GRAPHVIS_LM_STUDIO_URL", "http://127.0.0.1:1234")
     project = f"graphvis-eval-{re.sub(r'[^a-z0-9]', '', run_id.lower())}"
     child_env = os.environ.copy()
@@ -314,7 +310,7 @@ def main(argv: list[str] | None = None) -> int:
             _compose(root, project, ["up", "-d", "--build"], child_env)
         _wait_http(f"{api_url}/health", "GraphVisAgent backend")
         _wait_http(frontend_url, "GraphVisAgent frontend")
-        _wait_http(nx_url.rsplit("/mcp/sse", 1)[0] + "/health", "NetworkX API")
+        _wait_http(nx_url.rsplit("/mcp", 1)[0] + "/health", "NetworkX API")
 
         with temporary_cline_configuration(python, mcp_env) as cline_model:
             (run_dir / "model-preflight.json").write_text(

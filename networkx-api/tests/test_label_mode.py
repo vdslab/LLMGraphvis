@@ -2,16 +2,8 @@ from unittest import mock
 
 import pytest
 
-from app.core import database
 from app.mcp import tools
 from common import models
-
-
-@pytest.fixture
-def db():
-    session = database.SessionLocal()
-    yield session
-    session.close()
 
 
 @pytest.fixture

@@ -360,7 +360,7 @@ async def test_context_summary_marks_unreadable_resources():
 
 class _FakeSession:
     def __init__(self, text, mime):
-        self._contents = SimpleNamespace(text=text, mimeType=mime)
+        self._contents = SimpleNamespace(text=text, mime_type=mime)
 
     async def read_resource(self, uri):
         return SimpleNamespace(contents=[self._contents])

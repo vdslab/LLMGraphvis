@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from mcp import ClientSession
-from mcp.client.sse import sse_client
+from mcp.client.streamable_http import streamable_http_client
 
 from .config import EvaluationConfig
 
@@ -75,7 +75,7 @@ async def _networkx_tools(config: EvaluationConfig) -> list[dict[str, Any]]:
     source_locations = _tool_source_locations(
         config.repo_root / "networkx-api" / "app" / "mcp" / "tools"
     )
-    async with sse_client(config.networkx_mcp_url) as (read, write):
+    async with streamable_http_client(config.networkx_mcp_url) as (read, write):
         async with ClientSession(read, write) as session:
             await session.initialize()
             result = await session.list_tools()
@@ -84,7 +84,7 @@ async def _networkx_tools(config: EvaluationConfig) -> list[dict[str, Any]]:
                     "kind": "mcp_tool",
                     "name": tool.name,
                     "description": tool.description or "",
-                    "input_schema": tool.inputSchema,
+                    "input_schema": tool.input_schema,
                     "source": "networkx-mcp",
                     **source_locations.get(tool.name, {}),
                 }

@@ -39,7 +39,7 @@ class EvaluationConfig:
                 "GRAPHVIS_FRONTEND_URL", "http://127.0.0.1:15173"
             ).rstrip("/"),
             networkx_mcp_url=os.getenv(
-                "GRAPHVIS_NX_MCP_URL", "http://127.0.0.1:18001/mcp/sse"
+                "GRAPHVIS_NX_MCP_URL", "http://127.0.0.1:18001/mcp/"
             ),
             lm_studio_url=os.getenv(
                 "GRAPHVIS_LM_STUDIO_URL", "http://127.0.0.1:1234"
@@ -58,7 +58,7 @@ class EvaluationConfig:
 
     @property
     def networkx_api_url(self) -> str:
-        return self.networkx_mcp_url.split("/mcp/", 1)[0].rstrip("/")
+        return self.networkx_mcp_url.split("/mcp", 1)[0].rstrip("/")
 
     def ensure_directories(self) -> None:
         self.run_dir.mkdir(parents=True, exist_ok=True)

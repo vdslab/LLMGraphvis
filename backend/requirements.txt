@@ -5,17 +5,16 @@ alembic
 psycopg2-binary
 pydantic
 python-jose[cryptography]
-passlib[argon2]
+pwdlib[argon2]>=0.3.1,<1
 python-multipart
 httpx
-google-genai>=2.33,<3
+google-genai>=2.34,<3
 anthropic[vertex]>=2.3,<3
-openai>=3.39,<4
+openai>=3.41,<4
 python-dotenv
 sse-starlette
-# Pinned to 1.x: mcp 2.0 removed mcp.server.fastmcp (FastMCP) entirely in
-# favour of a rewritten server API. app/core/mcp.py targets the 1.x FastMCP.
-mcp>=1.28,<2
+mcp>=2.3,<3
+httpx2>=2.16,<3
 # Validates a call to a tool the model was not shown (guard_tool_is_exposed).
 jsonschema>=4.20
 pytest

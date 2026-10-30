@@ -6,7 +6,7 @@ x-default-logging: &default-logging
 
 services:
   evaluation-db:
-    image: postgres:15
+    image: postgres:15.19
     logging: *default-logging
     environment:
       POSTGRES_USER: evaluation

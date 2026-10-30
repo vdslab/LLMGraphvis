@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+from pwdlib import PasswordHash
 
 load_dotenv()
 
@@ -29,15 +29,15 @@ oauth2_scheme = OAuth2PasswordBearer(
     auto_error=False,
 )
 
-pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+password_hash = PasswordHash.recommended()
 
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    return password_hash.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    return password_hash.hash(password)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):

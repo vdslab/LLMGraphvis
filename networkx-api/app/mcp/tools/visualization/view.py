@@ -155,7 +155,7 @@ def visualization_set_viewport(
                 )
             directive = view_state.viewport_directive("nodes", node_ids, padding)
         elif target == "highlighted":
-            network = db.query(models.Network).get(network_id)
+            network = db.get(models.Network, network_id)
             highlighted = ((network and network.last_highlight_config) or {}).get(
                 "node_ids"
             )

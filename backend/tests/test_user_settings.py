@@ -124,3 +124,19 @@ def test_chat_pin_beats_user_default():
     assert resolve_chat_model(pinned) == ("google", "gemini-2.5-pro")
     assert resolve_chat_model(unpinned) == ("anthropic", "claude-haiku-4-5")
     assert resolve_chat_model(bare) == (None, None)
+
+
+@pytest.mark.asyncio
+async def test_session_probe_returns_null_for_logged_out_visitors(async_client):
+    response = await async_client.get("/auth/session")
+    assert response.status_code == 200
+    assert response.json() is None
+
+
+@pytest.mark.asyncio
+async def test_session_probe_recognizes_cookie_and_logout(async_client):
+    await _register(async_client)
+    response = await async_client.get("/auth/session")
+    assert response.json()["username"] == "alice"
+    await async_client.post("/auth/logout")
+    assert (await async_client.get("/auth/session")).json() is None

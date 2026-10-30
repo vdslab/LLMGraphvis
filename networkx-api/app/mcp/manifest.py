@@ -37,7 +37,7 @@ def build_manifest() -> dict:
 
     tools = asyncio.run(mcp.list_tools())
     return {
-        tool.name: sorted((tool.inputSchema or {}).get("properties", {}))
+        tool.name: sorted((tool.input_schema or {}).get("properties", {}))
         for tool in sorted(tools, key=lambda t: t.name)
     }
 

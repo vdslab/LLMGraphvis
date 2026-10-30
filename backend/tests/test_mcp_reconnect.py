@@ -10,15 +10,15 @@ from unittest.mock import patch
 
 import anyio
 import pytest
-from mcp.shared.exceptions import McpError
-from mcp.types import CONNECTION_CLOSED, ErrorData
+from mcp.shared.exceptions import MCPError
+from mcp.types import CONNECTION_CLOSED
 
 from app.services.llm import mcp_client
 
 
 def _ok(text='{"done": true}'):
     return SimpleNamespace(
-        isError=False, content=[SimpleNamespace(type="text", text=text)]
+        is_error=False, content=[SimpleNamespace(type="text", text=text)]
     )
 
 
@@ -64,9 +64,7 @@ async def test_a_call_on_a_closed_stream_reconnects_and_retries_once():
 
 @pytest.mark.asyncio
 async def test_a_call_cut_off_mid_run_is_reported_not_rerun_and_the_next_call_works():
-    cut = _Session(
-        McpError(ErrorData(code=CONNECTION_CLOSED, message="Connection closed"))
-    )
+    cut = _Session(MCPError(CONNECTION_CLOSED, "Connection closed"))
     fresh = _Session()
     scope, _ = _scopes(cut, fresh)
     with patch.object(mcp_client, "session_scope", scope):

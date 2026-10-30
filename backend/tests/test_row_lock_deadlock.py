@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
 from app.api.v1.endpoints.auth import get_current_user
@@ -38,6 +39,11 @@ PAYLOAD = {"nodes": [{"id": "a"}], "links": []}
 
 @pytest.fixture
 def pg_sessions():
+    database = make_url(POSTGRES_URL).database or ""
+    if not (database.endswith("_test") or database.startswith("test_")):
+        pytest.fail(
+            "TEST_POSTGRES_URL must name a disposable *_test or test_* database"
+        )
     engine = create_engine(POSTGRES_URL)
     Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)

@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.core.database import get_db
-from app.main import app
+from app.main import create_app
 
 # Import models to ensure they are registered with Base.metadata
 from common.models import Base
@@ -55,6 +55,7 @@ def client(db):
         finally:
             pass  # Session lifecycle managed by db fixture
 
+    app = create_app()
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
         yield c

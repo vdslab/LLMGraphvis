@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -114,7 +115,7 @@ def test_resources_declare_json_mime_type():
     """The backend parses resource bodies as JSON; FastMCP defaults templates to
     text/plain unless mime_type is passed explicitly.
     """
-    templates = mcp._resource_manager._templates.values()
+    templates = asyncio.run(mcp.list_resource_templates())
     network_templates = [
         t for t in templates if str(t.uri_template).startswith("network://")
     ]

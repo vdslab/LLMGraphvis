@@ -7,7 +7,7 @@ x-default-logging: &default-logging
 
 services:
   db:
-    image: postgres:15
+    image: postgres:15.19
     container_name: graphvis-db
     logging: *default-logging
     environment:

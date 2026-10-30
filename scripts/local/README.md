@@ -47,7 +47,7 @@ networkx-api), `logs/*.log`, and `run/*.pid`.
 - Local connections use `trust` auth, so `POSTGRES_PASSWORD` is not enforced
   (development only; the DB listens on localhost only).
 - Python dependencies are reinstalled automatically when either
-  `requirements.txt` changes; force a reinstall by deleting
+  `requirements.lock` changes; force a reinstall by deleting
   `.local/requirements.sha` (or all of `.local/venv`).
 - Use a specific Python for the venv with `PYTHON=/path/to/python3.12
   scripts/local/start.sh` (only affects venv creation on first run).

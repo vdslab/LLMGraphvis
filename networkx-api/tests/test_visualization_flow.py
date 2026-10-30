@@ -2,16 +2,8 @@ from unittest import mock
 
 import pytest
 
-from app.core import database
 from app.mcp import tools
 from common import models
-
-
-@pytest.fixture
-def db():
-    session = database.SessionLocal()
-    yield session
-    session.close()
 
 
 @pytest.fixture
@@ -121,14 +113,6 @@ def test_visualization_flow_strict_check(db, setup_network):
 
         # 3. Verify attributes exist
         attrs_str = tools.network_list_node_attributes(network_id)
-        # attrs_str is stringified dict/list representation from pydantic/sqlalchemy objects or just valid JSON?
-        # The tool returns str(stats). Implementation uses str(list_of_dicts).
-        # list_node_attributes implementation: "return str(stats)"
-        # Python's str() of a list uses single quotes. JSON requires double.
-        # We might need to adjust implementation to return JSON.
-        # For now, let's assume we fix implementation to return JSON or use eval (unsafe but ok for tests).
-        # Let's fix implementation to use json.dumps later.
-        # But for this test patch, I'll use eval if I must, or just check substring.
         assert "forceatlas2_x" in attrs_str
         assert "forceatlas2_y" in attrs_str
 
@@ -217,13 +201,11 @@ def test_color_patterns(db, setup_network):
 def test_missing_style_attribute(db, setup_network):
     network_id = setup_network
 
-    # Ensure layout exists so we don't fail on layout check
-    tools.layout_forceatlas2(network_id)
-
     session_proxy = mock.MagicMock(wraps=db)
     session_proxy.close.return_value = None
 
     with mock.patch("app.core.database.SessionLocal", return_value=session_proxy):
+        tools.layout_forceatlas2(network_id)
         # Try to use a non-existent attribute for coloring
         with pytest.raises(RuntimeError) as excinfo:
             tools.visualization_set_node_color(

@@ -2,11 +2,16 @@ import logging
 import traceback
 from functools import wraps
 
+from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import ValidationError
 
 from app.core import database
 
 logger = logging.getLogger(__name__)
+
+
+class ToolExecutionError(ToolError, RuntimeError):
+    """Expose actionable failures while retaining internal RuntimeError callers."""
 
 
 def execute_with_db(func):
@@ -41,10 +46,10 @@ def handle_tool_errors(func):
             return func(*args, **kwargs)
         except ValidationError as e:
             logger.error(f"Validation error in {func.__name__}: {e}")
-            raise RuntimeError(f"Invalid parameters provided: {e}") from e
+            raise ToolExecutionError(f"Invalid parameters provided: {e}") from e
         except Exception as e:
             logger.error(f"Error in {func.__name__}: {e}")
             logger.error(traceback.format_exc())
-            raise RuntimeError(f"Tool execution failed: {str(e)}") from e
+            raise ToolExecutionError(f"Tool execution failed: {str(e)}") from e
 
     return wrapper

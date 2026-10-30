@@ -5,9 +5,10 @@ import time
 from contextlib import AsyncExitStack, asynccontextmanager
 
 import anyio
+import httpx2
 from mcp import ClientSession
-from mcp.client.sse import sse_client
-from mcp.shared.exceptions import McpError
+from mcp.client.streamable_http import streamable_http_client
+from mcp.shared.exceptions import MCPError
 from mcp.types import CONNECTION_CLOSED
 
 from app.core.logging import get_logger
@@ -19,7 +20,7 @@ logger = get_logger(__name__)
 # NetworkX API Configuration (networkx-api serves on port 8001; see
 # networkx-api/Dockerfile)
 NETWORKX_API_URL = os.getenv("NETWORKX_API_URL") or "http://networkx-api:8001"
-SSE_ENDPOINT = f"{NETWORKX_API_URL}/mcp/sse"
+MCP_ENDPOINT = f"{NETWORKX_API_URL.rstrip('/')}/mcp/"
 
 
 # Discovered tool definitions, cached to avoid a list_tools() round trip per turn.
@@ -141,7 +142,9 @@ def _mcp_to_tool_definition(mcp_tool) -> ToolDefinition:
     tool_desc = str(
         getattr(mcp_tool, "description", None) or mcp_tool.get("description")
     )
-    tool_schema = getattr(mcp_tool, "inputSchema", None) or mcp_tool.get("inputSchema")
+    tool_schema = getattr(mcp_tool, "input_schema", None) or mcp_tool.get(
+        "input_schema"
+    )
 
     if tool_schema:
         if "$defs" in tool_schema or "definitions" in tool_schema:
@@ -247,14 +250,16 @@ async def session_scope():
              await session.call_tool(...)
     """
     try:
-        async with sse_client(SSE_ENDPOINT, timeout=CONNECT_TIMEOUT_SECONDS) as (
-            read,
-            write,
-        ):
-            async with ClientSession(read, write) as session:
-                async with asyncio.timeout(CONNECT_TIMEOUT_SECONDS):
-                    await session.initialize()
-                yield session
+        timeout = httpx2.Timeout(CALL_TIMEOUT_SECONDS, connect=CONNECT_TIMEOUT_SECONDS)
+        async with httpx2.AsyncClient(timeout=timeout) as client:
+            async with streamable_http_client(MCP_ENDPOINT, http_client=client) as (
+                read,
+                write,
+            ):
+                async with ClientSession(read, write) as session:
+                    async with asyncio.timeout(CONNECT_TIMEOUT_SECONDS):
+                        await session.initialize()
+                    yield session
     except Exception as e:
         _log_exception_details(e, "MCP Session connection")
         raise _unwrap_exception(e) from e
@@ -283,7 +288,7 @@ def _is_connection_error(e: BaseException) -> bool:
         ),
     ):
         return True
-    return isinstance(e, McpError) and e.error.code == CONNECTION_CLOSED
+    return isinstance(e, MCPError) and e.error.code == CONNECTION_CLOSED
 
 
 class ResilientSession:
@@ -400,7 +405,7 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
             content_item = result.contents[0]
 
             # naive mimeType check
-            mime = getattr(content_item, "mimeType", None) or "text/plain"
+            mime = getattr(content_item, "mime_type", None) or "text/plain"
 
             if "application/json" in mime:
                 try:
@@ -423,7 +428,7 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
                     "uri": r.uri,
                     "name": r.name,
                     "description": r.description,
-                    "mimeType": r.mimeType,
+                    "mimeType": r.mime_type,
                 }
                 for r in result.resources
             ]
@@ -431,7 +436,7 @@ async def _execute_internal(session: ClientSession, tool_name: str, arguments: d
 
         result = await session.call_tool(tool_name, arguments)
 
-        if result.isError:
+        if result.is_error:
             raise RuntimeError(f"Tool execution failed: {result.content}")
 
         # MCP returns a list of content (TextContent, ImageContent, etc.)
@@ -495,9 +500,9 @@ async def _read_resource_internal(session: ClientSession, uri: str) -> dict | li
     try:
         return json.loads(text)
     except ValueError:
-        mime = getattr(content_item, "mimeType", None) or "text/plain"
+        mime = getattr(content_item, "mime_type", None) or "text/plain"
         logger.warning(
-            f"Resource {uri} returned unparseable content (mimeType={mime}); "
+            f"Resource {uri} returned unparseable content (mime_type={mime}); "
             "expected a JSON object"
         )
         return {}

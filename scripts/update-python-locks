@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Resolve explicit updates; commit the locks together with regression results.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+for service in backend networkx-api evaluation; do
+  uv pip compile --quiet --upgrade --python-version 3.12 --universal --generate-hashes \
+    "$service/requirements.txt" -o "$service/requirements.lock"
+done
