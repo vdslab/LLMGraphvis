@@ -97,7 +97,6 @@ services:
       - "127.0.0.1:15173:5173"
     environment:
       VITE_API_URL: http://evaluation-backend:8000
-      VITE_NX_API_URL: http://evaluation-networkx:8001
     command: ["npm", "run", "dev", "--", "--host"]
     depends_on:
       evaluation-backend:

@@ -71,7 +71,7 @@ def visualization_highlight(
     Remove it with `visualization_reset_style(targets=['highlight'])`.
 
     Returns:
-        dict: The re-rendered visualization; `legend.highlight` reports how many
+        dict: A summary of the re-rendered drawing; `legend.highlight` reports how many
         nodes and edges are highlighted.
     """
     with get_db_context() as db:
@@ -94,7 +94,7 @@ def visualization_highlight(
                 "network again later, call visualization_set_viewport(target='all'); "
                 "visualization_reset_style does not touch the zoom."
             )
-        return vis_data
+        return visualization_builder.drawing_receipt(vis_data)
 
 
 @mcp.tool()
@@ -132,7 +132,7 @@ def visualization_set_viewport(
     effect.
 
     Returns:
-        dict: The visualization with a `viewport` instruction for the canvas.
+        dict: A summary of the drawing with a `viewport` instruction for the canvas.
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
@@ -178,4 +178,4 @@ def visualization_set_viewport(
             f"The view now shows {framed}; no further visualization_set_viewport "
             "call is needed."
         )
-        return vis_data
+        return visualization_builder.drawing_receipt(vis_data)

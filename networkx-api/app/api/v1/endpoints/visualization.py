@@ -12,11 +12,16 @@ logger = get_logger(__name__)
 
 
 @router.get("/{network_id}/visualization")
-def build_visualization(network_id: int, db: Session = Depends(get_db)):
-    """The network as drawn, built exactly as `visualization_generate` builds it.
+def build_visualization(
+    network_id: int, quality: bool = True, db: Session = Depends(get_db)
+):
+    """The network as drawn, built exactly as the `visualization_*` tools build it.
 
-    Used by the upload pipeline (ADR 0035). The POST route below predates the
-    builder and assembles the data differently.
+    The only route that carries node and link rows to the backend: the upload
+    pipeline (ADR 0035) and every drawing the agent makes (ADR 0045) read it.
+    `quality=false` skips `layout_quality` for a caller that already holds it
+    from a tool's receipt. The POST route below predates the builder and
+    assembles the data differently.
     """
     from app.logic import visualization_builder
 
@@ -24,7 +29,7 @@ def build_visualization(network_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail=f"Network {network_id} not found")
     try:
         vis_data = visualization_builder.build_visualization(
-            db, network_id, with_quality=True
+            db, network_id, with_quality=quality
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))

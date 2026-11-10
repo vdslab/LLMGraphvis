@@ -16,7 +16,7 @@ def visualization_generate(
     network_id: Annotated[int, Field(description="The ID of the network.")],
 ) -> dict:
     """
-    Renders the network and returns the visualization, using its saved style configuration.
+    Renders the network on the user's canvas with its saved style configuration and returns a summary of the drawing.
 
     This is the tool to call whenever the display needs to be (re)drawn: after computing a
     layout with any `layout_*` tool, after editing graph data, or to recover the current
@@ -41,7 +41,8 @@ def visualization_generate(
     `layout_suggest_parameters` searches for parameters that reduce these issues.
 
     Returns:
-        dict: The complete visualization object (nodes, links, legend, layout_quality).
+        dict: A summary of the drawing (rendered, node_count, link_count, legend, layout_quality).
+            The user's canvas receives the nodes and links itself.
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
@@ -50,7 +51,7 @@ def visualization_generate(
             db, network_id, with_quality=True
         )
         vis_data["network_id"] = network_id
-        return vis_data
+        return visualization_builder.drawing_receipt(vis_data)
 
 
 @mcp.tool()
@@ -193,7 +194,7 @@ def visualization_apply_layout(
     configuration, which includes the most recently computed layout.
 
     Returns:
-        dict: The updated visualization object (nodes, links, legend, layout_quality).
+        dict: A summary of the updated drawing (rendered, node_count, link_count, legend, layout_quality).
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
@@ -202,7 +203,7 @@ def visualization_apply_layout(
             db, network_id, with_quality=True
         )
         vis_data["network_id"] = network_id
-        return vis_data
+        return visualization_builder.drawing_receipt(vis_data)
 
 
 @mcp.tool()
@@ -233,7 +234,7 @@ def visualization_reset_style(
     centrality metric) are kept.
 
     Returns:
-        dict: The re-rendered visualization object (including layout_quality), plus `reset` listing the channels that
+        dict: A summary of the re-rendered drawing (including layout_quality), plus `reset` listing the channels that
         actually had a configuration to clear.
     """
     with get_db_context() as db:
@@ -245,7 +246,7 @@ def visualization_reset_style(
         )
         vis_data["network_id"] = network_id
         vis_data["reset"] = cleared
-        return vis_data
+        return visualization_builder.drawing_receipt(vis_data)
 
 
 @mcp.tool()
@@ -262,7 +263,7 @@ def visualization_switch_network(
     loaded networks. The last known layout and styles for the target network are preserved.
 
     Returns:
-        dict: The visualization object of the target network (nodes, links, legend, layout_quality).
+        dict: A summary of the target network's drawing (rendered, node_count, link_count, legend, layout_quality).
     """
     with get_db_context() as db:
         from app.logic import visualization_builder
@@ -271,4 +272,4 @@ def visualization_switch_network(
             db, network_id, with_quality=True
         )
         vis_data["network_id"] = network_id
-        return vis_data
+        return visualization_builder.drawing_receipt(vis_data)

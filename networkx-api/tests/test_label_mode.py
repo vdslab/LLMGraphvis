@@ -51,6 +51,13 @@ def setup_network(db):
     return net.id
 
 
+def _drawn(db, network_id):
+    """Node rows as the canvas gets them: over REST, from the saved style (ADR 0045)."""
+    from app.logic import visualization_builder
+
+    return visualization_builder.build_visualization(db, network_id)["nodes"]
+
+
 def test_label_mode_switch(db, setup_network):
     network_id = setup_network
 
@@ -64,19 +71,22 @@ def test_label_mode_switch(db, setup_network):
         tools.layout_forceatlas2(network_id)
 
         vis0 = tools.visualization_generate(network_id)
-        labels0 = {n["id"]: n["label"] for n in vis0["nodes"]}
+        assert "nodes" not in vis0
+        labels0 = {n["id"]: n["label"] for n in _drawn(db, network_id)}
         assert labels0["A"] == "Manual A"
         assert labels0["B"] == "Manual B"
 
         # 1. Switch to Attribute Labeling (country)
         vis1 = tools.visualization_set_node_labels(network_id, attribute="country")
-        labels1 = {n["id"]: n["label"] for n in vis1["nodes"]}
+        assert "nodes" not in vis1
+        labels1 = {n["id"]: n["label"] for n in _drawn(db, network_id)}
         assert labels1["A"] == "Austria"
         assert labels1["B"] == "Belgium"
 
         # 2. Revert to Default (None)
         vis2 = tools.visualization_set_node_labels(network_id, attribute=None)
-        labels2 = {n["id"]: n["label"] for n in vis2["nodes"]}
+        assert "nodes" not in vis2
+        labels2 = {n["id"]: n["label"] for n in _drawn(db, network_id)}
         assert labels2["A"] == "Manual A"
         assert labels2["B"] == "Manual B"
 

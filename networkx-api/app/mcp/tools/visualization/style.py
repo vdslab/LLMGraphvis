@@ -149,7 +149,7 @@ def visualization_set_node_color(
     passing an empty mapping here does not clear anything.
 
     Returns:
-        dict: The updated visualization object (nodes, links, legend, layout_quality),
+        dict: A summary of the updated drawing (rendered, node_count, link_count, legend, layout_quality),
             plus `encoding_note` when the scale does not fit the attribute's measurement.
     """
     with get_db_context() as db:
@@ -177,7 +177,7 @@ def visualization_set_node_color(
         )
         _add_encoding_note(db, vis_data, network_id, attribute, "node", "color")
         vis_data["network_id"] = network_id
-        return vis_data
+        return visualization_builder.drawing_receipt(vis_data)
 
 
 @mcp.tool()
@@ -230,7 +230,7 @@ def visualization_set_node_size(
     roughly quadruple the size or max_size value (~4x area).
 
     Returns:
-        dict: The updated visualization object (nodes, links, legend, layout_quality),
+        dict: A summary of the updated drawing (rendered, node_count, link_count, legend, layout_quality),
             plus `encoding_note` when the attribute has no numeric order (categorical, identifier, text).
     """
     with get_db_context() as db:
@@ -255,7 +255,7 @@ def visualization_set_node_size(
         )
         _add_encoding_note(db, vis_data, network_id, attribute, "node", "size")
         vis_data["network_id"] = network_id
-        return vis_data
+        return visualization_builder.drawing_receipt(vis_data)
 
 
 @mcp.tool()
@@ -325,7 +325,7 @@ def visualization_set_node_labels(
     To return labels to the default, use `visualization_reset_style(targets=['node_label'])`.
 
     Returns:
-        dict: The updated visualization object; `label_style.labeled_count` is
+        dict: A summary of the updated drawing; `label_style.labeled_count` is
         how many nodes carry a permanent label before overlap thinning.
     """
     with get_db_context() as db:
@@ -365,7 +365,7 @@ def visualization_set_node_labels(
             with_quality=True,
         )
         vis_data["network_id"] = network_id
-        return vis_data
+        return visualization_builder.drawing_receipt(vis_data)
 
 
 @mcp.tool()
@@ -422,7 +422,7 @@ def visualization_set_edge_color(
     To return edges to the default, use `visualization_reset_style(targets=['edge_color'])`.
 
     Returns:
-        dict: The updated visualization object (nodes, links, legend, layout_quality),
+        dict: A summary of the updated drawing (rendered, node_count, link_count, legend, layout_quality),
             plus `encoding_note` when the scale does not fit the attribute's measurement.
     """
     with get_db_context() as db:
@@ -448,7 +448,7 @@ def visualization_set_edge_color(
         )
         _add_encoding_note(db, vis_data, network_id, attribute, "edge", "color")
         vis_data["network_id"] = network_id
-        return vis_data
+        return visualization_builder.drawing_receipt(vis_data)
 
 
 @mcp.tool()
@@ -489,7 +489,7 @@ def visualization_set_edge_width(
     To return widths to the default, use `visualization_reset_style(targets=['edge_width'])`.
 
     Returns:
-        dict: The updated visualization object (nodes, links, legend, layout_quality),
+        dict: A summary of the updated drawing (rendered, node_count, link_count, legend, layout_quality),
             plus `encoding_note` when the attribute has no numeric order (categorical, identifier, text).
     """
     with get_db_context() as db:
@@ -513,4 +513,4 @@ def visualization_set_edge_width(
         )
         _add_encoding_note(db, vis_data, network_id, attribute, "edge", "width")
         vis_data["network_id"] = network_id
-        return vis_data
+        return visualization_builder.drawing_receipt(vis_data)

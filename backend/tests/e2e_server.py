@@ -5,7 +5,7 @@ Loaded only by docker-compose.test.yml; production never imports this module.
 
 from app.main import app  # noqa: F401
 from app.services import chat_service, llm
-from app.services.llm import emitters, events, mcp_client, tuning
+from app.services.llm import drawing, emitters, events, mcp_client, tuning
 from app.services.llm.markup import tool_execution_marker
 from app.services.llm.providers.types import UsageData
 from app.services.llm.tool_catalog import ToolCatalog
@@ -33,7 +33,7 @@ async def scripted_reply(chat_id, user_message, db, **kwargs):
         state["executed_calls"].append(call)
         executions.append(call)
         if name == "visualization_generate":
-            await emitters.emit_render_update(queue, result)
+            await emitters.emit_render_update(queue, await drawing.resolve(result))
     panel = tuning.present_tuning(
         chat_id,
         db,

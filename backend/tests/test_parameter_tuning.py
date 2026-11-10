@@ -285,7 +285,23 @@ async def test_form_apply_reruns_pipeline_draws_and_records_history(db, chat):
     row = db.get(models.ParameterTuning, panel["id"])
     queue = AsyncMock()
 
-    with _remote({"content": "Saved."}, {"message": "colored"}, PAYLOAD) as remote:
+    # The color tool answers with a receipt; the rows come over REST (ADR 0045).
+    receipt = {
+        "rendered": True,
+        "network_id": chat.network_id,
+        "node_count": 1,
+        "link_count": 0,
+        "legend": {"node_color": {"type": "categorical"}},
+    }
+    drawn = {**PAYLOAD, "legend": receipt["legend"], "network_id": chat.network_id}
+    with (
+        _remote({"content": "Saved."}, receipt) as remote,
+        patch(
+            "app.services.network_service.build_visualization",
+            new_callable=AsyncMock,
+            return_value=dict(PAYLOAD),
+        ) as rest,
+    ):
         outcome = await tuning.apply(
             db,
             row,
@@ -298,7 +314,8 @@ async def test_form_apply_reruns_pipeline_draws_and_records_history(db, chat):
     calls = [(c.args[0], c.args[1]) for c in remote.call_args_list]
     assert calls[0] == (LOUVAIN, {"network_id": chat.network_id, "resolution": 2.0})
     assert calls[1][0] == COLOR
-    assert calls[2] == ("visualization_generate", {"network_id": chat.network_id})
+    assert len(calls) == 2
+    rest.assert_awaited_once_with(chat.network_id, with_quality=False)
     queue.put.assert_awaited_once()
     assert outcome["changes"] == [
         {"param": f"{LOUVAIN}.resolution", "before": 1.0, "after": 2.0}
@@ -308,7 +325,7 @@ async def test_form_apply_reruns_pipeline_draws_and_records_history(db, chat):
     assert row.values == {f"{LOUVAIN}.resolution": 2.0}
     assert row.history[-1]["source"] == "form"
     assert row.reported_at is None
-    assert db.get(models.Chat, chat.id).visualization_state == PAYLOAD
+    assert db.get(models.Chat, chat.id).visualization_state == drawn
 
 
 @pytest.mark.asyncio

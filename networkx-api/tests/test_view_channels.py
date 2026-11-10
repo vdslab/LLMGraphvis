@@ -19,6 +19,13 @@ def bound(db, monkeypatch):
     return db
 
 
+def full(db, receipt):
+    """The drawing a receipt stands for, as the backend assembles it (ADR 0045)."""
+    assert "nodes" not in receipt and "links" not in receipt
+    drawn = visualization_builder.build_visualization(db, receipt["network_id"])
+    return {**drawn, **receipt}
+
+
 def by_id(vis):
     return {n["id"]: n for n in vis["nodes"]}
 
@@ -28,7 +35,9 @@ def edge_map(vis):
 
 
 def test_path_highlight_marks_route_edges_and_dims_the_rest(bound):
-    vis = tools.visualization_highlight(1, ["n1", "n2", "n3"], edges="path")
+    vis = full(
+        bound, tools.visualization_highlight(1, ["n1", "n2", "n3"], edges="path")
+    )
 
     nodes, edges = by_id(vis), edge_map(vis)
     assert nodes["n2"]["highlighted"] and nodes["n2"]["opacity"] == 1.0
@@ -45,10 +54,10 @@ def test_path_highlight_marks_route_edges_and_dims_the_rest(bound):
 def test_highlight_persists_through_other_channels_until_reset(bound):
     tools.visualization_highlight(1, ["n0"], neighbor_hops=1, edges="incident")
 
-    vis = tools.visualization_set_node_size(1, attribute="score")
+    vis = full(bound, tools.visualization_set_node_size(1, attribute="score"))
     assert {n["id"] for n in vis["nodes"] if n.get("highlighted")} == {"n0", "n1"}
 
-    reset = tools.visualization_reset_style(1, ["highlight"])
+    reset = full(bound, tools.visualization_reset_style(1, ["highlight"]))
     assert reset["reset"] == ["highlight"]
     assert not any(n.get("highlighted") for n in reset["nodes"])
     assert all(n["opacity"] == 1.0 for n in reset["nodes"])
@@ -79,8 +88,11 @@ def test_path_highlight_rejects_non_adjacent_nodes_and_unknown_ids(bound):
 
 
 def test_top_n_labels_follow_rank_attribute_and_style_is_reported(bound):
-    vis = tools.visualization_set_node_labels(
-        1, visibility="top_n", top_n=2, rank_by="score", font_size=14, max_length=8
+    vis = full(
+        bound,
+        tools.visualization_set_node_labels(
+            1, visibility="top_n", top_n=2, rank_by="score", font_size=14, max_length=8
+        ),
     )
 
     labelled = {n["id"] for n in vis["nodes"] if n["show_label"]}
@@ -94,7 +106,7 @@ def test_top_n_labels_follow_rank_attribute_and_style_is_reported(bound):
 
 
 def test_labels_without_visibility_leave_the_canvas_toggle_in_charge(bound):
-    vis = tools.visualization_set_node_labels(1, attribute="score")
+    vis = full(bound, tools.visualization_set_node_labels(1, attribute="score"))
 
     assert "show_label" not in vis["nodes"][0]
     assert by_id(vis)["n3"]["label"] == "3.0"
@@ -102,7 +114,7 @@ def test_labels_without_visibility_leave_the_canvas_toggle_in_charge(bound):
 
 def test_highlighted_label_visibility_uses_the_highlight(bound):
     tools.visualization_highlight(1, ["n2"])
-    vis = tools.visualization_set_node_labels(1, visibility="highlighted")
+    vis = full(bound, tools.visualization_set_node_labels(1, visibility="highlighted"))
 
     assert {n["id"] for n in vis["nodes"] if n["show_label"]} == {"n2"}
 
@@ -123,6 +135,4 @@ def test_current_state_reports_highlight(bound):
     tools.visualization_highlight(1, ["n1"])
     state = visualization_builder.get_current_visualization(bound, 1)
     assert state["highlight"]["node_ids"] == ["n1"]
-    assert (
-        bound.get(models.Network, 1).last_highlight_config["edges"] == "induced"
-    )
+    assert bound.get(models.Network, 1).last_highlight_config["edges"] == "induced"

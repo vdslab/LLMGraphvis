@@ -87,6 +87,13 @@ def setup_network(db):
     return net.id
 
 
+def _drawn(db, network_id):
+    """Node rows as the canvas gets them: over REST, from the saved style (ADR 0045)."""
+    from app.logic import visualization_builder
+
+    return visualization_builder.build_visualization(db, network_id)["nodes"]
+
+
 def test_visualization_flow_strict_check(db, setup_network):
     network_id = setup_network
 
@@ -118,9 +125,11 @@ def test_visualization_flow_strict_check(db, setup_network):
 
         # 4. Visualize again -> Should success
         result = tools.visualization_generate(network_id)
-        assert "nodes" in result
-        assert "links" in result
-        assert len(result["nodes"]) == 2
+        # A receipt of the drawing; the rows travel over REST (ADR 0045).
+        assert result["rendered"] is True
+        assert "nodes" not in result and "links" not in result
+        assert result["node_count"] == 2
+        assert len(_drawn(db, network_id)) == 2
 
 
 def test_color_patterns(db, setup_network):
@@ -162,7 +171,7 @@ def test_color_patterns(db, setup_network):
 
         # Pattern 3: Value Match (Fixed)
         # User says "Europe" is Red.
-        res3 = tools.visualization_set_node_color(
+        tools.visualization_set_node_color(
             network_id=network_id,
             attribute="country",
             scale_type="CATEGORICAL",
@@ -171,7 +180,7 @@ def test_color_patterns(db, setup_network):
         )
 
         # Verify nodes have color red
-        nodes = res3["nodes"]
+        nodes = _drawn(db, network_id)
         for n in nodes:
             assert n["color"] == "red"
 
@@ -187,7 +196,7 @@ def test_color_patterns(db, setup_network):
         )
         assert res4["legend"]["node_color"]["mapping"] == {"Europe": "purple"}
         assert res4["legend"]["node_color"]["palette"] == "pastel2"
-        assert all(node["color"] == "purple" for node in res4["nodes"])
+        assert all(node["color"] == "purple" for node in _drawn(db, network_id))
 
         with pytest.raises(RuntimeError, match="Available values.*Europe"):
             tools.visualization_set_node_color(

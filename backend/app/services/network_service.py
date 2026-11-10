@@ -110,12 +110,17 @@ async def calculate_layout(network_id: int, layout_name: str) -> None:
     )
 
 
-async def build_visualization(network_id: int) -> dict:
-    """The network as drawn, the same object `visualization_generate` returns."""
+async def build_visualization(network_id: int, with_quality: bool = True) -> dict:
+    """The network as drawn from its saved style, node and link rows included.
+
+    The one way those rows reach the backend (ADR 0045). `with_quality=False`
+    skips `layout_quality` for a caller that holds it from a tool's receipt.
+    """
     return await _call(
         "GET",
         f"/api/v1/networks/{network_id}/visualization",
         VISUALIZATION_TIMEOUT_SECONDS,
+        params={"quality": "true" if with_quality else "false"},
     )
 
 

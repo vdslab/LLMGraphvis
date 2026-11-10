@@ -34,21 +34,6 @@ export default defineConfig(({ mode }) => {
     },
   }
 
-  // Only enable NetworkX API proxy in development mode
-  if (mode === 'development') {
-    proxyConfig['/nx-api'] = {
-      target: process.env.VITE_NX_API_URL || env.VITE_NX_API_URL || 'http://networkx-api:8001',
-      changeOrigin: true,
-      secure: false,
-      rewrite: (path) => path.replace(/^\/nx-api/, ''),
-      configure: (proxy) => {
-        proxy.on('error', (err) => {
-          console.log('nx-api proxy error', err);
-        });
-      },
-    }
-  }
-
   return {
     plugins: [react()],
     server: {

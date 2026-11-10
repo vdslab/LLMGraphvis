@@ -12,8 +12,9 @@ The rules, in dispatch order:
    `subgraph_*` creators) switches the chat's active network and renders it.
 2. `on_label_update` — `node_update_label` changes what is drawn but returns no
    payload, so it needs an explicit re-render.
-3. `on_visualization_payload` — any tool that already returns `{nodes, links}`
-   (the `visualization_*` family) just gets pushed to the client as-is.
+3. `on_visualization_payload` — a `visualization_*` tool returns a receipt of
+   what it drew; the drawing itself is fetched over REST and pushed to the
+   client (ADR 0045).
 """
 
 from typing import Any, Dict, Optional
@@ -21,7 +22,7 @@ from typing import Any, Dict, Optional
 from app.core.logging import get_logger
 from common import models
 
-from ... import emitters
+from ... import drawing, emitters
 from ..registry import hook
 from ..types import HookContext, HookEvent
 
@@ -56,21 +57,33 @@ def _update_chat_state(
 
 
 async def _render(ctx: HookContext, network_id: int) -> Optional[Dict[str, Any]]:
-    """Build and push a visualization for `network_id`."""
-    from ... import mcp_client
+    """Build and push a visualization for `network_id`.
 
+    The backend's own redraw, not a model decision, so it goes over REST.
+    """
     try:
-        vis_data = await mcp_client.execute_tool(
-            "visualization_generate", {"network_id": network_id}, session=ctx.session
-        )
+        vis_data = await drawing.fetch(network_id)
     except Exception as e:
         logger.error(f"Auto-visualization failed for network {network_id}: {e}")
         return None
 
-    if isinstance(vis_data, dict) and "nodes" in vis_data:
+    if drawing.is_drawing(vis_data):
         await emitters.emit_render_update(ctx.queue, vis_data)
         return vis_data
     return None
+
+
+async def _drawn_by_tool(ctx: HookContext) -> Optional[Dict[str, Any]]:
+    """The drawing the tool's result stands for, or None.
+
+    A failed fetch leaves the canvas as it was; the tool itself succeeded and
+    its style is saved, so the next render shows it.
+    """
+    try:
+        return await drawing.resolve(ctx.result)
+    except Exception as e:
+        logger.error(f"Fetching the drawing after {ctx.tool_name} failed: {e}")
+        return None
 
 
 @hook(HookEvent.POST_TOOL, tools="*", priority=10, name="on_new_network_id")
@@ -130,11 +143,12 @@ async def on_view_switch(ctx: HookContext) -> None:
     logger.info(f"View switch via {ctx.tool_name}: -> {target}")
     ctx.turn_state["network_id"] = target
 
-    # `visualization_switch_network` already returns a rendered payload; the two
-    # local tools return only a message, so they need a render of their own.
-    if isinstance(ctx.result, dict) and "nodes" in ctx.result and "links" in ctx.result:
-        await emitters.emit_render_update(ctx.queue, ctx.result)
-        _update_chat_state(ctx, network_id=target, vis_data=ctx.result)
+    # `visualization_switch_network` reports what it drew; the two local tools
+    # return only a message, so they need a render of their own.
+    switched = await _drawn_by_tool(ctx)
+    if switched is not None:
+        await emitters.emit_render_update(ctx.queue, switched)
+        _update_chat_state(ctx, network_id=target, vis_data=switched)
     else:
         vis_data = await _render(ctx, target)
         _update_chat_state(ctx, network_id=target, vis_data=vis_data)
@@ -174,17 +188,16 @@ async def on_label_update(ctx: HookContext) -> None:
 
 @hook(HookEvent.POST_TOOL, tools="*", priority=30, name="on_visualization_payload")
 async def on_visualization_payload(ctx: HookContext) -> None:
-    """The tool already returned a renderable payload: forward it."""
+    """The tool drew something: fetch the drawing and forward it."""
     if ctx.handled:
         return
     if not isinstance(ctx.result, dict):
         return
 
-    vis_data = None
-    if "nodes" in ctx.result and "links" in ctx.result:
-        vis_data = ctx.result
-    elif (
-        ctx.tool_name in ("network_initialize", "initialize_network")
+    vis_data = await _drawn_by_tool(ctx)
+    if (
+        vis_data is None
+        and ctx.tool_name in ("network_initialize", "initialize_network")
         and "network" in ctx.result
     ):
         # `initialize_network` is the pre-refactor name; both are accepted so the

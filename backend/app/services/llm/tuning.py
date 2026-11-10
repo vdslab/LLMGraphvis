@@ -19,7 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from app.core.database import for_update
 from common import models
 
-from . import emitters, mcp_client
+from . import drawing, emitters, mcp_client
 from .inputs import is_valid_number
 
 OFFER_TOOL = "offer_parameter_tuning"
@@ -365,13 +365,19 @@ def coerce_value(spec: dict, value, *, label: str | None = None):
     return value
 
 
-def _is_payload(result) -> bool:
-    return isinstance(result, dict) and "nodes" in result and "links" in result
+def _drawn_counts(result):
+    """(nodes, edges) a result says were drawn, or None for a non-drawing result."""
+    if drawing.is_receipt(result):
+        return result.get("node_count"), result.get("link_count")
+    if drawing.is_drawing(result):
+        return len(result["nodes"]), len(result["links"])
+    return None
 
 
 def _summarize(result) -> str:
-    if _is_payload(result):
-        text = f"rendered {len(result['nodes'])} nodes, {len(result['links'])} edges"
+    counts = _drawn_counts(result)
+    if counts is not None:
+        text = f"rendered {counts[0]} nodes, {counts[1]} edges"
         # The number of categories is what a granularity change is judged by.
         color = (result.get("legend") or {}).get("node_color") or {}
         if color.get("type") == "categorical" and isinstance(
@@ -730,18 +736,15 @@ async def _run_pipeline(steps, network_id, session):
         results.append({"tool": step["tool"], "message": _summarize(result)})
         last = result
 
-    visualization = last if _is_payload(last) else None
-    if visualization is None:
-        try:
-            generated = await mcp_client.execute_tool(
-                "visualization_generate",
-                {"network_id": network_id},
-                session=session,
-            )
-        except Exception as exc:
-            raise TuningExecutionError("visualization_generate", str(exc)) from exc
-        visualization = generated if _is_payload(generated) else None
-    return results, visualization
+    # The rows come over REST, never in a tool result (ADR 0045). A pipeline
+    # that did not end in a drawing tool is drawn from the saved style.
+    try:
+        visualization = await drawing.resolve(last)
+        if visualization is None:
+            visualization = await drawing.fetch(network_id)
+    except Exception as exc:
+        raise TuningExecutionError("visualization", str(exc)) from exc
+    return results, visualization if drawing.is_drawing(visualization) else None
 
 
 def _record(db, row, plan, results, visualization, source) -> None:

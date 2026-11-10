@@ -87,3 +87,23 @@ async def test_other_errors_pass_through_without_reconnecting():
             with pytest.raises(ValueError):
                 await mcp_client.execute_tool("layout_profile", {}, session=session)
     assert opened == [broken]
+
+
+@pytest.mark.asyncio
+async def test_an_oversized_result_is_not_reported_as_safe_to_retry():
+    """ADR 0045: the transport closes the stream, but the tool ran and would
+    return the same oversized result again."""
+    oversized = _Session(
+        MCPError(
+            CONNECTION_CLOSED,
+            "SSE stream failed: Server-sent event exceeded the 1048576 byte limit.",
+        )
+    )
+    fresh = _Session()
+    scope, _ = _scopes(oversized, fresh)
+    with patch.object(mcp_client, "session_scope", scope):
+        async with mcp_client.ResilientSession() as session:
+            with pytest.raises(mcp_client.ToolResultTooLarge, match="too large"):
+                await mcp_client.execute_tool("node_list", {}, session=session)
+            assert fresh.calls == 0
+            assert await mcp_client.execute_tool("layout_profile", {}, session=session)

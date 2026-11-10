@@ -277,6 +277,27 @@ class ToolConnectionLost(RuntimeError):
         )
 
 
+class ToolResultTooLarge(RuntimeError):
+    """A tool's result exceeded what one MCP message may carry.
+
+    The transport reports this as a closed connection, but the tool ran and
+    would return the same oversized result again, so it must not be retried
+    as it was (ADR 0045).
+    """
+
+    def __init__(self, tool_name: str):
+        super().__init__(
+            f"{tool_name} ran, but its result was too large to return. Calling "
+            "it again the same way will fail the same way. Ask for less: lower "
+            "`limit`, narrow the selection, or use a tool that returns a summary."
+        )
+
+
+def _is_oversized_result(e: BaseException) -> bool:
+    """The client cut the stream because one event passed its size limit."""
+    return isinstance(e, MCPError) and "byte limit" in str(e)
+
+
 def _is_connection_error(e: BaseException) -> bool:
     if isinstance(
         e,
@@ -346,6 +367,8 @@ class ResilientSession:
             logger.warning(f"MCP connection lost during {label} ({e!r}); reconnecting")
             await self._close()
             await self._connect()
+            if _is_oversized_result(e):
+                raise ToolResultTooLarge(label) from e
             if never_sent:
                 return await operation(self.session)
             raise ToolConnectionLost(label) from e

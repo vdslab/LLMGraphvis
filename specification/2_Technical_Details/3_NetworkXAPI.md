@@ -329,9 +329,11 @@ networkx ではなくアプリが消費するので、`@register` の `app_param
 
 **方針**: 計算とデータ操作のロジックは `app/logic/` に一本化し、MCP ツールと REST エンドポイントはいずれもその薄いラッパとして実装する。**片方の入口にしか存在しない機能を作ってはならない。**
 
-**根拠**: REST 側はフロントエンドからの直接操作とデバッグに必要であり、MCP 側はエージェントに必要である。ロジックを重複させると、片方だけが修正された状態が生まれ、「チャットでは正しいのに直接叩くと違う」という再現困難な差異になる。
+**根拠**: REST 側は backend からの直接操作（ユーザーの操作と描画データの取得）とデバッグに必要であり、MCP 側はエージェントに必要である。ロジックを重複させると、片方だけが修正された状態が生まれ、「チャットでは正しいのに直接叩くと違う」という再現困難な差異になる。
 
 アップロード時の初期化は REST の入口だけを使う（`POST …/import`、`POST …/layout`、`GET …/visualization`）。`POST …/import` は GraphML を JSON に包まずに XML の本文として受け取り、上限は受付と同じ 50MB である。`GET …/visualization` は `visualization_generate` と同じ `build_visualization(with_quality=True)` を返す（[ADR 0035](../4_Decisions/0035-upload-over-rest.md)）。
+
+描画データの全体（ノードとエッジの行）を運ぶ入口は、この `GET …/visualization` だけである。描画系の MCP ツールは、スタイルを保存したうえで受領結果（`visualization_builder.drawing_receipt`）を返す。受領結果は描画データから行を除き、件数を足したものである。保存されない項目（一回限りの `viewport`、`encoding_note` など）を描画データに足すときは、受領結果を作る前に足す。後から足した項目は backend に届かない。`quality=false` を付けると品質指標の計算を省く。受領結果がすでに持っているためである（[ADR 0045](../4_Decisions/0045-drawing-over-rest.md)）。
 
 **エンドポイントの一覧とシグネチャは `/docs`（OpenAPI）と `app/api/` を参照すること。**
 

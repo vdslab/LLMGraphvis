@@ -914,6 +914,25 @@ def build_visualization(
     return vis_data
 
 
+def drawing_receipt(vis_data: Dict[str, Any]) -> Dict[str, Any]:
+    """What a drawing tool returns over MCP: the drawing without its rows.
+
+    Node and link rows are read by the canvas only, and a result that carries
+    them outgrows the MCP transport on a large network (ADR 0045). The backend
+    fetches them from `GET /networks/{id}/visualization` and lays every other
+    key of this receipt over that payload, so anything that is not saved with
+    the network (a one-shot `viewport`, a note) must be set on `vis_data`
+    before this is called.
+    """
+    receipt: Dict[str, Any] = {
+        "rendered": True,
+        "node_count": len(vis_data.get("nodes") or []),
+        "link_count": len(vis_data.get("links") or []),
+    }
+    receipt.update((k, v) for k, v in vis_data.items() if k not in ("nodes", "links"))
+    return receipt
+
+
 def display_node_sizes(db: Session, network_id: int) -> Dict[str, float]:
     """Each node's size (an area) as the saved style draws it, keyed by node_id.
 

@@ -36,7 +36,7 @@ listings, DDL and counts went stale before.
 
 ## House rules
 
-- Run the application with Docker (`docker compose up -d`).
+- Run the application with Docker.
 - Before writing code, produce a task list and wait for approval.
 - Commit often. Always use `git mv` when moving or renaming a file.
 - If a browser check fails or the console errors, stop and capture the log.
@@ -57,7 +57,7 @@ listings, DDL and counts went stale before.
 
 Tool docstrings and `Field` descriptions are **prompt surface**, sent to the
 model verbatim. Write them for a reader with no other context, and never describe
-a parameter as effective when it is not (see `scale`/`center`).
+a parameter as effective when it is not.
 
 ### Skills
 
@@ -134,7 +134,7 @@ Rationale: `specification/2_Technical_Details/3_NetworkXAPI.md`.
   `r = sqrt(size * 10 / π)` (`NetworkGraph.jsx`). Tool descriptions and
   `visualization_builder` say so too; keep the three in sync.
 - **Layout, then render.** `layout_*` only stores coordinates; nothing is drawn
-  until `visualization_generate`.
+  until `visualization_generate`. Tools return a receipt, never rows (ADR 0045).
 - **Coordinates are renormalized to [-1000, 1000]**, so a layout's
   `scale`/`center` are visually inert; never offer them as a zoom
   (`visualization_set_viewport` is the zoom).
