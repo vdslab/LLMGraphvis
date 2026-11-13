@@ -54,7 +54,7 @@ def visualization_highlight(
     zoom_to: Annotated[
         bool,
         Field(
-            description="Also move the view to frame the highlighted nodes, as visualization_set_viewport would."
+            description="False (default) preserves the current camera. True frames the highlighted nodes and may move the rest off-screen. Use True only for an explicit zoom, frame, or close-up request; highlighting and dimming alone do not request a zoom."
         ),
     ] = False,
 ) -> dict:

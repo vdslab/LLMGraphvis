@@ -10,6 +10,7 @@ viewport call that would frame the same thing again. Anything that can move
 nodes or change the highlighted set forgets the record.
 """
 
+import re
 from typing import Any, Dict, Optional, Tuple
 
 from ..registry import hook
@@ -37,6 +38,47 @@ def _key(network_id: Any, target: str, node_ids: Optional[list]) -> Tuple:
 def _viewport_key(args: Dict[str, Any]) -> Tuple:
     return _key(
         args.get("network_id"), args.get("target") or "all", args.get("node_ids")
+    )
+
+
+@hook(
+    HookEvent.PRE_TOOL,
+    tools="visualization_highlight",
+    priority=30,
+    name="preserve_highlight_camera",
+)
+def preserve_highlight_camera(ctx: HookContext) -> Optional[ToolCallDecision]:
+    """Keep context visible unless the user explicitly requested a close-up.
+
+    Highlighting alone does not authorize a camera change. An answered question
+    can resume an earlier authorized task, so do not infer that intent from the
+    answer alone. Missing request context also leaves the call alone.
+    """
+    text = ctx.turn_state.get("user_text") or ctx.user_text
+    if (
+        not ctx.args.get("zoom_to")
+        or not text
+        or ctx.turn_state.get("resumed_from_input")
+    ):
+        return None
+    zoom = re.search(
+        r"\b(?:zoom|frame|close[ -]?up)\b|ズーム|拡大|近づ|寄っ|画面に収め", text, re.I
+    )
+    declined = re.search(
+        r"(?:do not|don't|without|no)\s+(?:zoom|zooming|framing)|"
+        r"(?:keep|preserve|maintain)[^.?!\n]{0,30}(?:zoom|camera|framing)|"
+        r"(?:do not|don't|without)\s+(?:change|changing)\s+(?:the\s+)?(?:zoom|camera)|"
+        r"(?:ズーム|拡大)(?:は|を)?(?:しない|せず|しなく)|"
+        r"(?:画角|ズーム)(?:は|を)?(?:変えず|変えない|維持|そのまま)",
+        text,
+        re.I,
+    )
+    if zoom and not declined:
+        return None
+    return ToolCallDecision.modify(
+        {**ctx.args, "zoom_to": False},
+        "Kept the current camera: the user asked for a highlight, not a zoom. "
+        "The specified nodes remain highlighted and the rest stay visible and dimmed.",
     )
 
 

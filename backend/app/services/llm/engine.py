@@ -262,6 +262,7 @@ class GraphVisAgent:
         turn_state = hooks.new_turn_state(AGENT_MAX_ITERATIONS)
         turn_state["network_id"] = network_id
         turn_state["resumed_from_input"] = resumed_from_input
+        turn_state["user_text"] = user_text
         # From the context fetch; read by inject_skill_suggestions (ADR 0034).
         turn_state["network_large"] = network_large
 

@@ -1,7 +1,41 @@
 """The redundant-viewport guard (hooks/builtin/view.py)."""
 
+import pytest
+
 from app.services.llm.hooks.builtin import view
 from app.services.llm.hooks.types import HookContext, HookEvent, new_turn_state
+
+
+@pytest.mark.parametrize(
+    "user_text, preserve",
+    [
+        ("ノードID 0だけを強調し、それ以外を薄くしてください。", True),
+        ("Highlight node 0 and dim the rest", True),
+        ("Zoom in on node 0 and highlight it", False),
+        ("ノード0に寄って強調してください", False),
+        ("ノード0を拡大して強調してください", False),
+        ("Highlight node 0 without zooming", True),
+        ("ズームしないでノード0だけ強調してください", True),
+        ("Keep the current zoom and highlight node 0", True),
+        ("Highlight node 0 without changing the zoom", True),
+    ],
+)
+def test_highlight_preserves_camera_unless_zoom_was_requested(user_text, preserve):
+    c = HookContext(
+        event=HookEvent.PRE_TOOL,
+        chat_id=1,
+        network_id=7,
+        turn_state={"user_text": user_text},
+        tool_name="visualization_highlight",
+        args={"network_id": 7, "node_ids": ["0"], "zoom_to": True},
+    )
+    decision = view.preserve_highlight_camera(c)
+    if preserve:
+        assert decision.action == "modify"
+        assert decision.args["zoom_to"] is False
+        assert decision.args["node_ids"] == ["0"]
+    else:
+        assert decision is None
 
 
 def run(event, tool, args, state, result=None):
