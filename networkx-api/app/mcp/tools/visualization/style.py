@@ -135,6 +135,15 @@ def visualization_set_node_color(
     """
     Updates ONLY the node colors in the visualization based on a node attribute.
 
+    To highlight individual node IDs and dim the rest, use
+    `visualization_highlight(node_ids=[...])` instead of inventing an attribute
+    or category for a node ID. This tool maps attribute values to colors.
+
+    To return colors to their default uniform appearance, call
+    `visualization_reset_style(targets=['node_color'])`. This tool cannot clear a
+    mapping: `attribute` and `scale_type` are required, and an empty mapping does
+    not reset anything.
+
     All other visual settings (layout, node sizes, edge styles) are preserved.
     Call `analysis_louvain_communities` or `analysis_degree_centrality` first if needed.
 
@@ -149,9 +158,6 @@ def visualization_set_node_color(
     networks: automatic assignment depends on the categories and their frequencies.
     Read the actual value-to-color correspondence from `legend`; supply `mapping`
     when specific categories must keep specific colors.
-    To return colors to uniform, use `visualization_reset_style(targets=['node_color'])` —
-    passing an empty mapping here does not clear anything.
-
     Returns:
         dict: A summary of the updated drawing (rendered, node_count, link_count, legend, layout_quality),
             plus `encoding_note` when the scale does not fit the attribute's measurement.

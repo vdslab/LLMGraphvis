@@ -59,7 +59,7 @@ def visualization_highlight(
     ] = False,
 ) -> dict:
     """
-    Emphasizes a set of nodes (a focus, a neighbourhood, or a route) and dims everything else.
+    Highlights individual nodes by node_ids, a neighbourhood, or a route, and dims everything else.
 
     Use this to focus on nodes or show a path WITHOUT extracting a subgraph: the
     whole network stays on screen and every analysis still runs on it. Extract

@@ -330,6 +330,7 @@ async def run(
                 stopped = True
                 break
             for index, prompt in enumerate(scenario.prompts):
+                before_state = session.current_state
                 observation, _ = await bridge.send(session.session_id, prompt, True)
                 state = session.current_state
                 save(config.run_dir / f"{scenario.name}-{index + 1}-state.json", state)
@@ -341,6 +342,10 @@ async def run(
                 checks = check_drawing(check_name, original, state, initial)
                 if check_name == "club-setup":
                     checks.update(check_drawing("degree", original, state, initial))
+                if scenario.name == "reset-color" and index == 1:
+                    checks["sizes_preserved"] = {
+                        n["id"]: n["size"] for n in before_state["render"]["nodes"]
+                    } == {n["id"]: n["size"] for n in state["render"]["nodes"]}
                 browser = browser_checks(observation["capture"], state)
                 step = {
                     "probe_number": observation["probe_number"],
@@ -354,6 +359,15 @@ async def run(
                     "argument_audit": audit_tool_arguments(
                         observation["tool_executions"], schemas
                     ),
+                    "tool_failures": [
+                        {
+                            "tool": e["tool_name"],
+                            "arguments": e.get("arguments"),
+                            "error": e.get("error"),
+                        }
+                        for e in observation["tool_executions"]
+                        if e.get("status") == "failed"
+                    ],
                     "capture": observation["capture"],
                 }
                 entry["steps"].append(step)
@@ -420,6 +434,7 @@ async def run(
                     "",
                     f"Tools: {', '.join(step['tools'])}",
                     f"Undeclared arguments: {step.get('argument_audit', [])}",
+                    f"Failed tool calls: {step.get('tool_failures', [])}",
                     "",
                     step["response"],
                     "",

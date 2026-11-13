@@ -902,11 +902,13 @@ def offerable_pipeline(db, chat_id, network_id, user_text: str) -> list[str] | N
 def offer_hint(pipeline: list[str]) -> str:
     return (
         "# Tunable View\n"
-        f"The current view was drawn by {' → '.join(pipeline)}. The user is asking "
-        "about its parameters: change them from their words by re-running these "
+        f"The current view was drawn by {' → '.join(pipeline)}. If the user asks "
+        "to change its parameters, change them from their words by re-running these "
         f"tools, and to make them adjustable call {OFFER_TOOL} with "
         f"tools={pipeline} (it reuses the arguments those calls ran with). Do not "
-        "use ask_user for parameter values."
+        "use ask_user for parameter values. Returning a visual channel to its "
+        "default is not a parameter change: load visual-encoding for a reset "
+        "instead of replaying this pipeline."
     )
 
 
