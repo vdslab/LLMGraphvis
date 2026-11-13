@@ -58,6 +58,23 @@ def test_completed_steps_with_generic_closing_invitation_are_not_a_choice_menu()
     assert not ctx.turn_state.get("continuation")
 
 
+def test_feedback_about_which_side_is_unclear_is_not_a_choice_menu():
+    ctx = context(
+        "1. ツール名に問題はありません。\n"
+        "2. partition_value が左右のどちらに割り当てられるか分かりにくいです。\n"
+        "3. 左側に置く値だと説明してください。"
+    )
+    nudge_choice_ui(ctx)
+    assert not ctx.turn_state.get("continuation")
+
+
+def test_explicit_choice_questions_still_request_ui():
+    for question in ("どちらを見たいですか？", "Which view would you prefer?"):
+        ctx = context("1. 属性で色分け\n2. 中心性でサイズ変更\n" + question)
+        nudge_choice_ui(ctx)
+        assert ctx.turn_state.get("continuation")
+
+
 def test_empty_provider_response_retries_once_without_claiming_success():
     ctx = context("")
     retry_empty_response(ctx)
