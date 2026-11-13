@@ -66,3 +66,10 @@ successful and inconclusive probes, as a finding. Each finding object must conta
 For successful or non-prompt findings, use empty recommendation strings rather than
 inventing unnecessary edits. Put code defects in `implementation_issues` as well.
 The final summary must name both model IDs and explain the strongest evidence.
+
+To hear from the target assistant itself, call `ask_target_feedback` after the
+last probe in a chat. This is distinct from your own friction notes. Treat its
+answer as an unverified suggestion and compare it with actual tool executions.
+The feedback question must not precede another probe in the same chat: reset the
+test or start a fresh session first. The bridge includes this feedback in the
+final report separately from your findings.

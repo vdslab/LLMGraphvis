@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from pathlib import Path
 from typing import Any
 
@@ -109,12 +110,22 @@ async def capture_graph(
                     node_elements == expected_nodes and link_elements == expected_links
                 ),
                 "svg_validation": svg_validation,
+                "rendered_nodes": await graph.locator("svg circle").evaluate_all(
+                    """circles => circles.map(circle => ({
+                      id: String(circle.__data__.id),
+                      radius: Number(circle.getAttribute('r')),
+                      color: circle.getAttribute('fill'),
+                      opacity: Number(circle.getAttribute('opacity'))
+                    }))"""
+                ),
                 "errors": console_errors[-20:],
             }
         except Exception as exc:
+            with contextlib.suppress(Exception):
+                await page.screenshot(path=str(output_path), full_page=True)
             result = {
                 "captured": False,
-                "path": None,
+                "path": str(output_path) if output_path.is_file() else None,
                 "errors": console_errors[-20:] + [f"{type(exc).__name__}: {exc}"],
             }
         finally:

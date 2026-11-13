@@ -1,6 +1,44 @@
-# Cline exploratory prompt evaluation
+# Real-LLM evaluation
 
-This directory is a bridge between Cline and a real GraphVisAgent session. It is
+## Repeatable visualization scenarios
+
+Run the application in the disposable Docker stack, then run the scenario driver:
+
+```bash
+docker compose -f docker-compose.evaluation.yml -p graphvis-scenarios up -d --build --wait
+.local/venv/bin/python -m evaluation.scenarios
+docker compose -f docker-compose.evaluation.yml -p graphvis-scenarios down -v
+```
+
+Use `scripts/setup-evaluation` once if the Python environment or Playwright browser
+is missing. LM Studio must serve `google/gemma-4-e4b`; load it with enough context
+for the activated tool schemas and multi-turn history. The verified configuration
+uses a context length of 32768 and one parallel prediction. An 8192-token context
+failed after the first Skill activated more tools.
+
+`--case degree` selects a case (repeat the flag for several), and `--run-id NAME`
+names the artifact directory. The driver saves expectations and dataset hashes
+before sending any messages. It checks the uploaded drawing and each requested
+change against imported node/edge identities, channel configuration and actual
+SVG colors, radii and opacity. It stops on the first browser failure and retains
+the console evidence and PNG. A nonzero exit means a failed or incomplete run.
+Results and raw states are under `.evaluation/runs/<run-id>/`.
+
+After each scenario, the driver asks **the target chat assistant itself** about
+unclear tool names, descriptions, arguments and return values. This is a separate
+evaluation turn, saved as `target_feedback` in the session and scenario report.
+It is an unverified suggestion, never a pass/fail oracle. Unexpected calls or
+drawing changes during this turn are recorded. The next scenario uses a fresh
+chat to avoid priming it with the feedback question. `--no-feedback` skips this
+additional model call.
+
+The same operation is available as `ask_target_feedback` in the evaluation MCP.
+It refers only to the latest observed probe; reset that session before another
+probe. Evaluation notes by the evaluator remain in `record_analysis_friction`.
+
+## Cline exploratory prompt evaluation
+
+The exploratory workflow bridges Cline and a real GraphVisAgent session. It is
 for evaluating the current system prompt, Skills, and MCP descriptions—not for
 reviewing a Git diff. No scenario files or fixed expected-tool lists are used.
 

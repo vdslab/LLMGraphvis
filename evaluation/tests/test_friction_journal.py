@@ -20,7 +20,7 @@ def _bridge(tmp_path):
         network_id=1,
         current_state={},
         probe_count=1,
-        observations=[{"probe_number": 1, "assistant_message": "Done"}],
+        observations=[{"probe_number": 1, "chat_id": 1, "assistant_message": "Done"}],
     )
     return bridge
 

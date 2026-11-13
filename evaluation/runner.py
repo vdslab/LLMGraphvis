@@ -23,6 +23,7 @@ EVALUATION_TOOLS = [
     "observe_session",
     "reset_test",
     "record_analysis_friction",
+    "ask_target_feedback",
     "finish_evaluation",
 ]
 

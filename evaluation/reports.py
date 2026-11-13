@@ -73,6 +73,7 @@ class EvaluationReport(BaseModel):
     trials: list[dict[str, Any]] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)
     friction_notes: list[FrictionNote] = Field(default_factory=list)
+    target_feedback: list[dict[str, Any]] = Field(default_factory=list)
     implementation_issues: list[str] = Field(default_factory=list)
     completed_at: str = Field(
         default_factory=lambda: datetime.now(timezone.utc).isoformat()
@@ -134,6 +135,24 @@ def render_markdown(report: EvaluationReport, run_id: str) -> str:
                 "- Evidence:",
                 *[f"  - {item}" for item in note.evidence],
                 f"- Suggested change: {note.suggested_change or 'not proposed'}",
+                "",
+            ]
+        )
+
+    lines.extend(["## Target assistant feedback (unverified)", ""])
+    if not report.target_feedback:
+        lines.extend(["No target feedback was requested.", ""])
+    for feedback in report.target_feedback:
+        lines.extend(
+            [
+                f"### Probe {feedback['probe_number']}",
+                "",
+                f"- Model: `{feedback['model']}`",
+                f"- Tools during feedback: {feedback['tools_called']}",
+                "- Visualization changed during feedback: "
+                f"{feedback['visualization_diff']['changed']}",
+                "",
+                feedback["response"],
                 "",
             ]
         )

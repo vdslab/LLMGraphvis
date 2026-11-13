@@ -24,6 +24,7 @@ class EvaluationSession:
     probe_count: int = 0
     observations: list[dict[str, Any]] = field(default_factory=list)
     friction_notes: list[dict[str, Any]] = field(default_factory=list)
+    target_feedback: list[dict[str, Any]] = field(default_factory=list)
 
 
 class EvaluationBridge:
@@ -73,6 +74,10 @@ class EvaluationBridge:
         capture: bool,
     ) -> tuple[dict[str, Any], Path | None]:
         session = self._get(session_id)
+        if any(note["chat_id"] == session.chat_id for note in session.target_feedback):
+            raise ValueError(
+                "Reset this test after target feedback before probing again."
+            )
         probes_used = sum(item.probe_count for item in self.sessions.values())
         if probes_used >= self.config.max_probes:
             raise ValueError(
@@ -131,6 +136,56 @@ class EvaluationBridge:
         session.observations.append(observation)
         self._save_session(session)
         return observation, screenshot_path
+
+    async def ask_target_feedback(
+        self, session_id: str, probe_number: int
+    ) -> dict[str, Any]:
+        """Ask the target assistant for concrete tool usability feedback.
+
+        This is a separate evaluation turn after the last probe. It is not a
+        verdict or a disclosure of private reasoning. Reset before further probes
+        so the feedback question cannot prime the next scenario.
+        """
+        session = self._get(session_id)
+        if not session.observations or (
+            session.observations[-1]["probe_number"] != probe_number
+            or session.observations[-1].get("chat_id") != session.chat_id
+        ):
+            raise ValueError("Feedback must refer to the latest observed probe.")
+        if any(note["chat_id"] == session.chat_id for note in session.target_feedback):
+            raise ValueError(
+                "Target feedback has already been requested for this chat."
+            )
+        prompt = (
+            "直前の可視化依頼について、使ったツールの使い勝手を評価してください。"
+            "図や分析の変更、新しい計算、ツールの実行は不要です。"
+            "内部の思考過程の説明は不要です。次の項目を簡潔に回答してください。\n"
+            "1. 使用したツールのうち、名前や説明で用途を区別しにくかったもの。\n"
+            "2. 意味や指定方法が分かりにくかった引数、または不足していた戻り値。\n"
+            "3. その具体的な説明文の改善案。\n"
+            "問題がなかった項目は『問題なし』、確認できない点は『確認できない』と"
+            "書いてください。存在しないツール名や問題を作らないでください。"
+        )
+        observation = await self.api.send_message(
+            session.chat_id, prompt, session.current_state
+        )
+        session.current_state = observation.pop("visualization_state")
+        feedback = {
+            "session_id": session_id,
+            "chat_id": session.chat_id,
+            "probe_number": probe_number,
+            "question": prompt,
+            "response": observation["assistant_message"],
+            "provider": observation["provider"],
+            "model": observation["model"],
+            "tools_called": observation["tools_called"],
+            "tool_executions": observation["tool_executions"],
+            "visualization_diff": observation["visualization_diff"],
+            "status": "unverified_target_feedback",
+        }
+        session.target_feedback.append(feedback)
+        self._save_session(session)
+        return feedback
 
     async def observe(self, session_id: str) -> tuple[dict[str, Any], Path | None]:
         session = self._get(session_id)
@@ -227,6 +282,7 @@ class EvaluationBridge:
             "probe_count": session.probe_count,
             "observations": session.observations,
             "friction_notes": session.friction_notes,
+            "target_feedback": session.target_feedback,
         }
         path.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2, default=str),

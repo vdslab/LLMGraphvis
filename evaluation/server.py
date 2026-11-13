@@ -137,6 +137,18 @@ def record_analysis_friction(
 
 
 @mcp.tool()
+async def ask_target_feedback(session_id: str, probe_number: int) -> str:
+    """Ask GraphVisAgent itself about tool usability after its latest probe.
+
+    Returns the target assistant's unverified feedback, not the evaluator's opinion
+    or a correctness verdict. This adds a separate turn to the evaluation chat;
+    reset_test before any more probes in that session. Check the recorded calls
+    and visualization diff for unintended actions during feedback.
+    """
+    return _json(await bridge.ask_target_feedback(session_id, probe_number))
+
+
+@mcp.tool()
 async def finish_evaluation(
     summary: str,
     findings: list[dict[str, Any]],
@@ -183,6 +195,11 @@ async def finish_evaluation(
             "trials": trials,
             "findings": findings,
             "friction_notes": friction_notes,
+            "target_feedback": [
+                note
+                for session in bridge.sessions.values()
+                for note in session.target_feedback
+            ],
             "implementation_issues": implementation_issues or [],
         },
     )
