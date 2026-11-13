@@ -721,6 +721,22 @@ class TestCandidateListing:
     def test_all_hidden_reports_none(self):
         assert guards._format_candidates(["spring_x", "spring_y"]) == "(none)"
 
+    def test_core_label_and_weight_are_not_rejected_as_missing_attributes(self, db):
+        from app.services.llm.hooks import dbinfo
+        from common import models
+
+        db.add(models.Network(id=7, name="Core attributes"))
+        db.commit()
+        assert "label" in dbinfo.node_attribute_names(db, 7)
+        assert "weight" in dbinfo.edge_attribute_names(db, 7)
+        for tool, attribute in [
+            ("visualization_set_node_labels", "label"),
+            ("visualization_set_edge_color", "weight"),
+        ]:
+            c = ctx(tool, {"attribute": attribute})
+            c.db = db
+            assert guards.guard_attribute_exists(c) is None
+
 
 def _unexposed_call(args):
     from app.services.llm.hooks.builtin.guards import guard_tool_is_exposed

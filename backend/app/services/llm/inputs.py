@@ -159,7 +159,8 @@ class InputForm(BaseModel):
     question: str = Field(
         min_length=1,
         max_length=500,
-        description="The question itself, in the conversation language. The "
+        description="Required top-level question text, separate from fields and their "
+        "labels, in the conversation language. The "
         "explanation of the alternatives belongs in your ordinary text, not here.",
     )
     fields: list[InputField] = Field(
@@ -372,7 +373,14 @@ def _readable_validation_error(error: ValidationError) -> str:
     for detail in error.errors():
         location = ".".join(str(part) for part in detail["loc"]) or "(root)"
         problems.append(f"{location}: {detail['msg']}")
-    return "; ".join(problems) + ". " + FIELDS_SHAPE_HINT
+    question_hint = ""
+    if any(detail["loc"] == ("question",) for detail in error.errors()):
+        question_hint = (
+            'Include a nonempty top-level "question" alongside "fields", e.g. '
+            '{"question": "Which view would you like?", "fields": [...]}. '
+            'The field "label" is not the top-level question. '
+        )
+    return "; ".join(problems) + ". " + question_hint + FIELDS_SHAPE_HINT
 
 
 def present_question(chat_id, db, arguments, turn_state):

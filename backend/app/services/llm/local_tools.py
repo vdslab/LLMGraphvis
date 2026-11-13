@@ -361,6 +361,8 @@ def _input_definition() -> ToolDefinition:
         name="ask_user",
         description=(
             "REQUIRED when asking the user to choose among distinct alternatives (e.g. 'what analyses are possible?'). "
+            "Always pass both top-level arguments: question (the question text) and fields (the control array). "
+            "A field's label does not replace question. "
             "Plain text lists do not display interactive UI controls. The parameter schema defines the shape of "
             "`fields`; these are the rules the schema cannot state.\n\n"
             "1. Explain in the SAME response: Write ordinary text explaining what each option would show and which visual "

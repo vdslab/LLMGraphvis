@@ -929,3 +929,20 @@ def test_layout_evaluation_tools_are_not_tunable():
     assert tuning.is_rendering_tool("visualization_set_node_color")
     assert tuning.is_rendering_tool("visualization_generate")
     assert not tuning.is_rendering_tool("visualization_get_state")
+
+
+@pytest.mark.parametrize(
+    "user_text",
+    [
+        "色だけを初期状態の単色に戻してください。サイズの対応付けは保持してください。",
+        "Reset the node colors to default; keep the size mapping.",
+        "強調を解除し、全ノードと辺の薄表示を元に戻してください。",
+    ],
+)
+def test_style_reset_does_not_foreground_the_old_tuning_pipeline(user_text):
+    assert tuning.offerable_pipeline(None, 1, 1, user_text) is None
+
+
+def test_numeric_tuning_requests_are_not_style_resets():
+    assert not tuning._is_style_reset("resolutionを初期値に戻してください")
+    assert not tuning._is_style_reset("ノードサイズを2倍にしてください")

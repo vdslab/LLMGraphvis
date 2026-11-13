@@ -152,6 +152,7 @@ def nudge_layout_choice(ctx: HookContext) -> None:
             "keep your explanation and add one or two sentences on how readable the "
             "drawing is, from `layout_quality` in plain words (if `issues` is empty, "
             "say there is no obvious problem). Then call ask_user once with a single "
+            "required top-level question string and a fields array containing one "
             "select field asking how to adjust the layout, with exactly these three "
             "options in the conversation language: let you tune it automatically "
             "(おまかせで調整), adjust it themselves from the current values "

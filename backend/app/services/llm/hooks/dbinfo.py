@@ -27,7 +27,8 @@ def node_attribute_names(db: Any, network_id: int) -> List[str]:
         .filter(models.NodeAttribute.network_id == network_id)
         .all()
     )
-    return [r[0] for r in rows]
+    # NetworkX exposes Node.label as a core attribute outside the EAV table.
+    return list(dict.fromkeys([r[0] for r in rows] + ["label"]))
 
 
 def edge_attribute_names(db: Any, network_id: int) -> List[str]:
@@ -38,7 +39,8 @@ def edge_attribute_names(db: Any, network_id: int) -> List[str]:
         .filter(models.EdgeAttribute.network_id == network_id)
         .all()
     )
-    return [r[0] for r in rows]
+    # Imported Edge.weight is likewise stored on the edge row itself.
+    return list(dict.fromkeys([r[0] for r in rows] + ["weight"]))
 
 
 def graph_size(db: Any, network_id: int) -> Tuple[int, int]:

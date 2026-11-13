@@ -870,6 +870,10 @@ def offerable_pipeline(db, chat_id, network_id, user_text: str) -> list[str] | N
     """
     from .skills import registry as skill_registry
 
+    if _is_style_reset(user_text):
+        # "戻して" also triggers parameter-tuning, but clearing a channel must
+        # not foreground the previous set_* call as the operation to replay.
+        return None
     if not any(s.name == "parameter-tuning" for s in skill_registry.suggest(user_text)):
         return None
     rows = (
@@ -897,6 +901,20 @@ def offerable_pipeline(db, chat_id, network_id, user_text: str) -> list[str] | N
         return None
     after = [n for n in dict.fromkeys(names[starts[-1] + 1 :]) if is_rendering_tool(n)]
     return [names[starts[-1]], *after]
+
+
+def _is_style_reset(user_text: str) -> bool:
+    text = user_text.lower()
+    return bool(
+        re.search(
+            r"reset|restore|default|uniform|初期|単色|解除|元の(?:色|サイズ|大きさ)",
+            text,
+        )
+        and re.search(
+            r"colou?r|size|style|highlight|色|サイズ|大きさ|スタイル|強調|ハイライト",
+            text,
+        )
+    )
 
 
 def offer_hint(pipeline: list[str]) -> str:

@@ -173,10 +173,13 @@ def test_form_merges_split_single_option_select_fields():
 def test_form_auto_heals_malformed_fields_inputs():
     # Real-world chat 226 case: XML tag prefix leaked into fields string
     xml_string_payload = {
-        "question": "どの可視化を作成しますか？（各選択肢の内容は上の説明をご覧ください）",
+        "question": "どの可視化を作成しますか？"
+        "（各選択肢の内容は上の説明をご覧ください）",
         "fields": (
-            '\n<parameter name="fields">[{"id": "analysis_goal", "label": "可視化のゴール", '
-            '"kind": "select", "options": ["対立と橋渡し役を同時に表示", "接点リンクを強調", "構造を比較"]}]'
+            '\n<parameter name="fields">[{"id": "analysis_goal", '
+            '"label": "可視化のゴール", "kind": "select", '
+            '"options": ["対立と橋渡し役を同時に表示", '
+            '"接点リンクを強調", "構造を比較"]}]'
         ),
     }
     validated_xml = InputForm.model_validate(xml_string_payload)
@@ -551,7 +554,7 @@ async def test_answering_turn_reopens_with_the_tools_the_question_had(db, chat):
 async def test_consecutive_question_allowed_after_tool_execution_in_resumed_turn(
     db, chat
 ):
-    """A second ask_user after running analysis in an answered turn must not be deferred."""
+    """A second ask_user in an answered turn must not be deferred."""
     from contextlib import asynccontextmanager
 
     catalog_tools = [
@@ -652,3 +655,23 @@ async def test_consecutive_question_allowed_after_tool_execution_in_resumed_turn
         if c["name"] == "ask_user"
     ][0]
     assert ask_user_call["status"] == "completed"
+
+
+def test_missing_question_error_explains_the_required_top_level_argument():
+    result = present_question(
+        1,
+        None,
+        {
+            "fields": [
+                {
+                    "id": "layout_choice",
+                    "label": "Layout",
+                    "kind": "select",
+                    "options": ["Keep", "Tune"],
+                }
+            ]
+        },
+        {},
+    )
+    assert 'top-level "question"' in result["error"]
+    assert '{"question":' in result["error"]
