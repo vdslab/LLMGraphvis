@@ -455,7 +455,7 @@ async def run(
                     "",
                 ]
             )
-    if stopped:
+    if stopped and not run_error:
         lines.extend(
             ["", "Stopped at the first browser failure. Remaining cases were not run."]
         )
