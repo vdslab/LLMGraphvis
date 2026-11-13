@@ -49,6 +49,15 @@ def test_explanations_existing_forms_and_repeated_nudges_do_not_reprompt():
         assert not ctx.turn_state.get("continuation")
 
 
+def test_completed_steps_with_generic_closing_invitation_are_not_a_choice_menu():
+    ctx = context(
+        "1. clubで色分けしました。\n2. 媒介中心性でサイズを設定しました。\n"
+        "これで完了しました。他にどのような分析や変更をご希望ですか？"
+    )
+    nudge_choice_ui(ctx)
+    assert not ctx.turn_state.get("continuation")
+
+
 def test_empty_provider_response_retries_once_without_claiming_success():
     ctx = context("")
     retry_empty_response(ctx)

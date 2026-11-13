@@ -199,7 +199,7 @@ def nudge_choice_ui(ctx: HookContext) -> None:
     text = ctx.assistant_text or ""
     candidates = re.findall(r"(?m)^\s*(?:\*\*)?\d+[.)．、]\s*\S", text)
     invitation = re.search(
-        r"選んで|選択してください|どれ(?:を|に)|どちら(?:を|に)|ご希望|ご指示|教えてください|"
+        r"選んで|選択してください|どれ(?:を|に)|どちら(?:を|に)|教えてください|"
         r"\b(?:choose|prefer|which|let me know)\b",
         text,
         re.IGNORECASE,
