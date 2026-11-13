@@ -116,6 +116,63 @@ async def test_consume_stream_accumulates_usage(mock_agent, mock_queue):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "reasoning",
+    [
+        "<thought>I will calculate centrality.\n1. Color\n2. Size\n"
+        "Decide which channel is appropriate.</thought>",
+        ":::thought\nI will calculate centrality.\n1. Color\n2. Size\n"
+        "Decide which channel is appropriate.\n:::\n",
+    ],
+)
+async def test_completion_hooks_ignore_reasoning_menus(
+    mock_agent, mock_queue, reasoning
+):
+    mock_agent.provider.generate = MagicMock(
+        side_effect=lambda *a, **k: _async_iter([StreamChunk(text="Unexpected retry")])
+    )
+    final_text, _, _ = await mock_agent._execute_tool_loop(
+        initial_stream=_async_iter(
+            [StreamChunk(text=reasoning + "Color and size updated.")]
+        ),
+        history=[],
+        all_tools=[],
+        queue=mock_queue,
+        chat_id=1,
+        network_id=1,
+        session=None,
+    )
+    mock_agent.provider.generate.assert_not_called()
+    assert "Color and size updated." in final_text
+
+
+@pytest.mark.asyncio
+async def test_reasoning_question_does_not_hide_a_visible_stalled_action(
+    mock_agent, mock_queue
+):
+    mock_agent.provider.generate = MagicMock(
+        side_effect=lambda *a, **k: _async_iter([StreamChunk(text="Done.")])
+    )
+    await mock_agent._execute_tool_loop(
+        initial_stream=_async_iter(
+            [
+                StreamChunk(
+                    text="<thought>Which tool should I use?</thought>"
+                    "I will calculate centrality now."
+                )
+            ]
+        ),
+        history=[],
+        all_tools=[],
+        queue=mock_queue,
+        chat_id=1,
+        network_id=1,
+        session=None,
+    )
+    mock_agent.provider.generate.assert_called_once()
+
+
+@pytest.mark.asyncio
 async def test_loop_regenerates_on_a_stalled_intent(mock_agent, mock_queue):
     """An announced-but-unexecuted action must drive one more generate()."""
     history = []
@@ -559,7 +616,7 @@ async def test_modified_arguments_are_reported_in_the_result(mock_agent, mock_qu
 
 @pytest.mark.asyncio
 async def test_loop_aborts_when_a_hook_sets_should_abort(mock_agent, mock_queue):
-    """Repeated failures end the turn with an explanation instead of burning the budget."""
+    """Repeated failures end the turn with an explanation."""
     mock_agent._run_tool = AsyncMock(return_value=({"error": "boom"}, "failed", "boom"))
     fc = FunctionCallData(name="test_tool", args={}, call_id="c1")
     mock_agent.provider.generate = MagicMock(

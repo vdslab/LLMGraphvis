@@ -2,7 +2,13 @@ import copy
 import math
 from pathlib import Path
 
-from evaluation.scenarios import KARATE, browser_checks, check_drawing, fixture
+from evaluation.scenarios import (
+    KARATE,
+    audit_tool_arguments,
+    browser_checks,
+    check_drawing,
+    fixture,
+)
 
 
 def _degree_drawing():
@@ -66,3 +72,31 @@ def test_browser_checks_reject_stale_encoding_even_with_matching_counts():
     assert not browser_checks(capture, state)["drawn_channels_match"]
     capture["errors"] = ["Backend reported error"]
     assert not browser_checks(capture, state)["no_console_errors"]
+
+
+def test_tool_audit_catches_color_arguments_on_size_tool():
+    schemas = {
+        "visualization_set_node_size": {
+            "properties": {
+                "network_id": {},
+                "attribute": {},
+                "transform": {},
+            }
+        }
+    }
+    notes = audit_tool_arguments(
+        [
+            {
+                "tool_name": "visualization_set_node_size",
+                "arguments": {
+                    "network_id": 1,
+                    "attribute": "degree_centrality",
+                    "scale_type": "LINEAR",
+                },
+            },
+        ],
+        schemas,
+    )
+    assert notes == [
+        {"tool": "visualization_set_node_size", "undeclared_arguments": ["scale_type"]}
+    ]

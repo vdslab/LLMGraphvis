@@ -395,6 +395,51 @@ class TestGuardExpensiveComputation:
 
 
 class TestGuardRepeatCall:
+    def test_render_can_repeat_after_a_successful_layout(self):
+        from app.services.llm.hooks.builtin.audit import audit_tool_success
+
+        state = new_turn_state(10)
+        args = {"network_id": 7}
+        for _ in range(guards.MAX_IDENTICAL_CALLS - 1):
+            assert (
+                guards.guard_repeat_call(
+                    ctx("visualization_generate", args, turn_state=state)
+                )
+                is None
+            )
+        assert (
+            guards.guard_repeat_call(
+                ctx("visualization_generate", args, turn_state=state)
+            ).action
+            == "deny"
+        )
+
+        audit_tool_success(ctx("layout_bipartite", args, turn_state=state))
+        assert (
+            guards.guard_repeat_call(
+                ctx("visualization_generate", args, turn_state=state)
+            )
+            is None
+        )
+
+    def test_readonly_layout_inspection_does_not_reset_render_limit(self):
+        from app.services.llm.hooks.builtin.audit import audit_tool_success
+
+        state = new_turn_state(10)
+        args = {"network_id": 7}
+        for _ in range(guards.MAX_IDENTICAL_CALLS - 1):
+            guards.guard_repeat_call(
+                ctx("visualization_generate", args, turn_state=state)
+            )
+        audit_tool_success(ctx("layout_profile", args, turn_state=state))
+        audit_tool_success(ctx("layout_suggest_parameters", args, turn_state=state))
+        assert (
+            guards.guard_repeat_call(
+                ctx("visualization_generate", args, turn_state=state)
+            ).action
+            == "deny"
+        )
+
     def test_third_identical_call_is_denied(self):
         state = new_turn_state(10)
         for _ in range(guards.MAX_IDENTICAL_CALLS - 1):
@@ -556,6 +601,9 @@ class TestDetectStalledIntent:
             "The network has 34 nodes and 78 edges.",
             "I will explain what betweenness centrality means.",
             "このネットワークは34ノードです。",
+            "visualization_set_node_size はサイズの尺度を説明すると"
+            "使い勝手が向上します。",
+            "サイズの説明があると、ツールの用途が明確になります。",
         ],
     )
     def test_does_not_fire_without_an_announced_action(self, text):

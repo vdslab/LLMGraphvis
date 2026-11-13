@@ -42,7 +42,9 @@ _INTENT_PATTERNS = (
     r"\bi\s+am\s+going\s+to\b",
     r"\bnow\s+i\b",
     r"\bnext,?\s+i\b",
-    # Japanese: polite non-past ("...します") and its common inflections.
+    # A polite ending alone also matches feedback such as "使い勝手が向上します".
+    # Require an executable operation immediately before "します".
+    r"(?:計算|適用|色分け|可視化|描画|更新|変更|検出|抽出|作成|切り替え|実行|調整|配置)"
     r"します(?:ね)?[。\.]",
     r"していきます",
     r"してみます",

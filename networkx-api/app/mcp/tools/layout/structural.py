@@ -39,9 +39,9 @@ def layout_bipartite(
         ),
     ] = None,
     partition_value: Annotated[
-        Optional[str],
+        Optional[str | float],
         Field(
-            description="Which value of `partition_attribute` forms the first (left/top) side. Nodes with any other value form the second side. Required when the attribute has more than two distinct values."
+            description="Which value of `partition_attribute` forms the first (left/top) side. For numeric attributes, 0, 0.0, '0' and '0.0' select the same value; text attributes match exactly ('00' differs from '0'). Nodes with any other value form the second side. Required when the attribute has more than two distinct values."
         ),
     ] = None,
     nodes: Annotated[

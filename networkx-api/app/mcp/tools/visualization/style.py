@@ -68,7 +68,7 @@ def visualization_set_node_color(
     attribute: Annotated[
         str,
         Field(
-            description="Node attribute name to use for coloring (e.g., 'community', 'degree_centrality', 'country')."
+            description="Node attribute name to use for coloring (e.g., 'louvain_community', 'degree_centrality', 'country'). For a computed attribute, use the exact saved name from the analysis tool's result."
         ),
     ],
     scale_type: Annotated[
@@ -145,6 +145,10 @@ def visualization_set_node_color(
     - Skewed metric where most nodes look alike: scale_type='LINEAR', transform='log' (or 'rank')
 
     Report the returned `legend` mapping to the user using its exact hex codes.
+    A palette does not give a category the same fixed color across different
+    networks: automatic assignment depends on the categories and their frequencies.
+    Read the actual value-to-color correspondence from `legend`; supply `mapping`
+    when specific categories must keep specific colors.
     To return colors to uniform, use `visualization_reset_style(targets=['node_color'])` —
     passing an empty mapping here does not clear anything.
 
@@ -223,6 +227,9 @@ def visualization_set_node_size(
 
     All other visual settings (layout, colors, edge styles) are preserved.
     Leaving min/max/default as None uses smart adaptive sizing based on network density.
+    This tool has no `scale_type` parameter: numeric sizing is continuous. Use
+    `transform` to choose linear, log, or rank spacing; `scale_type` belongs to
+    color tools and must not be copied into a size call.
 
     Note: `size` is not a literal pixel radius — it scales with node area, so doubling
     `size` does not double the visible radius. The frontend renders the visible radius

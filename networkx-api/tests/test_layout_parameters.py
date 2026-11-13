@@ -107,7 +107,8 @@ class TestLayoutParamKeys:
         for name, keys in LAYOUT_PARAM_KEYS.items():
             accepted = set(inspect.signature(fns[name]).parameters)
             assert not (keys - accepted), (
-                f"{name}: allowlisted but not in nx signature: {sorted(keys - accepted)}"
+                f"{name}: allowlisted but not in nx signature: "
+                f"{sorted(keys - accepted)}"
             )
 
     def test_random_has_no_scale(self):
@@ -586,6 +587,42 @@ class TestNewAlgorithms:
         setup_graph(db)
         with pytest.raises(ValueError, match="partition_attribute"):
             calculate_layout(1, "bipartite", db)
+
+    @pytest.mark.parametrize("selected", ["0", "0.0", 0, 0.0])
+    def test_bipartite_numeric_partition_matches_imported_float(self, db, selected):
+        setup_graph(db, n=6, attrs={"side": {f"n{i}": i % 2 for i in range(6)}})
+        calculate_layout(
+            1,
+            "bipartite",
+            db,
+            overrides={
+                "partition_attribute": "side",
+                "partition_value": selected,
+            },
+        )
+        positions = load_layout_positions(1, "bipartite", db)
+        left = {round(positions[f"n{i}"][0], 6) for i in (0, 2, 4)}
+        right = {round(positions[f"n{i}"][0], 6) for i in (1, 3, 5)}
+        assert len(left) == len(right) == 1
+        assert max(left) < min(right)
+
+    def test_bipartite_preserves_distinct_text_codes(self, db):
+        setup_graph(
+            db,
+            n=6,
+            attrs={"side": {f"n{i}": "00" if i % 2 == 0 else "0" for i in range(6)}},
+        )
+        calculate_layout(
+            1,
+            "bipartite",
+            db,
+            overrides={
+                "partition_attribute": "side",
+                "partition_value": "00",
+            },
+        )
+        positions = load_layout_positions(1, "bipartite", db)
+        assert positions["n0"][0] < positions["n1"][0]
 
     def test_bipartite_rejects_more_than_two_values_without_a_choice(self, db):
         setup_graph(db, n=6, attrs={"grp": {f"n{i}": f"g{i % 3}" for i in range(6)}})

@@ -100,6 +100,13 @@ def summarize_visualization(state: Any) -> dict[str, Any]:
     position_hash = hashlib.sha256(
         json.dumps(positions, sort_keys=True, default=str).encode("utf-8")
     ).hexdigest()[:16]
+    drawing_hash = hashlib.sha256(
+        json.dumps(
+            {key: value for key, value in state.items() if key != "layout_quality"},
+            sort_keys=True,
+            default=str,
+        ).encode("utf-8")
+    ).hexdigest()[:16]
 
     return {
         "available": True,
@@ -128,6 +135,7 @@ def summarize_visualization(state: Any) -> dict[str, Any]:
             "distinct": len(set(sizes)),
         },
         "position_hash": position_hash,
+        "drawing_hash": drawing_hash,
         "legend": state.get("legend"),
         "issues": issues,
     }
@@ -149,6 +157,7 @@ def diff_visualizations(before: Any, after: Any) -> dict[str, Any]:
         "distinct_node_colors",
         "node_size",
         "position_hash",
+        "drawing_hash",
         "legend",
         "issues",
     )

@@ -184,6 +184,10 @@ def guard_repeat_call(ctx: HookContext) -> Optional[ToolCallDecision]:
     that would actually execute, not the model's raw ones.
     """
     fp = _fingerprint(ctx.tool_name or "", ctx.args)
+    if ctx.tool_name == "visualization_generate":
+        network_id = ctx.args.get("network_id", ctx.network_id)
+        revision = ctx.turn_state.get("layout_revisions", {}).get(network_id, 0)
+        fp += f":layout_revision={revision}"
     counts = ctx.turn_state.setdefault("call_counts", {})
     counts[fp] = counts.get(fp, 0) + 1
 

@@ -19,6 +19,7 @@ logger = get_logger(__name__)
 # (e.g. `pagerank`, `louvain_community`) and `layout_*` saves `{name}_x`/`_y`.
 _ATTRIBUTE_CREATING_PATTERNS = ("analysis_", "layout_")
 _PREPARATION_TOOLS = frozenset({"skill_load", "tool_search"})
+_READ_ONLY_LAYOUT_TOOLS = frozenset({"layout_profile", "layout_suggest_parameters"})
 
 
 @hook(HookEvent.POST_TOOL, tools="*", priority=90, name="audit_tool_success")
@@ -35,6 +36,12 @@ def audit_tool_success(ctx: HookContext) -> None:
         # A metric or layout attribute may have just appeared; make the next
         # attribute check re-read the database rather than trust a stale list.
         dbinfo.invalidate_attributes(ctx.turn_state)
+
+    if tool_name.startswith("layout_") and tool_name not in _READ_ONLY_LAYOUT_TOOLS:
+        # The same render arguments now draw different stored coordinates.
+        network_id = ctx.args.get("network_id", ctx.network_id)
+        revisions = ctx.turn_state.setdefault("layout_revisions", {})
+        revisions[network_id] = revisions.get(network_id, 0) + 1
 
     # A tool that succeeded clears that tool's failure streak, so three failures
     # spread across a recovered turn do not abort it.

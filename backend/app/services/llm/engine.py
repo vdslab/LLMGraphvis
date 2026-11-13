@@ -442,7 +442,9 @@ class GraphVisAgent:
                     db=self.db,
                     queue=queue,
                     session=session,
-                    assistant_text=chunk_text,
+                    # Completion heuristics judge what the user was told, not
+                    # plans or questions inside textual reasoning blocks.
+                    assistant_text=markup.visible_text(chunk_text),
                     thought_text=chunk_thought,
                 )
                 continuation = await hooks.registry.run_no_tool_calls(no_call_ctx)

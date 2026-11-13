@@ -47,3 +47,23 @@ def test_diff_visualizations_reports_encoding_change() -> None:
     assert "position_hash" in result["changes"]
     assert "layout" in result["changes"]
     assert result["after"]["node_attributes"] == ["group"]
+
+
+def test_diff_detects_opacity_and_color_changes_with_unchanged_summary():
+    before = {
+        "render": {
+            "nodes": [
+                {"id": "a", "x": 0, "y": 0, "color": "#abc", "size": 4, "opacity": 1},
+            ],
+            "links": [],
+        }
+    }
+    after = {
+        "render": {
+            "nodes": [
+                {"id": "a", "x": 0, "y": 0, "color": "#def", "size": 4, "opacity": 0.2},
+            ],
+            "links": [],
+        }
+    }
+    assert "drawing_hash" in diff_visualizations(before, after)["changes"]

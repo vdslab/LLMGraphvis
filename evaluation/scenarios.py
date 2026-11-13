@@ -17,6 +17,7 @@ from typing import Any
 from .bridge import EvaluationBridge
 from .capture import capture_graph
 from .config import EvaluationConfig
+from .surfaces import load_prompt_surfaces
 
 
 @dataclass(frozen=True)
@@ -254,6 +255,24 @@ def save(path: Path, value: Any) -> None:
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2, default=str) + "\n")
 
 
+def audit_tool_arguments(
+    executions: list[dict[str, Any]], schemas: dict[str, dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Flag undeclared arguments without prescribing a tool or a tool sequence."""
+    notes = []
+    for execution in executions:
+        name = execution["tool_name"]
+        if name not in schemas:
+            continue
+        extra = sorted(
+            set(execution.get("arguments") or {})
+            - set(schemas[name].get("properties", {}))
+        )
+        if extra:
+            notes.append({"tool": name, "undeclared_arguments": extra})
+    return notes
+
+
 async def run(
     config: EvaluationConfig, selected: list[Scenario], feedback: bool
 ) -> int:
@@ -275,6 +294,9 @@ async def run(
     stopped = False
     run_error = ""
     try:
+        surfaces = await load_prompt_surfaces(config)
+        save(config.run_dir / "prompt-surfaces.json", surfaces)
+        schemas = {tool["name"]: tool["input_schema"] for tool in surfaces["mcp_tools"]}
         for scenario in selected:
             print(f"Starting {scenario.name}", flush=True)
             entry: dict[str, Any] = {
@@ -329,6 +351,9 @@ async def run(
                     "response": observation["assistant_message"],
                     "provider": observation["provider"],
                     "model": observation["model"],
+                    "argument_audit": audit_tool_arguments(
+                        observation["tool_executions"], schemas
+                    ),
                     "capture": observation["capture"],
                 }
                 entry["steps"].append(step)
@@ -394,6 +419,7 @@ async def run(
                     f"Prompt: {step['prompt']}",
                     "",
                     f"Tools: {', '.join(step['tools'])}",
+                    f"Undeclared arguments: {step.get('argument_audit', [])}",
                     "",
                     step["response"],
                     "",
@@ -444,6 +470,10 @@ def main() -> int:
         run_id=args.run_id,
         max_probes=sum(len(s.prompts) for s in selected),
     )
+    if config.run_dir.exists():
+        parser.error(
+            f"Run directory already exists: {config.run_dir}; use a new run ID"
+        )
     return asyncio.run(run(config, selected, not args.no_feedback))
 
 

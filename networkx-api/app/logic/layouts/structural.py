@@ -11,6 +11,16 @@ import networkx as nx
 from .base import register
 
 
+def _partition_value_matches(stored, requested):
+    """Compare numeric attributes numerically while keeping text codes exact."""
+    if isinstance(stored, (int, float)) and not isinstance(stored, bool):
+        try:
+            return stored == float(requested)
+        except (TypeError, ValueError, OverflowError):
+            return False
+    return str(stored) == str(requested)
+
+
 def prepare_bipartite(G, network_id, overrides, db):
     """Turn `partition_attribute` (+ optional `partition_value`) into `nodes`."""
     from ..attributes import load_node_attribute_values
@@ -44,11 +54,16 @@ def prepare_bipartite(G, network_id, overrides, db):
             )
         partition_value = distinct[0]
 
-    side = [n for n in G.nodes if str(values.get(n)) == str(partition_value)]
+    side = [
+        n
+        for n in G.nodes
+        if n in values and _partition_value_matches(values[n], partition_value)
+    ]
     if not side or len(side) == len(G.nodes):
         raise ValueError(
             f"No usable split: '{partition_attr}' == '{partition_value}' selects "
-            f"{len(side)} of {len(G.nodes)} nodes. One side would be empty."
+            f"{len(side)} of {len(G.nodes)} nodes. One side would be empty. "
+            f"Available values: {', '.join(distinct[:5])}."
         )
     overrides["nodes"] = side
 
