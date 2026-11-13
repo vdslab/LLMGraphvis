@@ -68,7 +68,7 @@ SCENARIOS = (
             "ノードID 0だけを強調し、それ以外を薄くしてください。"
             "分析対象は全体のままにしてください。",
         ),
-        "分析対象と全ノード・辺を保持し、0だけを強調して他を薄くする。",
+        "分析対象と全ノード・辺と画角を保持し、0だけを強調して他を薄くする。",
     ),
     Scenario(
         "extract",
@@ -208,6 +208,7 @@ def check_drawing(
             max(columns[0]) < min(columns[1])
         )
     if name == "focus":
+        checks["viewport_unchanged"] = not render.get("viewport")
         checks["highlighted_ids"] = {
             key for key, n in by_id.items() if n.get("highlighted")
         } == {"0"}

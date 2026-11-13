@@ -100,3 +100,9 @@ def test_tool_audit_catches_color_arguments_on_size_tool():
     assert notes == [
         {"tool": "visualization_set_node_size", "undeclared_arguments": ["scale_type"]}
     ]
+
+
+def test_highlight_only_request_rejects_unrequested_zoom():
+    original, state = _degree_drawing()
+    state["render"]["viewport"] = {"mode": "nodes", "node_ids": ["0"]}
+    assert not check_drawing("focus", original, state, 1)["viewport_unchanged"]

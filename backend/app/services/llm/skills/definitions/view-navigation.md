@@ -32,7 +32,10 @@ colour channel already carries meaning the user still needs to read.
 
 ### Focus on named nodes
 1. Resolve names with `node_search`; ask with `ask_user` if a name is ambiguous.
-2. `visualization_highlight(node_ids=[...], zoom_to=True)`.
+2. `visualization_highlight(node_ids=[...])`. Keep the current framing when the
+   user asks only to highlight nodes and dim the rest. Use `zoom_to=True` only
+   for an explicit request to zoom, frame, or take a closer look; framing a
+   single node can move the rest off-screen.
 3. Say what is highlighted and that the rest is dimmed, not removed.
 
 ### Show a route
