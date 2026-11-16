@@ -205,13 +205,14 @@ def diagnose(report: QualityReport) -> List[str]:
     """Name the problems a reader would notice, most damaging first."""
     t = THRESHOLDS
     issues = []
+    # First: when the positions carry no structure, nothing else matters yet.
+    if report.edge_locality is not None and report.edge_locality > t["unstructured"]:
+        issues.append("unstructured")
     if (
         report.node_count
         and 2 * report.edge_count / report.node_count >= t["dense_edges"]
     ):
         issues.append("dense_edges")
-    if report.edge_locality is not None and report.edge_locality > t["unstructured"]:
-        issues.append("unstructured")
     if report.node_overlap > t["node_overlap"]:
         issues.append("node_overlap")
     if (
