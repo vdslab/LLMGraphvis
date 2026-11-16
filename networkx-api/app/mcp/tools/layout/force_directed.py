@@ -42,6 +42,14 @@ _INIT_FROM_DESC = (
     "to refine an existing arrangement rather than producing an unrelated new one."
 )
 
+_REMOVE_OVERLAP_DESC = (
+    "After the layout runs, push apart nodes whose drawn circles overlap, at the sizes they "
+    "are drawn now. On by default; it moves nodes only locally, so groups keep their place "
+    "and shape. Set False only when exact force-model positions matter more than seeing "
+    "every node. After changing node sizes, call this layout again to separate at the new "
+    "sizes."
+)
+
 
 @mcp.tool()
 @handle_tool_errors
@@ -122,6 +130,9 @@ def layout_forceatlas2(
     init_from_layout: Annotated[
         Optional[str], Field(description=_INIT_FROM_DESC)
     ] = None,
+    remove_overlap: Annotated[
+        Optional[bool], Field(description=_REMOVE_OVERLAP_DESC)
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -166,6 +177,7 @@ def layout_forceatlas2(
             "seed": seed,
             "init_from_layout": init_from_layout,
             "pos": pos,
+            "remove_overlap": remove_overlap,
         }
         info = layout.calculate_layout(
             network_id, "forceatlas2", db, overrides=overrides, force=force_recompute
@@ -242,6 +254,9 @@ def layout_spring(
     init_from_layout: Annotated[
         Optional[str], Field(description=_INIT_FROM_DESC)
     ] = None,
+    remove_overlap: Annotated[
+        Optional[bool], Field(description=_REMOVE_OVERLAP_DESC)
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -288,6 +303,7 @@ def layout_spring(
             "seed": seed,
             "init_from_layout": init_from_layout,
             "pos": pos,
+            "remove_overlap": remove_overlap,
         }
         info = layout.calculate_layout(
             network_id, "spring", db, overrides=overrides, force=force_recompute
@@ -345,6 +361,9 @@ def layout_arf(
     init_from_layout: Annotated[
         Optional[str], Field(description=_INIT_FROM_DESC)
     ] = None,
+    remove_overlap: Annotated[
+        Optional[bool], Field(description=_REMOVE_OVERLAP_DESC)
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -378,6 +397,7 @@ def layout_arf(
             "seed": seed,
             "init_from_layout": init_from_layout,
             "pos": pos,
+            "remove_overlap": remove_overlap,
         }
         info = layout.calculate_layout(
             network_id, "arf", db, overrides=overrides, force=force_recompute

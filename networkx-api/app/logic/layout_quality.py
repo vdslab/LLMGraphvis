@@ -91,20 +91,18 @@ def normalize_like_renderer(
     """
     if not pos:
         return {}
-    xs = [p[0] for p in pos.values()]
-    ys = [p[1] for p in pos.values()]
-    min_x, max_x = min(xs), max(xs)
-    min_y, max_y = min(ys), max(ys)
-    range_x = (max_x - min_x) if (max_x - min_x) > 0 else 1.0
-    range_y = (max_y - min_y) if (max_y - min_y) > 0 else 1.0
-    span = 2 * TARGET_EXTENT
-    return {
-        node: (
-            ((x - min_x) / range_x - 0.5) * span,
-            ((y - min_y) / range_y - 0.5) * span,
-        )
-        for node, (x, y) in pos.items()
-    }
+    points = normalize_points_like_renderer(
+        np.array([(float(x), float(y)) for x, y in pos.values()], dtype=float)
+    )
+    return {node: (float(x), float(y)) for node, (x, y) in zip(pos, points)}
+
+
+def normalize_points_like_renderer(points: np.ndarray) -> np.ndarray:
+    """`normalize_like_renderer` for an (N, 2) array, for loops that renormalize."""
+    low = points.min(axis=0)
+    extent = points.max(axis=0) - low
+    extent[extent <= 0] = 1.0
+    return ((points - low) / extent - 0.5) * (2 * TARGET_EXTENT)
 
 
 @dataclass

@@ -15,7 +15,14 @@ from sqlalchemy.orm import Session
 from app.core.logging import get_logger
 from common import models
 
-from .layouts import WeightRole, get_spec, layout_names, param_keys, resolve_weight
+from .layouts import (
+    REMOVE_OVERLAP,
+    WeightRole,
+    get_spec,
+    layout_names,
+    param_keys,
+    resolve_weight,
+)
 from .layouts.profile import profile_graph
 from .layouts.weights import normalize_strength
 
@@ -315,6 +322,14 @@ def calculate_layout(
         # Part of the cache key only: a layout stored before weights were
         # normalized must not be reused as if it had been.
         effective_params["weight_normalization"] = "median"
+    drawn_sizes = None
+    if params.get(REMOVE_OVERLAP):
+        # How far nodes are pushed apart depends on how large they are drawn, so
+        # a new size encoding must not reuse a layout separated for the old one.
+        from .visualization_builder import display_node_sizes
+
+        drawn_sizes = display_node_sizes(db, network_id)
+        effective_params["overlap_sizes"] = _digest_param(drawn_sizes)
 
     # A note only describes a default that was actually used.
     tuning_notes = [
@@ -347,7 +362,7 @@ def calculate_layout(
         f"layout='{layout_name}'. Recomputing."
     )
 
-    pos = spec.compute(G, params)
+    pos = spec.run(G, params, drawn_sizes or {})
     if any(
         len(point) != 2 or not all(math.isfinite(float(v)) for v in point)
         for point in pos.values()

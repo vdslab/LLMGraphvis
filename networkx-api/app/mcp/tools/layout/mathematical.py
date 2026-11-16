@@ -24,6 +24,14 @@ _SCALE_CENTER_DESC = (
     "or reposition the view."
 )
 
+_REMOVE_OVERLAP_DESC = (
+    "After the layout runs, push apart nodes whose drawn circles overlap, at the sizes they "
+    "are drawn now. On by default; it moves nodes only locally, so groups keep their place "
+    "and shape. Set False only when exact force-model positions matter more than seeing "
+    "every node. After changing node sizes, call this layout again to separate at the new "
+    "sizes."
+)
+
 
 @mcp.tool()
 @handle_tool_errors
@@ -58,6 +66,9 @@ def layout_kamada_kawai(
             description="Name of a previously computed layout whose stored coordinates become the starting positions for the optimization. A good starting point (e.g. 'forceatlas2') both speeds up convergence and avoids poor local minima."
         ),
     ] = None,
+    remove_overlap: Annotated[
+        Optional[bool], Field(description=_REMOVE_OVERLAP_DESC)
+    ] = None,
     force_recompute: Annotated[bool, Field(description=_FORCE_RECOMPUTE_DESC)] = False,
 ) -> str:
     """
@@ -90,6 +101,7 @@ def layout_kamada_kawai(
             "center": center,
             "init_from_layout": init_from_layout,
             "pos": pos,
+            "remove_overlap": remove_overlap,
         }
         info = layout.calculate_layout(
             network_id, "kamada_kawai", db, overrides=overrides, force=force_recompute

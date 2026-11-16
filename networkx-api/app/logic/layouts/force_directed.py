@@ -214,6 +214,7 @@ def tune_arf(G, profile):
     weight_role=WeightRole.STRENGTH,
     tune=tune_spring,
     aliases=("fruchterman_reingold",),
+    removes_overlap=True,
     knobs=(
         # Direction 0: try both ways. Spacing interacts with the renderer's
         # rescaling, and on a 300-node tree 1000 iterations left 88% of nodes
@@ -343,6 +344,7 @@ def _size_aware_forceatlas2(G, params):
     weight_role=WeightRole.STRENGTH,
     tune=tune_forceatlas2,
     prepare=prepare_forceatlas2,
+    removes_overlap=True,
     aliases=("forceatlas2_layout", "force-directed", "force_directed"),
     knobs=(
         Knob(
@@ -378,6 +380,7 @@ def forceatlas2(G, params):
     "arf",
     params={"pos", "scaling", "a", "etol", "dt", "max_iter", "seed"},
     tune=tune_arf,
+    removes_overlap=True,
     knobs=(
         Knob("scaling", 0.2, 20.0, fixes={"node_overlap": +1, "clumped": +1}),
         Knob("a", 1.1, 10.0, fixes={"outliers_compress_core": +1}),

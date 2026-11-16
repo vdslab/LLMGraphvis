@@ -101,7 +101,7 @@ def search(
 
     def run(params, changes) -> Candidate:
         t0 = clock()
-        pos = spec.compute(G, dict(params))
+        pos = spec.run(G, params, sizes)
         seconds = clock() - t0
         return Candidate(params, changes, evaluate(pos, G.edges, sizes), seconds)
 

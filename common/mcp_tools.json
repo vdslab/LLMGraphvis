@@ -179,6 +179,7 @@
   "max_iter",
   "network_id",
   "pos",
+  "remove_overlap",
   "scaling",
   "seed"
  ],
@@ -219,6 +220,7 @@
   "node_mass",
   "node_size",
   "pos",
+  "remove_overlap",
   "scaling_ratio",
   "seed",
   "size_aware",
@@ -232,6 +234,7 @@
   "init_from_layout",
   "network_id",
   "pos",
+  "remove_overlap",
   "scale",
   "weight"
  ],
@@ -294,6 +297,7 @@
   "network_id",
   "pack_components",
   "pos",
+  "remove_overlap",
   "scale",
   "seed",
   "threshold",

@@ -29,6 +29,8 @@ Every `visualization_generate` reports how the drawing reads, without an image:
 
 Tell the user about an issue in plain words ("many nodes overlap"), not as metric names, and only when it affects what they are trying to see.
 
+Force layouts (forceatlas2, spring, arf, kamada_kawai) push overlapping nodes apart after they run, at the sizes the nodes are drawn then. After you change node sizes, `node_overlap` can return: re-run the same layout tool to separate at the new sizes.
+
 ## Improving a Layout
 
 **`dense_edges` first.** When it is among the issues, no parameter or algorithm untangles the drawing: load `edge-backbone` and offer thinning the edges instead of tuning. Do not ask the three-option tuning question below for such a network.

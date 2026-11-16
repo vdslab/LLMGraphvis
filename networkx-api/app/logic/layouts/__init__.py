@@ -7,6 +7,7 @@ Importing this package registers every layout. `logic/layout.py` orchestrates
 # Importing each family module is what populates SPECS.
 from . import force_directed, geometric, mathematical, structural  # noqa: F401
 from .base import (  # noqa: F401
+    REMOVE_OVERLAP,
     SPECS,
     LayoutSpec,
     WeightRole,

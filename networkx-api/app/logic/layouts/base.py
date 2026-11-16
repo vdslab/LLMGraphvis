@@ -87,6 +87,9 @@ def _round(value: float) -> float:
 # from its plain default; the notes reach the model in the tool's reply.
 Tuning = Tuple[Dict[str, Any], List[str]]
 
+# The app parameter that turns overlap removal off for one call (ADR 0048).
+REMOVE_OVERLAP = "remove_overlap"
+
 
 @dataclass(frozen=True)
 class LayoutSpec:
@@ -103,12 +106,37 @@ class LayoutSpec:
     prepare: Optional[Callable] = None  # (G, network_id, overrides, db) -> None
     aliases: Tuple[str, ...] = ()
     knobs: Tuple[Knob, ...] = ()
+    # Whether nodes are pushed apart after `compute` until their drawn circles
+    # stop touching (ADR 0048). Only for layouts whose exact positions carry no
+    # meaning of their own: a circle or a bipartite column must stay as placed.
+    removes_overlap: bool = False
+
+    def run(self, G, params, sizes) -> Dict[Any, Tuple[float, float]]:
+        """Compute the layout as it will be drawn: `compute`, then overlap removal.
+
+        `sizes` are the drawn node sizes (areas), a mapping or one value for
+        all. `params` may carry the app-level `remove_overlap`; it is consumed
+        here and never reaches `compute`.
+        """
+        params = dict(params)
+        remove = params.pop(REMOVE_OVERLAP, self.removes_overlap)
+        pos = self.compute(G, params)
+        if remove and self.removes_overlap:
+            from .overlap import separate_overlaps
+
+            pos = separate_overlaps(pos, sizes)
+        return pos
 
     def tuned(self, G, profile) -> Tuning:
-        """The profile-derived defaults and the notes explaining them."""
-        if not self.tune:
-            return {}, []
-        return self.tune(G, profile)
+        """The profile-derived defaults and the notes explaining them.
+
+        Overlap removal is stated as a default where it applies, so the cache
+        key, the reply and replayed arguments all say it happened.
+        """
+        params, notes = self.tune(G, profile) if self.tune else ({}, [])
+        if self.removes_overlap:
+            params = {**params, REMOVE_OVERLAP: True}
+        return params, notes
 
     @property
     def accepted(self) -> FrozenSet[str]:
@@ -139,6 +167,7 @@ def register(
     prepare: Optional[Callable] = None,
     aliases=(),
     knobs=(),
+    removes_overlap: bool = False,
 ):
     """Declare a layout. Decorates the function that calls networkx.
 
@@ -154,19 +183,24 @@ def register(
     `app_params` are accepted, cached and reported like `params`, but `compute`
     consumes them before networkx is called, so they are not checked against
     the networkx signature.
+
+    `removes_overlap` pushes nodes apart after every run (ADR 0048) and adds
+    `remove_overlap` to the accepted app parameters, so a caller can opt out.
     """
 
     def decorator(fn: Callable) -> Callable:
         spec = LayoutSpec(
             name=name,
-            compute=fn,
+            compute=_ignoring_overlap_flag(fn) if removes_overlap else fn,
             params=frozenset(params),
-            app_params=frozenset(app_params),
+            app_params=frozenset(app_params)
+            | ({REMOVE_OVERLAP} if removes_overlap else frozenset()),
             weight_role=weight_role,
             tune=tune,
             prepare=prepare,
             aliases=tuple(aliases),
             knobs=tuple(knobs),
+            removes_overlap=removes_overlap,
         )
         unknown = {k.param for k in spec.knobs} - spec.accepted
         if unknown:
@@ -179,6 +213,16 @@ def register(
         return fn
 
     return decorator
+
+
+def _ignoring_overlap_flag(fn: Callable) -> Callable:
+    """`compute` is the bare layout: overlap removal belongs to `run`."""
+
+    def compute(G, params):
+        return fn(G, {k: v for k, v in params.items() if k != REMOVE_OVERLAP})
+
+    compute.__doc__ = fn.__doc__
+    return compute
 
 
 def canonical_name(layout_name: str) -> str:

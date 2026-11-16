@@ -14,6 +14,7 @@ from .base import WeightRole, register
     # nodes furthest apart, so it is never applied automatically.
     weight_role=WeightRole.DISTANCE,
     tune=lambda G, profile: ({"scale": 1.0}, []),
+    removes_overlap=True,
 )
 def kamada_kawai(G, params):
     """Kamada-Kawai. O(N^2) in time and memory, excellent global structure."""
