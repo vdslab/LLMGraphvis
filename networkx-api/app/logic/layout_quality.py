@@ -36,6 +36,8 @@ _OVERLAP_NEIGHBOURS = 8
 
 # Below this many nodes the percentile/grid metrics say nothing useful.
 MIN_NODES_FOR_SPREAD = 20
+# Random node pairs sampled for the baseline distance of `edge_locality`.
+_LOCALITY_PAIRS = 20_000
 
 # When a metric counts as a problem worth naming. `diagnose` reads these; the
 # layout knobs (logic/layouts) name the same labels to say what fixes them.
@@ -48,6 +50,12 @@ THRESHOLDS = {
     "uneven_edge_lengths": 1.0,  # edge_length_cv above this
     "distorted_aspect": 3.0,  # aspect above this
     "clumped": 0.15,  # occupancy below this
+    # edge_locality above this: connected nodes sit about as far apart as any
+    # two nodes, so the drawing shows nothing of the graph. A random placement
+    # measures 1.0; on the 3,383-node syllabus kNN graph ForceAtlas2 stopped at
+    # 50 iterations measured 0.85, spring 0.09; a dense concert graph
+    # (mean degree 15) drawn well measured 0.32 (ADR 0047).
+    "unstructured": 0.5,
     # Mean degree from which the edges cover the drawing whatever the layout
     # (a hairball); only thinning the edges helps (ADR 0040).
     "dense_edges": 6.0,
@@ -111,6 +119,7 @@ class QualityReport:
     core_extent: Optional[float]
     aspect: float
     occupancy: Optional[float]
+    edge_locality: Optional[float] = None
     issues: List[str] = field(default_factory=list)
     score: float = 0.0
 
@@ -129,6 +138,7 @@ class QualityReport:
             "core_extent": r(self.core_extent),
             "aspect": r(self.aspect),
             "occupancy": r(self.occupancy),
+            "edge_locality": r(self.edge_locality),
             "score": r(self.score),
             "issues": list(self.issues),
         }
@@ -184,6 +194,7 @@ def evaluate(
         core_extent=_core_extent(points),
         aspect=aspect,
         occupancy=_occupancy(points),
+        edge_locality=_edge_locality(points, edge_idx, seed),
     )
     report.issues = diagnose(report)
     report.score = score(report)
@@ -199,6 +210,8 @@ def diagnose(report: QualityReport) -> List[str]:
         and 2 * report.edge_count / report.node_count >= t["dense_edges"]
     ):
         issues.append("dense_edges")
+    if report.edge_locality is not None and report.edge_locality > t["unstructured"]:
+        issues.append("unstructured")
     if report.node_overlap > t["node_overlap"]:
         issues.append("node_overlap")
     if (
@@ -298,6 +311,27 @@ def _core_extent(points: np.ndarray) -> Optional[float]:
     if full[0] == 0 or full[1] == 0:
         return 0.0
     return float(np.prod((high - low) / full))
+
+
+def _edge_locality(points: np.ndarray, edges: np.ndarray, seed: int):
+    """Mean drawn edge length over the mean distance between two random nodes.
+
+    Near 1, an edge is no shorter than a random pair: the positions carry no
+    trace of the structure, as when a force layout stopped near its random
+    start. A readable drawing of a sparse graph sits far below.
+    """
+    n = len(points)
+    if n < MIN_NODES_FOR_SPREAD or len(edges) == 0:
+        return None
+    rng = np.random.default_rng(seed)
+    pairs = min(_LOCALITY_PAIRS, n * (n - 1) // 2)
+    a = rng.integers(0, n, pairs)
+    b = (a + rng.integers(1, n, pairs)) % n  # never a node with itself
+    baseline = np.linalg.norm(points[a] - points[b], axis=1).mean()
+    if baseline == 0:
+        return None
+    lengths = np.linalg.norm(points[edges[:, 0]] - points[edges[:, 1]], axis=1)
+    return float(lengths.mean() / baseline)
 
 
 def _occupancy(points: np.ndarray) -> Optional[float]:

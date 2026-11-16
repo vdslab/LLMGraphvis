@@ -24,7 +24,7 @@ When the user has not named one, call `layout_profile` and take the first `recom
 ## Reading `layout_quality`
 
 Every `visualization_generate` reports how the drawing reads, without an image:
-- `issues` names what a viewer would notice: `dense_edges` (so many edges that they hide any grouping; see below), `node_overlap`, `outliers_compress_core` (a few far-away nodes squeeze everything else together), `clumped`, `uneven_edge_lengths`, `distorted_aspect`.
+- `issues` names what a viewer would notice: `dense_edges` (so many edges that they hide any grouping; see below), `node_overlap`, `outliers_compress_core` (a few far-away nodes squeeze everything else together), `clumped`, `uneven_edge_lengths`, `distorted_aspect`, `unstructured` (connected nodes sit no closer than any two nodes: the positions show nothing of the graph, so do not describe where groups lie; redraw with the first `recommended` layout of `layout_profile`).
 - `score` compares layouts **of the same network** only (lower is better). Crossings count toward it but are never an issue on their own: dense graphs cross a lot under any layout.
 
 Tell the user about an issue in plain words ("many nodes overlap"), not as metric names, and only when it affects what they are trying to see.

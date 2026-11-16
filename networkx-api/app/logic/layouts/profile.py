@@ -109,9 +109,9 @@ def recommend_layouts(profile: GraphProfile) -> list:
                 "(pass the root as `start`)",
             )
         )
-    from .force_directed import fa2_iterations
+    from .force_directed import fa2_settles
 
-    fa2_cut_short = fa2_iterations(profile.nodes)[1]
+    fa2_cut_short = not fa2_settles(profile.nodes)
     if fa2_cut_short:
         # At this size ForceAtlas2 stops long before it converges and leaves an
         # even disc; spring's energy method converges in comparable time, and

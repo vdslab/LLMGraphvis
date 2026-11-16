@@ -109,6 +109,16 @@ async def test_overview_states_what_the_upload_already_did():
 
 
 @pytest.mark.asyncio
+async def test_overview_names_the_layout_the_upload_chose():
+    """A large upload is drawn with spring, not ForceAtlas2 (ADR 0047)."""
+    with _patch_resources():
+        _, body = await context.build_data_overview(1, layout_name="spring")
+
+    assert "Spring layout" in body
+    assert "ForceAtlas2" not in body
+
+
+@pytest.mark.asyncio
 async def test_overview_truncates_multiline_description():
     long_desc = "Co-performance network.\nNode type: musical_work\nSource: yearbook"
     with _patch_resources(metadata={"name": "Concerts", "description": long_desc}):

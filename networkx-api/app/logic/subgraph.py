@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.logging import get_logger
 from common import models
 
-from .layout import calculate_layout
+from .layout import calculate_initial_layout
 from .utils.attribute_copier import AttributeCopier
 from .utils.graph_builder import build_graph_from_db
 from .utils.node_utils import resolve_node_id
@@ -176,8 +176,8 @@ def create_subgraph_from_nodes(
 
     # 7. Calculate Initial Layout (only if NOT preserved)
     if not preserve_layout and initialize_layout:
-        logger.info("Calculating initial layout (forceatlas2)...")
-        calculate_layout(new_network_id, "forceatlas2", db)
+        info = calculate_initial_layout(new_network_id, db)
+        logger.info(f"Calculated initial layout ({info['layout_name']}).")
     elif preserve_layout:
         logger.info(
             "Preserving existing layout (x, y copied) from "

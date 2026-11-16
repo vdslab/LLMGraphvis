@@ -73,7 +73,8 @@ async def test_handle_upload_background_success(db):
             "app.services.network_service.import_graphml", new_callable=AsyncMock
         ) as mock_import,
         patch(
-            "app.services.network_service.calculate_layout", new_callable=AsyncMock
+            "app.services.network_service.calculate_initial_layout",
+            new_callable=AsyncMock,
         ) as mock_layout,
         patch(
             "app.services.network_service.build_visualization", new_callable=AsyncMock
@@ -107,7 +108,7 @@ async def test_handle_upload_background_success(db):
         )
 
         mock_import.assert_awaited_once_with(initial_network_id, graphml)
-        mock_layout.assert_awaited_once_with(new_network_id, "forceatlas2")
+        mock_layout.assert_awaited_once_with(new_network_id)
         mock_vis.assert_awaited_once_with(new_network_id)
         mock_exec.assert_not_called()
 

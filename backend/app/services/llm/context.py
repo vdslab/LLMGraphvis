@@ -334,7 +334,13 @@ def _attr_detail(attr: Dict[str, Any]) -> str:
     return f"{head} {stats}" if stats else head
 
 
-async def build_data_overview(network_id: int) -> Tuple[str, str]:
+# How the upload overview names the layout the app drew the network with.
+_INITIAL_LAYOUT_LABELS = {"forceatlas2": "ForceAtlas2", "spring": "Spring"}
+
+
+async def build_data_overview(
+    network_id: int, layout_name: str = "forceatlas2"
+) -> Tuple[str, str]:
     """Build the user-facing overview of an uploaded network, as (title, body).
 
     Shown at upload time so the user can see what the file contains before
@@ -344,8 +350,9 @@ async def build_data_overview(network_id: int) -> Tuple[str, str]:
 
     Like build_context_summary, this reads MCP resources directly from the
     backend — it does not rely on the LLM calling any tool. Returns ("", "")
-    when nothing could be read.
+    when nothing could be read. `layout_name` is the layout the upload ran.
     """
+    layout_label = _INITIAL_LAYOUT_LABELS.get(layout_name, layout_name)
     try:
         metadata, structure, node_attrs, edge_attrs = await _fetch_network_resources(
             network_id
@@ -433,7 +440,8 @@ async def build_data_overview(network_id: int) -> Tuple[str, str]:
         format_attrs_md(edge_attrs, "Edge attributes")
 
         lines.append(
-            "- **Already applied:** ForceAtlas2 layout, uniform node size and colour"
+            f"- **Already applied:** {layout_label} layout, "
+            "uniform node size and colour"
         )
 
         return _overview_title(metadata, structure), "\n".join(lines)

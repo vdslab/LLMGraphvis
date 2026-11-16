@@ -31,7 +31,10 @@ async def _run_upload(
         patch(
             "app.services.network_service.import_graphml", new_callable=AsyncMock
         ) as mock_import,
-        patch("app.services.network_service.calculate_layout", new_callable=AsyncMock),
+        patch(
+            "app.services.network_service.calculate_initial_layout",
+            new_callable=AsyncMock,
+        ),
         patch(
             "app.services.network_service.build_visualization", new_callable=AsyncMock
         ) as mock_vis,
@@ -86,7 +89,7 @@ async def test_pipeline_steps_are_progress_events_not_thinking():
         json.loads(e["data"])["label"] for e in events if e["event"] == "progress"
     ]
     assert "Importing GraphML data" in labels
-    assert "Calculating ForceAtlas2 layout" in labels
+    assert "Calculating initial layout" in labels
     assert "Generating initial visualization" in labels
 
 

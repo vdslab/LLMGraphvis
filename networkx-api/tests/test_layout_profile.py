@@ -58,7 +58,7 @@ class TestRecommendations:
         """A 3383-node backbone drew as an even disc under 50 FA2 iterations."""
         small = recommend_layouts(profile_graph(nx.cycle_graph(50)))
         assert small[0]["layout"] == "forceatlas2"
-        big = recommend_layouts(profile_graph(nx.cycle_graph(1500)))
+        big = recommend_layouts(profile_graph(nx.cycle_graph(2500)))
         assert [r["layout"] for r in big[:2]] == ["spring", "forceatlas2"]
         assert "stop early" in big[0]["reason"]
 
@@ -106,6 +106,24 @@ class TestTuning:
         floor = fa2_budget_floor_nodes()
         assert (floor - 1) ** 2 * _FA2_MIN_ITER <= _FA2_ITERATION_BUDGET
         assert floor**2 * _FA2_MIN_ITER > _FA2_ITERATION_BUDGET
+
+    def test_forceatlas2_settles_until_the_budget_leaves_too_few_iterations(self):
+        """A 1144-node graph drew alike under both; 2378 nodes did not (ADR 0047)."""
+        from app.logic.layouts.force_directed import fa2_settles
+
+        assert fa2_settles(50) and fa2_settles(1144)
+        assert not fa2_settles(2378) and not fa2_settles(3383)
+
+    def test_initial_layout_is_spring_where_forceatlas2_would_not_settle(self):
+        from app.logic.layout import initial_layout_name
+
+        assert initial_layout_name(1144) == "forceatlas2"
+        assert initial_layout_name(3383) == "spring"
+
+    def test_unsettled_forceatlas2_points_to_spring(self):
+        G = nx.barabasi_albert_graph(2500, 2, seed=0)
+        _params, notes = get_spec("forceatlas2").tuned(G, profile_graph(G))
+        assert any("`layout_spring`" in n for n in notes)
 
     def test_budgeted_iterations_are_explained(self):
         G = nx.barabasi_albert_graph(1500, 2, seed=0)

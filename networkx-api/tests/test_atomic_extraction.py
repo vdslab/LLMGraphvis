@@ -9,7 +9,7 @@ from common import models
 
 def test_extraction_creates_fresh_snapshot_without_layout(db):
     setup_graph(db)
-    with patch("app.logic.subgraph.calculate_layout") as layout:
+    with patch("app.logic.subgraph.calculate_initial_layout") as layout:
         first = extract_nodes(1, ["n0", "n1"], db)
         second = extract_nodes(1, ["n0", "n1", "n2"], db)
     layout.assert_not_called()

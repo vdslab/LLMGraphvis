@@ -100,14 +100,17 @@ async def import_graphml(network_id: int, graphml: str) -> int:
     return final_id
 
 
-async def calculate_layout(network_id: int, layout_name: str) -> None:
-    """Compute and store a layout with its auto-tuned defaults."""
-    await _call(
+async def calculate_initial_layout(network_id: int) -> str:
+    """Compute the layout the app picks for a fresh upload; returns its name.
+
+    ForceAtlas2, or spring where ForceAtlas2 would not settle (ADR 0047).
+    """
+    response = await _call(
         "POST",
-        f"/api/v1/networks/{network_id}/layout",
+        f"/api/v1/networks/{network_id}/layout/initial",
         LAYOUT_TIMEOUT_SECONDS,
-        json={"layout_name": layout_name},
     )
+    return response["layout"]
 
 
 async def build_visualization(network_id: int, with_quality: bool = True) -> dict:

@@ -193,8 +193,8 @@ async def handle_upload_background(
         # the placeholder the network was created with.
         _name_network_after_file(final_network_id, filename)
 
-        await step("Calculating ForceAtlas2 layout")
-        await network_service.calculate_layout(final_network_id, "forceatlas2")
+        await step("Calculating initial layout")
+        layout_name = await network_service.calculate_initial_layout(final_network_id)
 
         await step("Generating initial visualization")
         vis_data = await network_service.build_visualization(final_network_id)
@@ -205,7 +205,7 @@ async def handle_upload_background(
         await step("Inspecting uploaded data")
 
         overview_title, data_overview = await llm_context.build_data_overview(
-            final_network_id
+            final_network_id, layout_name=layout_name
         )
 
         await emitters.emit_progress(queue, steps[-1], status="done")

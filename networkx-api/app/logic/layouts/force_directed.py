@@ -28,6 +28,11 @@ _FA2_ITERATION_BUDGET = 500_000_000
 # Floor, so a very large graph still settles instead of staying near its
 # random start; past the size where it binds the budget no longer holds.
 _FA2_MIN_ITER = 50
+# Fewer default iterations than this and ForceAtlas2 stops before the graph
+# settles: on a 2,378-node kNN graph its 88 iterations measured edge_locality
+# 0.44 against spring's 0.09, on the 3,383-node one 50 iterations 0.85 against
+# 0.09. At 1,144 nodes (382 iterations) the two drew alike (ADR 0047).
+_FA2_SETTLED_ITER = 200
 # A graph in several parts is laid out part by part and packed (ADR 0041).
 # Each part is solved alone, so the largest part's size, not the graph's, sets
 # the work: N^2 x iterations for it is capped like ForceAtlas2's (ADR 0033).
@@ -121,6 +126,15 @@ def fa2_iterations(n):
     return min(by_size, by_budget), by_budget < by_size
 
 
+def fa2_settles(n):
+    """Whether the default ForceAtlas2 run on `n` nodes is long enough to settle.
+
+    When it is not, the drawing stays close to its random start and spring
+    draws the graph instead where the app chooses the layout (ADR 0047).
+    """
+    return fa2_iterations(n)[0] >= _FA2_SETTLED_ITER
+
+
 def fa2_budget_floor_nodes():
     """Smallest node count at which even `_FA2_MIN_ITER` iterations exceed the budget.
 
@@ -146,11 +160,18 @@ def tune_forceatlas2(G, profile):
         "seed": 42,
     }
     notes = []
-    if budgeted:
+    if budgeted and not fa2_settles(n):
         notes.append(
             f"`max_iter` {max_iter}, fewer than usual: each iteration compares "
-            f"every pair of the {n} nodes, and on graphs this size more "
-            "iterations add minutes without improving the drawing."
+            f"every pair of the {n} nodes, so a run long enough to settle takes "
+            "minutes. This short run can leave the nodes close to random "
+            "positions; `layout_spring` draws a graph this size in similar time."
+        )
+    elif budgeted:
+        notes.append(
+            f"`max_iter` {max_iter}, fewer than usual: each iteration compares "
+            f"every pair of the {n} nodes, and at this size more iterations "
+            "add time without improving the drawing much."
         )
     if profile.weighted and abs(profile.avg_strength - profile.avg_degree) > 0.5:
         notes.append(

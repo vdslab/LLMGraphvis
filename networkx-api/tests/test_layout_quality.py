@@ -106,6 +106,29 @@ class TestSpread:
         assert report.core_extent is None and report.occupancy is None
 
 
+class TestEdgeLocality:
+    """A drawing that shows nothing of the edges is named (ADR 0047)."""
+
+    def _ring(self, n=200):
+        return nx.cycle_graph(n)
+
+    def test_random_placement_is_unstructured(self):
+        G = self._ring()
+        report = lq.evaluate(nx.random_layout(G, seed=1), G.edges, sizes=1)
+        assert report.edge_locality == pytest.approx(1.0, abs=0.15)
+        assert "unstructured" in report.issues
+
+    def test_drawing_that_follows_the_edges_is_not(self):
+        G = self._ring()
+        report = lq.evaluate(nx.circular_layout(G), G.edges, sizes=1)
+        assert report.edge_locality < 0.1
+        assert "unstructured" not in report.issues
+
+    def test_small_graphs_skip_it(self):
+        pos, edges = _square_with_diagonals()
+        assert lq.evaluate(pos, edges, sizes=1).edge_locality is None
+
+
 class TestScore:
     def test_better_layout_scores_lower(self):
         G = nx.les_miserables_graph()
@@ -128,6 +151,7 @@ class TestScore:
             "core_extent",
             "aspect",
             "occupancy",
+            "edge_locality",
             "score",
             "issues",
         }

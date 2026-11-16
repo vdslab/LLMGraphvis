@@ -32,7 +32,7 @@ def initialize_network(
         # Calculate default layout (Required for visualization)
         from app.logic import layout
 
-        layout.calculate_layout(final_network_id, "forceatlas2", db)
+        layout.calculate_initial_layout(final_network_id, db)
 
         logger.info(f"Network initialized successfully: network_id={final_network_id}")
         return {"network_id": final_network_id, "status": "initialized"}

@@ -226,7 +226,10 @@ async def test_upload_names_chat_after_the_file(
         patch(
             "app.services.network_service.import_graphml", new_callable=AsyncMock
         ) as mock_import,
-        patch("app.services.network_service.calculate_layout", new_callable=AsyncMock),
+        patch(
+            "app.services.network_service.calculate_initial_layout",
+            new_callable=AsyncMock,
+        ),
         patch(
             "app.services.network_service.build_visualization", new_callable=AsyncMock
         ) as mock_vis,

@@ -50,14 +50,17 @@ async def test_import_sends_the_xml_itself_not_json(networkx_api):
 @pytest.mark.asyncio
 async def test_layout_and_visualization_hit_their_routes(networkx_api):
     calls = networkx_api(
-        lambda request: httpx.Response(200, json={"network_id": 7, "nodes": []})
+        lambda request: httpx.Response(
+            200, json={"network_id": 7, "nodes": [], "layout": "spring"}
+        )
     )
 
-    await network_service.calculate_layout(7, "forceatlas2")
+    layout_name = await network_service.calculate_initial_layout(7)
     vis = await network_service.build_visualization(7)
 
+    assert layout_name == "spring"
     assert [(c.method, c.url.path) for c in calls] == [
-        ("POST", "/api/v1/networks/7/layout"),
+        ("POST", "/api/v1/networks/7/layout/initial"),
         ("GET", "/api/v1/networks/7/visualization"),
     ]
     assert vis["network_id"] == 7
@@ -85,4 +88,4 @@ async def test_a_timeout_is_reported_as_a_pipeline_error(networkx_api):
     networkx_api(stall)
 
     with pytest.raises(network_service.NetworkPipelineError, match="did not answer"):
-        await network_service.calculate_layout(7, "forceatlas2")
+        await network_service.calculate_initial_layout(7)

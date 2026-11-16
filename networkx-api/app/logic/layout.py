@@ -415,8 +415,30 @@ def calculate_layout(
     return {**result, "cached": False}
 
 
+def initial_layout_name(node_count: int) -> str:
+    """The layout the app draws a network with before anyone has chosen one.
+
+    ForceAtlas2, unless its default run is too short to settle at this size:
+    then spring, which settles in similar time (ADR 0047).
+    """
+    from .layouts.force_directed import fa2_settles
+
+    return "forceatlas2" if fa2_settles(node_count) else "spring"
+
+
+def calculate_initial_layout(network_id: int, db: Session) -> dict:
+    """Compute the first layout of a network: uploaded, or newly extracted.
+
+    Returns `calculate_layout`'s summary; its `layout_name` says which one ran.
+    """
+    count = db.query(models.Node).filter(models.Node.network_id == network_id).count()
+    return calculate_layout(network_id, initial_layout_name(count), db)
+
+
 __all__ = [
     "LAYOUT_PARAM_KEYS",
+    "calculate_initial_layout",
+    "initial_layout_name",
     "build_layout_graph",
     "calculate_layout",
     "determine_layout_params",

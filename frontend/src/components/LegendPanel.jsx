@@ -58,6 +58,7 @@ const issueLabels = {
   clumped: 'Nodes cluster in a small area',
   uneven_edge_lengths: 'Connected nodes have uneven spacing',
   distorted_aspect: 'The layout is stretched',
+  unstructured: 'Positions do not reflect the connections',
 };
 
 const percent = (value) => typeof value === 'number'

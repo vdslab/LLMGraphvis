@@ -47,3 +47,4 @@
 | [0043](./0043-model-generations-and-pricing.md) | モデルの世代差はアダプターで吸収し、単価は期間と入力長で引く | 採用 |
 | [0045](./0045-drawing-over-rest.md) | 描画データは REST で運び、MCP の結果は受領結果だけにする | 採用 |
 | [0046](./0046-scenario-evaluation-and-target-feedback.md) | 可視化の到達条件とチャット先AIの改善意見を分けて記録する | 採用 |
+| [0047](./0047-initial-layout-where-forceatlas2-does-not-settle.md) | ForceAtlas2 が収束しない規模では、初期レイアウトを spring にする | 採用 |
