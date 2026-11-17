@@ -152,6 +152,55 @@ def test_create_ego_network(db: Session):
     verify_subgraph(db, result, 1)
 
 
+def test_ego_network_ignores_edge_direction(db: Session):
+    """In a directed network, nodes pointing at the center are neighbors too."""
+    net = models.Network(name="Directed", is_directed=True)
+    db.add(net)
+    db.commit()
+    nodes = {
+        name: models.Node(network_id=net.id, node_id=name, label=name)
+        for name in ("a", "b", "c", "d", "e")
+    }
+    db.add_all(nodes.values())
+    db.commit()
+    # d -> c -> a -> b, and e apart from all of them.
+    for u, v in (("c", "a"), ("a", "b"), ("d", "c")):
+        db.add(
+            models.Edge(
+                network_id=net.id,
+                edge_id=f"{u}-{v}",
+                source_node_id=nodes[u].id,
+                target_node_id=nodes[v].id,
+            )
+        )
+    db.commit()
+
+    def members(result):
+        return {
+            row.node_id
+            for row in db.query(models.Node.node_id).filter(
+                models.Node.network_id == result["new_network_id"]
+            )
+        }
+
+    one_hop = subgraph.create_ego_network(net.id, "a", radius=1, db=db)
+    assert members(one_hop) == {"a", "b", "c"}
+    two_hops = subgraph.create_ego_network(net.id, "a", radius=2, db=db)
+    assert members(two_hops) == {"a", "b", "c", "d"}
+
+    child = db.get(models.Network, one_hop["new_network_id"])
+    assert child.is_directed
+    ids = {
+        row.id: row.node_id
+        for row in db.query(models.Node).filter(models.Node.network_id == child.id)
+    }
+    edges = {
+        (ids[e.source_node_id], ids[e.target_node_id])
+        for e in db.query(models.Edge).filter(models.Edge.network_id == child.id)
+    }
+    assert edges == {("c", "a"), ("a", "b")}
+
+
 def test_create_path_subgraph(db: Session):
     net = create_source_network(db)
 

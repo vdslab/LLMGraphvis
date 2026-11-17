@@ -21,13 +21,16 @@ def subgraph_ego_network(
     radius: Annotated[
         int,
         Field(
-            description="Hop radius: 1 = direct neighbors only, 2 = neighbors-of-neighbors, etc."
+            description="Hop radius: 1 = direct neighbors only, 2 = neighbors-of-neighbors, etc. Hops ignore edge direction."
         ),
     ] = 1,
 ) -> dict:
     """
     Creates an ego network — a subgraph centered on one node including all neighbors within a given radius.
 
+    In a directed network a neighbor is a node on either end of an edge: nodes
+    that point at the center are included as well as nodes it points at, and
+    the edges between them keep their direction.
     Ego networks are useful for exploring the local context of an important node
     (e.g., "show me everyone connected to node X within 2 hops").
     Use `node_search` first to find the center node ID.

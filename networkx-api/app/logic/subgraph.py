@@ -345,7 +345,6 @@ def create_ego_network(
     description: str = None,
 ) -> Dict[str, Any]:
     logger.info(f"Creating ego network for {center_node_id} (r={radius})")
-    # Reconstruct graph structure to run ego_graph
     G = build_graph_from_db(source_network_id, db)
 
     # Resolve node ID
@@ -354,7 +353,10 @@ def create_ego_network(
     if center_node_id not in G:
         raise ValueError(f"Node {center_node_id} not found in network")
 
-    ego_G = nx.ego_graph(G, center_node_id, radius=radius)
+    # Hops ignore edge direction, as node_get_neighbors does: a node's
+    # surroundings include those that point at it. The copied edges keep
+    # their direction.
+    ego_G = nx.ego_graph(G, center_node_id, radius=radius, undirected=True)
     node_ids = list(ego_G.nodes())
 
     if description is None:
