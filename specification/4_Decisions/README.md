@@ -49,3 +49,4 @@
 | [0046](./0046-scenario-evaluation-and-target-feedback.md) | 可視化の到達条件とチャット先AIの改善意見を分けて記録する | 採用 |
 | [0047](./0047-initial-layout-where-forceatlas2-does-not-settle.md) | ForceAtlas2 が収束しない規模では、初期レイアウトを spring にする | 採用 |
 | [0048](./0048-remove-overlap-after-force-layouts.md) | 力学モデル系のレイアウトの後に、ノードの重なりを取り除く | 採用 |
+| [0049](./0049-measure-what-a-reduction-loses.md) | 削減候補ごとに失うものを測り、許されるかは質問で決める | 採用 |

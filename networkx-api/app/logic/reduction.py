@@ -21,6 +21,7 @@ from app.logic.attribute_semantics import (
 from app.logic.attributes import load_node_attribute_values
 from app.logic.backbone import suggest_backbones
 from app.logic.layouts.force_directed import fa2_budget_floor_nodes
+from app.logic.reduction_impact import assess, assess_backbone, structural_groups
 from app.logic.utils.graph_builder import build_graph_from_db
 from common import models
 
@@ -57,16 +58,24 @@ def suggest_reductions(
     n, m = G.number_of_nodes(), G.number_of_edges()
     target = target_nodes or default_target_nodes()
 
+    groups = structural_groups(G, network_id, db)
     candidates: List[Dict[str, Any]] = []
     for build in (_largest_component, _k_core, _min_degree):
         candidate = build(G, network_id, target)
-        if candidate:
+        # A cut that keeps every node changes nothing (ADR 0049).
+        if candidate and candidate["nodes"] < n:
+            keep = candidate.pop("_keep")
+            candidate["impact"] = assess(G, keep, groups)
             candidates.append(candidate)
 
     attribute_candidates, attributes_omitted = _attribute_groups(G, network_id, db)
     candidates.extend(attribute_candidates)
     # Dense networks: thin the edges instead of dropping nodes (ADR 0040).
-    candidates.extend(suggest_backbones(network_id, db))
+    for backbone in suggest_backbones(network_id, db):
+        backbone["impact"] = assess_backbone(
+            G, backbone["connected_parts"], backbone["isolated_nodes"]
+        )
+        candidates.append(backbone)
 
     return {
         "network_id": network_id,
@@ -77,6 +86,7 @@ def suggest_reductions(
         "target_nodes": target,
         "candidates": candidates,
         "attributes_omitted": attributes_omitted,
+        "groups_by": groups.source,
     }
 
 
@@ -102,6 +112,7 @@ def _largest_component(G, network_id, target) -> Optional[Dict[str, Any]]:
         "tool": "subgraph_largest_component",
         "arguments": {"network_id": network_id},
         **_size(G, largest),
+        "_keep": largest,
         "drops": (
             f"{len(components) - 1} smaller parts "
             f"({G.number_of_nodes() - len(largest)} nodes, {isolates} of them isolated)"
@@ -134,6 +145,7 @@ def _k_core(G, network_id, target) -> Optional[Dict[str, Any]]:
         "tool": "subgraph_k_core",
         "arguments": {"network_id": network_id, "k": k},
         **_size(G, nodes),
+        "_keep": nodes,
         "drops": (
             f"nodes outside every group whose members each have {k}+ links inside it"
         ),
@@ -166,6 +178,7 @@ def _min_degree(G, network_id, target) -> Optional[Dict[str, Any]]:
         "tool": "subgraph_high_degree_nodes",
         "arguments": {"network_id": network_id, "min_degree": cutoff},
         **_size(G, nodes),
+        "_keep": nodes,
         "drops": f"every node with fewer than {cutoff} links, and their edges",
         "keeps": "the most connected nodes (hubs), even if they end up disconnected",
     }

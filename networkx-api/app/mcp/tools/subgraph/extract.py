@@ -6,6 +6,7 @@ from pydantic import Field
 from app.core.database import get_db_context
 from app.core.decorators import handle_tool_errors
 from app.core.mcp import mcp
+from app.logic.reduction_impact import describe_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +127,10 @@ def subgraph_k_core(
     The k-core is the largest subgraph where every node has at least k connections to other nodes
     in the subgraph. Higher k = more tightly connected core. Useful for finding the most
     interconnected part of a network (e.g., the "inner circle" of a social network).
-    The new subgraph becomes the active view automatically.
+    The new subgraph becomes the active view automatically. The result says
+    what was lost against the source network (shares kept, new disconnected
+    pieces, groups dropped); tell the user, since later results describe only
+    the subgraph.
 
     Returns:
         dict: {"new_network_id": int, "content": str}
@@ -139,7 +143,8 @@ def subgraph_k_core(
         )
         return {
             "new_network_id": result["new_network_id"],
-            "content": f"K-core subgraph created (ID: {result['new_network_id']}, k={k}).",
+            "content": f"K-core subgraph created (ID: {result['new_network_id']}, k={k})."
+            + describe_extraction(network_id, result["new_network_id"], db),
         }
 
 
@@ -154,7 +159,10 @@ def subgraph_largest_component(
     Many real-world networks have isolated nodes or small disconnected islands.
     This tool filters them out, keeping only the main connected portion for analysis.
     Useful as a preprocessing step before running algorithms that require connectivity.
-    The new subgraph becomes the active view automatically.
+    The new subgraph becomes the active view automatically. The result says
+    what was lost against the source network (shares kept, new disconnected
+    pieces, groups dropped); tell the user, since later results describe only
+    the subgraph.
 
     Returns:
         dict: {"new_network_id": int, "content": str}
@@ -171,7 +179,8 @@ def subgraph_largest_component(
         new_id = result["new_network_id"]
         return {
             "new_network_id": new_id,
-            "content": f"Largest component subgraph created (ID: {new_id}).",
+            "content": f"Largest component subgraph created (ID: {new_id})."
+            + describe_extraction(network_id, new_id, db),
         }
 
 
@@ -192,7 +201,10 @@ def subgraph_high_degree_nodes(
     Useful for focusing on the most connected/active nodes in a network
     (e.g., "show only nodes with at least 5 connections"). Removes peripheral,
     low-degree nodes to reveal the backbone of the network.
-    The new subgraph becomes the active view automatically.
+    The new subgraph becomes the active view automatically. The result says
+    what was lost against the source network (shares kept, new disconnected
+    pieces, groups dropped); tell the user, since later results describe only
+    the subgraph.
 
     Returns:
         dict: {"new_network_id": int, "content": str}
@@ -210,5 +222,6 @@ def subgraph_high_degree_nodes(
         new_id = result["new_network_id"]
         return {
             "new_network_id": new_id,
-            "content": f"High-degree subgraph created (ID: {new_id}, min_degree={min_degree}).",
+            "content": f"High-degree subgraph created (ID: {new_id}, min_degree={min_degree})."
+            + describe_extraction(network_id, new_id, db),
         }
