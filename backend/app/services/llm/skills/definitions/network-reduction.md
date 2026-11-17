@@ -34,7 +34,9 @@ A candidate with no issues still drops nodes; say which. Degree in a
 similarity network (each node linked to its most similar ones) counts how many
 others resemble a node, not how important it is; a degree cut there keeps
 generic nodes, not key ones. For a question that only needs a part of the
-drawing, highlighting it is usually better than any cut.
+drawing, highlighting it is usually better than any cut. For groups in a
+dense network, an `edge_backbone` candidate keeps every node and usually
+separates the groups better than any node cut.
 
 ## Offer, do not decide
 

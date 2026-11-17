@@ -23,9 +23,11 @@ GROUP_MIN_SHARE = 0.01
 GROUP_MIN_NODES = 5
 # A group counts as lost when less than this share of its nodes is kept.
 LOST_SHARE = 0.1
-# Kept shares of the checked groups this far apart mean the reduced network
-# over-represents some groups: comparisons between groups no longer hold.
-SKEW_SPREAD = 0.5
+# The best-kept group keeping this many times the share of the worst-kept one
+# means the reduced network over-represents some groups: sizes and comparisons
+# between groups no longer hold. On the embedded syllabus a degree cut kept
+# 29% to 48% of each group (1.7x) and was still chosen for comparing groups.
+SKEW_RATIO = 1.5
 # New connected pieces beyond this share of the kept nodes mean the reduction
 # cuts links the analysis may depend on (paths, distances, components).
 FRAGMENT_SHARE = 0.01
@@ -125,7 +127,7 @@ def assess(G: nx.Graph, keep: Iterable[Hashable], groups: Groups) -> Dict[str, A
     kept_shares = [share for _, _, share in shares]
     if (
         len(kept_shares) >= 2
-        and max(kept_shares) - min(kept_shares) >= SKEW_SPREAD
+        and max(kept_shares) >= SKEW_RATIO * min(kept_shares)
         and not lost
     ):
         issues.append(SKEWS_GROUPS)

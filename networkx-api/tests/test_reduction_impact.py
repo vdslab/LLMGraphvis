@@ -144,3 +144,20 @@ def test_an_extraction_reports_what_it_lost(db):
 
 def test_an_unmeasurable_extraction_adds_nothing(db):
     assert describe_extraction(10**6, 10**6 + 1, db) == ""
+
+
+def test_a_moderate_but_uneven_cut_still_skews():
+    """29% vs 48% kept (the embedded syllabus degree cut) is a skew."""
+    G = nx.disjoint_union(nx.complete_graph(100), nx.complete_graph(100))
+    keep = list(range(29)) + list(range(100, 148))
+
+    impact = assess(G, keep, _groups(range(100), range(100, 200)))
+
+    assert impact["issues"] == [SKEWS_GROUPS]
+
+
+def test_nearly_even_shares_do_not_skew():
+    G = nx.disjoint_union(nx.complete_graph(100), nx.complete_graph(100))
+    keep = list(range(76)) + list(range(100, 197))
+
+    assert assess(G, keep, _groups(range(100), range(100, 200)))["issues"] == []

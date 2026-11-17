@@ -41,7 +41,7 @@ ADR 0034 で、`subgraph_suggest_reduction` は削減候補ごとに、残るノ
 - **損失には問題の種類の名前を付ける**（`issues`）。`layout_quality` の issue と同じ形にする。
   - `fragments`：新たな分断が、残るノードの 1% を超える
   - `drops_groups`：残る割合が 10% 未満のグループがある
-  - `skews_groups`：グループが消えはしないが、残る割合の差が 0.5 以上ある
+  - `skews_groups`：グループが消えはしないが、最もよく残るグループの割合が、最も残らないグループの 1.5 倍以上ある
 - **1 ノードも減らない候補は出さない。**
 - **どの損失が許されるかは、skill `network-reduction` が質問の種類ごとに決める。**
   ツールは測るだけで、良い悪いは判断しない。
@@ -54,6 +54,10 @@ ADR 0034 で、`subgraph_suggest_reduction` は削減候補ごとに、残るノ
   それなら、目的と照らし合わせられる形で失うものを示す必要がある。
 - 測定は安い。3,000 ノード級で Louvain は 0.2 秒ほどである。
 - しきい値はコードに置き、skill には数字を書かない（ADR 0017 と同じ方針）。
+- 偏りは差ではなく比で測る。最初は差 0.5 以上としたが、Docker 上の再実験では、
+  埋め込みシラバスの次数による削減（グループごとに 29〜48% が残る、1.7 倍）が偏りなしと判定された。
+  エージェントは、グループを比べたいという依頼に対して、この候補を選んだ。
+  残る割合が 1.7 倍違えば、グループの大きさの比較は成り立たない。
 
 却下した代替案:
 
@@ -67,6 +71,6 @@ ADR 0034 で、`subgraph_suggest_reduction` は削減候補ごとに、残るノ
 
 - 削減候補の `impact.issues` は、`fragments`、`drops_groups`、`skews_groups` のいずれかである。
   増やすときは、skill `network-reduction` の対応表も一緒に変える。
-- 定数（`GROUP_MIN_SHARE`、`LOST_SHARE`、`SKEW_SPREAD`、`FRAGMENT_SHARE`）は
+- 定数（`GROUP_MIN_SHARE`、`LOST_SHARE`、`SKEW_RATIO`、`FRAGMENT_SHARE`）は
   `networkx-api/app/logic/reduction_impact.py` にある。
 - エッジバックボーンの候補は全ノードを残すので、`fragments` だけを測る。
