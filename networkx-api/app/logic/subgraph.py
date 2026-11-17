@@ -123,7 +123,8 @@ def create_subgraph_from_nodes(
         is_directed=source_network.is_directed,
     )
 
-    # [FIX] Inherit visualization settings if preserving layout
+    # A preserved layout keeps the source's styles too, so the child looks
+    # like the part of the parent it was cut from.
     if preserve_layout and source_network:
         new_network.last_layout_name = source_network.last_layout_name
         new_network.last_node_size_config = source_network.last_node_size_config
@@ -183,10 +184,6 @@ def create_subgraph_from_nodes(
             "Preserving existing layout (x, y copied) from "
             f"{source_network.last_layout_name}."
         )
-        # Verify if the specific layout attributes exist?
-        # Ideally, AttributeCopier copied everything.
-        # If source_network.last_layout_name was 'forceatlas2', then 'forceatlas2_x'
-        # should have been copied.
 
     return {"new_network_id": new_network_id, "name": new_network.name}
 

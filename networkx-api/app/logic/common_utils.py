@@ -132,8 +132,7 @@ def interpolate_gradient(
     c1 = colors[segment_idx]
     c2 = colors[segment_idx + 1]
 
-    # Use existing single-step interpolation, mapping local_t back to range logic
-    # We can cheat and just recurse interpolate_color with min=0, max=1, val=local_t
+    # local_t is already a position in [0, 1] between the segment's two stops.
     return interpolate_color(local_t, 0.0, 1.0, c1, c2)
 
 
@@ -145,11 +144,11 @@ def calculate_smart_node_size(num_nodes: int) -> dict:
     if num_nodes <= 0:
         return {"default": 20, "min": 5, "max": 50}
 
-    # Heuristic: Larger graphs need smaller nodes
-    # Formula: base = 600 / sqrt(N)
-    # Target:
-    #   N=30  -> ~110 size -> Radius ~ 19 (in 2000px space) -> Good visibility
-    #   N=1000 -> ~19 size  -> Radius ~ 8 (in 2000px space) -> Small, readable dots
+    # Larger graphs need smaller nodes: base = 600 / sqrt(N), clamped to
+    # [5, 200]; the default size is twice the base. Drawn on the 2000-unit
+    # canvas with r = sqrt(size * 10 / pi):
+    #   N=30   -> default ~219 -> radius ~26
+    #   N=1000 -> default ~38  -> radius ~11
     import math
 
     base_size = 600 / math.sqrt(num_nodes)
@@ -325,7 +324,7 @@ EXTENDED_20_PALETTE = [
     "#9467bd",  # Purple
     "#8c564b",  # Brown
     "#e377c2",  # Pink
-    "#7f7f7f",  # Gray (Keep for now or replace?) -> Replace with Teal
+    "#7f7f7f",  # Gray
     "#bcbd22",  # Olive
     "#17becf",  # Cyan
     "#aec7e8",  # Light Blue

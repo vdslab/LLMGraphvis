@@ -202,9 +202,9 @@ const NetworkGraph = memo(({
 
     nodeGroup.select("circle")
       .attr("r", d => {
-         // NetworkX node_size is area. User script uses size * 10.
-         // Area = pi * r^2 = size * 10
-         // r = sqrt(size * 10 / pi)
+         // `size` is an area, not a radius: pi * r^2 = size * 10.
+         // The backend measures overlap with the same formula
+         // (layout_quality.radius_from_size); keep the two in sync.
          const size = d.size || 5;
          return Math.sqrt(size * 10 / Math.PI);
       })
@@ -285,7 +285,7 @@ const NetworkGraph = memo(({
       }
     }
     
-    // Cleanup on unmount
+    // Cleanup before this effect runs again, and on unmount
     return () => {
         if (frame) cancelAnimationFrame(frame);
         svg.interrupt();
@@ -297,7 +297,7 @@ const NetworkGraph = memo(({
         svg.on(".zoom", null);
     };
 
-  }, [nodes, links, showLabels, labelStyle, viewport, dimensions]); // Dependencies updated to exclude callbacks
+  }, [nodes, links, showLabels, labelStyle, viewport, dimensions]); // Callbacks are read through refs, so they are not dependencies
 
   return (
     <div

@@ -496,7 +496,7 @@ class GraphVisAgent:
                     return "I have processed your request.", execution_log, total_usage
                 return result_text, execution_log, total_usage
 
-            # Step C: Execute Tools (Parallelized)
+            # Step C: Execute tools, one at a time in dependency order
             step_log = await self._execute_tools_and_update_history(
                 function_calls,
                 chunk_text,

@@ -169,10 +169,8 @@ def parse_and_save_graphml(network_id: int, graphml_content: str, db: Session):
             for u, v, data in chunk:
                 u_str, v_str = str(u), str(v)
 
-                # Inject Description
-                # Try (u, v) and also (v, u) if undirected?
-                # NX read_graphml preserves direction if graph is directed.
-                # If undirected, the XML source/target might match u/v or v/u.
+                # Descriptions are keyed by the XML's source/target order, which
+                # an undirected graph may hand back reversed.
                 desc = edge_descs.get((u_str, v_str))
                 if not desc and not G.is_directed():
                     desc = edge_descs.get((v_str, u_str))

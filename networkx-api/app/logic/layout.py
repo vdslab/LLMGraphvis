@@ -369,10 +369,8 @@ def calculate_layout(
     ):
         raise ValueError("Layout produced non-finite coordinates; no result was saved")
 
-    # Save to DB - Bulk Update Strategy
-    # We save two attributes: {layout_name}_x and {layout_name}_y
-
-    # Prepare data maps
+    # Coordinates are stored as two node attributes, {layout_name}_x and
+    # {layout_name}_y; each save replaces the attribute's previous values.
     data_map_x = {}
     data_map_y = {}
 
@@ -413,7 +411,7 @@ def calculate_layout(
         derived_from=derived_from,
     )
 
-    # 4. Update Network Record with last layout name
+    # Record which layout the network was last drawn with.
     from sqlalchemy import text
 
     try:

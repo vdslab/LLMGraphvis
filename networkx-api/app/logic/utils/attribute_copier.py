@@ -207,14 +207,9 @@ class AttributeCopier:
 
                 # Fetch float/text values for the old attribute values in this chunk
                 if old_val_ids:
-                    # We also need to chunk this if old_val_ids is too large (e.g. >
-                    # parameters limit)
-                    # With chunk_size=500 and say 20 attributes -> 10,000 IDs. usually
-                    # fine.
-                    # But to be safe, we can process these in sub-chunks if needed.
-                    # For 500 nodes, 10k params is okay for Postgres (limit ~32k).
-                    # If SQLite (limit 999), this will fail.
-                    # Let's add sub-chunking for value IDs just in case.
+                    # One chunk of parents holds one value id per attribute, so
+                    # the ids are queried in sub-chunks to keep each IN list
+                    # short.
 
                     sub_chunk_size = 500
                     old_floats = []

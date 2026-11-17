@@ -171,12 +171,8 @@ const NetworkChatPage = () => {
   }, []);
 
   const handleAskAboutNode = useCallback(() => {
-      // selectedNode is in state, but we need it here.
-      // This function is passed to NodeDetailsPanel, which re-renders when selectedNode changes anyway?
-      // Actually handleAskAboutNode depends on selectedNode state.
-      // But we can pass the node AS ARGUMENT from the child if strictly needed,
-      // or just rebuild this callback when selectedNode changes.
-      // Re-building callback when selectedNode changes is fine, it's not the heavy Graph.
+      // Rebuilt whenever the selection changes; it is passed to
+      // NodeDetailsPanel only, never to the memoized graph.
       setContextNode(selectedNode);
   }, [selectedNode]);
 
@@ -185,10 +181,6 @@ const NetworkChatPage = () => {
   }, []);
   
   const handleBackgroundClick = useCallback(() => {
-      // access state inside callback?
-      // "selectedNode" is needed to know if we should close.
-      // Actually we can just unconditionally close if we want, or check state setter?
-      // "setNodeDetailsPanelOpen(false)" is safe.
       setNodeDetailsPanelOpen((prev) => {
           if (prev) return false;
           return prev;

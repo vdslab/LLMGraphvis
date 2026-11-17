@@ -145,7 +145,7 @@ def bulk_save_node_attributes(
     # Map db_node_id -> nav_id
     nav_map = {row.node_id: row.id for row in result}
 
-    # 5. Bulk Insert Values (Float or Text)
+    # 4. Bulk Insert Values (Float or Text)
     value_data = []
 
     if attr_type == "float":

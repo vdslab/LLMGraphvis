@@ -139,7 +139,7 @@ def build_graph_from_db(
 ) -> nx.Graph:
     """Reconstructs a NetworkX graph from the database for a given network_id.
 
-    Optimized to fetch only necessary ID columns.
+    Only ID columns are read; node and edge attributes are not attached.
 
     Args:
         network_id: The ID of the network.
@@ -158,7 +158,7 @@ def build_graph_from_db(
         raise ValueError(f"Network {network_id} not found")
     G = nx.DiGraph() if network.is_directed else nx.Graph()
 
-    # Optimized Node Query: Fetch only id (pk) and node_id (string id)
+    # Only id (pk) and node_id (string id) are needed.
     nodes_query = (
         db.query(models.Node.id, models.Node.node_id)
         .filter(models.Node.network_id == network_id)
@@ -180,7 +180,7 @@ def build_graph_from_db(
         else None
     )
 
-    # Optimized Edge Query: Fetch only source/target IDs (plus what weighting needs)
+    # Only source/target IDs, plus what weighting needs.
     columns = [models.Edge.source_node_id, models.Edge.target_node_id]
     if weight_attribute:
         columns.append(models.Edge.id)

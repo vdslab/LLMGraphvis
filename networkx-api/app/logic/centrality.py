@@ -93,11 +93,10 @@ def calculate_centrality(
         f"type='{centrality_type}'. Recomputing."
     )
 
-    # Reconstruct graph (Optimized). Only ask for edge weights when a `weight`
-    # attribute name was actually requested, so the default (fast) path is
-    # unaffected when no weight is requested. Passing the name through means a
-    # weight other than the imported `weight` column resolves to that edge
-    # attribute instead of silently producing an unweighted graph.
+    # Edge weights are loaded only when a `weight` attribute was requested.
+    # Passing the name through means a weight other than the imported `weight`
+    # column resolves to that edge attribute instead of silently producing an
+    # unweighted graph.
     from .utils.graph_builder import build_graph_from_db
 
     G = build_graph_from_db(network_id, db, weight_attribute=weight)
@@ -125,9 +124,7 @@ def calculate_centrality(
                 "Distance weights for this centrality must be finite and positive"
             )
 
-    # Need node_map for saving results later (node_id -> db_id)
-    # We can fetch this efficiently or reconstruct it.
-    # Since we need to map back to DB IDs for saving, let's fetch map.
+    # Results are saved by database id: node_id (string) -> db id.
     nodes = (
         db.query(models.Node.id, models.Node.node_id)
         .filter(models.Node.network_id == network_id)
