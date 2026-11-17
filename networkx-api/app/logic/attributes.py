@@ -705,7 +705,6 @@ def get_attribute_stats(
                 f"Error calculating stats for {attr.attribute_name} in network "
                 f"{network_id}: {e}"
             )
-            pass
 
         result.append(attr_data)
 
@@ -850,7 +849,6 @@ def get_specific_attribute_stats(
             f"Error calculating stats for {attr.attribute_name} in network "
             f"{network_id}: {e}"
         )
-        pass
 
     return attr_data
 

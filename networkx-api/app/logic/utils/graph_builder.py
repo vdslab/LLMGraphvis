@@ -192,6 +192,8 @@ def build_graph_from_db(
     for row in edges_query:
         u = id_map.get(row.source_node_id)
         v = id_map.get(row.target_node_id)
+        # Foreign keys guarantee both ends exist; an edge that still lacks one
+        # is skipped.
         if u is not None and v is not None:
             if G.has_edge(u, v):
                 raise ValueError(
@@ -207,10 +209,6 @@ def build_graph_from_db(
             else:
                 G.add_edge(u, v)
             edge_count += 1
-        else:
-            # This might happen if edges point to non-existent nodes
-            # (shouldn't happen with FKs but good to be safe)
-            pass
 
     logger.info(
         f"GraphBuilder: Loaded {edge_count} edges for Network {network_id}"

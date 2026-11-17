@@ -162,12 +162,9 @@ def _get_nodes_matching_condition(
                     models.NodeAttributeValue.float_value.has(and_(*range_filter))
                 )
 
-    if not filters:
-        # If no specific ranges or categories provided, maybe just presence of
-        # attribute?
-        # For now, if no criteria, return all nodes having this attribute.
-        pass
-    else:
+    # A condition with no categories or ranges matches every node that has
+    # the attribute.
+    if filters:
         query = query.filter(or_(*filters))
 
     results = query.all()

@@ -181,10 +181,7 @@ const NetworkChatPage = () => {
   }, []);
   
   const handleBackgroundClick = useCallback(() => {
-      setNodeDetailsPanelOpen((prev) => {
-          if (prev) return false;
-          return prev;
-      });
+      setNodeDetailsPanelOpen(false);
       setSelectedNode(null);
   }, []);
 

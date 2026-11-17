@@ -75,14 +75,6 @@ def _validate_node_color_config(config: Optional[Dict]):
     allowed = set(NodeColorConfig.model_fields)
     _validate_config_keys(config, allowed, "node_color_config")
 
-    if (
-        "attribute" not in config
-        and "scale_type" in config
-        and config["scale_type"] != "STATIC"
-    ):
-        # Maybe static doesn't need attribute, but others do
-        pass
-
     if "scale_type" in config:
         if config["scale_type"] not in ["LINEAR", "CATEGORICAL", "RANKING"]:
             raise ValueError(
