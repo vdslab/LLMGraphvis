@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from app.services.llm import markup
 from app.services.llm.engine import GraphVisAgent
 from app.services.llm.history import build_history

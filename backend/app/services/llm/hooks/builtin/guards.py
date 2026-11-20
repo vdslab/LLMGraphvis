@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional
 
 from app.core.logging import get_logger
 
+from ...tool_catalog import DEPRECATED_TOOL_NAMES
 from .. import dbinfo
 from ..registry import hook
 from ..types import HookContext, HookEvent, ToolCallDecision
@@ -59,7 +60,8 @@ def guard_tool_is_exposed(ctx: HookContext) -> Optional[ToolCallDecision]:
     catalog = ctx.turn_state.get("tool_catalog")
     if catalog is None or not catalog.names:
         return None
-    if ctx.tool_name in catalog.names:
+    # Deprecated tools are hidden from tool_search; never expose one by name.
+    if ctx.tool_name in catalog.names and ctx.tool_name not in DEPRECATED_TOOL_NAMES:
         problem = _schema_problem(catalog.get(ctx.tool_name).parameters, ctx.args)
         if problem is None:
             catalog.activate([ctx.tool_name], ctx.turn_state)
@@ -72,9 +74,11 @@ def guard_tool_is_exposed(ctx: HookContext) -> Optional[ToolCallDecision]:
             "stays callable for the rest of this turn, including after an "
             "ask_user answer."
         )
+    similar = catalog.similar_names(ctx.tool_name)
+    hint = f" Similar live names: {', '.join(similar)}." if similar else ""
     return ToolCallDecision.defer(
         f"'{ctx.tool_name}' is not in the live tool catalogue. Use tool_search "
-        "with a capability or domain prefix and choose a returned live name."
+        f"with a capability or domain prefix and choose a returned live name.{hint}"
     )
 
 

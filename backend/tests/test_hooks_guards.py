@@ -738,7 +738,7 @@ class TestCandidateListing:
             assert guards.guard_attribute_exists(c) is None
 
 
-def _unexposed_call(args):
+def _unexposed_call(args, tool_name="analysis_pagerank"):
     from app.services.llm.hooks.builtin.guards import guard_tool_is_exposed
     from app.services.llm.hooks.types import HookContext, HookEvent
 
@@ -751,6 +751,7 @@ def _unexposed_call(args):
         [
             ToolDefinition("skill_load", "", {}),
             ToolDefinition("analysis_pagerank", "", schema),
+            ToolDefinition("network_initialize", "", {}),
         ]
     )
     state = {}
@@ -761,7 +762,7 @@ def _unexposed_call(args):
         chat_id=1,
         network_id=1,
         turn_state=state,
-        tool_name="analysis_pagerank",
+        tool_name=tool_name,
         args=args,
     )
     return guard_tool_is_exposed(ctx), state
@@ -778,6 +779,19 @@ def test_unexposed_known_tool_with_an_invalid_call_is_deferred():
     assert decision.action == "defer"
     assert "does not match its parameters" in decision.reason
     assert "analysis_pagerank" not in state["enabled_tool_names"]
+
+
+def test_deprecated_tool_called_by_name_is_not_exposed():
+    decision, state = _unexposed_call({}, tool_name="network_initialize")
+    assert decision.action == "defer"
+    assert "network_initialize" not in state["enabled_tool_names"]
+
+
+def test_invented_tool_name_gets_similar_live_names():
+    decision, state = _unexposed_call({"network_id": 1}, tool_name="analysis_page_rank")
+    assert decision.action == "defer"
+    assert "Similar live names: analysis_pagerank" in decision.reason
+    assert "analysis_page_rank" not in state["enabled_tool_names"]
 
 
 # --------------------------------------------------------------------------
