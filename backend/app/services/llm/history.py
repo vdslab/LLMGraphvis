@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from common import models
 
+from . import markup
 from .observations import compact_past_observation, truncate_tool_result
 from .providers.types import (
     LLMFunctionCallPart,
@@ -139,8 +140,11 @@ def build_history(chat_id: int, user_message: str, db: Session) -> List[LLMMessa
                 )
 
         # 3. Add the final message content
-        if msg.content:
-            history.append(LLMMessage(role=role, parts=[LLMTextPart(text=msg.content)]))
+        content = msg.content
+        if role == "model":
+            content = markup.history_text(content or "")
+        if content:
+            history.append(LLMMessage(role=role, parts=[LLMTextPart(text=content)]))
 
     # Append the current user message if not already present
     last_part = history[-1].parts[0] if (history and history[-1].parts) else None

@@ -225,6 +225,36 @@ def nudge_choice_ui(ctx: HookContext) -> None:
     )
 
 
+@hook(HookEvent.NO_TOOL_CALLS, priority=0, name="nudge_textual_tool_calls")
+def nudge_textual_tool_calls(ctx: HookContext) -> None:
+    """The model wrote tool calls as text: say that text never runs.
+
+    Gemini 2.5 Flash does this (`print(default_api.f(...))` under `tool_code`),
+    usually echoing calls it has just made instead of reporting on them, so the
+    text was already stripped from the reply. Runs before `retry_empty_response`,
+    whose "your response was empty" would be wrong here. The model, not this
+    hook, decides whether a call still needs to run: the function results above
+    say which did.
+    """
+    names = ctx.turn_state.get("textual_tool_calls") or []
+    if not names:
+        return
+    if ctx.turn_state.get("continuations_granted", 0) >= MAX_CONTINUATIONS:
+        return
+    listed = ", ".join(dict.fromkeys(names))
+    logger.info(f"Tool calls written as text ({listed}) — requesting continuation")
+    ctx.request_continuation(
+        prompt=(
+            f"Your last response wrote tool calls as text ({listed}). Text is "
+            "never executed, and the user does not see it. Check the function "
+            "results above: do not repeat a call that already ran. If a call "
+            "still needs to run, make it as a real function call now. Otherwise "
+            "answer the user in prose, reporting what was done."
+        ),
+        model_text=ctx.assistant_text.strip() or "I wrote tool calls as text.",
+    )
+
+
 @hook(HookEvent.NO_TOOL_CALLS, priority=1, name="retry_empty_response")
 def retry_empty_response(ctx: HookContext) -> None:
     """Retry once when a provider returns neither text nor tool calls.

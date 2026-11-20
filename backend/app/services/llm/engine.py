@@ -406,6 +406,9 @@ class GraphVisAgent:
                 function_calls,
                 iter_usage,
             ) = await self._consume_stream(current_stream, queue)
+            # Calls written as text never run; nudge_textual_tool_calls reads this.
+            _, textual_calls = markup.split_textual_tool_calls(chunk_text)
+            turn_state["textual_tool_calls"] = textual_calls
             chunk_text = markup.sanitize_model_text(chunk_text)
             self.trace.emit(
                 "model_response",
@@ -413,6 +416,7 @@ class GraphVisAgent:
                 text=clip(markup.visible_text(chunk_text) if chunk_text else ""),
                 thought_chars=len(chunk_thought or ""),
                 tool_calls=[call.name for call in function_calls],
+                textual_tool_calls=textual_calls,
                 input_tokens=iter_usage.input_tokens,
                 output_tokens=iter_usage.output_tokens,
             )
